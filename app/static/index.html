@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini 知識庫助理</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: #f0f2f5;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        /* Layout */
+        .app-container {
+            display: flex;
+            flex: 1;
+            height: calc(100vh - 60px); /* 扣除 header */
+            overflow: hidden;
+        }
+        
+        /* Header */
+        header {
+            background: #ffffff;
+            padding: 1rem 2rem;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+        }
+        header h1 { font-size: 1.25rem; color: #4285f4; }
+        
+        /* Sidebar */
+        aside {
+            width: 320px;
+            background: #fff;
+            border-right: 1px solid #ddd;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+        }
+        .sidebar-section {
+            padding: 1.5rem;
+            border-bottom: 1px solid #eee;
+        }
+        .sidebar-section h2 {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            color: #666;
+            margin-bottom: 1rem;
+            font-weight: 600;
+        }
+        
+        /* Chat Area */
+        main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background: #f0f2f5;
+            position: relative;
+        }
+        
+        .chat-history {
+            flex: 1;
+            padding: 2rem;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        
+        .message {
+            max-width: 80%;
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            line-height: 1.6;
+            font-size: 1rem;
+            position: relative;
+        }
+        
+        .message.user {
+            align-self: flex-end;
+            background: #4285f4;
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        
+        .message.model {
+            align-self: flex-start;
+            background: white;
+            color: #1f1f1f;
+            border-bottom-left-radius: 4px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        }
+        
+        .input-area {
+            background: white;
+            padding: 1.5rem 2rem;
+            border-top: 1px solid #ddd;
+            display: flex;
+            gap: 1rem;
+        }
+        
+        /* Components */
+        input, select, textarea, button {
+            padding: 0.75rem;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 0.95rem;
+            outline: none;
+        }
+        input:focus, select:focus, textarea:focus {
+            border-color: #4285f4;
+            box-shadow: 0 0 0 2px rgba(66,133,244,0.2);
+        }
+        
+        button {
+            background: #4285f4;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        button:hover { background: #3367d6; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        button.secondary { background: #f1f3f4; color: #5f6368; }
+        button.secondary:hover { background: #e8eaed; }
+        button.danger { background: #d93025; color: white; }
+        button.danger:hover { background: #b31412; }
+        
+        textarea {
+            flex: 1;
+            resize: none;
+            height: 50px;
+            font-family: inherit;
+        }
+        
+        .file-list {
+            list-style: none;
+            margin-top: 0.5rem;
+        }
+        .file-list li {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #f1f3f4;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            color: #333;
+        }
+        .file-list li button {
+            padding: 0.2rem 0.5rem;
+            font-size: 0.75rem;
+            margin-left: 0.5rem;
+        }
+        
+        .empty-state {
+            text-align: center;
+            color: #666;
+            margin-top: 4rem;
+        }
+        
+        .loading-dots:after {
+            content: '.';
+            animation: dots 1.5s steps(5, end) infinite;
+        }
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60% { content: '...'; }
+            80%, 100% { content: ''; }
+        }
+
+        /* Overlay for store required */
+        .overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(255,255,255,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 10;
+            backdrop-filter: blur(2px);
+        }
+
+        /* Drop zone */
+        .drop-zone {
+            border: 2px dashed #ccc;
+            border-radius: 8px;
+            padding: 1.5rem 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 1rem;
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #4285f4;
+            background: #e8f0fe;
+        }
+        .drop-zone p {
+            margin: 0;
+            color: #666;
+            font-size: 0.85rem;
+        }
+        .drop-zone .browse-link {
+            color: #4285f4;
+            text-decoration: underline;
+        }
+        .drop-zone.uploading {
+            opacity: 0.6;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Gemini 知識庫助理</h1>
+        <div id="status" style="font-size: 0.9rem; color: #666;"></div>
+    </header>
+
+    <div class="app-container">
+        <!-- 左側邊欄：設定與資料管理 -->
+        <aside>
+            <!-- Store 選擇 -->
+            <div class="sidebar-section">
+                <h2>1. 設定與知識庫</h2>
+                
+                <label style="display:block; margin-bottom:0.3rem; font-size:0.8rem; color:#666;">選擇知識庫 (Store):</label>
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                    <select id="storeSelect" style="flex:1" onchange="onStoreChange()">
+                        <option value="">-- 載入中 --</option>
+                    </select>
+                    <button class="secondary" onclick="refreshStores()" title="重新整理">↻</button>
+                </div>
+                
+                <div style="display: flex; gap: 0.5rem; margin-top: 1rem; border-top: 1px solid #eee; padding-top: 1rem;">
+                    <input type="text" id="newStoreName" placeholder="新知識庫名稱" style="flex:1">
+                    <button class="secondary" onclick="createStore()">+</button>
+                </div>
+                <button class="danger" onclick="deleteStore()" style="width: 100%; margin-top: 1rem; font-size: 0.8rem;">刪除目前知識庫</button>
+            </div>
+
+            <!-- 檔案管理 -->
+            <div class="sidebar-section">
+                <h2>2. 管理文件</h2>
+                <div id="dropZone" class="drop-zone">
+                    <input type="file" id="fileInput" style="display: none;">
+                    <p>拖曳檔案至此 或 <span class="browse-link">點擊選擇</span></p>
+                </div>
+
+                <details style="margin-bottom: 1.5rem; font-size: 0.85rem; color: #666;">
+                    <summary style="cursor: pointer; margin-bottom: 0.5rem; user-select: none;">查看支援格式</summary>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 4px 0; font-weight: 600;">文字</td>
+                            <td style="padding: 4px 0; text-align: right;">.txt, .md, .html</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 4px 0; font-weight: 600;">文件</td>
+                            <td style="padding: 4px 0; text-align: right;">.pdf, .doc(x), .rtf</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 4px 0; font-weight: 600;">數據</td>
+                            <td style="padding: 4px 0; text-align: right;">.csv, .json, .xml</td>
+                        </tr>
+                         <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 4px 0; font-weight: 600;">試算表</td>
+                            <td style="padding: 4px 0; text-align: right;">.xls, .xlsx</td>
+                        </tr>
+                        <tr style="border-bottom: 1px solid #eee;">
+                            <td style="padding: 4px 0; font-weight: 600;">簡報</td>
+                            <td style="padding: 4px 0; text-align: right;">.ppt, .pptx</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 4px 0; font-weight: 600;">程式碼</td>
+                            <td style="padding: 4px 0; text-align: right;">.py, .js, .sh, .sql 等</td>
+                        </tr>
+                    </table>
+                </details>
+
+                <h2>已上傳文件</h2>
+                <ul id="fileList" class="file-list">
+                    <li style="color: #999; font-style: italic;">請先選擇知識庫</li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- 右側：聊天視窗 -->
+        <main>
+            <div id="chatOverlay" class="overlay">
+                <div style="text-align: center;">
+                    <h3>請先從左側選擇一個知識庫</h3>
+                    <p style="color: #666; margin-top: 0.5rem;">選擇後即可開始對話</p>
+                </div>
+            </div>
+
+            <div id="chatHistory" class="chat-history">
+                <div class="empty-state">
+                    <h3>歡迎使用 Gemini 知識庫助理</h3>
+                    <p>您可以詢問關於已上傳文件的任何問題。</p>
+                </div>
+            </div>
+
+            <div class="input-area">
+                <textarea id="messageInput" placeholder="輸入您的問題... (Shift+Enter 換行)" onkeydown="checkEnter(event)"></textarea>
+                <button onclick="sendMessage()" id="sendBtn" style="padding: 0 2rem;">送出</button>
+            </div>
+        </main>
+    </div>
+
+    <!-- 將 Script 移到 body 最後，確保 DOM 載入完成 -->
+    <script>
+        const API = '';
+        let currentStore = null;
+
+        // --- UI Helper Functions ---
+        function showStatus(msg) {
+            const el = document.getElementById('status');
+            el.textContent = msg;
+            setTimeout(() => el.textContent = '', 3000);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return "";
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // --- Store Management ---
+        async function refreshStores() {
+            try {
+                const res = await fetch(API + '/api/stores');
+                const stores = await res.json();
+                const select = document.getElementById('storeSelect');
+                const currentVal = select.value || localStorage.getItem('lastStore');
+
+                select.innerHTML = '<option value="">-- 請選擇 --</option>';
+                stores.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.name;
+                    opt.textContent = s.display_name || s.name;
+                    select.appendChild(opt);
+                });
+
+                if (currentVal && stores.find(s => s.name === currentVal)) {
+                    select.value = currentVal;
+                    onStoreChange();
+                }
+            } catch (e) {
+                console.error("Refresh stores failed:", e);
+                showStatus("載入知識庫列表失敗");
+            }
+        }
+
+        async function createStore() {
+            const name = document.getElementById('newStoreName').value.trim();
+            if (!name) return;
+            try {
+                const res = await fetch(API + '/api/stores', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ display_name: name })
+                });
+                if (!res.ok) throw new Error(await res.text());
+                document.getElementById('newStoreName').value = '';
+                await refreshStores();
+                // 自動選取剛建立的
+                const select = document.getElementById('storeSelect');
+                select.selectedIndex = select.options.length - 1;
+                onStoreChange();
+            } catch (e) {
+                alert('建立失敗: ' + e.message);
+            }
+        }
+
+        async function deleteStore() {
+            if (!currentStore) return;
+            if (!confirm('警告：這將會刪除整個知識庫及其所有文件！確定嗎？')) return;
+            
+            try {
+                await fetch(API + `/api/stores/${encodeURIComponent(currentStore)}`, { method: 'DELETE' });
+                currentStore = null;
+                document.getElementById('storeSelect').value = "";
+                await refreshStores();
+                onStoreChange();
+            } catch (e) {
+                alert('刪除失敗: ' + e.message);
+            }
+        }
+
+        async function onStoreChange() {
+            const select = document.getElementById('storeSelect');
+            currentStore = select.value;
+
+            if (currentStore) {
+                localStorage.setItem('lastStore', currentStore);
+            }
+
+            const overlay = document.getElementById('chatOverlay');
+            if (currentStore) {
+                overlay.style.display = 'none';
+                listFiles();
+                startChatSession();
+            } else {
+                overlay.style.display = 'flex';
+                document.getElementById('fileList').innerHTML = '<li style="color: #999;">請先選擇知識庫</li>';
+            }
+        }
+
+        // --- File Management ---
+        async function listFiles() {
+            if (!currentStore) return;
+            try {
+                const res = await fetch(API + `/api/stores/${encodeURIComponent(currentStore)}/files`);
+                let files = await res.json();
+                const ul = document.getElementById('fileList');
+                ul.innerHTML = '';
+                
+                if (files.length === 0) {
+                    ul.innerHTML = '<li style="color: #999;">(無文件)</li>';
+                    return;
+                }
+
+                // Sort files alphabetically by display_name
+                files.sort((a, b) => {
+                    const nameA = (a.display_name || a.name).toLowerCase();
+                    const nameB = (b.display_name || b.name).toLowerCase();
+                    if (nameA < nameB) return -1;
+                    if (nameA > nameB) return 1;
+                    return 0;
+                });
+
+                files.forEach(f => {
+                    const li = document.createElement('li');
+                    
+                    const span = document.createElement('span');
+                    span.textContent = f.display_name || '未命名文件';
+                    span.title = f.name;
+                    
+                    const delBtn = document.createElement('button');
+                    delBtn.textContent = '×';
+                    delBtn.className = 'danger';
+                    delBtn.title = '刪除文件';
+                    delBtn.onclick = () => deleteFile(f.name);
+                    
+                    li.appendChild(span);
+                    li.appendChild(delBtn);
+                    ul.appendChild(li);
+                });
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function uploadFile(fileToUpload = null) {
+            if (!currentStore) return alert('請先選擇知識庫');
+
+            const fileInput = document.getElementById('fileInput');
+            const file = fileToUpload || fileInput.files[0];
+            if (!file) return alert('請選擇檔案');
+
+            const dropZone = document.getElementById('dropZone');
+            const pText = dropZone.querySelector('p');
+            const originalText = pText.innerHTML;
+            
+            pText.textContent = `上傳中: ${file.name}`;
+            dropZone.classList.add('uploading');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                const res = await fetch(API + `/api/stores/${encodeURIComponent(currentStore)}/upload`, {
+                    method: 'POST',
+                    body: formData
+                });
+                if (!res.ok) {
+                    let errorMsg = await res.text();
+                    try {
+                        const json = JSON.parse(errorMsg);
+                        if (json.detail) errorMsg = json.detail;
+                    } catch(e) {}
+                    throw new Error(errorMsg);
+                }
+                fileInput.value = '';
+                listFiles();
+                showStatus("文件上傳成功");
+            } catch (e) {
+                alert('上傳失敗: ' + e.message);
+            } finally {
+                pText.innerHTML = originalText;
+                dropZone.classList.remove('uploading');
+            }
+        }
+
+        function initDropZone() {
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+
+            if (!dropZone || !fileInput) return;
+
+            dropZone.addEventListener('click', (e) => {
+                if (e.target !== fileInput) {
+                    fileInput.click();
+                }
+            });
+
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files[0]) uploadFile();
+            });
+
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('dragover');
+            });
+
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                const file = e.dataTransfer.files[0];
+                if (file) uploadFile(file);
+            });
+        }
+
+        async function deleteFile(fileName) {
+            if (!confirm('確定刪除此文件？')) return;
+            try {
+                const res = await fetch(API + `/api/files/${encodeURIComponent(fileName)}`, { method: 'DELETE' });
+                if (!res.ok) throw new Error(await res.text());
+                listFiles();
+                showStatus("文件已刪除");
+            } catch (e) {
+                alert('刪除失敗: ' + e.message);
+            }
+        }
+
+        // --- Chat ---
+        async function startChatSession() {
+            if (!currentStore) return;
+            
+            // 清空畫面
+            document.getElementById('chatHistory').innerHTML = `
+                <div class="empty-state">
+                    <h3>已連線至知識庫</h3>
+                    <p>現在您可以開始提問了。</p>
+                </div>`;
+            
+            try {
+                const res = await fetch(API + '/api/chat/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ store_name: currentStore })
+                });
+                if (!res.ok) {
+                    let errorMsg = await res.text();
+                    try {
+                        const json = JSON.parse(errorMsg);
+                        if (json.detail) errorMsg = json.detail;
+                    } catch(e) {}
+                    throw new Error(errorMsg);
+                }
+            } catch (e) {
+                console.error('Failed to start chat session', e);
+                showStatus("連線失敗: " + e.message);
+                document.getElementById('chatHistory').innerHTML += `
+                    <div class="message model" style="background:#fce8e6; color:#d93025">
+                        連線失敗: ${e.message}
+                    </div>`;
+            }
+        }
+
+        function checkEnter(e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        }
+
+        async function sendMessage() {
+            if (!currentStore) return;
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+            if (!text) return;
+
+            // Append User Message
+            appendMessage('user', escapeHtml(text));
+            input.value = '';
+            
+            // Show Loading
+            const loadingId = appendMessage('model', '<span class="loading-dots">思考中</span>');
+
+            try {
+                const res = await fetch(API + '/api/chat/message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text })
+                });
+                
+                if (!res.ok) {
+                    let errorMsg = await res.text();
+                    try {
+                        const json = JSON.parse(errorMsg);
+                        if (json.detail) errorMsg = json.detail;
+                    } catch(e) {}
+                    throw new Error(errorMsg);
+                }
+
+                const data = await res.json();
+                
+                // Replace loading with answer
+                updateMessage(loadingId, data.answer);
+            } catch (e) {
+                updateMessage(loadingId, '錯誤: ' + e.message, true);
+            }
+        }
+
+        function appendMessage(role, html) {
+            const container = document.getElementById('chatHistory');
+            // 移除 empty state
+            const empty = container.querySelector('.empty-state');
+            if (empty) empty.remove();
+
+            const div = document.createElement('div');
+            div.className = `message ${role}`;
+            // 加入隨機數避免 ID 重複
+            div.id = 'msg-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+            div.innerHTML = html;
+            container.appendChild(div);
+            container.scrollTop = container.scrollHeight;
+            return div.id;
+        }
+
+        function updateMessage(id, text, isError = false) {
+            const el = document.getElementById(id);
+            if (el) {
+                // 簡單的 markdown 轉 html 處理 (換行)
+                let html = escapeHtml(text).replace(/\n/g, "<br>");
+                
+                // 簡易支援粗體 (Markdown **text**)
+                html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                
+                el.innerHTML = html;
+                if (isError) el.style.background = '#fce8e6';
+            }
+        }
+
+        // 初始化
+        function init() {
+            refreshStores();
+            initDropZone();
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>
