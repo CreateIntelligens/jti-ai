@@ -8,6 +8,7 @@ import os
 import shutil
 import uuid
 from pathlib import Path
+from typing import Optional
 
 # 設定 uvicorn 日誌格式（加上時間戳，保留顏色，狀態碼上色）
 import uvicorn.logging
@@ -85,14 +86,17 @@ app.add_middleware(
 )
 
 manager: FileSearchManager | None = None
+prompt_manager = None
 
 
 @app.on_event("startup")
 def startup():
     """應用程式啟動時初始化 Manager。"""
-    global manager
+    global manager, prompt_manager
     try:
         manager = FileSearchManager()
+        from .prompts import PromptManager
+        prompt_manager = PromptManager()
     except ValueError as e:
         print(f"警告: {e}")
 
@@ -131,15 +135,6 @@ def create_store(req: CreateStoreRequest):
         raise HTTPException(status_code=500, detail="未設定 API Key")
     store_name = manager.create_store(req.display_name)
     return {"name": store_name}
-
-
-@app.delete("/api/stores/{store_name:path}")
-def delete_store(store_name: str):
-    """刪除 Store。"""
-    if not manager:
-        raise HTTPException(status_code=500, detail="未設定 API Key")
-    manager.delete_store(store_name)
-    return {"ok": True}
 
 
 @app.get("/api/stores/{store_name:path}/files")
@@ -210,9 +205,19 @@ def start_chat(req: ChatStartRequest):
     """開始新的對話 Session。"""
     if not manager:
         raise HTTPException(status_code=500, detail="未設定 API Key")
-    manager.start_chat(req.store_name, req.model)
-    return {"ok": True}
-
+    
+    # 取得啟用的 prompt (如果有)
+    system_instruction = None
+    if prompt_manager:
+        active_prompt = prompt_manager.get_active_prompt(req.store_name)
+        if active_prompt:
+            system_instruction = active_prompt.content
+            print(f"[DEBUG] 從 MongoDB 載入 Prompt: {active_prompt.name}")
+        else:
+            print(f"[DEBUG] Store {req.store_name} 沒有啟用的 Prompt")
+    
+    manager.start_chat(req.store_name, req.model, system_instruction=system_instruction)
+    return {"ok": True, "prompt_applied": system_instruction is not None}
 
 @app.post("/api/chat/message")
 def send_message(req: ChatMessageRequest):
@@ -232,6 +237,210 @@ def get_history():
     if not manager:
         raise HTTPException(status_code=500, detail="未設定 API Key")
     return manager.get_history()
+
+
+# ========== OpenAI Compatible API ==========
+
+class OpenAIChatMessage(BaseModel):
+    role: str
+    content: str
+
+class OpenAIChatRequest(BaseModel):
+    model: str = "gemini-2.0-flash-exp"
+    messages: list[OpenAIChatMessage]
+    temperature: float | None = None
+    max_tokens: int | None = None
+    stream: bool = False
+
+class OpenAIChatChoice(BaseModel):
+    index: int
+    message: OpenAIChatMessage
+    finish_reason: str
+
+class OpenAIChatResponse(BaseModel):
+    id: str
+    object: str = "chat.completion"
+    created: int
+    model: str
+    choices: list[OpenAIChatChoice]
+    usage: dict
+
+
+@app.post("/v1/chat/completions")
+async def openai_chat_completions(request: OpenAIChatRequest):
+    """
+    OpenAI 兼容的 Chat Completions API
+    使用當前 session 的知識庫進行 RAG 查詢
+    """
+    if not manager:
+        raise HTTPException(status_code=500, detail="未設定 API Key")
+    
+    if not manager.current_store:
+        raise HTTPException(status_code=400, detail="請先選擇知識庫 (使用 /api/chat/start)")
+    
+    # 取得最後一條用戶消息
+    user_messages = [msg for msg in request.messages if msg.role == "user"]
+    if not user_messages:
+        raise HTTPException(status_code=400, detail="沒有找到用戶消息")
+    
+    last_message = user_messages[-1].content
+    
+    try:
+        # 使用現有的 chat 功能
+        result = manager.chat(last_message)
+        
+        import time
+        response = OpenAIChatResponse(
+            id=f"chatcmpl-{uuid.uuid4().hex[:8]}",
+            created=int(time.time()),
+            model=request.model,
+            choices=[
+                OpenAIChatChoice(
+                    index=0,
+                    message=OpenAIChatMessage(
+                        role="assistant",
+                        content=result["answer"]
+                    ),
+                    finish_reason="stop"
+                )
+            ],
+            usage={
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "total_tokens": 0
+            }
+        )
+        
+        return response
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ========== Prompt Management API ==========
+
+class CreatePromptRequest(BaseModel):
+    name: str
+    content: str
+
+class UpdatePromptRequest(BaseModel):
+    name: Optional[str] = None
+    content: Optional[str] = None
+
+class SetActivePromptRequest(BaseModel):
+    prompt_id: str
+
+
+@app.get("/api/stores/{store_name:path}/prompts")
+def list_store_prompts(store_name: str):
+    """列出 Store 的所有 Prompts"""
+    if not prompt_manager:
+        raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
+    
+    prompts = prompt_manager.list_prompts(store_name)
+    active_prompt = prompt_manager.get_active_prompt(store_name)
+    
+    return {
+        "prompts": [p.model_dump() for p in prompts],
+        "active_prompt_id": active_prompt.id if active_prompt else None,
+        "max_prompts": prompt_manager.MAX_PROMPTS_PER_STORE
+    }
+
+
+@app.post("/api/stores/{store_name:path}/prompts")
+def create_store_prompt(store_name: str, request: CreatePromptRequest):
+    """建立新的 Prompt"""
+    if not prompt_manager:
+        raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
+    
+    try:
+        prompt = prompt_manager.create_prompt(
+            store_name=store_name,
+            name=request.name,
+            content=request.content
+        )
+        return prompt.model_dump()
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/api/stores/{store_name:path}/prompts/{prompt_id}")
+def get_store_prompt(store_name: str, prompt_id: str):
+    """取得特定 Prompt"""
+    if not prompt_manager:
+        raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
+    
+    prompt = prompt_manager.get_prompt(store_name, prompt_id)
+    if not prompt:
+        raise HTTPException(status_code=404, detail="Prompt 不存在")
+    
+    return prompt.model_dump()
+
+
+@app.put("/api/stores/{store_name:path}/prompts/{prompt_id}")
+def update_store_prompt(store_name: str, prompt_id: str, request: UpdatePromptRequest):
+    """更新 Prompt"""
+    if not prompt_manager:
+        raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
+    
+    try:
+        prompt = prompt_manager.update_prompt(
+            store_name=store_name,
+            prompt_id=prompt_id,
+            name=request.name,
+            content=request.content
+        )
+        return prompt.model_dump()
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.delete("/api/stores/{store_name:path}/prompts/{prompt_id}")
+def delete_store_prompt(store_name: str, prompt_id: str):
+    """刪除 Prompt"""
+    if not prompt_manager:
+        raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
+    
+    try:
+        prompt_manager.delete_prompt(store_name, prompt_id)
+        return {"message": "Prompt 已刪除"}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.post("/api/stores/{store_name:path}/prompts/active")
+def set_active_store_prompt(store_name: str, request: SetActivePromptRequest):
+    """設定啟用的 Prompt"""
+    if not prompt_manager:
+        raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
+    
+    try:
+        prompt_manager.set_active_prompt(store_name, request.prompt_id)
+        return {"message": "已設定啟用的 Prompt", "prompt_id": request.prompt_id}
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
+@app.get("/api/stores/{store_name:path}/prompts/active")
+def get_active_store_prompt(store_name: str):
+    """取得當前啟用的 Prompt"""
+    if not prompt_manager:
+        raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
+    
+    prompt = prompt_manager.get_active_prompt(store_name)
+    if not prompt:
+        return {"message": "尚未設定啟用的 Prompt", "prompt": None}
+    
+    return {"prompt": prompt.model_dump()}
+
+
+@app.delete("/api/stores/{store_name:path}")
+def delete_store(store_name: str):
+    """刪除 Store。"""
+    if not manager:
+        raise HTTPException(status_code=500, detail="未設定 API Key")
+    manager.delete_store(store_name)
+    return {"ok": True}
 
 
 @app.get("/")

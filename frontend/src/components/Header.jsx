@@ -1,4 +1,4 @@
-export default function Header({ status, onToggleSidebar, sidebarOpen }) {
+export default function Header({ status, onToggleSidebar, sidebarOpen, onOpenStoreManagement }) {
   return (
     <header>
       <div className="flex items-center gap-md">
@@ -12,7 +12,17 @@ export default function Header({ status, onToggleSidebar, sidebarOpen }) {
         </button>
         <h1>Gemini 知識庫助理</h1>
       </div>
-      <div className="status">{status}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <button
+          onClick={onOpenStoreManagement}
+          className="secondary"
+          style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+          title="管理知識庫"
+        >
+          ⚙️ 管理知識庫
+        </button>
+        <div className="status">{status}</div>
+      </div>
     </header>
   );
 }

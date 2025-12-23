@@ -2,11 +2,15 @@ import { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
-import * as api from './hooks/useApi';
+import StoreManagementModal from './components/StoreManagementModal';
+import PromptManagementModal from './components/PromptManagementModal';
+import * as api from './services/api';
 import './styles/App.css';
 
 export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [storeModalOpen, setStoreModalOpen] = useState(false);
+  const [promptModalOpen, setPromptModalOpen] = useState(false);
   const [status, setStatus] = useState('');
   const [stores, setStores] = useState([]);
   const [currentStore, setCurrentStore] = useState(null);
@@ -66,11 +70,28 @@ export default function App() {
     if (storeName) {
       localStorage.setItem('lastStore', storeName);
       try {
-        await api.startChat(storeName);
+        const result = await api.startChat(storeName);
+        if (result.prompt_applied) {
+          showStatus('✅ 已套用自訂 Prompt');
+        }
       } catch (e) {
         showStatus('連線失敗: ' + e.message);
         setMessages([{ role: 'model', text: '連線失敗: ' + e.message, error: true }]);
       }
+    }
+  };
+
+  // 重新啟動對話（用於套用新的 Prompt）
+  const handleRestartChat = async () => {
+    if (!currentStore) return;
+    setMessages([]);
+    try {
+      const result = await api.startChat(currentStore);
+      if (result.prompt_applied) {
+        showStatus('✅ 已套用新的 Prompt');
+      }
+    } catch (e) {
+      showStatus('重新啟動失敗: ' + e.message);
     }
   };
 
@@ -84,15 +105,17 @@ export default function App() {
     }
   };
 
-  const handleDeleteStore = async () => {
-    if (!currentStore) return;
-    if (!confirm('警告：這將會刪除整個知識庫及其所有文件！確定嗎？')) return;
+  const handleDeleteStore = async (storeName) => {
+    if (!storeName) return;
     try {
-      await api.deleteStore(currentStore);
-      setCurrentStore(null);
-      setFiles([]);
-      setMessages([]);
+      await api.deleteStore(storeName);
+      if (currentStore === storeName) {
+        setCurrentStore(null);
+        setFiles([]);
+        setMessages([]);
+      }
       await refreshStores();
+      showStatus('知識庫已刪除');
     } catch (e) {
       alert('刪除失敗: ' + e.message);
     }
@@ -148,7 +171,12 @@ export default function App() {
 
   return (
     <>
-      <Header status={status} onToggleSidebar={toggleSidebar} sidebarOpen={sidebarOpen} />
+      <Header 
+        status={status} 
+        onToggleSidebar={toggleSidebar} 
+        sidebarOpen={sidebarOpen}
+        onOpenStoreManagement={() => setStoreModalOpen(true)}
+      />
       <div className="app-container">
         <Sidebar
           isOpen={sidebarOpen}
@@ -156,11 +184,10 @@ export default function App() {
           currentStore={currentStore}
           files={files}
           onStoreChange={handleStoreChange}
-          onCreateStore={handleCreateStore}
-          onDeleteStore={handleDeleteStore}
           onUploadFile={handleUploadFile}
           onDeleteFile={handleDeleteFile}
           onRefresh={refreshStores}
+          onOpenPromptManagement={() => setPromptModalOpen(true)}
         />
         <ChatArea
           messages={messages}
@@ -169,6 +196,31 @@ export default function App() {
           loading={loading}
         />
       </div>
+      <StoreManagementModal
+        isOpen={storeModalOpen}
+        onClose={() => setStoreModalOpen(false)}
+        stores={stores}
+        currentStore={currentStore}
+        onCreateStore={handleCreateStore}
+        onDeleteStore={handleDeleteStore}
+        onRefresh={refreshStores}
+      />
+      <PromptManagementModal
+        isOpen={promptModalOpen}
+        onClose={() => setPromptModalOpen(false)}
+        currentStore={currentStore}
+        onRefresh={refreshStores}
+        onRestartChat={handleRestartChat}
+      />
+      <a 
+        href="/docs" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        className="docs-button"
+        title="查看 API 文件"
+      >
+        📖 API 文件
+      </a>
     </>
   );
 }

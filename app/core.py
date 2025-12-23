@@ -194,21 +194,36 @@ class FileSearchManager:
         )
         return list(files)
 
-    def start_chat(self, store_name: str, model: str = "gemini-2.5-flash"):
+    def start_chat(self, store_name: str, model: str = "gemini-2.5-flash", system_instruction: str = None):
         """開始一個新的 Chat Session (多輪對話)。"""
+        if system_instruction:
+            log(f"[Core] 設定 system_instruction: {system_instruction[:50]}...")
+        else:
+            log("[Core] 沒有 system_instruction")
+
+        # 封裝為 SDK 偏好的格式
+        si = None
+        if system_instruction:
+            si = [types.Part.from_text(text=system_instruction)]
+
+        # 保存 Config 供後續 send_message 使用
+        self.current_config = types.GenerateContentConfig(
+            tools=[
+                types.Tool(
+                    file_search=types.FileSearch(
+                        file_search_store_names=[store_name]
+                    )
+                )
+            ],
+            system_instruction=si
+        )
+
         self.chat_session = self.client.chats.create(
             model=model,
-            config=types.GenerateContentConfig(
-                tools=[
-                    types.Tool(
-                        file_search=types.FileSearch(
-                            file_search_store_names=[store_name]
-                        )
-                    )
-                ]
-            ),
+            config=self.current_config,
             history=[]
         )
+        self.current_store = store_name
         return self.chat_session
 
     def send_message(self, message: str):
@@ -216,7 +231,11 @@ class FileSearchManager:
         if not hasattr(self, 'chat_session') or not self.chat_session:
             raise ValueError("請先選擇 Store 以開始對話")
 
-        response = self.chat_session.send_message(message)
+        # 確保在發送訊息時也帶上 config
+        response = self.chat_session.send_message(
+            message=message,
+            config=self.current_config
+        )
         return response
 
     def get_history(self):

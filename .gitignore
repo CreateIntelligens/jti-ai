@@ -79,3 +79,6 @@ desktop.ini
 *.temp
 .cache/
 
+# Data directory
+data/
+

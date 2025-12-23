@@ -1,27 +1,29 @@
 import { useState } from 'react';
 import FileDropZone from './FileDropZone';
 
+// 格式化 Store 顯示名稱
+const formatStoreName = (store) => {
+  const displayName = store.display_name || '未命名';
+  // 從完整的 resource name 提取 ID
+  // 例如: fileSearchStores/abc123 -> abc123
+  const id = store.name.split('/').pop() || '';
+  const shortId = id.slice(0, 8); // 取前8個字符
+  
+  return `${displayName} (${shortId})`;
+};
+
 export default function Sidebar({
   isOpen,
   stores,
   currentStore,
   files,
   onStoreChange,
-  onCreateStore,
-  onDeleteStore,
   onUploadFile,
   onDeleteFile,
-  onRefresh
+  onRefresh,
+  onOpenPromptManagement
 }) {
-  const [newStoreName, setNewStoreName] = useState('');
   const [filesExpanded, setFilesExpanded] = useState(true);
-  const [storeManagementExpanded, setStoreManagementExpanded] = useState(false);
-
-  const handleCreateStore = async () => {
-    if (!newStoreName.trim()) return;
-    await onCreateStore(newStoreName.trim());
-    setNewStoreName('');
-  };
 
   return (
     <aside className={!isOpen ? 'closed' : ''}>
@@ -38,53 +40,33 @@ export default function Sidebar({
             <option value="">-- 請選擇知識庫 --</option>
             {stores.map(s => (
               <option key={s.name} value={s.name}>
-                {s.display_name || s.name}
+                {formatStoreName(s)}
               </option>
             ))}
           </select>
           <button className="secondary" onClick={onRefresh} title="重新整理">↻</button>
         </div>
 
-        {/* 進階管理區域 - 可收合 */}
-        <details 
-          open={storeManagementExpanded}
-          onToggle={(e) => setStoreManagementExpanded(e.target.open)}
-          style={{ marginTop: '1rem', borderTop: '1px solid #eee', paddingTop: '0.8rem' }}
-        >
-          <summary 
-            style={{ 
-              cursor: 'pointer', 
-              fontSize: '0.85rem', 
-              color: '#888',
-              fontWeight: 500,
-              userSelect: 'none',
-              marginBottom: '0.8rem'
+        {/* Prompt 管理按鈕 */}
+        {currentStore && (
+          <button
+            onClick={onOpenPromptManagement}
+            className="w-full"
+            style={{
+              marginTop: '0.5rem',
+              padding: '0.6rem',
+              backgroundColor: '#9C27B0',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: 'pointer',
+              fontSize: '0.9rem',
+              fontWeight: 500
             }}
           >
-            ⚙️ 知識庫管理
-          </summary>
-          
-          <div className="flex gap-sm mb-sm">
-            <input
-              type="text"
-              className="flex-1"
-              placeholder="新知識庫名稱"
-              value={newStoreName}
-              onChange={(e) => setNewStoreName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleCreateStore()}
-              style={{ fontSize: '0.9rem' }}
-            />
-            <button className="secondary" onClick={handleCreateStore}>建立</button>
-          </div>
-          <button
-            className="danger w-full"
-            style={{ fontSize: '0.85rem' }}
-            onClick={onDeleteStore}
-            disabled={!currentStore}
-          >
-            刪除目前知識庫
+            💬 管理 Prompts
           </button>
-        </details>
+        )}
       </div>
 
       {/* 檔案管理 */}
