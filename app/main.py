@@ -2,11 +2,49 @@
 Gemini File Search FastAPI 後端
 """
 
+import logging
 import traceback
 import os
 import shutil
 import uuid
 from pathlib import Path
+
+# 設定 uvicorn 日誌格式（加上時間戳，保留顏色，狀態碼上色）
+import uvicorn.logging
+
+# ANSI 顏色碼
+GREEN = "\033[32m"
+YELLOW = "\033[33m"
+RED = "\033[31m"
+RESET = "\033[0m"
+
+class TimestampFormatter(uvicorn.logging.ColourizedFormatter):
+    """在 uvicorn 原有的彩色格式前加上時間戳，並對狀態碼上色。"""
+    def formatMessage(self, record):
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        original = super().formatMessage(record)
+
+        # 對 HTTP 狀態碼上色
+        msg = original
+        if " 200" in msg or " 201" in msg:
+            msg = msg.replace(" 200", f" {GREEN}200{RESET}").replace(" 201", f" {GREEN}201{RESET}")
+        elif " 404" in msg or " 400" in msg or " 401" in msg or " 403" in msg:
+            msg = msg.replace(" 404", f" {RED}404{RESET}").replace(" 400", f" {RED}400{RESET}")
+            msg = msg.replace(" 401", f" {RED}401{RESET}").replace(" 403", f" {RED}403{RESET}")
+        elif " 500" in msg or " 502" in msg or " 503" in msg:
+            msg = msg.replace(" 500", f" {RED}500{RESET}").replace(" 502", f" {RED}502{RESET}")
+            msg = msg.replace(" 503", f" {RED}503{RESET}")
+        elif " 429" in msg:
+            msg = msg.replace(" 429", f" {YELLOW}429{RESET}")
+
+        return f"[{timestamp}] {msg}"
+
+# 覆蓋 uvicorn 的 logger 格式
+for logger_name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
+    uvicorn_logger = logging.getLogger(logger_name)
+    for handler in uvicorn_logger.handlers:
+        handler.setFormatter(TimestampFormatter("%(levelprefix)s %(message)s"))
 
 from fastapi import FastAPI, File, HTTPException, UploadFile, Request
 from fastapi.middleware.cors import CORSMiddleware

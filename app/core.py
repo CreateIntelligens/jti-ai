@@ -8,6 +8,7 @@ Gemini File Search API 範例程式
 import mimetypes
 import os
 import time
+from datetime import datetime
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -15,6 +16,12 @@ from google import genai
 from google.genai import types
 
 load_dotenv()
+
+
+def log(message: str) -> None:
+    """輸出帶有時間戳的日誌訊息。"""
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    print(f"[{timestamp}] {message}")
 
 
 class FileSearchManager:
@@ -51,7 +58,7 @@ class FileSearchManager:
             config={"display_name": display_name}
         )
         self.store_name = store.name
-        print(f"已建立 Store: {self.store_name}")
+        log(f"已建立 Store: {self.store_name}")
         return self.store_name
 
     def list_stores(self) -> list:
@@ -87,13 +94,13 @@ class FileSearchManager:
                 try:
                     self.delete_file(f.name)
                 except Exception as e:
-                    print(f"刪除檔案失敗 {f.name}: {e}")
+                    log(f"刪除檔案失敗 {f.name}: {e}")
         except Exception as e:
-            print(f"列出檔案失敗 (可能 Store 已不存在): {e}")
+            log(f"列出檔案失敗 (可能 Store 已不存在): {e}")
 
         # 2. 刪除 Store 本身
         self.client.file_search_stores.delete(name=store_name)
-        print(f"已刪除 Store: {store_name}")
+        log(f"已刪除 Store: {store_name}")
 
     def upload_file(
         self,
@@ -145,24 +152,18 @@ class FileSearchManager:
             if not mime_type:
                 mime_type = "text/plain"
 
-        # Debug log
-        if mime_type:
-            print(f"上傳中: {display_name} (mime={mime_type})")
-        else:
-            print(f"上傳中: {display_name} (mime=Auto-Detect)")
+        log(f"上傳中: {display_name} (mime={mime_type})")
 
         operation = self.client.file_search_stores.upload_to_file_search_store(
             file=file_path,
             file_search_store_name=store_name,
             config={"display_name": display_name, "mime_type": mime_type},
         )
-
-        print(f"上傳中: {display_name} ({mime_type})")
         while not operation.done:
             time.sleep(poll_interval)
             operation = self.client.operations.get(operation)
 
-        print(f"已上傳: {display_name}")
+        log(f"已上傳: {display_name}")
         if operation.response:
             return operation.response.document_name
         return ""
@@ -177,7 +178,7 @@ class FileSearchManager:
             name=file_name,
             config={"force": True}
         )
-        print(f"已刪除檔案: {file_name}")
+        log(f"已刪除檔案: {file_name}")
 
     def list_files(self, store_name: str) -> list:
         """列出 Store 中的所有檔案。
@@ -276,8 +277,8 @@ def main():
     api_key = os.getenv("GEMINI_API_KEY")
 
     if not api_key:
-        print("錯誤：未設定 GEMINI_API_KEY")
-        print("請複製 .env.example 為 .env 並填入 API Key")
+        log("錯誤：未設定 GEMINI_API_KEY")
+        log("請複製 .env.example 為 .env 並填入 API Key")
         return
 
     manager = FileSearchManager(api_key)
