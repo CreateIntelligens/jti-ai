@@ -92,3 +92,53 @@ export async function sendMessage(message) {
   }
   return res.json();
 }
+
+// ========== API Key Management ==========
+
+export async function fetchAPIKeys(storeName = null) {
+  const url = storeName
+    ? `${API_BASE}/api/keys?store_name=${encodeURIComponent(storeName)}`
+    : `${API_BASE}/api/keys`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to fetch API keys');
+  return res.json();
+}
+
+export async function createAPIKey(name, storeName, promptIndex = null) {
+  const res = await fetch(`${API_BASE}/api/keys`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      name,
+      store_name: storeName,
+      prompt_index: promptIndex
+    })
+  });
+  if (!res.ok) {
+    let errorMsg = await res.text();
+    try {
+      const json = JSON.parse(errorMsg);
+      if (json.detail) errorMsg = json.detail;
+    } catch(e) {}
+    throw new Error(errorMsg);
+  }
+  return res.json();
+}
+
+export async function updateAPIKey(keyId, name = null, promptIndex = null) {
+  const res = await fetch(`${API_BASE}/api/keys/${keyId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, prompt_index: promptIndex })
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteAPIKey(keyId) {
+  const res = await fetch(`${API_BASE}/api/keys/${keyId}`, {
+    method: 'DELETE'
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

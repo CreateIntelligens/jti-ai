@@ -270,33 +270,18 @@ textarea {
 .w-full { width: 100%; }
 .items-center { align-items: center; }
 
-/* API Docs Button */
-.docs-button {
-  position: fixed;
-  bottom: 1.5rem;
-  right: 1.5rem;
-  padding: 0.75rem 1.25rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  border-radius: 50px;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-  transition: all 0.3s ease;
-  z-index: 999;
-  text-decoration: none;
-  display: flex;
+/* Header Link */
+.header-link {
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem;
+  color: #5f6368;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  transition: all 0.2s;
 }
 
-.docs-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
-}
-
-.docs-button:active {
-  transform: translateY(0);
+.header-link:hover {
+  background: #e8eaed;
+  color: #202124;
 }

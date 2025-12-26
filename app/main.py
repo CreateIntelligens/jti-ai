@@ -54,6 +54,7 @@ from pydantic import BaseModel
 from google.genai.errors import ClientError
 
 from .core import FileSearchManager
+from .api_keys import APIKeyManager
 
 app = FastAPI(title="Gemini File Search API")
 
@@ -87,16 +88,18 @@ app.add_middleware(
 
 manager: FileSearchManager | None = None
 prompt_manager = None
+api_key_manager: APIKeyManager | None = None
 
 
 @app.on_event("startup")
 def startup():
     """應用程式啟動時初始化 Manager。"""
-    global manager, prompt_manager
+    global manager, prompt_manager, api_key_manager
     try:
         manager = FileSearchManager()
         from .prompts import PromptManager
         prompt_manager = PromptManager()
+        api_key_manager = APIKeyManager()
     except ValueError as e:
         print(f"警告: {e}")
 
@@ -245,8 +248,12 @@ class OpenAIChatMessage(BaseModel):
     role: str
     content: str
 
+# 支援的 Gemini 模型
+SUPPORTED_MODELS = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-3-flash-preview", "gemini-3-pro-preview"]
+DEFAULT_MODEL = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+
 class OpenAIChatRequest(BaseModel):
-    model: str = "gemini-2.0-flash-exp"
+    model: str = DEFAULT_MODEL
     messages: list[OpenAIChatMessage]
     temperature: float | None = None
     max_tokens: int | None = None
@@ -266,40 +273,111 @@ class OpenAIChatResponse(BaseModel):
     usage: dict
 
 
+def _extract_bearer_token(request: Request) -> Optional[str]:
+    """從 Authorization header 提取 Bearer token"""
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header[7:]
+    return None
+
+
+def _get_system_prompt(api_key_info, store_name: str, messages: list) -> Optional[str]:
+    """
+    根據優先順序決定使用哪個 system prompt:
+    1. Request 帶的 system message → 最優先
+    2. API Key 指定的 prompt_index → 次之
+    3. 知識庫的預設 (active_prompt_id) → 兜底
+    4. 都沒有 → None
+    """
+    # 1. 檢查 request 中的 system message
+    system_messages = [msg for msg in messages if msg.role == "system"]
+    if system_messages:
+        return system_messages[-1].content
+
+    if not prompt_manager:
+        return None
+
+    # 2. 檢查 API Key 指定的 prompt_index
+    if api_key_info and api_key_info.prompt_index is not None:
+        prompts = prompt_manager.list_prompts(store_name)
+        if 0 <= api_key_info.prompt_index < len(prompts):
+            return prompts[api_key_info.prompt_index].content
+
+    # 3. 使用知識庫預設的 active prompt
+    active_prompt = prompt_manager.get_active_prompt(store_name)
+    if active_prompt:
+        return active_prompt.content
+
+    return None
+
+
 @app.post("/v1/chat/completions")
-async def openai_chat_completions(request: OpenAIChatRequest):
+async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Request):
     """
     OpenAI 兼容的 Chat Completions API
-    使用當前 session 的知識庫進行 RAG 查詢
+
+    使用 Authorization: Bearer sk-xxx 驗證，API Key 綁定知識庫
+
+    Prompt 優先順序:
+    1. Request 帶的 system message
+    2. API Key 指定的 prompt_index
+    3. 知識庫的預設 prompt
     """
     if not manager:
-        raise HTTPException(status_code=500, detail="未設定 API Key")
-    
-    if not manager.current_store:
-        raise HTTPException(status_code=400, detail="請先選擇知識庫 (使用 /api/chat/start)")
-    
+        raise HTTPException(status_code=500, detail="未設定 Gemini API Key")
+
+    if not api_key_manager:
+        raise HTTPException(status_code=500, detail="API Key Manager 未初始化")
+
+    # 驗證 API Key
+    token = _extract_bearer_token(raw_request)
+    if not token:
+        raise HTTPException(status_code=401, detail="缺少 Authorization header")
+
+    api_key_info = api_key_manager.verify_key(token)
+    if not api_key_info:
+        raise HTTPException(status_code=401, detail="無效的 API Key")
+
+    store_name = api_key_info.store_name
+
     # 取得最後一條用戶消息
     user_messages = [msg for msg in request.messages if msg.role == "user"]
     if not user_messages:
         raise HTTPException(status_code=400, detail="沒有找到用戶消息")
-    
+
     last_message = user_messages[-1].content
-    
+
+    # 決定 system prompt
+    system_prompt = _get_system_prompt(api_key_info, store_name, request.messages)
+
+    # 驗證 model 並決定實際使用的模型
+    warning = None
+    if request.model in SUPPORTED_MODELS:
+        model_name = request.model
+    else:
+        model_name = DEFAULT_MODEL
+        warning = f"不支援的模型 '{request.model}'，已改用預設模型 '{DEFAULT_MODEL}'。支援的模型: {', '.join(SUPPORTED_MODELS)}"
+
     try:
-        # 使用現有的 chat 功能
-        result = manager.chat(last_message)
-        
+        # 使用 query 進行單次 RAG 查詢（不依賴 session）
+        response = manager.query(store_name, last_message, system_instruction=system_prompt, model=model_name)
+
+        # 如果有警告，附加到回覆開頭
+        answer_text = response.text
+        if warning:
+            answer_text = f"⚠️ {warning}\n\n{answer_text}"
+
         import time
-        response = OpenAIChatResponse(
+        result = OpenAIChatResponse(
             id=f"chatcmpl-{uuid.uuid4().hex[:8]}",
             created=int(time.time()),
-            model=request.model,
+            model=model_name,  # 返回實際使用的模型
             choices=[
                 OpenAIChatChoice(
                     index=0,
                     message=OpenAIChatMessage(
                         role="assistant",
-                        content=result["answer"]
+                        content=answer_text
                     ),
                     finish_reason="stop"
                 )
@@ -310,9 +388,9 @@ async def openai_chat_completions(request: OpenAIChatRequest):
                 "total_tokens": 0
             }
         )
-        
-        return response
-        
+
+        return result
+
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -441,6 +519,122 @@ def delete_store(store_name: str):
         raise HTTPException(status_code=500, detail="未設定 API Key")
     manager.delete_store(store_name)
     return {"ok": True}
+
+
+# ========== API Key Management ==========
+
+class CreateAPIKeyRequest(BaseModel):
+    name: str  # 用途說明
+    store_name: str  # 綁定的知識庫
+    prompt_index: Optional[int] = None  # 可選指定 prompt
+
+
+class UpdateAPIKeyRequest(BaseModel):
+    name: Optional[str] = None
+    prompt_index: Optional[int] = None
+
+
+@app.get("/api/keys")
+def list_api_keys(store_name: Optional[str] = None):
+    """列出 API Keys，可選篩選特定知識庫"""
+    if not api_key_manager:
+        raise HTTPException(status_code=500, detail="API Key Manager 未初始化")
+
+    keys = api_key_manager.list_keys(store_name)
+    # 不返回 key_hash
+    return [
+        {
+            "id": k.id,
+            "key_prefix": k.key_prefix,
+            "name": k.name,
+            "store_name": k.store_name,
+            "prompt_index": k.prompt_index,
+            "created_at": k.created_at,
+            "last_used_at": k.last_used_at
+        }
+        for k in keys
+    ]
+
+
+@app.post("/api/keys")
+def create_api_key(request: CreateAPIKeyRequest):
+    """建立新的 API Key"""
+    if not api_key_manager:
+        raise HTTPException(status_code=500, detail="API Key Manager 未初始化")
+
+    api_key, raw_key = api_key_manager.create_key(
+        name=request.name,
+        store_name=request.store_name,
+        prompt_index=request.prompt_index
+    )
+
+    return {
+        "id": api_key.id,
+        "key": raw_key,  # 只有這一次會顯示完整 key
+        "key_prefix": api_key.key_prefix,
+        "name": api_key.name,
+        "store_name": api_key.store_name,
+        "prompt_index": api_key.prompt_index,
+        "message": "請妥善保存此 API Key，之後無法再次查看完整金鑰"
+    }
+
+
+@app.get("/api/keys/{key_id}")
+def get_api_key(key_id: str):
+    """取得 API Key 資訊"""
+    if not api_key_manager:
+        raise HTTPException(status_code=500, detail="API Key Manager 未初始化")
+
+    key = api_key_manager.get_key(key_id)
+    if not key:
+        raise HTTPException(status_code=404, detail="API Key 不存在")
+
+    return {
+        "id": key.id,
+        "key_prefix": key.key_prefix,
+        "name": key.name,
+        "store_name": key.store_name,
+        "prompt_index": key.prompt_index,
+        "created_at": key.created_at,
+        "last_used_at": key.last_used_at
+    }
+
+
+@app.put("/api/keys/{key_id}")
+def update_api_key(key_id: str, request: UpdateAPIKeyRequest):
+    """更新 API Key 設定"""
+    if not api_key_manager:
+        raise HTTPException(status_code=500, detail="API Key Manager 未初始化")
+
+    key = api_key_manager.update_key(
+        key_id=key_id,
+        name=request.name,
+        prompt_index=request.prompt_index
+    )
+
+    if not key:
+        raise HTTPException(status_code=404, detail="API Key 不存在")
+
+    return {
+        "id": key.id,
+        "key_prefix": key.key_prefix,
+        "name": key.name,
+        "store_name": key.store_name,
+        "prompt_index": key.prompt_index
+    }
+
+
+@app.delete("/api/keys/{key_id}")
+def delete_api_key(key_id: str):
+    """刪除 API Key"""
+    if not api_key_manager:
+        raise HTTPException(status_code=500, detail="API Key Manager 未初始化")
+
+    success = api_key_manager.delete_key(key_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="API Key 不存在")
+
+    return {"message": "API Key 已刪除"}
 
 
 @app.get("/")

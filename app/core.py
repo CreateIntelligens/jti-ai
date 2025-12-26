@@ -264,6 +264,7 @@ class FileSearchManager:
         store_name: str,
         question: str,
         model: str = "gemini-2.5-flash",
+        system_instruction: str | None = None,
     ) -> types.GenerateContentResponse:
         """使用 File Search 查詢。
 
@@ -271,10 +272,16 @@ class FileSearchManager:
             store_name: Store 資源名稱
             question: 問題
             model: 使用的模型名稱
+            system_instruction: 系統指令（選填）
 
         Returns:
             GenerateContentResponse 物件
         """
+        # 建立 config
+        si = None
+        if system_instruction:
+            si = [types.Part.from_text(text=system_instruction)]
+
         response = self.client.models.generate_content(
             model=model,
             contents=question,
@@ -285,7 +292,8 @@ class FileSearchManager:
                             file_search_store_names=[store_name]
                         )
                     )
-                ]
+                ],
+                system_instruction=si
             ),
         )
         return response

@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import StoreManagementModal from './components/StoreManagementModal';
 import PromptManagementModal from './components/PromptManagementModal';
+import APIKeyModal from './components/APIKeyModal';
 import * as api from './services/api';
 import './styles/App.css';
 
@@ -11,6 +12,7 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [storeModalOpen, setStoreModalOpen] = useState(false);
   const [promptModalOpen, setPromptModalOpen] = useState(false);
+  const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
   const [status, setStatus] = useState('');
   const [stores, setStores] = useState([]);
   const [currentStore, setCurrentStore] = useState(null);
@@ -171,11 +173,12 @@ export default function App() {
 
   return (
     <>
-      <Header 
-        status={status} 
-        onToggleSidebar={toggleSidebar} 
+      <Header
+        status={status}
+        onToggleSidebar={toggleSidebar}
         sidebarOpen={sidebarOpen}
         onOpenStoreManagement={() => setStoreModalOpen(true)}
+        onOpenAPIKeyManagement={() => setApiKeyModalOpen(true)}
       />
       <div className="app-container">
         <Sidebar
@@ -212,15 +215,11 @@ export default function App() {
         onRefresh={refreshStores}
         onRestartChat={handleRestartChat}
       />
-      <a 
-        href="/docs" 
-        target="_blank" 
-        rel="noopener noreferrer"
-        className="docs-button"
-        title="查看 API 文件"
-      >
-        📖 API 文件
-      </a>
+      <APIKeyModal
+        isOpen={apiKeyModalOpen}
+        onClose={() => setApiKeyModalOpen(false)}
+        stores={stores}
+      />
     </>
   );
 }
