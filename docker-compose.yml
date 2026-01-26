@@ -3,6 +3,7 @@ services:
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
+    user: "1000:1000"
     env_file:
       - .env
     volumes:
@@ -22,9 +23,13 @@ services:
       dockerfile: docker/frontend.Dockerfile
     volumes:
       - ./frontend:/app
-      - ./docker/nginx.conf:/etc/nginx/http.d/default.conf:ro
+      - /app/node_modules
+      - /app/dist
     depends_on:
       - backend
     ports:
+      - "5174:5174"
       - "${PORT:-8008}:8008"
+    environment:
+      - VITE_API_URL=http://localhost:8008
     restart: unless-stopped

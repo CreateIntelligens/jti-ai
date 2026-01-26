@@ -6,6 +6,7 @@ import StoreManagementModal from './components/StoreManagementModal';
 import PromptManagementModal from './components/PromptManagementModal';
 import APIKeyModal from './components/APIKeyModal';
 import * as api from './services/api';
+import type { Store, FileItem, Message } from './types';
 import './styles/App.css';
 
 export default function App() {
@@ -14,15 +15,15 @@ export default function App() {
   const [promptModalOpen, setPromptModalOpen] = useState(false);
   const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
   const [status, setStatus] = useState('');
-  const [stores, setStores] = useState([]);
-  const [currentStore, setCurrentStore] = useState(null);
-  const [files, setFiles] = useState([]);
-  const [messages, setMessages] = useState([]);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [currentStore, setCurrentStore] = useState<string | null>(null);
+  const [files, setFiles] = useState<FileItem[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
-  const showStatus = (msg) => {
+  const showStatus = (msg: string) => {
     setStatus(msg);
     setTimeout(() => setStatus(''), 3000);
   };
@@ -34,6 +35,7 @@ export default function App() {
       return data;
     } catch (e) {
       showStatus('載入知識庫列表失敗');
+      console.error(e);
       return [];
     }
   }, []);
@@ -42,7 +44,9 @@ export default function App() {
     if (!currentStore) return;
     try {
       const data = await api.fetchFiles(currentStore);
-      data.sort((a, b) => (a.display_name || a.name).localeCompare(b.display_name || b.name));
+      data.sort((a, b) =>
+        (a.display_name || a.name).localeCompare(b.display_name || b.name)
+      );
       setFiles(data);
     } catch (e) {
       console.error('Failed to fetch files:', e);
@@ -58,7 +62,7 @@ export default function App() {
       }
     };
     init();
-  }, []);
+  }, [refreshStores]);
 
   useEffect(() => {
     if (currentStore) {
@@ -66,7 +70,7 @@ export default function App() {
     }
   }, [currentStore, refreshFiles]);
 
-  const handleStoreChange = async (storeName) => {
+  const handleStoreChange = async (storeName: string) => {
     setCurrentStore(storeName);
     setMessages([]);
     if (storeName) {
@@ -77,13 +81,17 @@ export default function App() {
           showStatus('✅ 已套用自訂 Prompt');
         }
       } catch (e) {
-        showStatus('連線失敗: ' + e.message);
-        setMessages([{ role: 'model', text: '連線失敗: ' + e.message, error: true }]);
+        const errorMsg = e instanceof Error ? e.message : String(e);
+        showStatus('連線失敗: ' + errorMsg);
+        setMessages([{
+          role: 'model',
+          text: '連線失敗: ' + errorMsg,
+          error: true
+        }]);
       }
     }
   };
 
-  // 重新啟動對話（用於套用新的 Prompt）
   const handleRestartChat = async () => {
     if (!currentStore) return;
     setMessages([]);
@@ -93,21 +101,23 @@ export default function App() {
         showStatus('✅ 已套用新的 Prompt');
       }
     } catch (e) {
-      showStatus('重新啟動失敗: ' + e.message);
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      showStatus('重新啟動失敗: ' + errorMsg);
     }
   };
 
-  const handleCreateStore = async (name) => {
+  const handleCreateStore = async (name: string) => {
     try {
       const newStore = await api.createStore(name);
       await refreshStores();
       handleStoreChange(newStore.name);
     } catch (e) {
-      alert('建立失敗: ' + e.message);
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      alert('建立失敗: ' + errorMsg);
     }
   };
 
-  const handleDeleteStore = async (storeName) => {
+  const handleDeleteStore = async (storeName: string) => {
     if (!storeName) return;
     try {
       await api.deleteStore(storeName);
@@ -119,11 +129,12 @@ export default function App() {
       await refreshStores();
       showStatus('知識庫已刪除');
     } catch (e) {
-      alert('刪除失敗: ' + e.message);
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      alert('刪除失敗: ' + errorMsg);
     }
   };
 
-  const handleUploadFile = async (file) => {
+  const handleUploadFile = async (file: File) => {
     if (!currentStore) {
       alert('請先選擇知識庫');
       return;
@@ -133,22 +144,24 @@ export default function App() {
       await refreshFiles();
       showStatus('文件上傳成功');
     } catch (e) {
-      alert('上傳失敗: ' + e.message);
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      alert('上傳失敗: ' + errorMsg);
     }
   };
 
-  const handleDeleteFile = async (fileName) => {
+  const handleDeleteFile = async (fileName: string) => {
     if (!confirm('確定刪除此文件？')) return;
     try {
       await api.deleteFile(fileName);
       await refreshFiles();
       showStatus('文件已刪除');
     } catch (e) {
-      alert('刪除失敗: ' + e.message);
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      alert('刪除失敗: ' + errorMsg);
     }
   };
 
-  const handleSendMessage = async (text) => {
+  const handleSendMessage = async (text: string) => {
     setMessages(prev => [...prev, { role: 'user', text }]);
     setMessages(prev => [...prev, { role: 'model', loading: true }]);
     setLoading(true);
@@ -157,13 +170,21 @@ export default function App() {
       const data = await api.sendMessage(text);
       setMessages(prev => {
         const newMessages = [...prev];
-        newMessages[newMessages.length - 1] = { role: 'model', text: data.answer };
+        newMessages[newMessages.length - 1] = {
+          role: 'model',
+          text: data.answer
+        };
         return newMessages;
       });
     } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : String(e);
       setMessages(prev => {
         const newMessages = [...prev];
-        newMessages[newMessages.length - 1] = { role: 'model', text: '錯誤: ' + e.message, error: true };
+        newMessages[newMessages.length - 1] = {
+          role: 'model',
+          text: '錯誤: ' + errorMsg,
+          error: true
+        };
         return newMessages;
       });
     } finally {
