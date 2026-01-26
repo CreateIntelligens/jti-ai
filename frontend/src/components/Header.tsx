@@ -16,22 +16,29 @@ export default function Header({
   return (
     <header>
       <div className="header-left">
-        <div className="toggle-icon" onClick={onToggleSidebar}>
+        <button
+          className="toggle-icon"
+          onClick={onToggleSidebar}
+          aria-label={sidebarOpen ? '關閉側邊欄' : '開啟側邊欄'}
+          aria-expanded={sidebarOpen}
+        >
           {sidebarOpen ? '◧' : '◨'}
-        </div>
-        <h1>✦ Crystalline Archive</h1>
-        {status && <div className="status">{status}</div>}
+        </button>
+        <h1>File Search Gemini</h1>
+        {status && <div className="status" role="status" aria-live="polite">{status}</div>}
       </div>
       <div className="header-actions">
         <button
           onClick={onOpenStoreManagement}
           className="header-link secondary"
+          aria-label="開啟知識庫管理"
         >
           ⬡ 知識庫管理
         </button>
         <button
           onClick={onOpenAPIKeyManagement}
           className="header-link secondary"
+          aria-label="開啟 API 金鑰管理"
         >
           ⬢ API 金鑰
         </button>

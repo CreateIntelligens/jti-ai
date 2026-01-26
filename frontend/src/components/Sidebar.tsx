@@ -63,13 +63,14 @@ export default function Sidebar({
   };
 
   return (
-    <aside className={isOpen ? '' : 'closed'}>
+    <aside className={isOpen ? '' : 'closed'} aria-label="側邊欄">
       <div className="sidebar-section fixed-section">
         <h2>知識庫</h2>
         <select
           value={currentStore || ''}
           onChange={e => onStoreChange(e.target.value)}
           className="w-full"
+          aria-label="選擇知識庫"
         >
           <option value="">選擇知識庫...</option>
           {stores.map(store => (
@@ -81,6 +82,7 @@ export default function Sidebar({
         <button
           onClick={onRefresh}
           className="secondary w-full mt-sm"
+          aria-label="重新整理知識庫列表"
         >
           ⟳ 重新整理
         </button>
@@ -94,6 +96,9 @@ export default function Sidebar({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
+          role="button"
+          tabIndex={0}
+          aria-label="上傳文件區域"
         >
           <p>
             {uploading ? '上傳中...' : (
@@ -108,18 +113,20 @@ export default function Sidebar({
             type="file"
             onChange={handleFileSelect}
             style={{ display: 'none' }}
+            aria-label="選擇文件"
           />
         </div>
 
         <div className="file-list-container">
           {files.length > 0 ? (
-            <ul className="file-list">
+            <ul className="file-list" aria-label="文件列表">
               {files.map(file => (
                 <li key={file.name}>
                   <span>{file.display_name || file.name}</span>
                   <button
                     onClick={() => onDeleteFile(file.name)}
                     className="danger small"
+                    aria-label={`刪除文件 ${file.display_name || file.name}`}
                   >
                     ✕
                   </button>
@@ -138,6 +145,7 @@ export default function Sidebar({
         <button
           onClick={onOpenPromptManagement}
           className="secondary w-full"
+          aria-label="開啟自訂 Prompt 管理"
         >
           ⚙ 自訂 Prompt
         </button>

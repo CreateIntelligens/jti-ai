@@ -38,7 +38,7 @@ export default function ChatArea({
 
   return (
     <main>
-      <div className="chat-history">
+      <div className="chat-history" role="log" aria-live="polite" aria-label="對話歷史">
         {messages.length === 0 ? (
           <div className="empty-state">
             <h3>✧ 開始對話 ✧</h3>
@@ -49,9 +49,11 @@ export default function ChatArea({
             <div
               key={idx}
               className={`message ${msg.role} ${msg.error ? 'error' : ''}`}
+              role={msg.role === 'user' ? 'article' : 'article'}
+              aria-label={msg.role === 'user' ? '使用者訊息' : 'AI 回覆'}
             >
               {msg.loading ? (
-                <span className="loading-dots">思考中</span>
+                <span className="loading-dots" aria-label="AI 思考中">思考中</span>
               ) : (
                 msg.text
               )}
@@ -61,15 +63,20 @@ export default function ChatArea({
         <div ref={chatEndRef} />
       </div>
 
-      <form className="input-area" onSubmit={handleSubmit}>
+      <form className="input-area" onSubmit={handleSubmit} aria-label="訊息輸入表單">
         <textarea
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={disabled ? '請先選擇知識庫...' : '輸入訊息... (Enter 傳送, Shift+Enter 換行)'}
           disabled={disabled || loading}
+          aria-label="訊息輸入框"
         />
-        <button type="submit" disabled={disabled || loading || !input.trim()}>
+        <button
+          type="submit"
+          disabled={disabled || loading || !input.trim()}
+          aria-label="傳送訊息"
+        >
           ⬡ 傳送
         </button>
       </form>
