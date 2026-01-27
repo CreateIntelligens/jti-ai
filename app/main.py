@@ -47,11 +47,13 @@ for logger_name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
     for handler in uvicorn_logger.handlers:
         handler.setFormatter(TimestampFormatter("%(levelprefix)s %(message)s"))
 
-from fastapi import FastAPI, File, HTTPException, UploadFile, Request
+from fastapi import FastAPI, File, HTTPException, UploadFile, Request, Header as FastAPIHeader
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from google.genai.errors import ClientError
+from typing import Dict
+import hashlib
 
 from .core import FileSearchManager
 from .api_keys import APIKeyManager
@@ -89,6 +91,8 @@ app.add_middleware(
 manager: FileSearchManager | None = None
 prompt_manager = None
 api_key_manager: APIKeyManager | None = None
+# Session managers: {session_id: FileSearchManager}
+user_managers: Dict[str, FileSearchManager] = {}
 
 
 @app.on_event("startup")
@@ -102,6 +106,27 @@ def startup():
         api_key_manager = APIKeyManager()
     except ValueError as e:
         print(f"警告: {e}")
+
+
+def _get_or_create_manager(user_api_key: Optional[str] = None) -> FileSearchManager:
+    """根據使用者提供的 API Key 取得或建立 Manager"""
+    if not user_api_key:
+        # 沒有提供 API Key，使用預設的全域 manager
+        if not manager:
+            raise HTTPException(status_code=500, detail="未設定 API Key")
+        return manager
+    
+    # 使用 API Key 的 hash 作為 session ID
+    session_id = hashlib.sha256(user_api_key.encode()).hexdigest()
+    
+    if session_id not in user_managers:
+        try:
+            user_managers[session_id] = FileSearchManager(api_key=user_api_key)
+            print(f"[Session] 建立新的使用者 Manager: {session_id[:8]}...")
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=f"無效的 API Key: {e}")
+    
+    return user_managers[session_id]
 
 
 class CreateStoreRequest(BaseModel):
@@ -123,29 +148,26 @@ class ChatMessageRequest(BaseModel):
 
 
 @app.get("/api/stores")
-def list_stores():
+def list_stores(x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
     """列出所有 Store。"""
-    if not manager:
-        raise HTTPException(status_code=500, detail="未設定 API Key")
-    stores = manager.list_stores()
+    mgr = _get_or_create_manager(x_gemini_api_key)
+    stores = mgr.list_stores()
     return [{"name": s.name, "display_name": s.display_name} for s in stores]
 
 
 @app.post("/api/stores")
-def create_store(req: CreateStoreRequest):
+def create_store(req: CreateStoreRequest, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
     """建立新 Store。"""
-    if not manager:
-        raise HTTPException(status_code=500, detail="未設定 API Key")
-    store_name = manager.create_store(req.display_name)
+    mgr = _get_or_create_manager(x_gemini_api_key)
+    store_name = mgr.create_store(req.display_name)
     return {"name": store_name}
 
 
 @app.get("/api/stores/{store_name:path}/files")
-def list_files(store_name: str):
+def list_files(store_name: str, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
     """列出 Store 中的檔案。"""
-    if not manager:
-        raise HTTPException(status_code=500, detail="未設定 API Key")
-    files = manager.list_files(store_name)
+    mgr = _get_or_create_manager(x_gemini_api_key)
+    files = mgr.list_files(store_name)
     return [{"name": f.name, "display_name": f.display_name} for f in files]
 
 
@@ -154,13 +176,12 @@ import traceback
 # ... imports ...
 
 @app.delete("/api/files/{file_name:path}")
-def delete_file(file_name: str):
+def delete_file(file_name: str, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
     """刪除檔案。"""
-    if not manager:
-        raise HTTPException(status_code=500, detail="未設定 API Key")
+    mgr = _get_or_create_manager(x_gemini_api_key)
     try:
         print(f"嘗試刪除檔案: {file_name}")
-        manager.delete_file(file_name)
+        mgr.delete_file(file_name)
         return {"ok": True}
     except Exception as e:
         traceback.print_exc()  # Print full traceback to logs
@@ -168,10 +189,9 @@ def delete_file(file_name: str):
 
 
 @app.post("/api/stores/{store_name:path}/upload")
-async def upload_file(store_name: str, file: UploadFile = File(...)):
+async def upload_file(store_name: str, file: UploadFile = File(...), x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
     """上傳檔案到 Store。"""
-    if not manager:
-        raise HTTPException(status_code=500, detail="未設定 API Key")
+    mgr = _get_or_create_manager(x_gemini_api_key)
 
     temp_dir = Path("/tmp/gemini-upload")
     temp_dir.mkdir(exist_ok=True)
@@ -186,7 +206,7 @@ async def upload_file(store_name: str, file: UploadFile = File(...)):
     try:
         # 故意不傳入 file.content_type，讓 core.py 根據副檔名自己判斷正確的 MIME Type
         # 這樣可以避免瀏覽器傳送錯誤的 MIME Type (例如 xlsx 被當成 application/octet-stream)
-        result = manager.upload_file(
+        result = mgr.upload_file(
             store_name, str(temp_path), file.filename, mime_type=None
         )
         return {"name": result}
@@ -195,19 +215,17 @@ async def upload_file(store_name: str, file: UploadFile = File(...)):
 
 
 @app.post("/api/query")
-def query(req: QueryRequest):
+def query(req: QueryRequest, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
     """查詢 Store (單次)。"""
-    if not manager:
-        raise HTTPException(status_code=500, detail="未設定 API Key")
-    response = manager.query(req.store_name, req.question)
+    mgr = _get_or_create_manager(x_gemini_api_key)
+    response = mgr.query(req.store_name, req.question)
     return {"answer": response.text}
 
 
 @app.post("/api/chat/start")
-def start_chat(req: ChatStartRequest):
+def start_chat(req: ChatStartRequest, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
     """開始新的對話 Session。"""
-    if not manager:
-        raise HTTPException(status_code=500, detail="未設定 API Key")
+    mgr = _get_or_create_manager(x_gemini_api_key)
     
     # 取得啟用的 prompt (如果有)
     system_instruction = None
@@ -219,27 +237,25 @@ def start_chat(req: ChatStartRequest):
         else:
             print(f"[DEBUG] Store {req.store_name} 沒有啟用的 Prompt")
     
-    manager.start_chat(req.store_name, req.model, system_instruction=system_instruction)
+    mgr.start_chat(req.store_name, req.model, system_instruction=system_instruction)
     return {"ok": True, "prompt_applied": system_instruction is not None}
 
 @app.post("/api/chat/message")
-def send_message(req: ChatMessageRequest):
+def send_message(req: ChatMessageRequest, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
     """發送訊息到目前對話。"""
-    if not manager:
-        raise HTTPException(status_code=500, detail="未設定 API Key")
+    mgr = _get_or_create_manager(x_gemini_api_key)
     try:
-        response = manager.send_message(req.message)
+        response = mgr.send_message(req.message)
         return {"answer": response.text}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/api/chat/history")
-def get_history():
+def get_history(x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
     """取得目前對話紀錄。"""
-    if not manager:
-        raise HTTPException(status_code=500, detail="未設定 API Key")
-    return manager.get_history()
+    mgr = _get_or_create_manager(x_gemini_api_key)
+    return mgr.get_history()
 
 
 # ========== OpenAI Compatible API ==========
@@ -513,11 +529,10 @@ def get_active_store_prompt(store_name: str):
 
 
 @app.delete("/api/stores/{store_name:path}")
-def delete_store(store_name: str):
+def delete_store(store_name: str, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
     """刪除 Store。"""
-    if not manager:
-        raise HTTPException(status_code=500, detail="未設定 API Key")
-    manager.delete_store(store_name)
+    mgr = _get_or_create_manager(x_gemini_api_key)
+    mgr.delete_store(store_name)
     return {"ok": True}
 
 

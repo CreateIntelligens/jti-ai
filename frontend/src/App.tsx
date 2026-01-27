@@ -5,6 +5,7 @@ import ChatArea from './components/ChatArea';
 import StoreManagementModal from './components/StoreManagementModal';
 import PromptManagementModal from './components/PromptManagementModal';
 import APIKeyModal from './components/APIKeyModal';
+import UserApiKeyModal from './components/UserApiKeyModal';
 import * as api from './services/api';
 import type { Store, FileItem, Message } from './types';
 import './styles/App.css';
@@ -14,10 +15,12 @@ export default function App() {
   const [storeModalOpen, setStoreModalOpen] = useState(false);
   const [promptModalOpen, setPromptModalOpen] = useState(false);
   const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
+  const [userApiKeyModalOpen, setUserApiKeyModalOpen] = useState(false);
   const [status, setStatus] = useState('');
   const [stores, setStores] = useState<Store[]>([]);
   const [currentStore, setCurrentStore] = useState<string | null>(null);
   const [files, setFiles] = useState<FileItem[]>([]);
+  const [filesLoading, setFilesLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -42,6 +45,7 @@ export default function App() {
 
   const refreshFiles = useCallback(async () => {
     if (!currentStore) return;
+    setFilesLoading(true);
     try {
       const data = await api.fetchFiles(currentStore);
       data.sort((a, b) =>
@@ -50,6 +54,8 @@ export default function App() {
       setFiles(data);
     } catch (e) {
       console.error('Failed to fetch files:', e);
+    } finally {
+      setFilesLoading(false);
     }
   }, [currentStore]);
 
@@ -59,6 +65,8 @@ export default function App() {
       const lastStore = localStorage.getItem('lastStore');
       if (lastStore && storeList.find(s => s.name === lastStore)) {
         handleStoreChange(lastStore);
+      } else if (storeList.length > 0) {
+        handleStoreChange(storeList[0].name);
       }
     };
     init();
@@ -204,6 +212,7 @@ export default function App() {
         sidebarOpen={sidebarOpen}
         onOpenStoreManagement={() => setStoreModalOpen(true)}
         onOpenAPIKeyManagement={() => setApiKeyModalOpen(true)}
+        onOpenUserApiKeySettings={() => setUserApiKeyModalOpen(true)}
       />
       <div className="app-container">
         <Sidebar
@@ -211,6 +220,7 @@ export default function App() {
           stores={stores}
           currentStore={currentStore}
           files={files}
+          filesLoading={filesLoading}
           onStoreChange={handleStoreChange}
           onUploadFile={handleUploadFile}
           onDeleteFile={handleDeleteFile}
@@ -244,6 +254,15 @@ export default function App() {
         isOpen={apiKeyModalOpen}
         onClose={() => setApiKeyModalOpen(false)}
         stores={stores}
+      />
+      <UserApiKeyModal
+        isOpen={userApiKeyModalOpen}
+        onClose={() => setUserApiKeyModalOpen(false)}
+        onApiKeySaved={() => {
+          showStatus('✅ API Key 已儲存');
+          refreshStores();
+          refreshFiles();
+        }}
       />
     </>
   );

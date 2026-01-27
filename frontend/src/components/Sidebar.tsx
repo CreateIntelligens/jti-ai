@@ -6,6 +6,7 @@ interface SidebarProps {
   stores: Store[];
   currentStore: string | null;
   files: FileItem[];
+  filesLoading: boolean;
   onStoreChange: (storeName: string) => void;
   onUploadFile: (file: File) => void;
   onDeleteFile: (fileName: string) => void;
@@ -18,6 +19,7 @@ export default function Sidebar({
   stores,
   currentStore,
   files,
+  filesLoading,
   onStoreChange,
   onUploadFile,
   onDeleteFile,
@@ -72,7 +74,9 @@ export default function Sidebar({
           className="w-full"
           aria-label="選擇知識庫"
         >
-          <option value="">選擇知識庫...</option>
+          {stores.length === 0 && (
+            <option value="">尚無知識庫</option>
+          )}
           {stores.map(store => (
             <option key={store.name} value={store.name}>
               {store.display_name || store.name}
@@ -118,10 +122,18 @@ export default function Sidebar({
         </div>
 
         <div className="file-list-container">
-          {files.length > 0 ? (
+          {filesLoading ? (
+            <ul className="file-list" aria-label="載入中">
+              {[1, 2, 3].map(i => (
+                <li key={i} className="file-skeleton">
+                  <div className="skeleton-bar" style={{ width: `${50 + i * 12}%` }} />
+                </li>
+              ))}
+            </ul>
+          ) : files.length > 0 ? (
             <ul className="file-list" aria-label="文件列表">
-              {files.map(file => (
-                <li key={file.name}>
+              {files.map((file, i) => (
+                <li key={file.name} className="file-item-enter" style={{ animationDelay: `${i * 40}ms` }}>
                   <span>{file.display_name || file.name}</span>
                   <button
                     onClick={() => onDeleteFile(file.name)}

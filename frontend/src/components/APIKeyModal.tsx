@@ -73,7 +73,7 @@ export default function APIKeyModal({ isOpen, onClose, stores }: APIKeyModalProp
   const handleDelete = async (keyId: string) => {
     if (!confirm('確定要刪除此 API Key 嗎？')) return;
     try {
-      await api.deleteApiKey(keyId);
+      await api.deleteServerApiKey(keyId);
       await loadKeys();
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : String(e);

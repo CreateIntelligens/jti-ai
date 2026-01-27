@@ -4,6 +4,7 @@ interface HeaderProps {
   sidebarOpen: boolean;
   onOpenStoreManagement: () => void;
   onOpenAPIKeyManagement: () => void;
+  onOpenUserApiKeySettings: () => void;
 }
 
 export default function Header({
@@ -12,6 +13,7 @@ export default function Header({
   sidebarOpen,
   onOpenStoreManagement,
   onOpenAPIKeyManagement,
+  onOpenUserApiKeySettings,
 }: HeaderProps) {
   return (
     <header>
@@ -28,6 +30,13 @@ export default function Header({
         {status && <div className="status" role="status" aria-live="polite">{status}</div>}
       </div>
       <div className="header-actions">
+        <button
+          onClick={onOpenUserApiKeySettings}
+          className="header-link primary"
+          aria-label="設定你的 API Key"
+        >
+          ⬢ 我的 API Key
+        </button>
         <button
           onClick={onOpenStoreManagement}
           className="header-link secondary"

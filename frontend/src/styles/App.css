@@ -611,6 +611,46 @@ button.small {
   margin-left: 0.75rem;
 }
 
+/* File list animations */
+.file-item-enter {
+  animation: fileSlideIn 0.3s ease both;
+}
+
+@keyframes fileSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Skeleton loading */
+.file-skeleton {
+  pointer-events: none;
+  padding: 0.85rem 1rem !important;
+}
+
+.skeleton-bar {
+  height: 14px;
+  border-radius: 6px;
+  background: linear-gradient(
+    90deg,
+    rgba(61, 217, 211, 0.06) 25%,
+    rgba(61, 217, 211, 0.12) 50%,
+    rgba(61, 217, 211, 0.06) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 /* ==================== DROP ZONE ==================== */
 
 .drop-zone {
