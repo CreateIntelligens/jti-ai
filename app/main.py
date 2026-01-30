@@ -265,8 +265,8 @@ class OpenAIChatMessage(BaseModel):
     content: str
 
 # 支援的 Gemini 模型
-SUPPORTED_MODELS = ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-3-flash-preview", "gemini-3-pro-preview"]
-DEFAULT_MODEL = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+SUPPORTED_MODELS = ["gemini-2.5-flash-lite", "gemini-3-flash-preview", "gemini-3-pro-preview"]
+DEFAULT_MODEL = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
 
 class OpenAIChatRequest(BaseModel):
     model: str = DEFAULT_MODEL

@@ -3,8 +3,9 @@ interface HeaderProps {
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
   onOpenStoreManagement: () => void;
-  onOpenAPIKeyManagement: () => void;
   onOpenUserApiKeySettings: () => void;
+  theme: 'dark' | 'light';
+  onToggleTheme: () => void;
 }
 
 export default function Header({
@@ -12,8 +13,9 @@ export default function Header({
   onToggleSidebar,
   sidebarOpen,
   onOpenStoreManagement,
-  onOpenAPIKeyManagement,
   onOpenUserApiKeySettings,
+  theme,
+  onToggleTheme,
 }: HeaderProps) {
   return (
     <header>
@@ -30,6 +32,19 @@ export default function Header({
         {status && <div className="status" role="status" aria-live="polite">{status}</div>}
       </div>
       <div className="header-actions">
+        <div 
+          className="theme-switch"
+          onClick={onToggleTheme}
+          role="switch"
+          aria-checked={theme === 'light'}
+          aria-label="切換深淺色主題"
+          tabIndex={0}
+          onKeyDown={e => e.key === 'Enter' && onToggleTheme()}
+        >
+          <span className={`theme-option ${theme === 'dark' ? 'active' : ''}`}>🌙</span>
+          <span className={`theme-option ${theme === 'light' ? 'active' : ''}`}>☀️</span>
+          <div className={`theme-slider ${theme === 'light' ? 'light' : ''}`} />
+        </div>
         <button
           onClick={onOpenUserApiKeySettings}
           className="header-link primary"
@@ -43,13 +58,6 @@ export default function Header({
           aria-label="開啟知識庫管理"
         >
           ⬡ 知識庫管理
-        </button>
-        <button
-          onClick={onOpenAPIKeyManagement}
-          className="header-link secondary"
-          aria-label="開啟 API 金鑰管理"
-        >
-          ⬢ API 金鑰
         </button>
       </div>
     </header>

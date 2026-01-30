@@ -157,9 +157,9 @@ export default function Sidebar({
         <button
           onClick={onOpenPromptManagement}
           className="secondary w-full"
-          aria-label="開啟自訂 Prompt 管理"
+          aria-label="開啟設置"
         >
-          ⚙ 自訂 Prompt
+          ⚙ 設置
         </button>
       </div>
     </aside>

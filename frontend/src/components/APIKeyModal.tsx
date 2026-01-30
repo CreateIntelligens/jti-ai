@@ -7,7 +7,15 @@ interface APIKey {
   key_prefix: string;
   name: string;
   store_name: string;
+  prompt_index: number | null;
   created_at: string;
+}
+
+interface PromptItem {
+  id: string;
+  name: string;
+  content: string;
+  is_active: boolean;
 }
 
 interface APIKeyModalProps {
@@ -19,6 +27,8 @@ interface APIKeyModalProps {
 export default function APIKeyModal({ isOpen, onClose, stores }: APIKeyModalProps) {
   const [selectedStore, setSelectedStore] = useState('');
   const [keyName, setKeyName] = useState('');
+  const [selectedPromptIndex, setSelectedPromptIndex] = useState<string>('');
+  const [prompts, setPrompts] = useState<PromptItem[]>([]);
   const [keys, setKeys] = useState<APIKey[]>([]);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -31,6 +41,18 @@ export default function APIKeyModal({ isOpen, onClose, stores }: APIKeyModalProp
       setNewKeyCreated(null);
     }
   }, [isOpen, selectedStore]);
+
+  // 選擇知識庫後載入該庫的 prompt 列表
+  useEffect(() => {
+    if (selectedStore) {
+      api.listPrompts(selectedStore).then(data => {
+        setPrompts(Array.isArray(data) ? data : []);
+      }).catch(() => setPrompts([]));
+    } else {
+      setPrompts([]);
+    }
+    setSelectedPromptIndex('');
+  }, [selectedStore]);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -58,9 +80,11 @@ export default function APIKeyModal({ isOpen, onClose, stores }: APIKeyModalProp
     if (!selectedStore || !keyName.trim()) return;
     setCreating(true);
     try {
-      const result = await api.createApiKey(keyName.trim(), selectedStore);
+      const promptIndex = selectedPromptIndex !== '' ? Number(selectedPromptIndex) : null;
+      const result = await api.createApiKey(keyName.trim(), selectedStore, promptIndex);
       setNewKeyCreated(result.key);
       setKeyName('');
+      setSelectedPromptIndex('');
       await loadKeys();
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : String(e);
@@ -81,34 +105,42 @@ export default function APIKeyModal({ isOpen, onClose, stores }: APIKeyModalProp
     }
   };
 
+  const getPromptLabel = (promptIndex: number | null): string => {
+    if (promptIndex == null) return '';
+    if (prompts.length > 0 && promptIndex < prompts.length) {
+      return prompts[promptIndex].name;
+    }
+    return `Prompt #${promptIndex}`;
+  };
+
   if (!isOpen) return null;
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
+      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '680px' }}>
         <h2>⬢ API 金鑰管理</h2>
 
         <div className="modal-content">
           {newKeyCreated && (
-            <div style={{ 
-              padding: '1rem', 
-              background: 'var(--crystal-amber)', 
-              color: '#0a0f1a', 
+            <div style={{
+              padding: '1rem',
+              background: 'var(--crystal-amber)',
+              color: '#0a0f1a',
               borderRadius: '8px',
               marginBottom: '1rem'
             }}>
               <p style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>✓ API Key 已建立</p>
               <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>請妥善保存此金鑰，之後無法再次查看：</p>
-              <code style={{ 
-                display: 'block', 
-                padding: '0.5rem', 
-                background: 'rgba(0,0,0,0.2)', 
+              <code style={{
+                display: 'block',
+                padding: '0.5rem',
+                background: 'rgba(0,0,0,0.2)',
                 borderRadius: '4px',
                 wordBreak: 'break-all'
               }}>
                 {newKeyCreated}
               </code>
-              <button 
+              <button
                 onClick={() => setNewKeyCreated(null)}
                 style={{ marginTop: '0.5rem', fontSize: '0.85rem' }}
               >
@@ -121,6 +153,7 @@ export default function APIKeyModal({ isOpen, onClose, stores }: APIKeyModalProp
             <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--crystal-cyan)' }}>
               建立新的 API Key
             </h3>
+            {/* 知識庫選擇 */}
             <div style={{ marginBottom: '1rem' }}>
               <label style={{ display: 'block', marginBottom: '0.5rem', color: '#8090b0' }}>
                 選擇知識庫
@@ -139,19 +172,42 @@ export default function APIKeyModal({ isOpen, onClose, stores }: APIKeyModalProp
               </select>
             </div>
             {selectedStore && (
-              <div className="flex gap-md">
-                <input
-                  type="text"
-                  value={keyName}
-                  onChange={e => setKeyName(e.target.value)}
-                  placeholder="輸入用途說明（例如：測試、生產環境）"
-                  className="flex-1"
-                  onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                />
-                <button onClick={handleCreate} disabled={creating || !keyName.trim()}>
-                  {creating ? '建立中...' : '✓ 建立'}
-                </button>
-              </div>
+              <>
+                {/* Prompt 選擇（可選） */}
+                {prompts.length > 0 && (
+                  <div style={{ marginBottom: '1rem' }}>
+                    <label style={{ display: 'block', marginBottom: '0.5rem', color: '#8090b0' }}>
+                      指定 Prompt（可選）
+                    </label>
+                    <select
+                      value={selectedPromptIndex}
+                      onChange={e => setSelectedPromptIndex(e.target.value)}
+                      className="w-full"
+                    >
+                      <option value="">使用預設（啟用中的 Prompt）</option>
+                      {prompts.map((p, idx) => (
+                        <option key={p.id} value={idx}>
+                          {p.name}{p.is_active ? ' (目前啟用)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {/* 名稱 + 建立 */}
+                <div className="flex gap-md">
+                  <input
+                    type="text"
+                    value={keyName}
+                    onChange={e => setKeyName(e.target.value)}
+                    placeholder="用途說明（例如：測試、生產環境）"
+                    className="flex-1"
+                    onKeyDown={e => e.key === 'Enter' && handleCreate()}
+                  />
+                  <button onClick={handleCreate} disabled={creating || !keyName.trim()}>
+                    {creating ? '建立中...' : '✓ 建立'}
+                  </button>
+                </div>
+              </>
             )}
           </div>
 
@@ -175,6 +231,11 @@ export default function APIKeyModal({ isOpen, onClose, stores }: APIKeyModalProp
                       <div style={{ fontWeight: 'bold' }}>{key.name}</div>
                       <div style={{ fontSize: '0.85rem', color: '#8090b0' }}>
                         {key.key_prefix} | {stores.find(s => s.name === key.store_name)?.display_name || key.store_name}
+                        {key.prompt_index != null && (
+                          <span style={{ color: 'var(--crystal-cyan)', marginLeft: '0.5rem' }}>
+                            | {getPromptLabel(key.prompt_index)}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <button

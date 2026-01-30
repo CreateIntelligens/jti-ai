@@ -4,7 +4,6 @@ import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
 import StoreManagementModal from './components/StoreManagementModal';
 import PromptManagementModal from './components/PromptManagementModal';
-import APIKeyModal from './components/APIKeyModal';
 import UserApiKeyModal from './components/UserApiKeyModal';
 import * as api from './services/api';
 import type { Store, FileItem, Message } from './types';
@@ -14,7 +13,6 @@ export default function App() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [storeModalOpen, setStoreModalOpen] = useState(false);
   const [promptModalOpen, setPromptModalOpen] = useState(false);
-  const [apiKeyModalOpen, setApiKeyModalOpen] = useState(false);
   const [userApiKeyModalOpen, setUserApiKeyModalOpen] = useState(false);
   const [status, setStatus] = useState('');
   const [stores, setStores] = useState<Store[]>([]);
@@ -23,6 +21,20 @@ export default function App() {
   const [filesLoading, setFilesLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('theme');
+    return (saved === 'light' || saved === 'dark') ? saved : 'dark';
+  });
+
+  // Apply theme to document
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
@@ -211,8 +223,9 @@ export default function App() {
         onToggleSidebar={toggleSidebar}
         sidebarOpen={sidebarOpen}
         onOpenStoreManagement={() => setStoreModalOpen(true)}
-        onOpenAPIKeyManagement={() => setApiKeyModalOpen(true)}
         onOpenUserApiKeySettings={() => setUserApiKeyModalOpen(true)}
+        theme={theme}
+        onToggleTheme={toggleTheme}
       />
       <div className="app-container">
         <Sidebar
@@ -249,10 +262,6 @@ export default function App() {
         currentStore={currentStore}
         onRefresh={refreshStores}
         onRestartChat={handleRestartChat}
-      />
-      <APIKeyModal
-        isOpen={apiKeyModalOpen}
-        onClose={() => setApiKeyModalOpen(false)}
         stores={stores}
       />
       <UserApiKeyModal

@@ -149,14 +149,13 @@ export async function listApiKeys(storeName?: string): Promise<any[]> {
   return handleResponse<any[]>(response);
 }
 
-export async function createApiKey(name: string, storeName: string): Promise<{ key: string; message: string }> {
+export async function createApiKey(name: string, storeName: string, promptIndex?: number | null): Promise<{ key: string; message: string }> {
+  const body: Record<string, unknown> = { name, store_name: storeName };
+  if (promptIndex != null) body.prompt_index = promptIndex;
   const response = await fetch(`${API_BASE}/keys`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ 
-      name,
-      store_name: storeName
-    }),
+    body: JSON.stringify(body),
   });
   return handleResponse<{ key: string; message: string }>(response);
 }
