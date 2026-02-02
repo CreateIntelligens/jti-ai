@@ -7,8 +7,13 @@ import traceback
 import os
 import shutil
 import uuid
+import warnings
 from pathlib import Path
 from typing import Optional
+
+# 過濾 Gemini AFC 警告（我們故意使用 Manual Function Calling）
+warnings.filterwarnings('ignore', message='.*automatic function calling.*')
+warnings.filterwarnings('ignore', message='.*AFC.*')
 
 # 設定 uvicorn 日誌格式（加上時間戳，保留顏色，狀態碼上色）
 import uvicorn.logging
@@ -57,6 +62,7 @@ import hashlib
 
 from .core import FileSearchManager
 from .api_keys import APIKeyManager
+from .routers import mbti, jti_test
 
 app = FastAPI(title="Gemini File Search API")
 
@@ -656,3 +662,8 @@ def delete_api_key(key_id: str):
 def index():
     """API 入口。"""
     return {"message": "Gemini File Search API", "docs": "/docs"}
+
+
+# 引入 MBTI 路由
+app.include_router(mbti.router)
+app.include_router(jti_test.router)
