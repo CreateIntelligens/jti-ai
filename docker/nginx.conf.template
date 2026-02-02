@@ -35,23 +35,17 @@ server {
     proxy_send_timeout 300;
   }
 
-  # FastAPI docs
-  location /docs {
-    proxy_pass http://backend:${BACKEND_PORT}/docs;
+  # FastAPI backend routes (優先度高)
+  location ~ ^/(jti|docs|openapi.json|api/|v1/) {
+    proxy_pass http://backend:${BACKEND_PORT};
     proxy_http_version 1.1;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
-  }
-
-  location /openapi.json {
-    proxy_pass http://backend:${BACKEND_PORT}/openapi.json;
-    proxy_http_version 1.1;
-    proxy_set_header Host $host;
-    proxy_set_header X-Real-IP $remote_addr;
-    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_read_timeout 300;
+    proxy_connect_timeout 300;
+    proxy_send_timeout 300;
   }
 
   # Vite dev server (支援熱重載的 WebSocket)
