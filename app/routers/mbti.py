@@ -198,7 +198,7 @@ async def chat(request: ChatRequest):
             else:
                 # ❌ 無法判斷 A/B：用 AI 打哈哈 + 重問當前題
                 nudge_instruction = (
-                    "使用者回覆不是 A/B 選項，請用一句輕鬆打哈哈的語氣帶過（不要回答新問題），"
+                    "使用者回覆不是 A/B 選項，請用一句輕鬆的語氣敷衍回答，"
                     f"並提醒還剩 {remaining} 題，然後重問當前題目：\n\n{current_q_text}"
                 )
 

@@ -201,6 +201,13 @@ class ToolExecutor:
 
         # 如果還沒完成，附上下一題並保存到 session
         if not is_complete:
+            # 取得剛回答的題目資訊（用於評論）
+            answered_question = session.selected_questions[session.current_q_index - 1] if session.selected_questions else None
+            answered_option_text = ""
+            if answered_question:
+                opt_index = 0 if option_id == "a" else 1
+                answered_option_text = answered_question['options'][opt_index]['text']
+
             # 從 session 中選中的題目列表取得下一題
             if session.selected_questions:
                 next_question = get_question_from_selected(session.selected_questions, session.current_q_index)
@@ -209,16 +216,24 @@ class ToolExecutor:
                 next_question = quiz_get_question(session.quiz_id, session.current_q_index)
 
             result["next_question"] = next_question
-            # 讓 LLM 自然回應，可加簡短評論或直接問下一題
-            result["instruction_for_llm"] = f"""使用者已回答，請自然回應。可以：
-1. 簡短評論使用者的選擇（5-8字，例如「了解！」「收到」「有意思」）
-2. 或直接問下一題（不需要客套話）
+            # 讓 LLM 簡短評論上一題答案，然後問下一題
+            result["instruction_for_llm"] = f"""使用者選擇了「{answered_option_text}」，請用一句話簡短評論這個選擇（5-10字），然後問下一題。
 
+評論範例：
+- 「喜歡獨處充電的人～」
+- 「很有創意的類型！」
+- 「務實派的你～」
+- 「重視感受的人呢」
+
+必須問的下一題：
 第{session.current_q_index + 1}題：{next_question['text']}
 A. {next_question['options'][0]['text']}
 B. {next_question['options'][1]['text']}
 
-不要說「好的，謝謝您的回答/選擇」這類公式化的話。"""
+禁止事項：
+- 不要問「請選擇 A 還是 B」
+- 不要說「好的，謝謝您的回答」
+- 評論要簡短，不要超過 10 個字"""
             session_manager.set_current_question(session_id, next_question)
         else:
             # 完成測驗，立即計算 MBTI 類型
