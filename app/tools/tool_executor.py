@@ -110,7 +110,7 @@ class ToolExecutor:
 
         return {
             "success": True,
-            "message": f"測驗已開始！\n\n第1題：{question['text']}\nA. {question['options'][0]['text']}\nB. {question['options'][1]['text']}",
+            "message": f"\n第1題：{question['text']}\nA. {question['options'][0]['text']}\nB. {question['options'][1]['text']}",
             "current_question": question,
             "total_questions": 5,
             "progress": 0
@@ -209,8 +209,16 @@ class ToolExecutor:
                 next_question = quiz_get_question(session.quiz_id, session.current_q_index)
 
             result["next_question"] = next_question
-            # 不直接提供 message，讓 LLM 根據答案給予回應後再問下一題
-            result["instruction_for_llm"] = f"請簡短評論使用者的選擇（1句話），然後問下一題：\n\n第{session.current_q_index + 1}題：{next_question['text']}\nA. {next_question['options'][0]['text']}\nB. {next_question['options'][1]['text']}"
+            # 讓 LLM 自然回應，可加簡短評論或直接問下一題
+            result["instruction_for_llm"] = f"""使用者已回答，請自然回應。可以：
+1. 簡短評論使用者的選擇（5-8字，例如「了解！」「收到」「有意思」）
+2. 或直接問下一題（不需要客套話）
+
+第{session.current_q_index + 1}題：{next_question['text']}
+A. {next_question['options'][0]['text']}
+B. {next_question['options'][1]['text']}
+
+不要說「好的，謝謝您的回答/選擇」這類公式化的話。"""
             session_manager.set_current_question(session_id, next_question)
         else:
             # 完成測驗，立即計算 MBTI 類型

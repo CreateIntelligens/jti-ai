@@ -112,9 +112,10 @@ async def chat(request: ChatRequest):
        - 其他問題 → 正常回答
 
     2. QUIZ 狀態（有當前題目）：後端完全接管
-       - 用 LLM 判斷使用者選 A 還是 B
+       - 先用規則判斷使用者選 A 還是 B（明確 A/B/1/2 或選項文字）
+       - 規則無法判斷時，再用 LLM 判斷
        - 判斷成功 → 呼叫 submit_answer，回覆下一題
-       - 判斷失敗 → 回「剩餘題數 + 重問當前題」
+       - 判斷失敗 → AI 打哈哈 + 重問當前題
        - **不走知識庫，鎖定作答**
     """
     try:
@@ -195,8 +196,21 @@ async def chat(request: ChatRequest):
                     tool_calls=response_tool_calls
                 )
             else:
-                # ❌ 無法判斷 A/B，重問當前題
-                response_message = f"請選擇 A 或 B 來回答喔！還剩 {remaining} 題 🎯\n\n{current_q_text}"
+                # ❌ 無法判斷 A/B：用 AI 打哈哈 + 重問當前題
+                nudge_instruction = (
+                    "使用者回覆不是 A/B 選項，請用一句輕鬆打哈哈的語氣帶過（不要回答新問題），"
+                    f"並提醒還剩 {remaining} 題，然後重問當前題目：\n\n{current_q_text}"
+                )
+
+                nudge_result = await main_agent.chat_with_tool_result(
+                    session_id=request.session_id,
+                    user_message=request.message,
+                    tool_name="quiz_nudge",
+                    tool_args={},
+                    tool_result={"instruction_for_llm": nudge_instruction}
+                )
+
+                response_message = nudge_result["message"]
 
                 # 記錄對話
                 session_manager.add_chat_message(request.session_id, "user", request.message)
@@ -224,50 +238,7 @@ async def chat(request: ChatRequest):
                     tool_calls=[]
                 )
 
-        # ========== 非 QUIZ 狀態：走 LLM ==========
-        # 檢查是否要開始測驗
-        msg_lower = request.message.lower()
-
-        # 如果已有 persona 且使用者問 MBTI 相關問題，回答結果而非重新開始
-        if session.persona and 'mbti' in msg_lower:
-            # 使用者可能在問自己的 MBTI 類型
-            # 交給 LLM 處理，它會從 session 狀態知道 persona
-            pass
-        elif any(keyword in msg_lower for keyword in ['mbti', '測驗', '測試', '遊戲', '玩', '開始']):
-            # 開始測驗（只有在沒有 persona 或明確要求開始時）
-            tool_result = await tool_executor.execute("start_quiz", {
-                "session_id": request.session_id
-            })
-
-            updated_session = session_manager.get_session(request.session_id)
-            response_message = tool_result.get("message", "測驗已開始！")
-
-            session_manager.add_chat_message(request.session_id, "user", request.message)
-            session_manager.add_chat_message(request.session_id, "assistant", response_message)
-
-            # 記錄到對話日誌
-            conversation_logger.log_conversation(
-                session_id=request.session_id,
-                user_message=request.message,
-                agent_response=response_message,
-                tool_calls=[{"tool": "start_quiz", "args": {}, "result": tool_result}],
-                session_state={
-                    "step": updated_session.step.value,
-                    "answers_count": len(updated_session.answers),
-                    "persona": updated_session.persona,
-                    "current_question_id": updated_session.current_question.get("id") if updated_session.current_question else None
-                }
-            )
-
-            logger.info(f"✅ 開始測驗")
-
-            return ChatResponse(
-                message=response_message,
-                session=updated_session.model_dump(),
-                tool_calls=[{"tool": "start_quiz", "args": {}}]
-            )
-
-        # 一般對話，走 LLM + 知識庫
+        # ========== 非 QUIZ 狀態：走 LLM（由 AI 判斷是否開始測驗） ==========
         result = await main_agent.chat(
             session_id=request.session_id,
             user_message=request.message,
@@ -283,7 +254,7 @@ async def chat(request: ChatRequest):
 
 async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]:
     """
-    用 LLM 判斷使用者選擇 A 還是 B
+    先用規則判斷，判不出時用 LLM 判斷使用者選擇 A 還是 B
 
     Returns:
         "A", "B", 或 None（無法判斷）
@@ -293,6 +264,7 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
 
     msg = user_message.strip()
     msg_upper = msg.upper()
+    msg_lower = msg.lower()
 
     # 快速判斷：明確的 A/B
     if msg_upper in ['A', 'B']:
@@ -308,16 +280,23 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
     if msg in ['2', '二', '第二']:
         return 'B'
 
-    # 用 LLM 判斷
+    # 快速判斷：包含選項文字
+    options = question.get("options", []) if isinstance(question, dict) else []
+    opt_a = options[0].get("text", "") if len(options) > 0 else ""
+    opt_b = options[1].get("text", "") if len(options) > 1 else ""
+
+    if opt_a and opt_a.lower() in msg_lower:
+        return 'A'
+    if opt_b and opt_b.lower() in msg_lower:
+        return 'B'
+
+    # 用 LLM 判斷（規則判不出時）
     try:
         client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-        opt_a = question['options'][0]['text']
-        opt_b = question['options'][1]['text']
-
         prompt = f"""判斷使用者選擇了哪個選項。
 
-題目：{question['text']}
+題目：{question.get('text', '')}
 A. {opt_a}
 B. {opt_b}
 

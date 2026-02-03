@@ -49,8 +49,22 @@ class MainAgent:
         )
 
     def _build_tools(self) -> List[types.Tool]:
-        """建立 tools - 測驗相關由後端處理，這裡保留推薦工具與知識庫"""
+        """建立 tools - 只有開始測驗與推薦商品交給 LLM 呼叫"""
         function_declarations = [
+            types.FunctionDeclaration(
+                name="start_quiz",
+                description="開始 MBTI 測驗。使用者表達想開始測驗時呼叫。",
+                parameters={
+                    "type": "object",
+                    "properties": {
+                        "session_id": {
+                            "type": "string",
+                            "description": "Session ID"
+                        }
+                    },
+                    "required": ["session_id"]
+                }
+            ),
             types.FunctionDeclaration(
                 name="recommend_products",
                 description="根據 MBTI 類型推薦商品。測驗完成後或使用者要求推薦時呼叫。",
@@ -150,6 +164,7 @@ class MainAgent:
 
             # 4. 第一次呼叫 LLM
             config = types.GenerateContentConfig(tools=tools)
+            no_tool_config = types.GenerateContentConfig()
             
             response = gemini_client.models.generate_content(
                 model=self.model_name,
@@ -233,8 +248,19 @@ class MainAgent:
                                 # 有明確指示，直接使用
                                 instruction = tool_result['instruction_for_llm']
                             elif "message" in tool_result:
-                                # 有預設訊息，要求 LLM 直接使用
-                                instruction = f"請直接使用這段文字回應使用者（不要修改）：\n{tool_result['message']}"
+                                # 有預設訊息，請 LLM 用自然語氣回覆並完整保留內容
+                                if tool_name == "start_quiz":
+                                    instruction = (
+                                        "請用自然語氣回應，並在回覆中完整保留題目與選項文字（原封不動）。"
+                                        "可在前後加一句友善的引導話：\n"
+                                        f"{tool_result['message']}"
+                                    )
+                                else:
+                                    instruction = (
+                                        "請用自然語氣回應，並在回覆中完整保留以下內容。"
+                                        "可在前後加一句友善的引導話：\n"
+                                        f"{tool_result['message']}"
+                                    )
                             else:
                                 # 沒有明確指示，讓 LLM 自由發揮
                                 instruction = "請根據工具執行結果自然回應使用者。"
@@ -249,7 +275,7 @@ class MainAgent:
                             response = gemini_client.models.generate_content(
                                 model=self.model_name,
                                 contents=conversation_parts,
-                                config=config
+                                config=no_tool_config
                             )
                             break
 
@@ -258,30 +284,25 @@ class MainAgent:
 
                 iteration += 1
 
-            # 5. 取得最終回應
-            # 優先使用工具結果中的 message（如果有的話）
+            # 5. 取得最終回應（優先 LLM 產生的文本）
             final_message = ""
-            
-            # 首先檢查是否有工具被執行
-            if tool_calls_log:
+
+            if response.candidates and response.candidates[0].content.parts:
+                for part in response.candidates[0].content.parts:
+                    if hasattr(part, 'text') and part.text:
+                        final_message += part.text
+
+            if not final_message and tool_calls_log:
+                # 後備：若 LLM 沒有產生文字，才使用工具 message
                 last_tool_call = tool_calls_log[-1]
                 tool_result = last_tool_call.get("result", {})
                 if isinstance(tool_result, dict) and "message" in tool_result:
-                    # 有工具 message，優先使用，忽略 LLM 生成的文本
                     final_message = tool_result["message"]
-                    logger.info(f"優先使用工具 message: tool={last_tool_call.get('tool')}")
-            
-            # 如果沒有工具 message，才使用 LLM 生成的文本
+                    logger.warning(f"LLM 無文字回應，改用工具 message: tool={last_tool_call.get('tool')}")
+
             if not final_message:
-                if response.candidates and response.candidates[0].content.parts:
-                    for part in response.candidates[0].content.parts:
-                        # 提取文本（如果有 function_call 會在同一個 part，但我們只要 text）
-                        if hasattr(part, 'text') and part.text:
-                            final_message += part.text
-                
-                if not final_message:
-                    final_message = "AI目前故障 請聯絡"
-                    logger.warning(f"LLM 未生成任何文本回應，使用者輸入：{user_message[:50]}")
+                final_message = "AI目前故障 請聯絡"
+                logger.warning(f"LLM 未生成任何文本回應，使用者輸入：{user_message[:50]}")
 
             # 6. 保存對話歷史
             updated_session = session_manager.get_session(session_id)
