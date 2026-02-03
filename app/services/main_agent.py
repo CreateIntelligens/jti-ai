@@ -40,111 +40,36 @@ class MainAgent:
         self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 
     def _build_system_prompt(self, session: Session) -> str:
-        """建立 System Prompt"""
-        # 建構當前題目資訊
-        current_q_info = ""
-        if session.current_question:
-            q = session.current_question
-            current_q_info = CURRENT_QUESTION_TEMPLATE.format(
-                question_id=q.get('id', 'unknown'),
-                question_text=q.get('text', ''),
-                option_a=q.get('options', [{}])[0].get('text', '') if q.get('options') else '',
-                option_b=q.get('options', [{}])[1].get('text', '') if len(q.get('options', [])) > 1 else ''
-            )
-
-        # 不再需要在系統提示中包含對話歷史
-        # 改用真正的 conversation history（在 chat() 中處理）
-        
+        """建立 System Prompt - 測驗由後端處理，這裡只給 LLM 基本資訊"""
         return MAIN_AGENT_SYSTEM_PROMPT_TEMPLATE.format(
             session_id=session.session_id,
             step_value=session.step.value,
             answers_count=len(session.answers),
-            persona=session.persona or '尚未計算',
-            current_q_info=current_q_info
+            persona=session.persona or '尚未計算'
         )
 
     def _build_tools(self) -> List[types.Tool]:
-        """建立 tools"""
+        """建立 tools - 測驗相關由後端處理，這裡保留推薦工具與知識庫"""
         function_declarations = [
             types.FunctionDeclaration(
-                name="start_quiz",
-                description="開始 MBTI 測驗。當使用者說「MBTI」「測驗」「測試」「遊戲」「玩」或表達想做測驗的意圖時，立即呼叫此工具。不要自己生成問題。",
-                parameters={
-                    "type": "object",
-                    "properties": {
-                        "session_id": {
-                            "type": "string",
-                            "description": "Session ID"
-                        }
-                    },
-                    "required": ["session_id"]
-                }
-            ),
-            types.FunctionDeclaration(
-                name="get_question",
-                description="取得當前題目。用於顯示下一道題目給使用者。",
-                parameters={
-                    "type": "object",
-                    "properties": {
-                        "session_id": {
-                            "type": "string",
-                            "description": "Session ID"
-                        }
-                    },
-                    "required": ["session_id"]
-                }
-            ),
-            types.FunctionDeclaration(
-                name="submit_answer",
-                description="提交使用者的答案。當使用者選擇 A 或 B 時呼叫。",
-                parameters={
-                    "type": "object",
-                    "properties": {
-                        "session_id": {
-                            "type": "string",
-                            "description": "Session ID"
-                        },
-                        "question_id": {
-                            "type": "string",
-                            "description": "題目 ID，例如 'q1'"
-                        },
-                        "option_id": {
-                            "type": "string",
-                            "description": "選項 ID，'a' 或 'b'"
-                        }
-                    },
-                    "required": ["session_id", "question_id", "option_id"]
-                }
-            ),
-            types.FunctionDeclaration(
-                name="calculate_persona",
-                description="計算 MBTI 類型。當 5 題都回答完畢後呼叫。",
-                parameters={
-                    "type": "object",
-                    "properties": {
-                        "session_id": {
-                            "type": "string",
-                            "description": "Session ID"
-                        }
-                    },
-                    "required": ["session_id"]
-                }
-            ),
-            types.FunctionDeclaration(
                 name="recommend_products",
-                description="根據 MBTI 類型推薦商品。計算出類型後呼叫。",
+                description="根據 MBTI 類型推薦商品。測驗完成後或使用者要求推薦時呼叫。",
                 parameters={
                     "type": "object",
                     "properties": {
                         "session_id": {
                             "type": "string",
                             "description": "Session ID"
+                        },
+                        "max_results": {
+                            "type": "integer",
+                            "description": "最多推薦幾個商品",
+                            "default": 3
                         }
                     },
                     "required": ["session_id"]
                 }
             ),
-
         ]
 
         # 整合 Function Declarations + File Search
@@ -213,6 +138,8 @@ class MainAgent:
             else:
                 # 有歷史：直接重申系統提示（作為當前必須遵守的規則）
                 current_user_message = f"{system_prompt}\n\n使用者現在說：{user_message}"
+
+            logger.info(f"[DEBUG] 發送給 LLM 的完整提示:\n{current_user_message[:500]}...")
             
             conversation_parts.append(
                 types.Content(
@@ -292,15 +219,30 @@ class MainAgent:
                             # 重新取得最新的 session 狀態以更新系統提示
                             updated_session = session_manager.get_session(session_id)
                             updated_system_prompt = self._build_system_prompt(updated_session)
+                            logger.info(f"[DEBUG] 更新系統提示")
+                            logger.info(f"  - current_q_index: {updated_session.current_q_index}")
+                            logger.info(f"  - answers: {updated_session.answers}")
+                            logger.info(f"  - current_question_id: {updated_session.current_question.get('id') if updated_session.current_question else None}")
+                            logger.info(f"  - system_prompt 包含當前題目: {'🎯 當前題目' in updated_system_prompt}")
+                            logger.info(f"  - system_prompt 長度: {len(updated_system_prompt)} 字元")
+                            if updated_session.current_question:
+                                logger.info(f"  - 完整系統提示:\n{updated_system_prompt}")
 
-                            # 繼續對話 - 重申系統提示作為當前必須遵守的規則
-                            # 不使用標籤,直接給出指令
+                            # 繼續對話 - 根據工具返回內容決定如何更新系統提示
+                            if "instruction_for_llm" in tool_result:
+                                # 有明確指示，直接使用
+                                instruction = tool_result['instruction_for_llm']
+                            elif "message" in tool_result:
+                                # 有預設訊息，要求 LLM 直接使用
+                                instruction = f"請直接使用這段文字回應使用者（不要修改）：\n{tool_result['message']}"
+                            else:
+                                # 沒有明確指示，讓 LLM 自由發揮
+                                instruction = "請根據工具執行結果自然回應使用者。"
+
                             conversation_parts.append(
                                 types.Content(
                                     role="user",
-                                    parts=[types.Part.from_text(
-                                        text=f"{updated_system_prompt}\n\n工具已執行完成。請根據工具返回的 message 欄位內容回應使用者，不要自己編造內容。"
-                                    )]
+                                    parts=[types.Part.from_text(text=f"{updated_system_prompt}\n\n{instruction}")]
                                 )
                             )
 
@@ -342,11 +284,11 @@ class MainAgent:
                     logger.warning(f"LLM 未生成任何文本回應，使用者輸入：{user_message[:50]}")
 
             # 6. 保存對話歷史
+            updated_session = session_manager.get_session(session_id)
             session_manager.add_chat_message(session_id, "user", user_message)
             session_manager.add_chat_message(session_id, "assistant", final_message)
 
             # 7. 記錄對話日誌（用於 debug）
-            updated_session = session_manager.get_session(session_id)
             conversation_logger.log_conversation(
                 session_id=session_id,
                 user_message=user_message,
@@ -381,6 +323,105 @@ class MainAgent:
             return {
                 "error": str(e),
                 "message": f"抱歉，發生錯誤：{str(e)}"
+            }
+
+    async def chat_with_tool_result(
+        self,
+        session_id: str,
+        user_message: str,
+        tool_name: str,
+        tool_args: dict,
+        tool_result: dict
+    ) -> dict:
+        """
+        當後端已執行工具時，讓 LLM 根據工具結果生成回應
+
+        用於 QUIZ 流程：後端判斷並呼叫工具，LLM 負責生成自然回應
+        """
+        try:
+            session = session_manager.get_session(session_id)
+            if not session:
+                return {"error": "Session not found", "message": "找不到 session"}
+
+            # 建立對話上下文
+            conversation_parts = []
+
+            # 加入歷史對話（最多 5 筆）
+            if session.chat_history:
+                recent_history = session.chat_history[-5:]
+                for msg in recent_history:
+                    # 轉換 role：assistant → model
+                    role = "model" if msg["role"] == "assistant" else msg["role"]
+                    conversation_parts.append(
+                        types.Content(
+                            role=role,
+                            parts=[types.Part.from_text(text=msg["content"])]
+                        )
+                    )
+
+            # 根據工具結果生成指示
+            if "instruction_for_llm" in tool_result:
+                instruction = tool_result["instruction_for_llm"]
+            elif "recommend_result" in tool_result:
+                # 測驗完成 + 推薦
+                persona_id = tool_result.get('persona_result', {}).get('persona_id', 'Unknown')
+                recommend_msg = tool_result['recommend_result'].get('message', '')
+                instruction = f"""使用者剛完成 MBTI 測驗，類型是 {persona_id}。
+
+{recommend_msg}
+
+請用友善、鼓勵的語氣回應，包含：
+1. 恭喜完成測驗
+2. MBTI 類型及特質描述
+3. 推薦的商品"""
+            else:
+                instruction = "請簡短回應使用者"
+
+            # 組合：system prompt + 使用者訊息 + 指示
+            system_prompt = self._build_system_prompt(session)
+            full_prompt = f"""{system_prompt}
+
+使用者說：{user_message}
+
+{instruction}"""
+
+            conversation_parts.append(
+                types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=full_prompt)]
+                )
+            )
+
+            # 呼叫 LLM 生成回應
+            response = gemini_client.models.generate_content(
+                model=self.model_name,
+                contents=conversation_parts
+            )
+
+            # 提取回應
+            final_message = ""
+            if response.candidates and response.candidates[0].content.parts:
+                for part in response.candidates[0].content.parts:
+                    if hasattr(part, 'text') and part.text:
+                        final_message += part.text
+
+            if not final_message:
+                final_message = "收到！"
+
+            # 記錄對話（不在這裡記錄，由 API 層記錄）
+            # session_manager.add_chat_message(session_id, "user", user_message)
+            # session_manager.add_chat_message(session_id, "assistant", final_message)
+
+            return {
+                "message": final_message,
+                "session": session.model_dump()
+            }
+
+        except Exception as e:
+            logger.error(f"chat_with_tool_result failed: {e}", exc_info=True)
+            return {
+                "error": str(e),
+                "message": "收到！"
             }
 
 

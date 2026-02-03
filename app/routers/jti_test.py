@@ -5,11 +5,11 @@ JTI 智慧助手測試介面
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
 
-router = APIRouter(prefix="/jti", tags=["JTI Test"])
+router = APIRouter(prefix="/jti-backup", tags=["JTI Test Backup"])
 
 
 @router.get("", response_class=HTMLResponse)
-async def jti_test_page():
+async def jti_test_backup_page():
     """JTI 智慧助手測試頁面"""
     html_content = """
 <!DOCTYPE html>

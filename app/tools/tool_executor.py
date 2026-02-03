@@ -7,7 +7,7 @@ Tool 執行器
 from typing import Dict, Any
 import logging
 from google.genai import types
-from app.tools.quiz import generate_quiz, get_question as quiz_get_question, get_total_questions
+from app.tools.quiz import generate_quiz, get_question as quiz_get_question, get_total_questions, generate_random_quiz, get_question_from_selected
 from app.tools.persona import calculate_persona as calc_persona, get_mbti_description
 from app.tools.products import recommend_products as rec_products
 from app.services.session_manager import session_manager
@@ -20,6 +20,7 @@ class ToolExecutor:
 
     def __init__(self):
         self.tool_map = {
+            "quiz_response": self._execute_quiz_response,
             "start_quiz": self._execute_start_quiz,
             "get_question": self._execute_get_question,
             "submit_answer": self._execute_submit_answer,
@@ -45,6 +46,46 @@ class ToolExecutor:
 
     # === Tool 實作 ===
 
+    async def _execute_quiz_response(self, args: Dict) -> Dict:
+        """統一處理測驗互動（開始測驗 或 回答題目）"""
+        session_id = args.get("session_id")
+        action = args.get("action")
+        user_choice = args.get("user_choice", "").upper()
+
+        if not session_id or not action:
+            return {"error": "Missing session_id or action"}
+
+        session = session_manager.get_session(session_id)
+        if not session:
+            return {"error": "Session not found"}
+
+        # 開始測驗
+        if action == "start":
+            return await self._execute_start_quiz({"session_id": session_id})
+
+        # 回答題目
+        if action == "answer":
+            if not session.current_question:
+                return {"error": "沒有進行中的題目"}
+
+            # 判斷選項
+            if user_choice not in ["A", "B"]:
+                return {"error": f"無效的選擇：{user_choice}，請選擇 A 或 B"}
+
+            option_id = "a" if user_choice == "A" else "b"
+            question_id = session.current_question.get("id")
+
+            # 提交答案（包含自動計算 persona 和問下一題的邏輯）
+            result = await self._execute_submit_answer({
+                "session_id": session_id,
+                "question_id": question_id,
+                "option_id": option_id
+            })
+
+            return result
+
+        return {"error": f"Unknown action: {action}"}
+
     async def _execute_start_quiz(self, args: Dict) -> Dict:
         """開始測驗"""
         session_id = args.get("session_id")
@@ -52,14 +93,17 @@ class ToolExecutor:
         if not session_id:
             return {"error": "Missing session_id"}
 
-        # 重置測驗狀態
-        session = session_manager.start_quiz(session_id)
+        # 隨機抽選 5 題（每個維度 1 題 + 額外 1 題）
+        selected_questions = generate_random_quiz("mbti_quick")
+
+        # 重置測驗狀態並保存選中的題目
+        session = session_manager.start_quiz(session_id, selected_questions)
 
         if session is None:
             return {"error": "Session not found"}
 
         # 取得第一題
-        question = quiz_get_question("mbti_quick", 0)
+        question = selected_questions[0]
 
         # 保存當前題目到 session
         session_manager.set_current_question(session_id, question)
@@ -68,7 +112,7 @@ class ToolExecutor:
             "success": True,
             "message": f"測驗已開始！\n\n第1題：{question['text']}\nA. {question['options'][0]['text']}\nB. {question['options'][1]['text']}",
             "current_question": question,
-            "total_questions": get_total_questions("mbti_quick"),
+            "total_questions": 5,
             "progress": 0
         }
 
@@ -84,9 +128,13 @@ class ToolExecutor:
         if session is None:
             return {"error": "Session not found"}
 
-        # 取得當前題目
-        question = quiz_get_question(session.quiz_id, session.current_q_index)
-        total = get_total_questions(session.quiz_id)
+        # 從 session 中選中的題目列表取得當前題目
+        if session.selected_questions:
+            question = get_question_from_selected(session.selected_questions, session.current_q_index)
+        else:
+            question = None
+
+        total = 5
 
         if question is None:
             # 已經完成所有題目
@@ -106,9 +154,25 @@ class ToolExecutor:
     async def _execute_submit_answer(self, args: Dict) -> Dict:
         """提交答案"""
         session_id = args.get("session_id")
+
+        # 檢查是否來自 LLM（有 user_choice）還是內部呼叫（有 question_id + option_id）
+        user_choice = args.get("user_choice", "").upper()
         question_id = args.get("question_id")
         option_id = args.get("option_id")
 
+        # 如果有 user_choice，從 session 取得當前題目
+        if user_choice:
+            if user_choice not in ["A", "B"]:
+                return {"error": f"user_choice 必須是 A 或 B，收到：{user_choice}"}
+
+            session = session_manager.get_session(session_id)
+            if not session or not session.current_question:
+                return {"error": "沒有進行中的題目"}
+
+            question_id = session.current_question.get("id")
+            option_id = "a" if user_choice == "A" else "b"
+
+        # 驗證必要參數
         if not all([session_id, question_id, option_id]):
             return {"error": "Missing required parameters"}
 
@@ -121,7 +185,7 @@ class ToolExecutor:
             return {"error": "Session not found or invalid state"}
 
         # 檢查是否完成測驗
-        total_questions = get_total_questions(session.quiz_id)
+        total_questions = 5
         is_complete = session.is_quiz_complete(total_questions)
 
         logger.info(f"Answer submitted: Q{question_id}={option_id}, answered={len(session.answers)}/{total_questions}, complete={is_complete}")
@@ -137,9 +201,16 @@ class ToolExecutor:
 
         # 如果還沒完成，附上下一題並保存到 session
         if not is_complete:
-            next_question = quiz_get_question(session.quiz_id, session.current_q_index)
+            # 從 session 中選中的題目列表取得下一題
+            if session.selected_questions:
+                next_question = get_question_from_selected(session.selected_questions, session.current_q_index)
+            else:
+                # 向後相容：如果沒有 selected_questions，使用舊邏輯
+                next_question = quiz_get_question(session.quiz_id, session.current_q_index)
+
             result["next_question"] = next_question
-            result["message"] = f"已記錄您的答案。接下來是第{session.current_q_index + 1}題：\n\n{next_question['text']}\nA. {next_question['options'][0]['text']}\nB. {next_question['options'][1]['text']}"
+            # 不直接提供 message，讓 LLM 根據答案給予回應後再問下一題
+            result["instruction_for_llm"] = f"請簡短評論使用者的選擇（1句話），然後問下一題：\n\n第{session.current_q_index + 1}題：{next_question['text']}\nA. {next_question['options'][0]['text']}\nB. {next_question['options'][1]['text']}"
             session_manager.set_current_question(session_id, next_question)
         else:
             # 完成測驗，立即計算 MBTI 類型
@@ -222,7 +293,7 @@ class ToolExecutor:
         product_messages = []
         for i, prod in enumerate(products, 1):
             product_messages.append(f"{i}. {prod.get('name', '商品')} - {prod.get('description', '暫無描述')}")
-        
+
         products_text = "\n".join(product_messages) if product_messages else "暫無推薦商品"
 
         return {
@@ -231,7 +302,6 @@ class ToolExecutor:
             "total_results": len(products),
             "message": f"根據你的 MBTI 類型 {session.persona}，我為你推薦了以下商品：\n\n{products_text}"
         }
-
 
 # 全域實例
 tool_executor = ToolExecutor()

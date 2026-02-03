@@ -5,11 +5,18 @@ import ChatArea from './components/ChatArea';
 import StoreManagementModal from './components/StoreManagementModal';
 import PromptManagementModal from './components/PromptManagementModal';
 import UserApiKeyModal from './components/UserApiKeyModal';
+import JtiTest from './pages/JtiTest';
 import * as api from './services/api';
 import type { Store, FileItem, Message } from './types';
 import './styles/App.css';
 
 export default function App() {
+  // 簡單的路由判斷：如果路徑是 /jti，顯示 JTI 測試頁面
+  const isJtiPage = window.location.pathname === '/jti';
+
+  if (isJtiPage) {
+    return <JtiTest />;
+  }
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [storeModalOpen, setStoreModalOpen] = useState(false);
   const [promptModalOpen, setPromptModalOpen] = useState(false);

@@ -6,7 +6,7 @@ LLM 不得根據對話內容自行判斷進度，只能依賴 session。
 """
 
 from enum import Enum
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, List
 from pydantic import BaseModel, Field
 from datetime import datetime
 import uuid
@@ -14,6 +14,7 @@ import uuid
 
 class SessionStep(str, Enum):
     """Session 狀態定義"""
+    WELCOME = "WELCOME"     # 初始狀態，歡迎使用者
     QUIZ = "QUIZ"           # 問答中
     SCORING = "SCORING"     # 計分中（不可與 user 互動）
     RECOMMEND = "RECOMMEND" # 商品推薦
@@ -29,12 +30,13 @@ class Session(BaseModel):
     """Session 資料結構"""
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     mode: GameMode = GameMode.MBTI
-    step: SessionStep = SessionStep.QUIZ
+    step: SessionStep = SessionStep.WELCOME
 
     # 測驗相關
     quiz_id: str = "mbti_quick"  # 使用的題庫 ID
     current_q_index: int = 0      # 目前題目索引
     answers: Dict[str, str] = Field(default_factory=dict)  # {question_id: option_id}
+    selected_questions: Optional[List[Dict[str, Any]]] = None  # 本次測驗隨機選中的題目列表
 
     # 結果相關
     persona: Optional[str] = None  # MBTI 類型，例如 "INTJ"

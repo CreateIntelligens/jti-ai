@@ -7,8 +7,9 @@ JTI 品牌的智慧對話系統，整合 MBTI 性格測驗與商品推薦功能�
 - **智慧對話**：基於 Google Gemini 2.5 Flash 的自然語言對話
 - **MBTI 測驗**：5 題快速性格測驗（E/I, S/N, T/F, J/P + 隨機題）
 - **商品推薦**：根據 MBTI 性格類型推薦適合的 JTI 商品
-- **知識庫查詢**：透過 Gemini File Search 回答商品相關問題
+- **知識庫查詢**：一般對話時透過 Gemini File Search 回答商品相關問題
 - **對話記錄**：完整的 session 管理和對話日誌
+- **測驗鎖定**：測驗進行中只接受作答，非題目內容會提示剩餘題數並重問當前題
 
 ## 系統架構
 
@@ -84,10 +85,11 @@ docker compose up -d
 3. 顯示第 1 題（E/I 維度）
 4. 用戶回答 A 或 B
 5. Agent 呼叫 `submit_answer` 提交答案
-6. 重複步驟 3-5，直到完成 5 題
-7. 自動呼叫 `calculate_persona` 計算 MBTI 類型
-8. 呼叫 `recommend_products` 推薦商品
-9. 結合知識庫資訊，提供完整推薦說明
+6. 若用戶在測驗中詢問其他問題，系統只提示剩餘題數並重顯當前題
+7. 重複步驟 3-6，直到完成 5 題
+8. 自動呼叫 `calculate_persona` 計算 MBTI 類型
+9. 呼叫 `recommend_products` 推薦商品
+10. 結合知識庫資訊，提供完整推薦說明
 
 ## API 端點
 
@@ -96,7 +98,7 @@ docker compose up -d
 | 方法 | 路徑 | 說明 |
 |------|------|------|
 | POST | `/api/mbti/session/new` | 建立新 session |
-| POST | `/api/mbti/chat` | 對話（自動處理測驗流程）|
+| POST | `/api/mbti/chat` | 對話（測驗中鎖定作答）|
 | GET | `/jti` | 測試頁面 |
 
 ### 原有功能（File Search）
@@ -166,11 +168,11 @@ ls -lt logs/conversations/*.txt | head -1 | xargs cat
 ### Session 狀態機
 
 ```
-CHAT → QUIZ → SCORING → RECOMMEND → DONE
+WELCOME → QUIZ → SCORING → RECOMMEND → DONE
 ```
 
-- **CHAT**: 一般對話
-- **QUIZ**: 測驗進行中
+- **WELCOME**: 一般對話
+- **QUIZ**: 測驗進行中（僅接受作答）
 - **SCORING**: 計算 MBTI（自動）
 - **RECOMMEND**: 推薦商品
 - **DONE**: 完成

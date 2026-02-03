@@ -12,13 +12,12 @@ COPY docker/nginx.conf.template /etc/nginx/nginx.conf.template
 
 # 創建啟動腳本 - 用 envsubst 替換環境變數
 RUN echo '#!/bin/sh' > /start.sh && \
-    echo 'export NGINX_PORT=${NGINX_PORT:-8008}' >> /start.sh && \
-    echo 'export BACKEND_PORT=${BACKEND_PORT:-8008}' >> /start.sh && \
-    echo 'envsubst "\$NGINX_PORT \$BACKEND_PORT" < /etc/nginx/nginx.conf.template > /etc/nginx/http.d/default.conf' >> /start.sh && \
+    echo 'export PORT=${PORT:-8008}' >> /start.sh && \
+    echo 'envsubst "\$PORT" < /etc/nginx/nginx.conf.template > /etc/nginx/http.d/default.conf' >> /start.sh && \
     echo 'nginx' >> /start.sh && \
     echo 'cd /app && su node -c "npm install && npm run dev -- --host 0.0.0.0"' >> /start.sh && \
     chmod +x /start.sh
 
-EXPOSE 8008
+# 注意：EXPOSE 只是文檔用途，實際端口由 docker-compose.yml 的 ports 控制
 
 CMD ["/start.sh"]

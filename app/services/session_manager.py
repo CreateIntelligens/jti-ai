@@ -9,7 +9,7 @@ Session 管理服務
 注意：目前使用記憶體存儲，生產環境應該換成 Redis
 """
 
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Any
 from datetime import datetime, timedelta
 from app.models.session import Session, SessionStep, GameMode
 import logging
@@ -68,7 +68,7 @@ class SessionManager:
 
     # === 狀態轉換方法 ===
 
-    def start_quiz(self, session_id: str) -> Optional[Session]:
+    def start_quiz(self, session_id: str, selected_questions: Optional[List[Dict[str, Any]]] = None) -> Optional[Session]:
         """開始測驗"""
         session = self.get_session(session_id)
         if not session:
@@ -78,6 +78,7 @@ class SessionManager:
         session.current_q_index = 0
         session.answers = {}
         session.current_question = None
+        session.selected_questions = selected_questions  # 保存隨機選中的題目
         return self.update_session(session)
 
     def set_current_question(self, session_id: str, question: dict) -> Optional[Session]:

@@ -115,7 +115,6 @@ RECOMMEND_PRODUCTS_TOOL = {
     }
 }
 
-
 # === 所有 Tools 的列表 ===
 
 ALL_TOOLS: List[Dict] = [
