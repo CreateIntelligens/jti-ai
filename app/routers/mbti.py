@@ -238,7 +238,76 @@ async def chat(request: ChatRequest):
                     tool_calls=[]
                 )
 
-        # ========== 非 QUIZ 狀態：走 LLM（由 AI 判斷是否開始測驗） ==========
+        # ========== 非 QUIZ 狀態 ==========
+
+        # 先用關鍵字判斷是否要開始測驗（不依賴 LLM 呼叫工具）
+        start_keywords = ['mbti', '測驗', '心理測驗', '開始', '玩', '試試', '來吧', '好啊', '開始吧']
+        msg_lower = request.message.lower()
+        should_start_quiz = any(kw in msg_lower for kw in start_keywords)
+
+        # 如果已完成測驗想再測一次，拒絕
+        if should_start_quiz and session.step.value == "DONE":
+            response_message = "你已經完成過測驗囉！這次對話只能測驗一次。如果想重新測驗，請重新整理頁面開始新的對話。"
+
+            # 記錄對話
+            conversation_logger.log_conversation(
+                session_id=request.session_id,
+                user_message=request.message,
+                agent_response=response_message,
+                tool_calls=[],
+                session_state={
+                    "step": session.step.value,
+                    "answers_count": len(session.answers),
+                    "persona": session.persona,
+                    "current_question_id": None
+                }
+            )
+
+            return ChatResponse(
+                message=response_message,
+                session=session.model_dump(),
+                tool_calls=[]
+            )
+
+        if should_start_quiz and session.step.value == "WELCOME":
+            # 直接呼叫 start_quiz，不依賴 LLM
+            tool_result = await tool_executor.execute("start_quiz", {
+                "session_id": request.session_id
+            })
+
+            if tool_result.get("success"):
+                # 讓 LLM 生成自然的開場白
+                result = await main_agent.chat_with_tool_result(
+                    session_id=request.session_id,
+                    user_message=request.message,
+                    tool_name="start_quiz",
+                    tool_args={"session_id": request.session_id},
+                    tool_result=tool_result
+                )
+
+                updated_session = session_manager.get_session(request.session_id)
+
+                # 記錄對話
+                conversation_logger.log_conversation(
+                    session_id=request.session_id,
+                    user_message=request.message,
+                    agent_response=result["message"],
+                    tool_calls=[{"tool": "start_quiz", "args": {"session_id": request.session_id}, "result": tool_result}],
+                    session_state={
+                        "step": updated_session.step.value,
+                        "answers_count": len(updated_session.answers),
+                        "persona": updated_session.persona,
+                        "current_question_id": updated_session.current_question.get("id") if updated_session.current_question else None
+                    }
+                )
+
+                return ChatResponse(
+                    message=result["message"],
+                    session=updated_session.model_dump(),
+                    tool_calls=[{"tool": "start_quiz", "args": {"session_id": request.session_id}}]
+                )
+
+        # 一般對話：走 LLM
         result = await main_agent.chat(
             session_id=request.session_id,
             user_message=request.message,
