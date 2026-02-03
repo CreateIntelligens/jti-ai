@@ -383,6 +383,16 @@ class MainAgent:
             # 根據工具結果生成指示
             if "instruction_for_llm" in tool_result:
                 instruction = tool_result["instruction_for_llm"]
+            elif tool_name == "start_quiz" and tool_result.get("current_question"):
+                # 開始測驗，顯示第一題
+                q = tool_result["current_question"]
+                instruction = f"""測驗已開始，請用友善的語氣介紹並問第一題。
+
+第1題：{q['text']}
+A. {q['options'][0]['text']}
+B. {q['options'][1]['text']}
+
+必須完整顯示題目和選項，可以加一句簡短的開場白。"""
             elif "recommend_result" in tool_result:
                 # 測驗完成 + 推薦
                 persona_id = tool_result.get('persona_result', {}).get('persona_id', 'Unknown')
