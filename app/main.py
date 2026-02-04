@@ -62,7 +62,7 @@ import hashlib
 
 from .core import FileSearchManager
 from .api_keys import APIKeyManager
-from .routers import mbti, jti_test
+from .routers import mbti
 
 app = FastAPI(title="Gemini File Search API")
 
@@ -666,4 +666,3 @@ def index():
 
 # 引入 MBTI 路由
 app.include_router(mbti.router)
-app.include_router(jti_test.router)
