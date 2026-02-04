@@ -5,7 +5,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5174,
-    host: true,
+    host: '0.0.0.0',
+    strictPort: true,
+    cors: true, // 啟用 CORS
+    hmr: {
+      clientPort: 8913, // HMR 透過 nginx port
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
