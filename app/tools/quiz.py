@@ -15,21 +15,25 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# 載入題庫
-QUIZ_BANK_PATH = Path("data/quiz_bank.json")
-quiz_data = None
+# 載入題庫（支援多語言）
+QUIZ_BANK_PATHS = {
+    "zh": Path("data/quiz_bank_zh.json"),
+    "en": Path("data/quiz_bank_en.json"),
+}
+quiz_data_cache = {}
 
 
-def load_quiz_bank():
+def load_quiz_bank(language: str = "zh"):
     """載入題庫"""
-    global quiz_data
-    if quiz_data is None:
-        with open(QUIZ_BANK_PATH, "r", encoding="utf-8") as f:
-            quiz_data = json.load(f)
-    return quiz_data
+    global quiz_data_cache
+    if language not in quiz_data_cache:
+        path = QUIZ_BANK_PATHS.get(language, QUIZ_BANK_PATHS["zh"])
+        with open(path, "r", encoding="utf-8") as f:
+            quiz_data_cache[language] = json.load(f)
+    return quiz_data_cache[language]
 
 
-def generate_random_quiz(quiz_id: str = "mbti_quick") -> List[Dict]:
+def generate_random_quiz(quiz_id: str = "mbti_quick", language: str = "zh") -> List[Dict]:
     """
     產生隨機測驗題目
 
@@ -76,7 +80,7 @@ def generate_random_quiz(quiz_id: str = "mbti_quick") -> List[Dict]:
         if remaining:
             selected.append(random.choice(remaining))
 
-        logger.info(f"Generated random quiz: {quiz_id}, selected {len(selected)} questions: {[q['id'] for q in selected]}")
+        logger.info(f"Generated random quiz: {quiz_id} ({language}), selected {len(selected)} questions: {[q['id'] for q in selected]}")
         return selected
 
     except Exception as e:
@@ -84,7 +88,7 @@ def generate_random_quiz(quiz_id: str = "mbti_quick") -> List[Dict]:
         raise
 
 
-def generate_quiz(quiz_id: str = "mbti_quick") -> Dict:
+def generate_quiz(quiz_id: str = "mbti_quick", language: str = "zh") -> Dict:
     """
     產生測驗題目（向後相容的 wrapper）
 
@@ -98,14 +102,14 @@ def generate_quiz(quiz_id: str = "mbti_quick") -> Dict:
         }
     """
     try:
-        quiz_bank = load_quiz_bank()
+        quiz_bank = load_quiz_bank(language)
         quiz_set = quiz_bank["quiz_sets"].get(quiz_id)
 
         if not quiz_set:
             raise ValueError(f"Quiz set '{quiz_id}' not found")
 
         # 隨機抽 5 題
-        questions = generate_random_quiz(quiz_id)
+        questions = generate_random_quiz(quiz_id, language)
 
         result = {
             "quiz_id": quiz_id,

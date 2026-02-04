@@ -31,6 +31,7 @@ class Session(BaseModel):
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     mode: GameMode = GameMode.MBTI
     step: SessionStep = SessionStep.WELCOME
+    language: str = "zh"  # 語言設定 (zh/en)
 
     # 測驗相關
     quiz_id: str = "mbti_quick"  # 使用的題庫 ID

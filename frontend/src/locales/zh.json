@@ -1,0 +1,21 @@
+{
+  "app_title": "JTI 智慧助手",
+  "status_ready": "準備中...",
+  "status_connected": "已連線",
+  "status_failed": "連線失敗",
+  "status_chatting": "對話中",
+  "status_quiz": "測驗中",
+  "welcome_title": "歡迎使用 JTI 智慧助手",
+  "welcome_description": "透過 AI 驅動的對話系統，幫助您了解自己的性格特質，並為您推薦最適合的 JTI 產品。",
+  "quick_start": "快速開始",
+  "quick_action_quiz": "開始 MBTI 測驗",
+  "quick_action_greeting": "打個招呼",
+  "quick_action_products": "看看商品",
+  "input_placeholder": "輸入訊息... (試試「我想做測驗」)",
+  "button_send": "發送",
+  "button_restart": "重新開始",
+  "restart_confirm": "確定要重新開始對話嗎？所有記錄將清除。",
+  "session_label": "Session:",
+  "error_network": "網路錯誤，請稍後再試",
+  "error_system": "抱歉，發生錯誤："
+}

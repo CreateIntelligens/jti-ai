@@ -1,0 +1,21 @@
+{
+  "app_title": "JTI Smart Assistant",
+  "status_ready": "Preparing...",
+  "status_connected": "Connected",
+  "status_failed": "Connection Failed",
+  "status_chatting": "Chatting",
+  "status_quiz": "Quiz in Progress",
+  "welcome_title": "Welcome to JTI Smart Assistant",
+  "welcome_description": "AI-powered conversation system to help you understand your personality and recommend the perfect JTI products for you.",
+  "quick_start": "Quick Start",
+  "quick_action_quiz": "Start MBTI Quiz",
+  "quick_action_greeting": "Say Hello",
+  "quick_action_products": "Browse Products",
+  "input_placeholder": "Type a message... (try \"I want to take the quiz\")",
+  "button_send": "Send",
+  "button_restart": "Restart",
+  "restart_confirm": "Are you sure you want to restart the conversation? All records will be cleared.",
+  "session_label": "Session:",
+  "error_network": "Network error, please try again later",
+  "error_system": "Sorry, an error occurred:"
+}

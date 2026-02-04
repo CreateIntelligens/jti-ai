@@ -93,8 +93,12 @@ class ToolExecutor:
         if not session_id:
             return {"error": "Missing session_id"}
 
+        # 取得 session 語言設定
+        session = session_manager.get_session(session_id)
+        language = session.language if session else "zh"
+
         # 隨機抽選 5 題（每個維度 1 題 + 額外 1 題）
-        selected_questions = generate_random_quiz("mbti_quick")
+        selected_questions = generate_random_quiz("mbti_quick", language)
 
         # 重置測驗狀態並保存選中的題目
         session = session_manager.start_quiz(session_id, selected_questions)

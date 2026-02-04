@@ -9,7 +9,7 @@ export default defineConfig({
     strictPort: true,
     cors: true, // 啟用 CORS
     hmr: {
-      clientPort: 8913, // HMR 透過 nginx port
+      clientPort: parseInt(process.env.PORT || '8914'), // HMR 透過 nginx port
     },
     proxy: {
       '/api': {

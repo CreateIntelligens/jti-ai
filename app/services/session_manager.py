@@ -24,11 +24,11 @@ class SessionManager:
         self._sessions: Dict[str, Session] = {}
         self.idle_timeout = timedelta(minutes=idle_timeout_minutes)
 
-    def create_session(self, mode: GameMode = GameMode.MBTI) -> Session:
+    def create_session(self, mode: GameMode = GameMode.MBTI, language: str = "zh") -> Session:
         """建立新 session"""
-        session = Session(mode=mode)
+        session = Session(mode=mode, language=language)
         self._sessions[session.session_id] = session
-        logger.info(f"Created session: {session.session_id}")
+        logger.info(f"Created session: {session.session_id} (language={language})")
         return session
 
     def get_session(self, session_id: str) -> Optional[Session]:

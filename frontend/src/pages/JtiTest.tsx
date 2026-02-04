@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import '../styles/JtiTest.css';
 
 interface Message {
@@ -16,33 +17,95 @@ interface SessionData {
 }
 
 export default function JtiTest() {
+  const { t, i18n } = useTranslation();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [statusText, setStatusText] = useState('正在連接...');
+  const [statusText, setStatusText] = useState(t('status_ready'));
   const [sessionInfo, setSessionInfo] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  // 重新開始對話
+  const restartConversation = useCallback(async () => {
+    if (messages.length > 0) {
+      if (!window.confirm(t('restart_confirm'))) {
+        return;
+      }
+    }
+
+    try {
+      const res = await fetch('/api/mbti/session/new', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'MBTI', language: currentLanguage }),
+      });
+      const data = await res.json();
+      setSessionId(data.session_id);
+      setMessages([]);
+      setStatusText(t('status_connected'));
+      setSessionInfo(`#${data.session_id.substring(0, 8)}`);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    } catch {
+      setStatusText(t('status_failed'));
+    }
+  }, [currentLanguage, messages.length, t]);
+
+  // 切換語言
+  const toggleLanguage = useCallback(async () => {
+    // 如果有訊息記錄，警告使用者切換語言會重新開始
+    if (messages.length > 0) {
+      const confirmMessage = currentLanguage === 'zh'
+        ? '切換語言將重新開始對話，確定要繼續嗎？'
+        : 'Switching language will restart the conversation. Continue?';
+      if (!window.confirm(confirmMessage)) {
+        return;
+      }
+    }
+
+    const newLang = currentLanguage === 'zh' ? 'en' : 'zh';
+    i18n.changeLanguage(newLang);
+    setCurrentLanguage(newLang);
+    localStorage.setItem('language', newLang);
+
+    // 重新建立 session
+    try {
+      const res = await fetch('/api/mbti/session/new', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'MBTI', language: newLang }),
+      });
+      const data = await res.json();
+      setSessionId(data.session_id);
+      setMessages([]);
+      setStatusText(t('status_connected'));
+      setSessionInfo(`#${data.session_id.substring(0, 8)}`);
+    } catch {
+      setStatusText(t('status_failed'));
+    }
+  }, [currentLanguage, i18n, messages.length, t]);
+
   // 初始化 session
   useEffect(() => {
+    const lang = localStorage.getItem('language') || 'zh';
     fetch('/api/mbti/session/new', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'MBTI' }),
+      body: JSON.stringify({ mode: 'MBTI', language: lang }),
     })
       .then(res => res.json())
       .then(data => {
         setSessionId(data.session_id);
-        setStatusText('已連線');
+        setStatusText(t('status_connected'));
         setSessionInfo(`#${data.session_id.substring(0, 8)}`);
         setTimeout(() => inputRef.current?.focus(), 100);
       })
-      .catch(() => setStatusText('連線失敗'));
-  }, []);
+      .catch(() => setStatusText(t('status_failed')));
+  }, [t]);
 
   // 自動滾動到底部
   useEffect(() => {
@@ -61,7 +124,7 @@ export default function JtiTest() {
       const res = await fetch('/api/mbti/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, message }),
+        body: JSON.stringify({ session_id: sessionId, message, language: currentLanguage }),
       });
 
       const data = await res.json();
@@ -78,15 +141,15 @@ export default function JtiTest() {
       if (data.session) {
         const s = data.session as SessionData;
         const count = Object.keys(s.answers || {}).length;
-        const status = s.step === 'QUIZ' ? `測驗進行中 · ${count}/5`
-          : s.step === 'RECOMMEND' && s.persona ? `性格類型 · ${s.persona}`
-          : s.persona || '對話中';
+        const status = s.step === 'QUIZ' ? `${t('status_quiz')} · ${count}/5`
+          : s.step === 'RECOMMEND' && s.persona ? `${s.persona}`
+          : s.persona || t('status_chatting');
         setStatusText(status);
       }
     } catch {
       setIsTyping(false);
       setMessages(prev => [...prev, {
-        text: '⚠️ 網路連線異常，請稍後再試',
+        text: `⚠️ ${t('error_network')}`,
         type: 'system',
         timestamp: Date.now()
       }]);
@@ -111,9 +174,9 @@ export default function JtiTest() {
   };
 
   const quickActions = [
-    { icon: '🎮', text: '開始 MBTI 測驗', msg: '我想做 MBTI 測驗', primary: true },
-    { icon: '💭', text: '了解產品', msg: '加熱菸是什麼？', primary: false },
-    { icon: '👋', text: '打個招呼', msg: '你好', primary: false },
+    { icon: '🎮', text: t('quick_action_quiz'), msg: t('quick_action_quiz'), primary: true },
+    { icon: '💭', text: t('quick_action_products'), msg: t('quick_action_products'), primary: false },
+    { icon: '👋', text: t('quick_action_greeting'), msg: t('quick_action_greeting'), primary: false },
   ];
 
   return (
@@ -127,9 +190,23 @@ export default function JtiTest() {
         <div className="header-content">
           <div className="logo-section">
             <span className="logo-icon">🚬</span>
-            <h1 className="logo-text">JTI 智慧助手</h1>
+            <h1 className="logo-text">{t('app_title')}</h1>
           </div>
           <div className="status-section">
+            <button
+              className="restart-button"
+              onClick={restartConversation}
+              title={t('button_restart')}
+            >
+              🔄
+            </button>
+            <button
+              className="lang-toggle"
+              onClick={toggleLanguage}
+              title={currentLanguage === 'zh' ? 'Switch to English' : '切換至繁體中文'}
+            >
+              {currentLanguage === 'zh' ? 'EN' : '中'}
+            </button>
             <div className="status-indicator">
               <span className="status-dot"></span>
               <span className="status-text">{statusText}</span>
@@ -148,16 +225,14 @@ export default function JtiTest() {
                   <span className="hero-icon">🚬</span>
                   <div className="icon-glow"></div>
                 </div>
-                <h2 className="hero-title">歡迎使用 JTI 智慧助手</h2>
+                <h2 className="hero-title">{t('welcome_title')}</h2>
                 <p className="hero-description">
-                  透過 AI 驅動的對話系統，幫助您了解自己的性格特質，
-                  <br />
-                  並為您推薦最適合的 JTI 產品。
+                  {t('welcome_description')}
                 </p>
               </div>
 
               <div className="quick-start">
-                <p className="quick-start-label">快速開始</p>
+                <p className="quick-start-label">{t('quick_start')}</p>
                 <div className="quick-actions">
                   {quickActions.map((action, i) => (
                     <button
@@ -234,7 +309,7 @@ export default function JtiTest() {
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={loading ? '處理中...' : '輸入訊息...'}
+                placeholder={loading ? t('status_ready') : t('input_placeholder')}
                 disabled={loading || !sessionId}
                 autoComplete="off"
                 spellCheck={false}

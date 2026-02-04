@@ -21,6 +21,7 @@ router = APIRouter(prefix="/api/mbti", tags=["MBTI Game"])
 class CreateSessionRequest(BaseModel):
     """建立 session 請求"""
     mode: GameMode = GameMode.MBTI
+    language: str = "zh"  # 語言 (zh/en)
 
 
 class CreateSessionResponse(BaseModel):
@@ -36,6 +37,7 @@ class ChatRequest(BaseModel):
     session_id: str = Field(..., description="Session ID")
     message: str = Field(..., description="使用者訊息")
     store_id: Optional[str] = Field(None, description="File Search Store ID（選用）")
+    language: Optional[str] = Field(None, description="語言 (zh/en)")
 
 
 class ChatResponse(BaseModel):
@@ -61,9 +63,9 @@ async def create_session(request: CreateSessionRequest):
     這會初始化一個新的 MBTI 測驗流程
     """
     try:
-        session = session_manager.create_session(mode=request.mode)
+        session = session_manager.create_session(mode=request.mode, language=request.language)
 
-        logger.info(f"Created new session: {session.session_id}")
+        logger.info(f"Created new session: {session.session_id} (language={request.language})")
 
         return CreateSessionResponse(
             session_id=session.session_id,
@@ -122,6 +124,11 @@ async def chat(request: ChatRequest):
         session = session_manager.get_session(request.session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
+
+        # 如果前端傳來 language，更新 session
+        if request.language and request.language != session.language:
+            session.language = request.language
+            logger.info(f"Updated session language: {session.session_id} -> {request.language}")
 
         from app.tools.tool_executor import tool_executor
 

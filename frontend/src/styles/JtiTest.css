@@ -68,7 +68,7 @@
   background: rgba(26, 31, 46, 0.85);
   backdrop-filter: blur(20px) saturate(180%);
   border-bottom: 1px solid rgba(224, 192, 104, 0.12);
-  padding: 1.5rem 2.5rem;
+  padding: 2rem 2.5rem;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -113,7 +113,55 @@
 .status-section {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 1.5rem;
+}
+
+.restart-button {
+  padding: 0.6rem 1rem;
+  background: rgba(224, 192, 104, 0.08);
+  border: 1.5px solid rgba(224, 192, 104, 0.25);
+  border-radius: 20px;
+  color: var(--gold);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  line-height: 1;
+}
+
+.restart-button:hover {
+  background: rgba(224, 192, 104, 0.15);
+  border-color: var(--gold);
+  box-shadow: 0 4px 16px rgba(224, 192, 104, 0.2);
+  transform: translateY(-1px) rotate(180deg);
+}
+
+.restart-button:active {
+  transform: translateY(0) rotate(180deg);
+}
+
+.lang-toggle {
+  padding: 0.6rem 1rem;
+  background: rgba(224, 192, 104, 0.08);
+  border: 1.5px solid rgba(224, 192, 104, 0.25);
+  border-radius: 20px;
+  color: var(--gold);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.lang-toggle:hover {
+  background: rgba(224, 192, 104, 0.15);
+  border-color: var(--gold);
+  box-shadow: 0 4px 16px rgba(224, 192, 104, 0.2);
+  transform: translateY(-1px);
+}
+
+.lang-toggle:active {
+  transform: translateY(0);
 }
 
 .status-indicator {

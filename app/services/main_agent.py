@@ -26,6 +26,8 @@ from app.services.gemini_service import client as gemini_client
 from app.tools.tool_executor import tool_executor
 from app.services.agent_prompts import (
     MAIN_AGENT_SYSTEM_PROMPT_TEMPLATE,
+    SYSTEM_INSTRUCTIONS,
+    SESSION_STATE_TEMPLATES,
     CURRENT_QUESTION_TEMPLATE
 )
 from app.services.conversation_logger import conversation_logger
@@ -39,16 +41,20 @@ class MainAgent:
     def __init__(self):
         self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 
-    def _build_system_prompt(self, session: Session) -> str:
-        """建立 System Prompt - 測驗由後端處理，這裡只給 LLM 基本資訊"""
-        return MAIN_AGENT_SYSTEM_PROMPT_TEMPLATE.format(
-            session_id=session.session_id,
+    def _get_system_instruction(self, session: Session) -> str:
+        """取得靜態 System Instruction（不變的規則）"""
+        return SYSTEM_INSTRUCTIONS.get(session.language, SYSTEM_INSTRUCTIONS["zh"])
+
+    def _get_session_state(self, session: Session) -> str:
+        """取得動態 Session 狀態（會變化的資訊）"""
+        template = SESSION_STATE_TEMPLATES.get(session.language, SESSION_STATE_TEMPLATES["zh"])
+        return template.format(
             step_value=session.step.value,
             answers_count=len(session.answers),
-            persona=session.persona or '尚未計算'
+            persona=session.persona or ('Not calculated yet' if session.language == 'en' else '尚未計算')
         )
 
-    def _build_tools(self) -> List[types.Tool]:
+    def _build_tools(self, language: str = "zh") -> List[types.Tool]:
         """建立 tools - 只有開始測驗與推薦商品交給 LLM 呼叫"""
         function_declarations = [
             types.FunctionDeclaration(
@@ -89,9 +95,16 @@ class MainAgent:
         # 整合 Function Declarations + File Search
         tools = [types.Tool(function_declarations=function_declarations)]
 
-        # 如果有設定 File Search Store ID，加入 File Search 工具
-        file_search_store_id = os.getenv("GEMINI_FILE_SEARCH_STORE_ID")
+        # 根據語言選擇對應的知識庫
+        store_env_key = f"GEMINI_FILE_SEARCH_STORE_ID_{language.upper()}"
+        file_search_store_id = os.getenv(store_env_key)
+
+        # 向後相容：如果沒有語言專屬的，fallback 到舊的環境變數
+        if not file_search_store_id:
+            file_search_store_id = os.getenv("GEMINI_FILE_SEARCH_STORE_ID")
+
         if file_search_store_id:
+            logger.info(f"使用知識庫: {store_env_key}={file_search_store_id}")
             tools.append(
                 types.Tool(
                     file_search=types.FileSearch(
@@ -99,6 +112,8 @@ class MainAgent:
                     )
                 )
             )
+        else:
+            logger.warning(f"未設定知識庫: {store_env_key}")
 
         return tools
 
@@ -124,13 +139,14 @@ class MainAgent:
                     "message": "找不到對話記錄，請重新開始。"
                 }
 
-            # 2. 建立對話內容（包含歷史對話串）
-            system_prompt = self._build_system_prompt(session)
-            tools = self._build_tools()
+            # 2. 準備靜態 system instruction 和動態狀態
+            system_instruction = self._get_system_instruction(session)  # 靜態規則（不變）
+            session_state = self._get_session_state(session)  # 動態狀態（會變）
+            tools = self._build_tools(language=session.language)  # 根據語言選擇知識庫
 
             # 3. 建立完整的對話串（包含歷史）
             conversation_parts = []
-            
+
             # 如果有對話歷史，先加入
             if session.chat_history:
                 print(f"[DEBUG] 載入對話歷史: {len(session.chat_history)} 筆")
@@ -148,30 +164,27 @@ class MainAgent:
             else:
                 print("[DEBUG] 沒有對話歷史（新 session）")
                 logger.info("沒有對話歷史（新 session）")
-            
-            # 加入當前訊息
-            # 系統提示總是以強制性指令的形式包含
-            # 不使用 [系統提示] 標籤,避免 LLM 誤認為是參考資訊
-            if not conversation_parts:
-                # 新對話：系統提示 + 使用者訊息
-                current_user_message = f"{system_prompt}\n\n使用者說：{user_message}"
-            else:
-                # 有歷史：直接重申系統提示（作為當前必須遵守的規則）
-                current_user_message = f"{system_prompt}\n\n使用者現在說：{user_message}"
 
-            logger.info(f"[DEBUG] 發送給 LLM 的完整提示:\n{current_user_message[:500]}...")
-            
+            # 加入當前訊息（包含動態狀態）
+            current_message = f"{session_state}\n\n{user_message}"
             conversation_parts.append(
                 types.Content(
                     role="user",
-                    parts=[types.Part.from_text(text=current_user_message)]
+                    parts=[types.Part.from_text(text=current_message)]
                 )
             )
 
-            # 4. 第一次呼叫 LLM
-            config = types.GenerateContentConfig(tools=tools)
-            no_tool_config = types.GenerateContentConfig()
-            
+            logger.info(f"[DEBUG] 使用者訊息: {user_message[:200]}...")
+
+            # 4. 第一次呼叫 LLM（使用靜態 system_instruction）
+            config = types.GenerateContentConfig(
+                tools=tools,
+                system_instruction=system_instruction  # 只包含不變的規則
+            )
+            no_tool_config = types.GenerateContentConfig(
+                system_instruction=system_instruction
+            )
+
             response = gemini_client.models.generate_content(
                 model=self.model_name,
                 contents=conversation_parts,
@@ -237,51 +250,54 @@ class MainAgent:
                                 )
                             )
 
-                            # 重新取得最新的 session 狀態以更新系統提示
+                            # 重新取得最新的 session 狀態
                             updated_session = session_manager.get_session(session_id)
-                            updated_system_prompt = self._build_system_prompt(updated_session)
-                            logger.info(f"[DEBUG] 更新系統提示")
+                            updated_state = self._get_session_state(updated_session)
+                            logger.info(f"[DEBUG] 更新狀態")
                             logger.info(f"  - current_q_index: {updated_session.current_q_index}")
                             logger.info(f"  - answers: {updated_session.answers}")
                             logger.info(f"  - current_question_id: {updated_session.current_question.get('id') if updated_session.current_question else None}")
-                            logger.info(f"  - system_prompt 包含當前題目: {'🎯 當前題目' in updated_system_prompt}")
-                            logger.info(f"  - system_prompt 長度: {len(updated_system_prompt)} 字元")
-                            if updated_session.current_question:
-                                logger.info(f"  - 完整系統提示:\n{updated_system_prompt}")
 
-                            # 繼續對話 - 根據工具返回內容決定如何更新系統提示
+                            # 繼續對話 - 根據工具返回內容決定如何更新
                             if "instruction_for_llm" in tool_result:
-                                # 有明確指示，直接使用
-                                instruction = tool_result['instruction_for_llm']
+                                # 有明確指示，包含更新狀態
+                                instruction = f"{updated_state}\n\n{tool_result['instruction_for_llm']}"
                             elif "message" in tool_result:
                                 # 有預設訊息，請 LLM 用自然語氣回覆並完整保留內容
                                 if tool_name == "start_quiz":
                                     instruction = (
+                                        f"{updated_state}\n\n"
                                         "請用自然語氣回應，並在回覆中完整保留題目與選項文字（原封不動）。"
                                         "可在前後加一句友善的引導話：\n"
                                         f"{tool_result['message']}"
                                     )
                                 else:
                                     instruction = (
+                                        f"{updated_state}\n\n"
                                         "請用自然語氣回應，並在回覆中完整保留以下內容。"
                                         "可在前後加一句友善的引導話：\n"
                                         f"{tool_result['message']}"
                                     )
                             else:
                                 # 沒有明確指示，讓 LLM 自由發揮
-                                instruction = "請根據工具執行結果自然回應使用者。"
+                                instruction = f"{updated_state}\n\n請根據工具執行結果自然回應使用者。"
 
                             conversation_parts.append(
                                 types.Content(
                                     role="user",
-                                    parts=[types.Part.from_text(text=f"{updated_system_prompt}\n\n{instruction}")]
+                                    parts=[types.Part.from_text(text=instruction)]
                                 )
+                            )
+
+                            # system_instruction 保持不變（只有靜態規則）
+                            updated_config = types.GenerateContentConfig(
+                                system_instruction=system_instruction
                             )
 
                             response = gemini_client.models.generate_content(
                                 model=self.model_name,
                                 contents=conversation_parts,
-                                config=no_tool_config
+                                config=updated_config
                             )
                             break
 
