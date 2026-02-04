@@ -85,3 +85,6 @@ desktop.ini
 # Data directory
 data/
 
+# Git worktrees
+.worktrees/
+
