@@ -28,7 +28,7 @@ export default function JtiTest() {
   const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   // 重新開始對話
   const restartConversation = useCallback(async () => {
@@ -112,6 +112,18 @@ export default function JtiTest() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [messages]);
 
+  // 自動調整輸入框高度（直到上限）
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    const styles = window.getComputedStyle(el);
+    const maxHeight = parseFloat(styles.maxHeight || '160');
+    const nextHeight = Math.min(el.scrollHeight, maxHeight);
+    el.style.height = `${nextHeight}px`;
+    el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }, [userInput]);
+
   const sendMessage = useCallback(async (message: string) => {
     if (!message || !sessionId || loading) return;
 
@@ -166,7 +178,7 @@ export default function JtiTest() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       const msg = userInput.trim();
       if (msg && !loading) sendMessage(msg);
@@ -175,6 +187,7 @@ export default function JtiTest() {
 
   const quickActions = [
     { icon: '🎮', text: t('quick_action_quiz'), msg: t('quick_action_quiz'), primary: true },
+    { text: t('quick_action_htp'), msg: t('quick_action_htp'), primary: false },
     { icon: '👋', text: t('quick_action_greeting'), msg: t('quick_action_greeting'), primary: false },
   ];
 
@@ -240,7 +253,7 @@ export default function JtiTest() {
                       onClick={() => sendMessage(action.msg)}
                       disabled={loading || !sessionId}
                     >
-                      <span className="action-icon">{action.icon}</span>
+                      {action.icon && <span className="action-icon">{action.icon}</span>}
                       <span className="action-text">{action.text}</span>
                     </button>
                   ))}
@@ -301,9 +314,8 @@ export default function JtiTest() {
         <div className="input-area">
           <form onSubmit={handleSubmit} className="input-form">
             <div className="input-container">
-              <input
+              <textarea
                 ref={inputRef}
-                type="text"
                 className="chat-input"
                 value={userInput}
                 onChange={(e) => setUserInput(e.target.value)}
@@ -322,7 +334,7 @@ export default function JtiTest() {
                 {loading ? (
                   <span className="button-spinner"></span>
                 ) : (
-                  <svg className="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg className="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
                     <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
                   </svg>
                 )}

@@ -248,9 +248,19 @@ async def chat(request: ChatRequest):
         # ========== 非 QUIZ 狀態 ==========
 
         # 先用關鍵字判斷是否要開始測驗（不依賴 LLM 呼叫工具）
-        start_keywords = ['mbti', '測驗', '心理測驗', '開始', '玩', '試試', '來吧', '好啊', '開始吧']
+        start_keywords = ['mbti', '測驗', '心理測驗', '開始', '玩', '試試', '來吧', '好啊', '開始吧', 'quiz', 'start']
+        negative_keywords = ['不想', '不要', '不用', '不玩', '跳過', '算了', '不了', "don't", "dont", "no ", "not ", "skip", "pass", "never"]
         msg_lower = request.message.lower()
-        should_start_quiz = any(kw in msg_lower for kw in start_keywords)
+
+        # 檢查是否有開始意圖
+        has_start_intent = any(kw in msg_lower for kw in start_keywords)
+        # 檢查是否有拒絕意圖
+        has_rejection = any(kw in msg_lower for kw in negative_keywords) or any(kw in request.message for kw in negative_keywords)
+
+        # 只有在有開始意圖且沒有拒絕時才開始測驗
+        should_start_quiz = has_start_intent and not has_rejection
+
+        logger.info(f"[DEBUG] 測驗判斷: has_start={has_start_intent}, has_rejection={has_rejection}, should_start={should_start_quiz}")
 
         # 如果已完成測驗想再測一次，拒絕
         if should_start_quiz and session.step.value == "DONE":

@@ -519,11 +519,14 @@
   gap: 1rem;
   flex-wrap: wrap;
   justify-content: center;
+  align-items: center;
 }
 
 .quick-action {
   display: flex;
   align-items: center;
+  flex-direction: row;
+  flex-wrap: nowrap;
   gap: 0.75rem;
   padding: 0 1.6rem;
   background: rgba(26, 31, 46, 0.6);
@@ -532,6 +535,10 @@
   font-weight: 500;
   cursor: pointer;
   transition: var(--control-transition);
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: max-content;
+  white-space: nowrap;
 }
 
 .quick-action:hover:not(:disabled) {
@@ -557,18 +564,26 @@
   font-size: 1.05rem;
 }
 
+.action-text {
+  white-space: nowrap;
+}
+
 /* Input */
 .input-area {
   background: rgba(26, 31, 46, 0.85);
   backdrop-filter: blur(20px) saturate(180%);
   border-top: 1.5px solid rgba(224, 192, 104, 0.12);
   padding: 1.75rem 2.5rem;
+  --input-h: 56px;
+  --input-max-h: 160px;
+  --send-w: 72px;
   box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.2);
 }
 
 .input-form {
-  max-width: 900px;
-  margin: 0 auto;
+  width: 100%;
+  max-width: 100%;
+  margin: 0;
 }
 
 .input-container {
@@ -582,13 +597,18 @@
   background: rgba(255, 255, 255, 0.06);
   border: 1.5px solid rgba(255, 255, 255, 0.12);
   color: var(--text);
-  height: var(--control-h);
-  padding: 0 1.4rem;
+  min-height: var(--input-h, var(--control-h));
+  max-height: var(--input-max-h);
+  height: var(--input-h, var(--control-h));
+  padding: 0.8rem 1.4rem;
   border-radius: 20px;
   font-size: 1rem;
   font-family: inherit;
+  line-height: 1.5;
   transition: all 0.4s ease;
   outline: none;
+  resize: none;
+  overflow-y: hidden;
 }
 
 .chat-input:focus {
@@ -608,12 +628,12 @@
 }
 
 .send-button {
-  width: var(--control-h);
-  height: var(--control-h);
-  background: linear-gradient(135deg, var(--gold), var(--gold-dark));
-  color: var(--bg);
+  width: var(--send-w, var(--input-h, var(--control-h)));
+  height: var(--input-h, var(--control-h));
+  background: linear-gradient(135deg, #f1d486 0%, var(--gold) 45%, var(--gold-dark) 100%);
+  color: #1a1f2e;
   border: none;
-  border-radius: 16px;
+  border-radius: 18px;
   cursor: pointer;
   transition: var(--control-transition);
   display: flex;
@@ -632,8 +652,13 @@
 }
 
 .send-icon {
-  width: 24px;
-  height: 24px;
+  width: 36px;
+  height: 36px;
+  stroke: currentColor;
+  fill: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.25));
 }
 
 .button-spinner {
@@ -733,11 +758,20 @@
 
   .quick-action {
     width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
     justify-content: center;
+    white-space: normal;
+  }
+
+  .action-text {
+    white-space: normal;
   }
 
   .input-area {
     padding: 1.25rem 1rem;
+    --input-h: 56px;
+    --send-w: 64px;
   }
 }
 

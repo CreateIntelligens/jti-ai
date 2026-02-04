@@ -56,16 +56,34 @@ class MainAgent:
 
     def _build_tools(self, language: str = "zh") -> List[types.Tool]:
         """建立 tools - 只有開始測驗與推薦商品交給 LLM 呼叫"""
+        # Tool descriptions 雙語版本
+        tool_descriptions = {
+            "zh": {
+                "start_quiz": "開始 MBTI 測驗。⚠️ 重要：僅在使用者明確表達「想要」開始的意願時呼叫（例如：「我想做測驗」「開始吧」）。如果使用者表達否定或拒絕（例如：「不想」「不要」「跳過」），絕對禁止呼叫此工具。",
+                "recommend_products": "根據 MBTI 類型推薦商品。測驗完成後或使用者要求推薦時呼叫。",
+                "session_id": "Session ID",
+                "max_results": "最多推薦幾個商品"
+            },
+            "en": {
+                "start_quiz": "Start MBTI quiz. ⚠️ IMPORTANT: Only call when user explicitly expresses WILLINGNESS to start (e.g., 'I want to take the quiz', 'let's begin'). If user expresses negation or refusal (e.g., 'don't want', 'no', 'skip'), absolutely DO NOT call this tool.",
+                "recommend_products": "Recommend products based on MBTI type. Call after quiz completion or when user requests recommendations.",
+                "session_id": "Session ID",
+                "max_results": "Maximum number of products to recommend"
+            }
+        }
+
+        desc = tool_descriptions.get(language, tool_descriptions["zh"])
+
         function_declarations = [
             types.FunctionDeclaration(
                 name="start_quiz",
-                description="開始 MBTI 測驗。使用者表達想開始測驗時呼叫。",
+                description=desc["start_quiz"],
                 parameters={
                     "type": "object",
                     "properties": {
                         "session_id": {
                             "type": "string",
-                            "description": "Session ID"
+                            "description": desc["session_id"]
                         }
                     },
                     "required": ["session_id"]
@@ -73,17 +91,17 @@ class MainAgent:
             ),
             types.FunctionDeclaration(
                 name="recommend_products",
-                description="根據 MBTI 類型推薦商品。測驗完成後或使用者要求推薦時呼叫。",
+                description=desc["recommend_products"],
                 parameters={
                     "type": "object",
                     "properties": {
                         "session_id": {
                             "type": "string",
-                            "description": "Session ID"
+                            "description": desc["session_id"]
                         },
                         "max_results": {
                             "type": "integer",
-                            "description": "最多推薦幾個商品",
+                            "description": desc["max_results"],
                             "default": 3
                         }
                     },
@@ -104,6 +122,7 @@ class MainAgent:
             file_search_store_id = os.getenv("GEMINI_FILE_SEARCH_STORE_ID")
 
         if file_search_store_id:
+            print(f"[DEBUG] 使用知識庫: {store_env_key}={file_search_store_id}")
             logger.info(f"使用知識庫: {store_env_key}={file_search_store_id}")
             tools.append(
                 types.Tool(
@@ -113,6 +132,7 @@ class MainAgent:
                 )
             )
         else:
+            print(f"[DEBUG] ⚠️ 未設定知識庫: {store_env_key}")
             logger.warning(f"未設定知識庫: {store_env_key}")
 
         return tools
@@ -218,12 +238,37 @@ class MainAgent:
                                 tool_args["session_id"] = session_id
 
                             logger.info(f"✓ LLM 呼叫工具: {tool_name}({tool_args})")
+                            print(f"[DEBUG TOOL] 工具呼叫: {tool_name}, user_message='{user_message}'")
 
                             # 執行 tool
                             # 忽略模型腦補的 'query' 工具（這是 File Search 誤用造成的）
                             if tool_name == "query":
                                 logger.warning("Ignoring hallucinated tool: query")
                                 tool_result = {"error": "請直接回答問題，不要使用 query 工具。"}
+                            # 後端攔截：檢查 start_quiz 是否應該被阻擋
+                            elif tool_name == "start_quiz":
+                                # 檢查使用者訊息是否包含拒絕意圖
+                                negative_keywords_zh = ["不想", "不要", "不用", "不玩", "跳過", "算了", "不了"]
+                                negative_keywords_en = ["don't", "dont", "no ", "not ", "skip", "pass", "never"]
+                                user_msg_lower = user_message.lower()
+
+                                has_rejection = (
+                                    any(kw in user_message for kw in negative_keywords_zh) or
+                                    any(kw in user_msg_lower for kw in negative_keywords_en)
+                                )
+
+                                print(f"[DEBUG 攔截檢查] user_message='{user_message}', has_rejection={has_rejection}")
+
+                                if has_rejection:
+                                    print(f"[DEBUG] ✅ 攔截 start_quiz！使用者拒絕測驗")
+                                    logger.warning(f"後端攔截: 使用者拒絕測驗，不執行 start_quiz")
+                                    tool_result = {
+                                        "blocked": True,
+                                        "message": "使用者表示不想做測驗，請尊重使用者意願，不要開始測驗。"
+                                    }
+                                else:
+                                    print(f"[DEBUG] ❌ 未攔截，執行 start_quiz")
+                                    tool_result = await tool_executor.execute(tool_name, tool_args)
                             else:
                                 tool_result = await tool_executor.execute(tool_name, tool_args)
 
@@ -430,9 +475,9 @@ B. {q['options'][1]['text']}
             else:
                 instruction = "請簡短回應使用者"
 
-            # 組合：system prompt + 使用者訊息 + 指示
-            system_prompt = self._build_system_prompt(session)
-            full_prompt = f"""{system_prompt}
+            # 組合：session state + 使用者訊息 + 指示
+            session_state = self._get_session_state(session)
+            full_prompt = f"""{session_state}
 
 使用者說：{user_message}
 
@@ -445,10 +490,16 @@ B. {q['options'][1]['text']}
                 )
             )
 
-            # 呼叫 LLM 生成回應
+            # 呼叫 LLM 生成回應（使用靜態 system instruction）
+            system_instruction = self._get_system_instruction(session)
+            config = types.GenerateContentConfig(
+                system_instruction=system_instruction
+            )
+
             response = gemini_client.models.generate_content(
                 model=self.model_name,
-                contents=conversation_parts
+                contents=conversation_parts,
+                config=config
             )
 
             # 提取回應

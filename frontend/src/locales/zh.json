@@ -9,6 +9,7 @@
   "welcome_description": "透過 AI 驅動的對話系統，幫助您了解自己的性格特質，並為您推薦最適合的 JTI 產品。",
   "quick_start": "快速開始",
   "quick_action_quiz": "開始 MBTI 測驗",
+  "quick_action_htp": "什麼是加熱菸?",
   "quick_action_greeting": "打個招呼",
   "input_placeholder": "輸入訊息... (試試「我想做測驗」)",
   "button_send": "發送",

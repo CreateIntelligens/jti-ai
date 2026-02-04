@@ -9,6 +9,7 @@
   "welcome_description": "AI-powered conversation system to help you understand your personality and recommend the perfect JTI products for you.",
   "quick_start": "Quick Start",
   "quick_action_quiz": "Start MBTI Quiz",
+  "quick_action_htp": "What is Heated Tobacco?",
   "quick_action_greeting": "Say Hello",
   "input_placeholder": "Type a message... (try \"I want to take the quiz\")",
   "button_send": "Send",

@@ -112,9 +112,15 @@ class ToolExecutor:
         # 保存當前題目到 session
         session_manager.set_current_question(session_id, question)
 
+        # 根據語言生成訊息
+        if language == "en":
+            message = f"\nQuestion 1: {question['text']}\nA. {question['options'][0]['text']}\nB. {question['options'][1]['text']}"
+        else:
+            message = f"\n第1題：{question['text']}\nA. {question['options'][0]['text']}\nB. {question['options'][1]['text']}"
+
         return {
             "success": True,
-            "message": f"\n第1題：{question['text']}\nA. {question['options'][0]['text']}\nB. {question['options'][1]['text']}",
+            "message": message,
             "current_question": question,
             "total_questions": 5,
             "progress": 0
@@ -220,8 +226,28 @@ class ToolExecutor:
                 next_question = quiz_get_question(session.quiz_id, session.current_q_index)
 
             result["next_question"] = next_question
-            # 讓 LLM 簡短評論上一題答案，然後問下一題
-            result["instruction_for_llm"] = f"""使用者選擇了「{answered_option_text}」，請用一句話簡短評論這個選擇（5-10字），然後問下一題。
+
+            # 根據語言生成指令
+            if session.language == "en":
+                result["instruction_for_llm"] = f"""User chose "{answered_option_text}". Give a brief comment (5-10 words) about this choice, then ask the next question.
+
+Comment examples:
+- "Loves recharging alone~"
+- "Very creative type!"
+- "Practical minded~"
+- "Values feelings"
+
+Next question to ask:
+Question {session.current_q_index + 1}: {next_question['text']}
+A. {next_question['options'][0]['text']}
+B. {next_question['options'][1]['text']}
+
+Don't:
+- Ask "Please choose A or B"
+- Say "Thank you for your answer"
+- Keep comments under 10 words"""
+            else:
+                result["instruction_for_llm"] = f"""使用者選擇了「{answered_option_text}」，請用一句話簡短評論這個選擇（5-10字），然後問下一題。
 
 評論範例：
 - 「喜歡獨處充電的人～」
@@ -283,12 +309,18 @@ B. {next_question['options'][1]['text']}
             scores=result["dimension_scores"],
         )
 
+        # 根據語言生成訊息
+        if session.language == "en":
+            message = f"Congratulations! Your MBTI type is {result['persona_id']}.\n\n{description}"
+        else:
+            message = f"恭喜！你的 MBTI 類型是 {result['persona_id']}。\n\n{description}"
+
         return {
             "persona_id": result["persona_id"],
             "description": description,
             "dimension_scores": result["dimension_scores"],
             "confidence": result["confidence"],
-            "message": f"恭喜！你的 MBTI 類型是 {result['persona_id']}。\n\n{description}"
+            "message": message
         }
 
     async def _execute_recommend_products(self, args: Dict) -> Dict:
