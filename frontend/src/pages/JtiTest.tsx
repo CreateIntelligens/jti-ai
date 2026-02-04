@@ -175,7 +175,6 @@ export default function JtiTest() {
 
   const quickActions = [
     { icon: '🎮', text: t('quick_action_quiz'), msg: t('quick_action_quiz'), primary: true },
-    { icon: '💭', text: t('quick_action_products'), msg: t('quick_action_products'), primary: false },
     { icon: '👋', text: t('quick_action_greeting'), msg: t('quick_action_greeting'), primary: false },
   ];
 
@@ -198,7 +197,7 @@ export default function JtiTest() {
               onClick={restartConversation}
               title={t('button_restart')}
             >
-              🔄
+              <span className="restart-label">{t('button_restart')}</span>
             </button>
             <button
               className="lang-toggle"
