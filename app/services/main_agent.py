@@ -87,14 +87,20 @@ class MainAgent:
         ]
 
         # 整合 Function Declarations + File Search
-        return [
-            types.Tool(function_declarations=function_declarations),
-            types.Tool(
-                file_search=types.FileSearch(
-                    file_search_store_names=["fileSearchStores/jti-xgvgfp8g1wsq"]
+        tools = [types.Tool(function_declarations=function_declarations)]
+
+        # 如果有設定 File Search Store ID，加入 File Search 工具
+        file_search_store_id = os.getenv("GEMINI_FILE_SEARCH_STORE_ID")
+        if file_search_store_id:
+            tools.append(
+                types.Tool(
+                    file_search=types.FileSearch(
+                        file_search_store_names=[f"fileSearchStores/{file_search_store_id}"]
+                    )
                 )
             )
-        ]
+
+        return tools
 
     async def chat(
         self,
