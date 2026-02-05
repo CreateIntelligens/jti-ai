@@ -24,7 +24,7 @@ class SessionManager:
         self._sessions: Dict[str, Session] = {}
         self.idle_timeout = timedelta(minutes=idle_timeout_minutes)
 
-    def create_session(self, mode: GameMode = GameMode.MBTI, language: str = "zh") -> Session:
+    def create_session(self, mode: GameMode = GameMode.COLOR, language: str = "zh") -> Session:
         """建立新 session"""
         session = Session(mode=mode, language=language)
         self._sessions[session.session_id] = session
@@ -79,6 +79,9 @@ class SessionManager:
         session.answers = {}
         session.current_question = None
         session.selected_questions = selected_questions  # 保存隨機選中的題目
+        session.color_scores = {}
+        session.color_result_id = None
+        session.color_result = None
         return self.update_session(session)
 
     def set_current_question(self, session_id: str, question: dict) -> Optional[Session]:
@@ -125,27 +128,16 @@ class SessionManager:
         return self.update_session(session)
 
     def complete_scoring(
-        self, session_id: str, persona: str, scores: Dict[str, int]
+        self, session_id: str, color_result_id: str, scores: Dict[str, int], color_result: Optional[Dict[str, Any]] = None
     ) -> Optional[Session]:
         """完成計分"""
         session = self.get_session(session_id)
         if not session:
             return None
 
-        session.persona = persona
-        session.persona_scores = scores
-        session.step = SessionStep.RECOMMEND
-        return self.update_session(session)
-
-    def save_recommendations(
-        self, session_id: str, products: list
-    ) -> Optional[Session]:
-        """保存推薦結果"""
-        session = self.get_session(session_id)
-        if not session:
-            return None
-
-        session.recommended_products = products
+        session.color_result_id = color_result_id
+        session.color_scores = scores
+        session.color_result = color_result
         session.step = SessionStep.DONE
         return self.update_session(session)
 

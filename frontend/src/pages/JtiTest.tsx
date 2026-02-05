@@ -13,7 +13,8 @@ interface SessionData {
   session_id: string;
   step: string;
   answers?: Record<string, string>;
-  persona?: string;
+  color_result_id?: string;
+  color_result?: { color_name?: string };
 }
 
 export default function JtiTest() {
@@ -39,10 +40,10 @@ export default function JtiTest() {
     }
 
     try {
-      const res = await fetch('/api/mbti/session/new', {
+      const res = await fetch('/api/jti/session/new', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'MBTI', language: currentLanguage }),
+        body: JSON.stringify({ mode: 'COLOR', language: currentLanguage }),
       });
       const data = await res.json();
       setSessionId(data.session_id);
@@ -74,10 +75,10 @@ export default function JtiTest() {
 
     // 重新建立 session
     try {
-      const res = await fetch('/api/mbti/session/new', {
+      const res = await fetch('/api/jti/session/new', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'MBTI', language: newLang }),
+        body: JSON.stringify({ mode: 'COLOR', language: newLang }),
       });
       const data = await res.json();
       setSessionId(data.session_id);
@@ -92,10 +93,10 @@ export default function JtiTest() {
   // 初始化 session
   useEffect(() => {
     const lang = localStorage.getItem('language') || 'zh';
-    fetch('/api/mbti/session/new', {
+    fetch('/api/jti/session/new', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'MBTI', language: lang }),
+      body: JSON.stringify({ mode: 'COLOR', language: lang }),
     })
       .then(res => res.json())
       .then(data => {
@@ -133,7 +134,7 @@ export default function JtiTest() {
     setIsTyping(true);
 
     try {
-      const res = await fetch('/api/mbti/chat', {
+      const res = await fetch('/api/jti/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, message, language: currentLanguage }),
@@ -142,6 +143,27 @@ export default function JtiTest() {
       const data = await res.json();
       await new Promise(resolve => setTimeout(resolve, 300));
       setIsTyping(false);
+
+      // Console log: 對話記錄
+      console.log(`[用戶] ${message}`);
+      console.log(`[AI回應] ${data.message}`);
+      if (data.session) {
+        const s = data.session as SessionData;
+        const count = Object.keys(s.answers || {}).length;
+        if (s.step === 'QUIZ') {
+          console.log(`[測驗進度] ${count}/5 題`);
+        }
+        if (s.color_scores && Object.keys(s.color_scores).length > 0) {
+          const sorted = Object.entries(s.color_scores).sort(([,a],[,b]) => (b as number) - (a as number));
+          console.log(`[當前分數] ${sorted.map(([k,v]) => `${k}:${v}`).join(' | ')}`);
+        }
+        if (s.color_result_id) {
+          console.log(`[測驗結果] ${s.color_result_id} - ${s.color_result?.title || ''}`);
+        }
+      }
+      if (data.tool_calls?.length) {
+        console.log(`[工具呼叫]`, data.tool_calls);
+      }
 
       const newMsg: Message = data.error && !data.message
         ? { text: `⚠️ ${data.error}`, type: 'system', timestamp: Date.now() }
@@ -153,9 +175,9 @@ export default function JtiTest() {
       if (data.session) {
         const s = data.session as SessionData;
         const count = Object.keys(s.answers || {}).length;
+        const colorName = s.color_result?.color_name || s.color_result_id || '';
         const status = s.step === 'QUIZ' ? `${t('status_quiz')} · ${count}/5`
-          : s.step === 'RECOMMEND' && s.persona ? `${s.persona}`
-          : s.persona || t('status_chatting');
+          : colorName || t('status_chatting');
         setStatusText(status);
       }
     } catch {

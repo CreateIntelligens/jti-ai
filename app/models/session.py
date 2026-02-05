@@ -23,28 +23,26 @@ class SessionStep(str, Enum):
 
 class GameMode(str, Enum):
     """遊戲模式"""
-    MBTI = "MBTI"           # MBTI 測驗
+    COLOR = "COLOR"         # 色彩測驗
 
 
 class Session(BaseModel):
     """Session 資料結構"""
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    mode: GameMode = GameMode.MBTI
+    mode: GameMode = GameMode.COLOR
     step: SessionStep = SessionStep.WELCOME
     language: str = "zh"  # 語言設定 (zh/en)
 
     # 測驗相關
-    quiz_id: str = "mbti_quick"  # 使用的題庫 ID
+    quiz_id: str = "color_taste"  # 使用的題庫 ID
     current_q_index: int = 0      # 目前題目索引
     answers: Dict[str, str] = Field(default_factory=dict)  # {question_id: option_id}
     selected_questions: Optional[List[Dict[str, Any]]] = None  # 本次測驗隨機選中的題目列表
 
     # 結果相關
-    persona: Optional[str] = None  # MBTI 類型，例如 "INTJ"
-    persona_scores: Optional[Dict[str, int]] = None  # 各維度得分
-
-    # 推薦相關
-    recommended_products: Optional[list] = None
+    color_result_id: Optional[str] = None  # 色系結果，例如 "metal"
+    color_scores: Dict[str, int] = Field(default_factory=dict)  # 各色系得分
+    color_result: Optional[Dict[str, Any]] = None  # 色系結果內容（文案與推薦色）
 
     # 時間戳記
     created_at: datetime = Field(default_factory=datetime.now)

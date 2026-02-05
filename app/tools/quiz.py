@@ -1,8 +1,8 @@
 """
-Quiz 工具：產生題目
+Quiz 工具：產生色彩測驗題目
 
 職責：
-1. 從題庫隨機抽題（每個維度隨機選一題）
+1. 根據 selection_rules 隨機抽題
 2. 回傳結構化資料
 3. LLM 不得自行生成題目
 """
@@ -15,10 +15,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# 載入題庫（支援多語言）
+# 載入題庫（色彩題庫，目前以中文為主）
 QUIZ_BANK_PATHS = {
-    "zh": Path("data/quiz_bank_zh.json"),
-    "en": Path("data/quiz_bank_en.json"),
+    "zh": Path("data/quiz_bank_color.json"),
+    "en": Path("data/quiz_bank_color.json"),
 }
 quiz_data_cache = {}
 
@@ -33,14 +33,13 @@ def load_quiz_bank(language: str = "zh"):
     return quiz_data_cache[language]
 
 
-def generate_random_quiz(quiz_id: str = "mbti_quick", language: str = "zh") -> List[Dict]:
+def generate_random_quiz(quiz_id: str = "color_taste", language: str = "zh") -> List[Dict]:
     """
     產生隨機測驗題目
 
     策略：
-    - 4 個 MBTI 維度 (E_I, S_N, T_F, J_P) 各隨機抽 1 題
-    - 最後從剩餘題目中隨機抽 1 題
-    - 總共 5 題
+    - 依 selection_rules 的 required 規則抽題
+    - 總題數由 selection_rules.total 決定（預設 5 題）
 
     Args:
         quiz_id: 題庫 ID
@@ -49,38 +48,65 @@ def generate_random_quiz(quiz_id: str = "mbti_quick", language: str = "zh") -> L
         List of 5 selected questions
     """
     try:
-        quiz_bank = load_quiz_bank()
-        quiz_set = quiz_bank["quiz_sets"].get(quiz_id)
+        quiz_bank = load_quiz_bank(language)
+        all_questions = quiz_bank.get("questions", [])
+        selection_rules = quiz_bank.get("selection_rules", {})
+        required = selection_rules.get("required", {})
+        total_questions = selection_rules.get("total", 5)
 
-        if not quiz_set:
-            raise ValueError(f"Quiz set '{quiz_id}' not found")
-
-        all_questions = quiz_set["questions"]
-
-        # 按維度分組
-        dimensions = {}
+        # 按分類分組
+        categories: Dict[str, List[Dict]] = {}
         for q in all_questions:
-            dim = q.get("dimension", "UNKNOWN")
-            if dim not in dimensions:
-                dimensions[dim] = []
-            dimensions[dim].append(q)
+            category = q.get("category", "unknown")
+            categories.setdefault(category, []).append(q)
 
-        selected = []
-        used_questions = set()
+        selected: List[Dict] = []
+        used_ids = set()
 
-        # 每個主要維度隨機抽 1 題
-        for dim in ["E_I", "S_N", "T_F", "J_P"]:
-            if dim in dimensions and dimensions[dim]:
-                question = random.choice(dimensions[dim])
-                selected.append(question)
-                used_questions.add(question["id"])
+        # 1) 必選類別（目前：personality 1 題）
+        personality_count = required.get("personality", 0)
+        if personality_count > 0:
+            pool = categories.get("personality", [])
+            if pool:
+                picked = random.sample(pool, k=min(personality_count, len(pool)))
+                selected.extend(picked)
+                used_ids.update(q["id"] for q in picked)
 
-        # 從剩餘題目隨機抽 1 題
-        remaining = [q for q in all_questions if q["id"] not in used_questions]
-        if remaining:
-            selected.append(random.choice(remaining))
+        # 2) 從指定分類清單中抽題（不重複）
+        remaining = total_questions - len(selected)
+        random_from = required.get("random_from", [])
+        available_categories = [c for c in random_from if c in categories]
 
-        logger.info(f"Generated random quiz: {quiz_id} ({language}), selected {len(selected)} questions: {[q['id'] for q in selected]}")
+        if remaining > 0 and available_categories:
+            chosen_categories = random.sample(
+                available_categories,
+                k=min(remaining, len(available_categories))
+            )
+            for category in chosen_categories:
+                pool = [q for q in categories.get(category, []) if q["id"] not in used_ids]
+                if pool:
+                    question = random.choice(pool)
+                    selected.append(question)
+                    used_ids.add(question["id"])
+
+        # 3) 若仍不足，從剩餘題目補足
+        if len(selected) < total_questions:
+            remaining_pool = [q for q in all_questions if q["id"] not in used_ids]
+            if remaining_pool:
+                fill = random.sample(
+                    remaining_pool,
+                    k=min(total_questions - len(selected), len(remaining_pool))
+                )
+                selected.extend(fill)
+                used_ids.update(q["id"] for q in fill)
+
+        logger.info(
+            "Generated random quiz: %s (%s), selected %s questions: %s",
+            quiz_id,
+            language,
+            len(selected),
+            [q.get("id") for q in selected],
+        )
         return selected
 
     except Exception as e:
@@ -88,7 +114,7 @@ def generate_random_quiz(quiz_id: str = "mbti_quick", language: str = "zh") -> L
         raise
 
 
-def generate_quiz(quiz_id: str = "mbti_quick", language: str = "zh") -> Dict:
+def generate_quiz(quiz_id: str = "color_taste", language: str = "zh") -> Dict:
     """
     產生測驗題目（向後相容的 wrapper）
 
@@ -103,18 +129,14 @@ def generate_quiz(quiz_id: str = "mbti_quick", language: str = "zh") -> Dict:
     """
     try:
         quiz_bank = load_quiz_bank(language)
-        quiz_set = quiz_bank["quiz_sets"].get(quiz_id)
 
-        if not quiz_set:
-            raise ValueError(f"Quiz set '{quiz_id}' not found")
-
-        # 隨機抽 5 題
+        # 隨機抽題
         questions = generate_random_quiz(quiz_id, language)
 
         result = {
-            "quiz_id": quiz_id,
-            "name": quiz_set["name"],
-            "description": quiz_set["description"],
+            "quiz_id": quiz_bank.get("quiz_id", quiz_id),
+            "name": quiz_bank.get("title", quiz_id),
+            "description": quiz_bank.get("description", ""),
             "total_questions": len(questions),
             "questions": questions,
         }
@@ -160,12 +182,7 @@ def get_question(quiz_id: str, question_index: int) -> Optional[Dict]:
     """
     try:
         quiz_bank = load_quiz_bank()
-        quiz_set = quiz_bank["quiz_sets"].get(quiz_id)
-
-        if not quiz_set:
-            return None
-
-        questions = quiz_set["questions"]
+        questions = quiz_bank.get("questions", [])
         if question_index < 0 or question_index >= len(questions):
             return None
 
@@ -176,6 +193,8 @@ def get_question(quiz_id: str, question_index: int) -> Optional[Dict]:
         return None
 
 
-def get_total_questions(quiz_id: str = "mbti_quick") -> int:
-    """取得題庫總題數（隨機測驗固定為 5 題）"""
-    return 5
+def get_total_questions(quiz_id: str = "color_taste") -> int:
+    """取得題庫總題數（依 selection_rules 決定）"""
+    quiz_bank = load_quiz_bank()
+    selection_rules = quiz_bank.get("selection_rules", {})
+    return selection_rules.get("total", 5)

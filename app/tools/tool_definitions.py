@@ -12,14 +12,14 @@ GENERATE_QUIZ_TOOL = {
     "type": "function",
     "function": {
         "name": "generate_quiz",
-        "description": "產生 MBTI 測驗的完整題目。這個 tool 會回傳所有題目的結構化資料。",
+        "description": "產生色彩測驗的完整題目。這個 tool 會回傳所有題目的結構化資料。",
         "parameters": {
             "type": "object",
             "properties": {
                 "quiz_id": {
                     "type": "string",
-                    "description": "題庫 ID，預設為 'mbti_basic'",
-                    "default": "mbti_basic"
+                    "description": "題庫 ID，預設為 'color_taste'",
+                    "default": "color_taste"
                 }
             }
         }
@@ -74,40 +74,17 @@ SUBMIT_ANSWER_TOOL = {
     }
 }
 
-CALCULATE_PERSONA_TOOL = {
+CALCULATE_COLOR_RESULT_TOOL = {
     "type": "function",
     "function": {
-        "name": "calculate_persona",
-        "description": "根據使用者的所有答案計算 MBTI 類型。這個 tool 會回傳確定的 MBTI 結果（例如 INTJ）和信心分數。",
+        "name": "calculate_color_result",
+        "description": "根據使用者的所有答案計算色系結果。這個 tool 會回傳色系與對應文案。",
         "parameters": {
             "type": "object",
             "properties": {
                 "session_id": {
                     "type": "string",
                     "description": "Session ID"
-                }
-            },
-            "required": ["session_id"]
-        }
-    }
-}
-
-RECOMMEND_PRODUCTS_TOOL = {
-    "type": "function",
-    "function": {
-        "name": "recommend_products",
-        "description": "根據使用者的 MBTI 類型推薦商品。這個 tool 會回傳結構化的商品清單。",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "session_id": {
-                    "type": "string",
-                    "description": "Session ID"
-                },
-                "max_results": {
-                    "type": "integer",
-                    "description": "最多推薦幾個商品",
-                    "default": 3
                 }
             },
             "required": ["session_id"]
@@ -121,8 +98,7 @@ ALL_TOOLS: List[Dict] = [
     GENERATE_QUIZ_TOOL,
     GET_QUESTION_TOOL,
     SUBMIT_ANSWER_TOOL,
-    CALCULATE_PERSONA_TOOL,
-    RECOMMEND_PRODUCTS_TOOL,
+    CALCULATE_COLOR_RESULT_TOOL,
 ]
 
 

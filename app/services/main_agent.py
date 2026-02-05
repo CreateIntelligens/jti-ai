@@ -4,15 +4,14 @@ Main Agent - 核心對話邏輯
 職責：
 1. 處理一般對話
 2. 判斷使用者意圖
-3. 在適當時機呼叫 MBTI 測驗工具
+3. 在適當時機呼叫色彩測驗工具
 4. 商品問答（可用 RAG）
 
 Agent 擁有的 Tools：
-- start_quiz: 開始 MBTI 測驗
+- start_quiz: 開始色彩測驗
 - get_question: 取得當前題目
 - submit_answer: 提交答案
-- calculate_persona: 計算 MBTI 類型
-- recommend_products: 推薦商品
+- calculate_color_result: 計算色系結果
 """
 
 import os
@@ -51,24 +50,20 @@ class MainAgent:
         return template.format(
             step_value=session.step.value,
             answers_count=len(session.answers),
-            persona=session.persona or ('Not calculated yet' if session.language == 'en' else '尚未計算')
+            color_result=session.color_result_id or ('Not calculated yet' if session.language == 'en' else '尚未計算')
         )
 
     def _build_tools(self, language: str = "zh") -> List[types.Tool]:
-        """建立 tools - 只有開始測驗與推薦商品交給 LLM 呼叫"""
+        """建立 tools - 只有開始測驗交給 LLM 呼叫"""
         # Tool descriptions 雙語版本
         tool_descriptions = {
             "zh": {
-                "start_quiz": "開始 MBTI 測驗。⚠️ 重要：僅在使用者明確表達「想要」開始的意願時呼叫（例如：「我想做測驗」「開始吧」）。如果使用者表達否定或拒絕（例如：「不想」「不要」「跳過」），絕對禁止呼叫此工具。",
-                "recommend_products": "根據 MBTI 類型推薦商品。測驗完成後或使用者要求推薦時呼叫。",
-                "session_id": "Session ID",
-                "max_results": "最多推薦幾個商品"
+                "start_quiz": "開始色彩測驗。⚠️ 重要：僅在使用者明確表達「想要」開始的意願時呼叫（例如：「我想做測驗」「開始吧」）。如果使用者表達否定或拒絕（例如：「不想」「不要」「跳過」），絕對禁止呼叫此工具。",
+                "session_id": "Session ID"
             },
             "en": {
-                "start_quiz": "Start MBTI quiz. ⚠️ IMPORTANT: Only call when user explicitly expresses WILLINGNESS to start (e.g., 'I want to take the quiz', 'let's begin'). If user expresses negation or refusal (e.g., 'don't want', 'no', 'skip'), absolutely DO NOT call this tool.",
-                "recommend_products": "Recommend products based on MBTI type. Call after quiz completion or when user requests recommendations.",
-                "session_id": "Session ID",
-                "max_results": "Maximum number of products to recommend"
+                "start_quiz": "Start the color quiz. ⚠️ IMPORTANT: Only call when user explicitly expresses WILLINGNESS to start (e.g., 'I want to take the quiz', 'let's begin'). If user expresses negation or refusal (e.g., 'don't want', 'no', 'skip'), absolutely DO NOT call this tool.",
+                "session_id": "Session ID"
             }
         }
 
@@ -84,25 +79,6 @@ class MainAgent:
                         "session_id": {
                             "type": "string",
                             "description": desc["session_id"]
-                        }
-                    },
-                    "required": ["session_id"]
-                }
-            ),
-            types.FunctionDeclaration(
-                name="recommend_products",
-                description=desc["recommend_products"],
-                parameters={
-                    "type": "object",
-                    "properties": {
-                        "session_id": {
-                            "type": "string",
-                            "description": desc["session_id"]
-                        },
-                        "max_results": {
-                            "type": "integer",
-                            "description": desc["max_results"],
-                            "default": 3
                         }
                     },
                     "required": ["session_id"]
@@ -233,7 +209,7 @@ class MainAgent:
                             # 自動補上 session_id
                             if "session_id" in [p for p in tool_args.keys()] or tool_name in [
                                 "start_quiz", "get_question", "submit_answer",
-                                "calculate_persona", "recommend_products"
+                                "calculate_color_result"
                             ]:
                                 tool_args["session_id"] = session_id
 
@@ -385,7 +361,7 @@ class MainAgent:
                 session_state={
                     "step": updated_session.step.value if updated_session else None,
                     "answers_count": len(updated_session.answers) if updated_session else 0,
-                    "persona": updated_session.persona if updated_session else None,
+                    "color_result_id": updated_session.color_result_id if updated_session else None,
                     "current_question_id": updated_session.current_question.get("id") if updated_session and updated_session.current_question else None
                 } if updated_session else None
             )
@@ -453,25 +429,26 @@ class MainAgent:
             elif tool_name == "start_quiz" and tool_result.get("current_question"):
                 # 開始測驗，顯示第一題
                 q = tool_result["current_question"]
+                options = q.get("options", [])
+                labels = "ABCDE"
+                options_text = "\n".join(
+                    f"{labels[i]}. {opt.get('text', '')}"
+                    for i, opt in enumerate(options)
+                )
                 instruction = f"""測驗已開始，請用友善的語氣介紹並問第一題。
 
 第1題：{q['text']}
-A. {q['options'][0]['text']}
-B. {q['options'][1]['text']}
+{options_text}
 
 必須完整顯示題目和選項，可以加一句簡短的開場白。"""
-            elif "recommend_result" in tool_result:
-                # 測驗完成 + 推薦
-                persona_id = tool_result.get('persona_result', {}).get('persona_id', 'Unknown')
-                recommend_msg = tool_result['recommend_result'].get('message', '')
-                instruction = f"""使用者剛完成 MBTI 測驗，類型是 {persona_id}。
+            elif "color_result" in tool_result and tool_result.get("message"):
+                instruction = f"""使用者剛完成色彩測驗。
 
-{recommend_msg}
+{tool_result['message']}
 
 請用友善、鼓勵的語氣回應，包含：
 1. 恭喜完成測驗
-2. MBTI 類型及特質描述
-3. 推薦的商品"""
+2. 色系結果與推薦色"""
             else:
                 instruction = "請簡短回應使用者"
 

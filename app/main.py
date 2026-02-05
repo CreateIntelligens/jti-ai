@@ -11,6 +11,9 @@ import warnings
 from pathlib import Path
 from typing import Optional
 
+# 設定 app logger 輸出
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(name)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+
 # 過濾 Gemini AFC 警告（我們故意使用 Manual Function Calling）
 warnings.filterwarnings('ignore', message='.*automatic function calling.*')
 warnings.filterwarnings('ignore', message='.*AFC.*')
@@ -62,7 +65,7 @@ import hashlib
 
 from .core import FileSearchManager
 from .api_keys import APIKeyManager
-from .routers import mbti
+from .routers import jti
 
 app = FastAPI(title="Gemini File Search API")
 
@@ -664,5 +667,5 @@ def index():
     return {"message": "Gemini File Search API", "docs": "/docs"}
 
 
-# 引入 MBTI 路由
-app.include_router(mbti.router)
+# 引入色彩測驗路由
+app.include_router(jti.router)

@@ -1,5 +1,5 @@
 """
-MBTI 遊戲 API Endpoints
+JTI 測驗系統 API Endpoints
 """
 
 from fastapi import APIRouter, HTTPException
@@ -13,14 +13,14 @@ from app.services.conversation_logger import conversation_logger
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/mbti", tags=["MBTI Game"])
+router = APIRouter(prefix="/api/jti", tags=["JTI Quiz"])
 
 
 # === Request/Response Models ===
 
 class CreateSessionRequest(BaseModel):
     """建立 session 請求"""
-    mode: GameMode = GameMode.MBTI
+    mode: GameMode = GameMode.COLOR
     language: str = "zh"  # 語言 (zh/en)
 
 
@@ -60,7 +60,7 @@ async def create_session(request: CreateSessionRequest):
     """
     建立新的測驗 session
 
-    這會初始化一個新的 MBTI 測驗流程
+    這會初始化一個新的色彩測驗流程
     """
     try:
         session = session_manager.create_session(mode=request.mode, language=request.language)
@@ -110,7 +110,7 @@ async def chat(request: ChatRequest):
 
     流程設計：
     1. WELCOME/一般狀態：走 LLM（可用知識庫）
-       - 使用者說「MBTI」「測驗」「玩」→ 開始測驗
+       - 使用者說「色彩」「顏色」「測驗」「玩」→ 開始測驗
        - 其他問題 → 正常回答
 
     2. QUIZ 狀態（有當前題目）：後端完全接管
@@ -125,6 +125,9 @@ async def chat(request: ChatRequest):
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
+        # 記錄用戶訊息
+        logger.info(f"[用戶訊息] Session: {request.session_id[:8]}... | 狀態: {session.step.value} | 訊息: '{request.message}'")
+
         # 如果前端傳來 language，更新 session
         if request.language and request.language != session.language:
             session.language = request.language
@@ -134,15 +137,24 @@ async def chat(request: ChatRequest):
 
         # ========== QUIZ 狀態：後端完全接管 ==========
         if session.step.value == "QUIZ" and session.current_question:
+            from app.tools.quiz import get_total_questions
+
             q = session.current_question
-            remaining = 5 - len(session.answers)
+            total_questions = get_total_questions(session.quiz_id)
+            remaining = total_questions - len(session.answers)
             current_q_num = len(session.answers) + 1
 
             # 格式化當前題目
-            current_q_text = f"第{current_q_num}題：{q['text']}\nA. {q['options'][0]['text']}\nB. {q['options'][1]['text']}"
+            options_text = _format_options_text(q.get("options", []))
+            current_q_text = f"第{current_q_num}題：{q['text']}\n{options_text}"
 
-            # 用 LLM 判斷 A/B
+            # 記錄當前測驗進度
+            logger.info(f"[測驗進度] 第 {current_q_num}/{total_questions} 題 | 題目: {q.get('text', '')[:30]}...")
+
+            # 用規則/LLM 判斷選項
             user_choice = await _judge_user_choice(request.message, q)
+
+            logger.info(f"[答題判斷] 使用者回答: '{request.message}' -> 判定選項: {user_choice}")
 
             if user_choice:
                 # ✅ 判斷成功，呼叫 submit_answer
@@ -153,16 +165,14 @@ async def chat(request: ChatRequest):
 
                 updated_session = session_manager.get_session(request.session_id)
 
+                # 記錄答題結果和當前分數
+                logger.info(f"[答題結果] 選項: {user_choice} | 已答: {len(updated_session.answers)}/{total_questions} 題")
+                if updated_session.color_scores:
+                    scores_str = " | ".join([f"{k}:{v}" for k, v in sorted(updated_session.color_scores.items(), key=lambda x: -x[1])])
+                    logger.info(f"[當前分數] {scores_str}")
+
                 # 記錄工具呼叫
                 tool_calls = [{"tool": "submit_answer", "args": {"user_choice": user_choice}, "result": tool_result}]
-
-                # 測驗完成時自動推薦商品
-                if tool_result.get("is_complete"):
-                    recommend_result = await tool_executor.execute("recommend_products", {
-                        "session_id": request.session_id
-                    })
-                    tool_result["recommend_result"] = recommend_result
-                    tool_calls.append({"tool": "recommend_products", "args": {}, "result": recommend_result})
 
                 # 交給 main_agent 的 LLM 處理回應（生成評論 + 下一題）
                 result = await main_agent.chat_with_tool_result(
@@ -176,6 +186,9 @@ async def chat(request: ChatRequest):
                 response_message = result["message"]
                 updated_session = session_manager.get_session(request.session_id)
 
+                # 記錄 AI 回應
+                logger.info(f"[AI回應] {response_message[:100]}{'...' if len(response_message) > 100 else ''}")
+
                 # 記錄到對話日誌
                 conversation_logger.log_conversation(
                     session_id=request.session_id,
@@ -185,7 +198,7 @@ async def chat(request: ChatRequest):
                     session_state={
                         "step": updated_session.step.value,
                         "answers_count": len(updated_session.answers),
-                        "persona": updated_session.persona,
+                        "color_result_id": updated_session.color_result_id,
                         "current_question_id": updated_session.current_question.get("id") if updated_session.current_question else None
                     }
                 )
@@ -203,9 +216,9 @@ async def chat(request: ChatRequest):
                     tool_calls=response_tool_calls
                 )
             else:
-                # ❌ 無法判斷 A/B：用 AI 打哈哈 + 重問當前題
+                # ❌ 無法判斷選項：用 AI 打哈哈 + 重問當前題
                 nudge_instruction = (
-                    "使用者回覆不是 A/B 選項，請用一句輕鬆的語氣敷衍回答，"
+                    "使用者回覆不是選項，請用一句輕鬆的語氣敷衍回答，"
                     f"並提醒還剩 {remaining} 題，然後重問當前題目：\n\n{current_q_text}"
                 )
 
@@ -218,6 +231,9 @@ async def chat(request: ChatRequest):
                 )
 
                 response_message = nudge_result["message"]
+
+                # 記錄 AI 回應
+                logger.info(f"[AI回應] 無法判斷選項，重問 | {response_message[:80]}...")
 
                 # 記錄對話
                 session_manager.add_chat_message(request.session_id, "user", request.message)
@@ -232,7 +248,7 @@ async def chat(request: ChatRequest):
                     session_state={
                         "step": session.step.value,
                         "answers_count": len(session.answers),
-                        "persona": session.persona,
+                        "color_result_id": session.color_result_id,
                         "current_question_id": session.current_question.get("id") if session.current_question else None
                     }
                 )
@@ -248,7 +264,7 @@ async def chat(request: ChatRequest):
         # ========== 非 QUIZ 狀態 ==========
 
         # 先用關鍵字判斷是否要開始測驗（不依賴 LLM 呼叫工具）
-        start_keywords = ['mbti', '測驗', '心理測驗', '開始', '玩', '試試', '來吧', '好啊', '開始吧', 'quiz', 'start']
+        start_keywords = ['色彩', '顏色', '配色', '保護殼', '測驗', '心理測驗', '開始', '玩', '試試', '來吧', '好啊', '開始吧', 'quiz', 'start']
         negative_keywords = ['不想', '不要', '不用', '不玩', '跳過', '算了', '不了', "don't", "dont", "no ", "not ", "skip", "pass", "never"]
         msg_lower = request.message.lower()
 
@@ -275,10 +291,10 @@ async def chat(request: ChatRequest):
                 session_state={
                     "step": session.step.value,
                     "answers_count": len(session.answers),
-                    "persona": session.persona,
-                    "current_question_id": None
-                }
-            )
+                        "color_result_id": session.color_result_id,
+                        "current_question_id": None
+                    }
+                )
 
             return ChatResponse(
                 message=response_message,
@@ -304,6 +320,9 @@ async def chat(request: ChatRequest):
 
                 updated_session = session_manager.get_session(request.session_id)
 
+                # 記錄 AI 回應
+                logger.info(f"[AI回應] 測驗開始 | {result['message'][:80]}...")
+
                 # 記錄對話
                 conversation_logger.log_conversation(
                     session_id=request.session_id,
@@ -313,7 +332,7 @@ async def chat(request: ChatRequest):
                     session_state={
                         "step": updated_session.step.value,
                         "answers_count": len(updated_session.answers),
-                        "persona": updated_session.persona,
+                        "color_result_id": updated_session.color_result_id,
                         "current_question_id": updated_session.current_question.get("id") if updated_session.current_question else None
                     }
                 )
@@ -331,6 +350,9 @@ async def chat(request: ChatRequest):
             store_id=request.store_id
         )
 
+        # 記錄 AI 回應
+        logger.info(f"[AI回應] 一般對話 | {result['message'][:80]}...")
+
         return ChatResponse(**result)
 
     except Exception as e:
@@ -338,12 +360,21 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _format_options_text(options: list) -> str:
+    labels = "ABCDE"
+    lines = []
+    for idx, opt in enumerate(options):
+        label = labels[idx] if idx < len(labels) else str(idx + 1)
+        lines.append(f"{label}. {opt.get('text', '')}")
+    return "\n".join(lines)
+
+
 async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]:
     """
-    先用規則判斷，判不出時用 LLM 判斷使用者選擇 A 還是 B
+    先用規則判斷，判不出時用 LLM 判斷使用者選擇哪個選項
 
     Returns:
-        "A", "B", 或 None（無法判斷）
+        "A"~"E" 或 None（無法判斷）
     """
     import os
     from google import genai
@@ -352,48 +383,66 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
     msg_upper = msg.upper()
     msg_lower = msg.lower()
 
-    # 快速判斷：明確的 A/B
-    if msg_upper in ['A', 'B']:
-        return msg_upper
-    if 'A' in msg_upper and 'B' not in msg_upper:
-        return 'A'
-    if 'B' in msg_upper and 'A' not in msg_upper:
-        return 'B'
+    options = question.get("options", []) if isinstance(question, dict) else []
+    labels = list("ABCDE")[: len(options)]
 
-    # 快速判斷：數字
-    if msg in ['1', '一', '第一']:
-        return 'A'
-    if msg in ['2', '二', '第二']:
-        return 'B'
+    # 快速判斷：明確的 A-E
+    if msg_upper in labels:
+        logger.info(f"[規則判斷] 明確字母: '{user_message}' -> {msg_upper}")
+        return msg_upper
+    label_hits = [label for label in labels if label in msg_upper]
+    if len(label_hits) == 1:
+        logger.info(f"[規則判斷] 包含字母: '{user_message}' -> {label_hits[0]}")
+        return label_hits[0]
+
+    # 快速判斷：數字或中文序號
+    number_map = {
+        "1": 0, "一": 0, "第一": 0,
+        "2": 1, "二": 1, "第二": 1,
+        "3": 2, "三": 2, "第三": 2,
+        "4": 3, "四": 3, "第四": 3,
+        "5": 4, "五": 4, "第五": 4,
+    }
+    if msg in number_map and number_map[msg] < len(options):
+        result = labels[number_map[msg]]
+        logger.info(f"[規則判斷] 數字/序號: '{user_message}' -> {result}")
+        return result
+    if msg.isdigit():
+        idx = int(msg) - 1
+        if 0 <= idx < len(options):
+            logger.info(f"[規則判斷] 純數字: '{user_message}' -> {labels[idx]}")
+            return labels[idx]
+    digit_hits = [d for d in ["1", "2", "3", "4", "5"] if d in msg]
+    if len(digit_hits) == 1:
+        idx = int(digit_hits[0]) - 1
+        if 0 <= idx < len(options):
+            logger.info(f"[規則判斷] 包含數字: '{user_message}' -> {labels[idx]}")
+            return labels[idx]
 
     # 快速判斷：包含選項文字
-    options = question.get("options", []) if isinstance(question, dict) else []
-    opt_a = options[0].get("text", "") if len(options) > 0 else ""
-    opt_b = options[1].get("text", "") if len(options) > 1 else ""
-
-    if opt_a and opt_a.lower() in msg_lower:
-        return 'A'
-    if opt_b and opt_b.lower() in msg_lower:
-        return 'B'
+    for idx, opt in enumerate(options):
+        text = opt.get("text", "")
+        if text and text.lower() in msg_lower:
+            logger.info(f"[規則判斷] 匹配選項文字: '{user_message}' -> {labels[idx]} ('{text}')")
+            return labels[idx]
 
     # 用 LLM 判斷（規則判不出時）
+    logger.info(f"[LLM判斷] 規則無法判定，呼叫 LLM: '{user_message}'")
     try:
         client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
         prompt = f"""判斷使用者選擇了哪個選項。
 
 題目：{question.get('text', '')}
-A. {opt_a}
-B. {opt_b}
+{_format_options_text(options)}
 
 使用者回覆：「{user_message}」
 
 規則：
-- 如果使用者明確選擇或傾向 A 選項 → 回覆 A
-- 如果使用者明確選擇或傾向 B 選項 → 回覆 B
+- 如果使用者明確選擇或傾向某選項 → 回覆該選項的字母
 - 如果無法判斷或使用者在問問題/閒聊 → 回覆 X
 
-只回覆一個字母：A、B 或 X"""
+只回覆一個字母：A 至 E 或 X"""
 
         model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.0-flash")
         response = client.models.generate_content(
@@ -403,11 +452,11 @@ B. {opt_b}
 
         result = response.text.strip().upper()
 
-        if result in ['A', 'B']:
-            logger.info(f"LLM 判斷: '{user_message}' → {result}")
+        if result in labels:
+            logger.info(f"[LLM判斷] 成功: '{user_message}' -> {result}")
             return result
         else:
-            logger.info(f"LLM 無法判斷: '{user_message}' → {result}")
+            logger.info(f"[LLM判斷] 失敗/無法判斷: '{user_message}' -> {result}")
             return None
 
     except Exception as e:

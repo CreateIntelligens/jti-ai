@@ -99,8 +99,8 @@ class ConversationLogger:
                     f.write(f"\n📊 Session 狀態:\n")
                     f.write(f"  - 階段: {session_state.get('step')}\n")
                     f.write(f"  - 已回答: {session_state.get('answers_count', 0)}/5\n")
-                    if session_state.get('persona'):
-                        f.write(f"  - MBTI: {session_state.get('persona')}\n")
+                    if session_state.get('color_result_id'):
+                        f.write(f"  - 色系: {session_state.get('color_result_id')}\n")
 
                 if error:
                     f.write(f"\n❌ 錯誤:\n{error}\n")
