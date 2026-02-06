@@ -1,0 +1,214 @@
+{
+  "quiz_sets": {
+    "mbti_quick": {
+      "name": "MBTI 快速測驗",
+      "description": "12 題測驗，深入了解你的 MBTI 類型",
+      "questions": [
+        {
+          "id": "q1",
+          "dimension": "E_I",
+          "text": "週末你更喜歡？",
+          "options": [
+            {
+              "id": "a",
+              "text": "約朋友出門玩",
+              "score": {"E": 1}
+            },
+            {
+              "id": "b",
+              "text": "一個人在家放鬆",
+              "score": {"I": 1}
+            }
+          ]
+        },
+        {
+          "id": "q2",
+          "dimension": "E_I",
+          "text": "在聚會中，你通常？",
+          "options": [
+            {
+              "id": "a",
+              "text": "主動認識新朋友",
+              "score": {"E": 1}
+            },
+            {
+              "id": "b",
+              "text": "跟熟悉的人聊天",
+              "score": {"I": 1}
+            }
+          ]
+        },
+        {
+          "id": "q3",
+          "dimension": "E_I",
+          "text": "工作一整天後，你覺得？",
+          "options": [
+            {
+              "id": "a",
+              "text": "想找人聊天放鬆",
+              "score": {"E": 1}
+            },
+            {
+              "id": "b",
+              "text": "需要獨處恢復精力",
+              "score": {"I": 1}
+            }
+          ]
+        },
+        {
+          "id": "q4",
+          "dimension": "S_N",
+          "text": "做決定時，你更傾向？",
+          "options": [
+            {
+              "id": "a",
+              "text": "相信直覺和可能性",
+              "score": {"N": 1}
+            },
+            {
+              "id": "b",
+              "text": "依據事實和經驗",
+              "score": {"S": 1}
+            }
+          ]
+        },
+        {
+          "id": "q5",
+          "dimension": "S_N",
+          "text": "學習新事物時，你偏好？",
+          "options": [
+            {
+              "id": "a",
+              "text": "先了解理論和概念",
+              "score": {"N": 1}
+            },
+            {
+              "id": "b",
+              "text": "直接動手實作練習",
+              "score": {"S": 1}
+            }
+          ]
+        },
+        {
+          "id": "q6",
+          "dimension": "S_N",
+          "text": "聊天時，你比較喜歡討論？",
+          "options": [
+            {
+              "id": "a",
+              "text": "未來的可能性和創意",
+              "score": {"N": 1}
+            },
+            {
+              "id": "b",
+              "text": "現實的細節和經驗",
+              "score": {"S": 1}
+            }
+          ]
+        },
+        {
+          "id": "q7",
+          "dimension": "T_F",
+          "text": "面對朋友的問題時，你會？",
+          "options": [
+            {
+              "id": "a",
+              "text": "分析問題並給建議",
+              "score": {"T": 1}
+            },
+            {
+              "id": "b",
+              "text": "先理解他的感受",
+              "score": {"F": 1}
+            }
+          ]
+        },
+        {
+          "id": "q8",
+          "dimension": "T_F",
+          "text": "做重要決定時，你主要考慮？",
+          "options": [
+            {
+              "id": "a",
+              "text": "邏輯和效率",
+              "score": {"T": 1}
+            },
+            {
+              "id": "b",
+              "text": "人際和諧與感受",
+              "score": {"F": 1}
+            }
+          ]
+        },
+        {
+          "id": "q9",
+          "dimension": "T_F",
+          "text": "被批評時，你的第一反應是？",
+          "options": [
+            {
+              "id": "a",
+              "text": "思考批評是否合理",
+              "score": {"T": 1}
+            },
+            {
+              "id": "b",
+              "text": "在意對方的語氣態度",
+              "score": {"F": 1}
+            }
+          ]
+        },
+        {
+          "id": "q10",
+          "dimension": "J_P",
+          "text": "計劃旅行時，你喜歡？",
+          "options": [
+            {
+              "id": "a",
+              "text": "提前規劃好行程",
+              "score": {"J": 1}
+            },
+            {
+              "id": "b",
+              "text": "隨興走走看看",
+              "score": {"P": 1}
+            }
+          ]
+        },
+        {
+          "id": "q11",
+          "dimension": "J_P",
+          "text": "工作方式上，你傾向？",
+          "options": [
+            {
+              "id": "a",
+              "text": "按部就班完成任務",
+              "score": {"J": 1}
+            },
+            {
+              "id": "b",
+              "text": "靈活應變保持彈性",
+              "score": {"P": 1}
+            }
+          ]
+        },
+        {
+          "id": "q12",
+          "dimension": "J_P",
+          "text": "面對截止日期，你通常？",
+          "options": [
+            {
+              "id": "a",
+              "text": "提早完成避免壓力",
+              "score": {"J": 1}
+            },
+            {
+              "id": "b",
+              "text": "最後衝刺反而有效率",
+              "score": {"P": 1}
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

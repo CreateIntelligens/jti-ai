@@ -1,0 +1,1538 @@
+{
+  "quiz_id": "color_taste",
+  "title": "Lifestyle Color Taste Explorer",
+  "description": "Answer 5 simple questions to find the Ploom X case color that suits you best.",
+  "total_questions": 5,
+  "questions": [
+    {
+      "id": "c1",
+      "text": "Choose the word that best represents your personality.",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Elegant and refined", "score": {"metal": 2}},
+        {"id": "b", "text": "Fresh and natural", "score": {"cool": 2}},
+        {"id": "c", "text": "Passionate and free-spirited", "score": {"warm": 2}},
+        {"id": "d", "text": "Calm and reserved", "score": {"dark": 2}},
+        {"id": "e", "text": "Unique and creative", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c2",
+      "text": "Which word would your friends use to describe you?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Stylish", "score": {"metal": 2}},
+        {"id": "b", "text": "Soothing", "score": {"cool": 2}},
+        {"id": "c", "text": "Full of energy", "score": {"warm": 2}},
+        {"id": "d", "text": "Reliable", "score": {"dark": 2}},
+        {"id": "e", "text": "Distinctive", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c3",
+      "text": "If you were a kind of weather, what would you be?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "A clear dusk with golden sunlight", "score": {"metal": 2}},
+        {"id": "b", "text": "A cool sea breeze under blue skies", "score": {"cool": 2}},
+        {"id": "c", "text": "A passionate summer day full of sunshine", "score": {"warm": 2}},
+        {"id": "d", "text": "A quiet night with twinkling stars", "score": {"dark": 2}},
+        {"id": "e", "text": "A vibrant rainbow after rain", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c4",
+      "text": "Which element attracts you the most?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Gold, shining and noble", "score": {"metal": 2}},
+        {"id": "b", "text": "Water, clear and flowing", "score": {"cool": 2}},
+        {"id": "c", "text": "Fire, intense and bold", "score": {"warm": 2}},
+        {"id": "d", "text": "Earth, grounded and steady", "score": {"dark": 2}},
+        {"id": "e", "text": "Wood, full of life", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c5",
+      "text": "If you were an animal, which would you be?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "A peacock, elegant and gorgeous", "score": {"metal": 2}},
+        {"id": "b", "text": "A dolphin, free and playful", "score": {"cool": 2}},
+        {"id": "c", "text": "A lion, full of presence", "score": {"warm": 2}},
+        {"id": "d", "text": "An owl, calm and wise", "score": {"dark": 2}},
+        {"id": "e", "text": "A butterfly, colorful and lively", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c6",
+      "text": "How would you describe your first impression?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Sophisticated", "score": {"metal": 2}},
+        {"id": "b", "text": "Comfortable", "score": {"cool": 2}},
+        {"id": "c", "text": "Warm and enthusiastic", "score": {"warm": 2}},
+        {"id": "d", "text": "Steady and mature", "score": {"dark": 2}},
+        {"id": "e", "text": "Fun and interesting", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c7",
+      "text": "After a meal, what sweet treat would you choose?",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Sweet cake or chocolate, the sweeter the better", "score": {"warm": 1}},
+        {"id": "b", "text": "Cool ice cream or mint candy, refreshing and light", "score": {"cool": 1}}
+      ]
+    },
+    {
+      "id": "c8",
+      "text": "For weekend brunch, what would you rather have?",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "A delicate French croissant with coffee", "score": {"metal": 1}},
+        {"id": "b", "text": "A refreshing salad with juice", "score": {"cool": 1}},
+        {"id": "c", "text": "A hearty American breakfast", "score": {"warm": 1}},
+        {"id": "d", "text": "Simple toast with black coffee", "score": {"dark": 1}},
+        {"id": "e", "text": "A colorful fruit platter", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c9",
+      "text": "For afternoon tea, what would you pick?",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "A rich latte or cappuccino", "score": {"warm": 1}},
+        {"id": "b", "text": "Fragrant green tea or floral tea", "score": {"cool": 1}}
+      ]
+    },
+    {
+      "id": "c10",
+      "text": "For a late-night snack, what do you crave most?",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Hot instant noodles or fried chicken bites", "score": {"warm": 1}},
+        {"id": "b", "text": "Light fruit or yogurt", "score": {"cool": 1}}
+      ]
+    },
+    {
+      "id": "c11",
+      "text": "At a cafe, what do you usually order?",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Hand-pour single-origin coffee for the flavor", "score": {"metal": 1}},
+        {"id": "b", "text": "Iced latte or cold brew", "score": {"cool": 1}},
+        {"id": "c", "text": "Caramel macchiato or mocha", "score": {"warm": 1}},
+        {"id": "d", "text": "Americano", "score": {"dark": 1}},
+        {"id": "e", "text": "Seasonal signature special", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c12",
+      "text": "When buying accessories, what matters most to you?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Texture and taste, it must feel premium", "score": {"metal": 1}},
+        {"id": "b", "text": "Practical and timeless, classic and durable", "score": {"dark": 1}}
+      ]
+    },
+    {
+      "id": "c13",
+      "text": "When buying clothes, what do you usually choose?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Designer pieces that show taste", "score": {"metal": 1}},
+        {"id": "b", "text": "Fresh, minimalist style", "score": {"cool": 1}},
+        {"id": "c", "text": "Bright and eye-catching colors", "score": {"warm": 1}},
+        {"id": "d", "text": "Versatile basics that never go out of style", "score": {"dark": 1}},
+        {"id": "e", "text": "Unique statement pieces", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c14",
+      "text": "When choosing a phone case, what do you pick?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Metallic or leather materials", "score": {"metal": 1}},
+        {"id": "b", "text": "Transparent or light colors", "score": {"cool": 1}},
+        {"id": "c", "text": "Bright and vivid colors", "score": {"warm": 1}},
+        {"id": "d", "text": "Black or dark tones", "score": {"dark": 1}},
+        {"id": "e", "text": "Special patterns or color-block designs", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c15",
+      "text": "When choosing sunglasses, what would you pick?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Gold or silver frames with premium feel", "score": {"metal": 1}},
+        {"id": "b", "text": "Clear or light-colored frames", "score": {"cool": 1}},
+        {"id": "c", "text": "Red or orange frames", "score": {"warm": 1}},
+        {"id": "d", "text": "Black frames, classic and versatile", "score": {"dark": 1}},
+        {"id": "e", "text": "Unusual shapes or patterns", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c16",
+      "text": "When buying a bag, what do you care about most?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Brand quality and a luxury feel", "score": {"metal": 1}},
+        {"id": "b", "text": "Capacity and practicality, easy to carry", "score": {"dark": 1}}
+      ]
+    },
+    {
+      "id": "c17",
+      "text": "What's your ideal vacation destination?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "A tropical island with sun and beach", "score": {"cool": 1}},
+        {"id": "b", "text": "Forests and mountains, close to nature", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c18",
+      "text": "What do you most want to do on the weekend?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Enjoy a fine meal at an upscale restaurant", "score": {"metal": 1}},
+        {"id": "b", "text": "Stay home, binge shows, and unwind", "score": {"cool": 1}},
+        {"id": "c", "text": "Go out and have fun with friends", "score": {"warm": 1}},
+        {"id": "d", "text": "Read quietly by yourself", "score": {"dark": 1}},
+        {"id": "e", "text": "Try something new and unusual", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c19",
+      "text": "At a party, you usually...",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Become the center of attention and lift the vibe", "score": {"warm": 1}},
+        {"id": "b", "text": "Find a few close friends and chat quietly", "score": {"dark": 1}}
+      ]
+    },
+    {
+      "id": "c20",
+      "text": "For exercise, what do you prefer?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Yoga or Pilates", "score": {"cool": 1}},
+        {"id": "b", "text": "Running or the gym", "score": {"warm": 1}}
+      ]
+    },
+    {
+      "id": "c21",
+      "text": "When traveling, what do you prefer?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Staying at boutique hotels with great service", "score": {"metal": 1}},
+        {"id": "b", "text": "Staying in homestays for local life", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c22",
+      "text": "When shopping, where do you go first?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Luxury boutiques or designer brands", "score": {"metal": 1}},
+        {"id": "b", "text": "Fast fashion or affordable brands", "score": {"cool": 1}},
+        {"id": "c", "text": "Sporting goods stores", "score": {"warm": 1}},
+        {"id": "d", "text": "Bookstores or stationery shops", "score": {"dark": 1}},
+        {"id": "e", "text": "Thrift or vintage stores", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c23",
+      "text": "Which home style do you like?",
+      "category": "home",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Minimal modern, mainly black/white/gray", "score": {"dark": 1}},
+        {"id": "b", "text": "Colorful and expressive", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c24",
+      "text": "When decorating your room, what would you add?",
+      "category": "home",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Metallic decor or lighting", "score": {"metal": 1}},
+        {"id": "b", "text": "Blue-toned cushions or curtains", "score": {"cool": 1}},
+        {"id": "c", "text": "Warm-toned lights or rugs", "score": {"warm": 1}},
+        {"id": "d", "text": "Dark wood furniture", "score": {"dark": 1}},
+        {"id": "e", "text": "Colorful potted plants", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c25",
+      "text": "What's your ideal bedroom lighting?",
+      "category": "home",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Warm yellow light with cozy atmosphere", "score": {"warm": 1}},
+        {"id": "b", "text": "Bright white light, clean and fresh", "score": {"cool": 1}}
+      ]
+    },
+    {
+      "id": "c26",
+      "text": "When choosing bedsheets, what would you pick?",
+      "category": "home",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Solid colors with premium texture", "score": {"metal": 1}},
+        {"id": "b", "text": "Light blue or light green tones", "score": {"cool": 1}},
+        {"id": "c", "text": "Warm orange or yellow tones", "score": {"warm": 1}},
+        {"id": "d", "text": "Dark gray or navy blue", "score": {"dark": 1}},
+        {"id": "e", "text": "Patterns or prints", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c27",
+      "text": "What would you most want in your living room?",
+      "category": "home",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "A tasteful framed artwork", "score": {"metal": 1}},
+        {"id": "b", "text": "Large floor-to-ceiling windows", "score": {"cool": 1}},
+        {"id": "c", "text": "A big comfortable sofa", "score": {"warm": 1}},
+        {"id": "d", "text": "A wall full of bookshelves", "score": {"dark": 1}},
+        {"id": "e", "text": "Displays for various collections", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c28",
+      "text": "When listening to music, what do you prefer?",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Elegant classical or jazz", "score": {"metal": 1}},
+        {"id": "b", "text": "Soft easy-listening or nature sounds", "score": {"cool": 1}},
+        {"id": "c", "text": "Rhythmic pop or EDM", "score": {"warm": 1}},
+        {"id": "d", "text": "Deep rock or indie music", "score": {"dark": 1}},
+        {"id": "e", "text": "All kinds, depending on mood", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c29",
+      "text": "When you're stressed, what do you do?",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Eat and drink to treat yourself", "score": {"warm": 1}},
+        {"id": "b", "text": "Stay alone quietly to reset", "score": {"dark": 1}}
+      ]
+    },
+    {
+      "id": "c30",
+      "text": "When taking photos, what filter style do you like?",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Vintage with a golden tone", "score": {"metal": 1}},
+        {"id": "b", "text": "Fresh and natural with blue tones", "score": {"cool": 1}},
+        {"id": "c", "text": "Bright and vivid warm tones", "score": {"warm": 1}},
+        {"id": "d", "text": "Low-key and steady dark tones", "score": {"dark": 1}},
+        {"id": "e", "text": "Highly saturated and colorful", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c31",
+      "text": "When you're in a good mood, what do you do?",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Buy something nice for yourself", "score": {"metal": 1}},
+        {"id": "b", "text": "Walk by the beach or in a park", "score": {"cool": 1}},
+        {"id": "c", "text": "Meet up with friends", "score": {"warm": 1}},
+        {"id": "d", "text": "Enjoy time alone", "score": {"dark": 1}},
+        {"id": "e", "text": "Try new things", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c32",
+      "text": "When watching movies, what do you choose most often?",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Artistic films", "score": {"metal": 1}},
+        {"id": "b", "text": "Warm and healing films", "score": {"cool": 1}},
+        {"id": "c", "text": "Action-packed films", "score": {"warm": 1}},
+        {"id": "d", "text": "Suspense and mind-bending films", "score": {"dark": 1}},
+        {"id": "e", "text": "Fantasy adventure films", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c33",
+      "text": "Before bed, you usually...",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Scroll social media on your phone", "score": {"warm": 1}},
+        {"id": "b", "text": "Read or listen to music to relax", "score": {"dark": 1}}
+      ]
+    },
+    {
+      "id": "c34",
+      "text": "When choosing perfume, what notes do you like?",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Woody or leather notes, mature and steady", "score": {"metal": 1}},
+        {"id": "b", "text": "Marine or fresh notes, clean and comfortable", "score": {"cool": 1}},
+        {"id": "c", "text": "Fruity/floral or sweet notes, romantic and soft", "score": {"warm": 1}},
+        {"id": "d", "text": "Smoky or musk notes, mysterious and deep", "score": {"dark": 1}},
+        {"id": "e", "text": "Blended or unique notes, different from others", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c35",
+      "text": "If you could learn one skill, what would you choose?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Piano or violin", "score": {"metal": 1}},
+        {"id": "b", "text": "Swimming or diving", "score": {"cool": 1}},
+        {"id": "c", "text": "Dance or fitness training", "score": {"warm": 1}},
+        {"id": "d", "text": "Photography or writing", "score": {"dark": 1}},
+        {"id": "e", "text": "Drawing or handicrafts", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c36",
+      "text": "On social media, what is your profile picture style?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Carefully edited aesthetic photo", "score": {"metal": 1}},
+        {"id": "b", "text": "Natural, fresh landscape photo", "score": {"cool": 1}},
+        {"id": "c", "text": "Smiling selfie", "score": {"warm": 1}},
+        {"id": "d", "text": "Low-key and mysterious side/back shot", "score": {"dark": 1}},
+        {"id": "e", "text": "Playful and creative photo", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c37",
+      "text": "When receiving gifts, which one makes you happier?",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "A premium gift with elegant packaging", "score": {"metal": 1}},
+        {"id": "b", "text": "Practical and thoughtful daily items", "score": {"cool": 1}},
+        {"id": "c", "text": "Handmade gift full of warmth", "score": {"warm": 1}},
+        {"id": "d", "text": "A meaningful book or album", "score": {"dark": 1}},
+        {"id": "e", "text": "A surprising and fun experience", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c38",
+      "text": "If you had a pet, what would you choose?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "An elegant cat", "score": {"metal": 1}},
+        {"id": "b", "text": "Graceful ornamental fish", "score": {"cool": 1}},
+        {"id": "c", "text": "An energetic dog", "score": {"warm": 1}},
+        {"id": "d", "text": "A quiet turtle or rabbit", "score": {"dark": 1}},
+        {"id": "e", "text": "A special reptile or bird", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c39",
+      "text": "When choosing a car, what matters most?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Stylish, premium exterior", "score": {"metal": 1}},
+        {"id": "b", "text": "Fuel-efficient, eco-friendly, easy maintenance", "score": {"cool": 1}},
+        {"id": "c", "text": "Strong horsepower and performance", "score": {"warm": 1}},
+        {"id": "d", "text": "Stable, reliable, and durable", "score": {"dark": 1}},
+        {"id": "e", "text": "Unique personality", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c40",
+      "text": "When you're tired from work, what do you want?",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "A relaxing spa massage", "score": {"metal": 1}},
+        {"id": "b", "text": "Some fresh air by the sea or in the mountains", "score": {"cool": 1}},
+        {"id": "c", "text": "Drinks and chat with friends to decompress", "score": {"warm": 1}},
+        {"id": "d", "text": "Go home and rest quietly alone", "score": {"dark": 1}},
+        {"id": "e", "text": "Do something fun to reset your mood", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c41",
+      "text": "For a date, where would you rather go?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "A fine restaurant", "score": {"metal": 1}},
+        {"id": "b", "text": "Walk by the beach at sunset", "score": {"cool": 1}},
+        {"id": "c", "text": "An amusement park", "score": {"warm": 1}},
+        {"id": "d", "text": "A quiet chat at a cafe", "score": {"dark": 1}},
+        {"id": "e", "text": "Explore an exhibition or market", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c42",
+      "text": "If you opened a store, what would it be?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Curated lifestyle boutique", "score": {"metal": 2}},
+        {"id": "b", "text": "Artsy cafe", "score": {"cool": 2}},
+        {"id": "c", "text": "Lively bistro/bar", "score": {"warm": 2}},
+        {"id": "d", "text": "Quiet independent bookstore", "score": {"dark": 2}},
+        {"id": "e", "text": "Creative handmade studio", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c43",
+      "text": "What's your phone wallpaper usually like?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Minimal design or brand logo", "score": {"metal": 1}},
+        {"id": "b", "text": "Seascape or sky scenery", "score": {"cool": 1}},
+        {"id": "c", "text": "Photo with friends or family", "score": {"warm": 1}},
+        {"id": "d", "text": "Pure black or dark tones", "score": {"dark": 1}},
+        {"id": "e", "text": "Illustration or art pattern", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c44",
+      "text": "If choosing a drink cup, which would you pick?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Stainless steel insulated tumbler, premium feel", "score": {"metal": 1}},
+        {"id": "b", "text": "Clear glass cup, clean and fresh", "score": {"cool": 1}},
+        {"id": "c", "text": "Cute-shaped cup that makes you smile", "score": {"warm": 1}},
+        {"id": "d", "text": "Matte ceramic cup, low-key and stylish", "score": {"dark": 1}},
+        {"id": "e", "text": "Hand-painted cup, one of a kind", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c45",
+      "text": "When choosing a laptop, what do you care about most?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Slim, premium design", "score": {"metal": 1}},
+        {"id": "b", "text": "Long battery life and stable performance", "score": {"cool": 1}},
+        {"id": "c", "text": "Large screen and strong specs", "score": {"warm": 1}},
+        {"id": "d", "text": "Durable and reliable", "score": {"dark": 1}},
+        {"id": "e", "text": "Customizable with stickers/decor", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c46",
+      "text": "At KTV, what songs do you usually pick?",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Classic old songs to show vocal skills", "score": {"metal": 1}},
+        {"id": "b", "text": "Slow ballads to relax", "score": {"cool": 1}},
+        {"id": "c", "text": "Hype dance songs to raise the vibe", "score": {"warm": 1}},
+        {"id": "d", "text": "Hidden gems to show taste", "score": {"dark": 1}},
+        {"id": "e", "text": "Any genre, depending on mood", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c47",
+      "text": "Choose a dream superpower.",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Turn stone into gold", "score": {"metal": 2}},
+        {"id": "b", "text": "Control water", "score": {"cool": 2}},
+        {"id": "c", "text": "Control fire", "score": {"warm": 2}},
+        {"id": "d", "text": "Invisibility", "score": {"dark": 2}},
+        {"id": "e", "text": "Shapeshifting", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c48",
+      "text": "On weekend mornings, what's the first thing you do?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Brew a good coffee and enjoy it slowly", "score": {"metal": 1}},
+        {"id": "b", "text": "Stay in bed and zone out", "score": {"cool": 1}},
+        {"id": "c", "text": "Check messages from friends", "score": {"warm": 1}},
+        {"id": "d", "text": "Read news or a book quietly", "score": {"dark": 1}},
+        {"id": "e", "text": "Think about fun things to do today", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c49",
+      "text": "Which kind of gathering do you prefer?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Refined dinner at an upscale restaurant", "score": {"metal": 1}},
+        {"id": "b", "text": "Relaxed afternoon tea at a cafe", "score": {"cool": 1}},
+        {"id": "c", "text": "Lively BBQ or hotpot party", "score": {"warm": 1}},
+        {"id": "d", "text": "Quiet wine- or tea-tasting gathering", "score": {"dark": 1}},
+        {"id": "e", "text": "Theme party or board game night", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c50",
+      "text": "Choose the city you most want to visit.",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Paris, romantic and fashionable", "score": {"metal": 1}},
+        {"id": "b", "text": "Tokyo, clean and comfortable", "score": {"cool": 1}},
+        {"id": "c", "text": "New York, lively and bustling", "score": {"warm": 1}},
+        {"id": "d", "text": "London, calm and reserved", "score": {"dark": 1}},
+        {"id": "e", "text": "Bangkok, colorful and fun", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c51",
+      "text": "If you were a flower, which would you be?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Rose, noble and elegant", "score": {"metal": 2}},
+        {"id": "b", "text": "Lavender, fresh and soothing", "score": {"cool": 2}},
+        {"id": "c", "text": "Sunflower, bright and sunny", "score": {"warm": 2}},
+        {"id": "d", "text": "Lily, calm and graceful", "score": {"dark": 2}},
+        {"id": "e", "text": "Hydrangea, colorful and vibrant", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c52",
+      "text": "When choosing furniture, what material do you prefer?",
+      "category": "home",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Metal or glass, very modern", "score": {"metal": 1}},
+        {"id": "b", "text": "Light-colored wood, natural and fresh", "score": {"cool": 1}},
+        {"id": "c", "text": "Fabric or plush, warm and cozy", "score": {"warm": 1}},
+        {"id": "d", "text": "Dark wood, steady and elegant", "score": {"dark": 1}},
+        {"id": "e", "text": "Mixed materials", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c53",
+      "text": "Choose an art style.",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Classicism, refined and elegant", "score": {"metal": 1}},
+        {"id": "b", "text": "Impressionism, soft and dreamy", "score": {"cool": 1}},
+        {"id": "c", "text": "Fauvism, strong colors", "score": {"warm": 1}},
+        {"id": "d", "text": "Minimalism, clean and sharp", "score": {"dark": 1}},
+        {"id": "e", "text": "Pop art, bold and colorful", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c54",
+      "text": "In a group, what role do you usually play?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "The style expert who gives advice", "score": {"metal": 2}},
+        {"id": "b", "text": "The harmonizer who keeps everyone happy", "score": {"cool": 2}},
+        {"id": "c", "text": "The mood maker who brings energy", "score": {"warm": 2}},
+        {"id": "d", "text": "The strategist who plans things out", "score": {"dark": 2}},
+        {"id": "e", "text": "The idea generator with lots of creativity", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c55",
+      "text": "Choose a dessert.",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "French macarons", "score": {"metal": 1}},
+        {"id": "b", "text": "Japanese matcha cake", "score": {"cool": 1}},
+        {"id": "c", "text": "Chocolate lava cake", "score": {"warm": 1}},
+        {"id": "d", "text": "Tiramisu", "score": {"dark": 1}},
+        {"id": "e", "text": "Rainbow mille crepe cake", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c56",
+      "text": "When facing difficulties, what do you usually do?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Analyze calmly and find the best solution", "score": {"metal": 2}},
+        {"id": "b", "text": "Take a break to clear your mind", "score": {"cool": 2}},
+        {"id": "c", "text": "Discuss with friends and brainstorm", "score": {"warm": 2}},
+        {"id": "d", "text": "Think quietly on your own", "score": {"dark": 2}},
+        {"id": "e", "text": "Try many different approaches", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c57",
+      "text": "Which colors are most common in your wardrobe?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Earth tones like beige and khaki", "score": {"metal": 1}},
+        {"id": "b", "text": "Light tones like white and light blue", "score": {"cool": 1}},
+        {"id": "c", "text": "Bright tones like red and orange", "score": {"warm": 1}},
+        {"id": "d", "text": "Dark tones like black and charcoal", "score": {"dark": 1}},
+        {"id": "e", "text": "All kinds of colors", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c58",
+      "text": "Choose a type of sky.",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Golden dusk glow", "score": {"metal": 1}},
+        {"id": "b", "text": "Clear blue sky with white clouds", "score": {"cool": 1}},
+        {"id": "c", "text": "Fiery sunrise", "score": {"warm": 1}},
+        {"id": "d", "text": "Deep star-filled night sky", "score": {"dark": 1}},
+        {"id": "e", "text": "Brilliant rainbow aurora", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c59",
+      "text": "If you learned cooking, what would you learn?",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "French cuisine with refined plating", "score": {"metal": 1}},
+        {"id": "b", "text": "Japanese cuisine, light and healthy", "score": {"cool": 1}},
+        {"id": "c", "text": "Chinese stir-fry with high heat", "score": {"warm": 1}},
+        {"id": "d", "text": "Italian cuisine, simple and delicious", "score": {"dark": 1}},
+        {"id": "e", "text": "Cuisines from all over the world", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c60",
+      "text": "Your life rhythm feels like...",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "An elegant waltz", "score": {"metal": 2}},
+        {"id": "b", "text": "Slow healing music", "score": {"cool": 2}},
+        {"id": "c", "text": "Passionate Latin dance music", "score": {"warm": 2}},
+        {"id": "d", "text": "A steady classical movement", "score": {"dark": 2}},
+        {"id": "e", "text": "Ever-changing jazz", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c61",
+      "text": "Choose a gemstone.",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Diamond, dazzling and brilliant", "score": {"metal": 1}},
+        {"id": "b", "text": "Sapphire, calm and elegant", "score": {"cool": 1}},
+        {"id": "c", "text": "Ruby, passionate like fire", "score": {"warm": 1}},
+        {"id": "d", "text": "Obsidian, mysterious and deep", "score": {"dark": 1}},
+        {"id": "e", "text": "Opal, shifting colors", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c62",
+      "text": "What's your favorite photography subject?",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Architecture or city streets", "score": {"metal": 1}},
+        {"id": "b", "text": "Seaside or lakeside landscapes", "score": {"cool": 1}},
+        {"id": "c", "text": "People or daily life moments", "score": {"warm": 1}},
+        {"id": "d", "text": "Black-and-white or dark-tone style", "score": {"dark": 1}},
+        {"id": "e", "text": "Flowers or nature", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c63",
+      "text": "Choose a season that represents you.",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Autumn, mature and elegant", "score": {"metal": 2}},
+        {"id": "b", "text": "Spring, fresh and gentle", "score": {"cool": 2}},
+        {"id": "c", "text": "Summer, passionate and bold", "score": {"warm": 2}},
+        {"id": "d", "text": "Winter, calm and reserved", "score": {"dark": 2}},
+        {"id": "e", "text": "I like all seasons, each is unique", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c64",
+      "text": "What are your reading habits?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Business or self-growth books", "score": {"metal": 1}},
+        {"id": "b", "text": "Healing essays or travel books", "score": {"cool": 1}},
+        {"id": "c", "text": "Inspirational stories or biographies", "score": {"warm": 1}},
+        {"id": "d", "text": "Mystery novels or philosophy", "score": {"dark": 1}},
+        {"id": "e", "text": "I read all genres", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c65",
+      "text": "Choose a frozen dessert.",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Italian gelato, creamy and rich", "score": {"metal": 1}},
+        {"id": "b", "text": "Japanese shaved ice, cool and refreshing", "score": {"cool": 1}},
+        {"id": "c", "text": "Mango shaved ice, sweet and satisfying", "score": {"warm": 1}},
+        {"id": "d", "text": "Black sesame ice cream, deep and nutty", "score": {"dark": 1}},
+        {"id": "e", "text": "Rainbow snow ice, colorful and cute", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c66",
+      "text": "If you became a food, what would you be?",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Truffle, rare and unique", "score": {"metal": 1}},
+        {"id": "b", "text": "Sashimi, fresh and clean", "score": {"cool": 1}},
+        {"id": "c", "text": "Spicy hotpot, full of passion", "score": {"warm": 1}},
+        {"id": "d", "text": "Black coffee, bitter with aroma", "score": {"dark": 1}},
+        {"id": "e", "text": "Combo pizza, rich and colorful", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c67",
+      "text": "What's your favorite time of day?",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Evening, with a golden sunset", "score": {"metal": 1}},
+        {"id": "b", "text": "Early morning, with fresh air", "score": {"cool": 1}},
+        {"id": "c", "text": "Noon, bright sunshine", "score": {"warm": 1}},
+        {"id": "d", "text": "Late night, quiet reflection", "score": {"dark": 1}},
+        {"id": "e", "text": "Every time has its own beauty", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c68",
+      "text": "Where is your ideal home located?",
+      "category": "home",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Luxury apartment in the city center", "score": {"metal": 1}},
+        {"id": "b", "text": "Relaxing cottage by the sea", "score": {"cool": 1}},
+        {"id": "c", "text": "Near a lively commercial district", "score": {"warm": 1}},
+        {"id": "d", "text": "Detached house in a quiet suburb", "score": {"dark": 1}},
+        {"id": "e", "text": "A unique lodge in the forest or mountains", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c69",
+      "text": "Choose a sport.",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Golf or tennis", "score": {"metal": 1}},
+        {"id": "b", "text": "Swimming or surfing", "score": {"cool": 1}},
+        {"id": "c", "text": "Basketball or soccer", "score": {"warm": 1}},
+        {"id": "d", "text": "Hiking or jogging", "score": {"dark": 1}},
+        {"id": "e", "text": "Dance or gymnastics", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c70",
+      "text": "What is your social style?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Quality over quantity, tasteful friends", "score": {"metal": 2}},
+        {"id": "b", "text": "Relaxed and easy, can chat with anyone", "score": {"cool": 2}},
+        {"id": "c", "text": "Warm and outgoing, many friends", "score": {"warm": 2}},
+        {"id": "d", "text": "Slow to warm up, but deep friendships", "score": {"dark": 2}},
+        {"id": "e", "text": "Friends from all kinds of circles", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c71",
+      "text": "When picking a pillow, what would you choose?",
+      "category": "home",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Memory foam or latex pillow, high quality", "score": {"metal": 1}},
+        {"id": "b", "text": "Cooling or bamboo-charcoal pillow, cool and comfy", "score": {"cool": 1}},
+        {"id": "c", "text": "Down pillow, soft and warm", "score": {"warm": 1}},
+        {"id": "d", "text": "A firmer pillow for stable sleep", "score": {"dark": 1}},
+        {"id": "e", "text": "Extra throw pillows for decoration", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c72",
+      "text": "If you were a material, what would you be?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Metal, hard and shiny", "score": {"metal": 2}},
+        {"id": "b", "text": "Crystal, clear and transparent", "score": {"cool": 2}},
+        {"id": "c", "text": "Sunlight, warm and bright", "score": {"warm": 2}},
+        {"id": "d", "text": "Rock, solid and steady", "score": {"dark": 2}},
+        {"id": "e", "text": "Rainbow, colorful and ever-changing", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c73",
+      "text": "Choose a vehicle that represents you.",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Sports car, stylish and sleek", "score": {"metal": 1}},
+        {"id": "b", "text": "Sailboat, free and relaxed", "score": {"cool": 1}},
+        {"id": "c", "text": "Motorcycle, bold and passionate", "score": {"warm": 1}},
+        {"id": "d", "text": "Train, stable and reliable", "score": {"dark": 1}},
+        {"id": "e", "text": "Hot air balloon, unique and romantic", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c74",
+      "text": "How would you describe your smile?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Elegant smile", "score": {"metal": 2}},
+        {"id": "b", "text": "Gentle smile", "score": {"cool": 2}},
+        {"id": "c", "text": "Big cheerful laugh", "score": {"warm": 2}},
+        {"id": "d", "text": "Subtle reserved smile", "score": {"dark": 2}},
+        {"id": "e", "text": "Silly, carefree smile", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c75",
+      "text": "What are your water-drinking habits?",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Warm water or mineral water", "score": {"metal": 1}},
+        {"id": "b", "text": "Iced water or water with lemon", "score": {"cool": 1}},
+        {"id": "c", "text": "I often forget to drink water", "score": {"warm": 1}},
+        {"id": "d", "text": "I always carry a water bottle", "score": {"dark": 1}},
+        {"id": "e", "text": "I like adding fruit or carbonation", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c76",
+      "text": "Choose a cake decoration style.",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Gold leaf decoration, luxurious and refined", "score": {"metal": 1}},
+        {"id": "b", "text": "Whipped cream frosting, simple and fresh", "score": {"cool": 1}},
+        {"id": "c", "text": "Loaded with fruit, colorful and juicy", "score": {"warm": 1}},
+        {"id": "d", "text": "Chocolate glaze, calm and classy", "score": {"dark": 1}},
+        {"id": "e", "text": "Fondant design, highly creative", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c77",
+      "text": "Which sound feels most healing to you?",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Soft piano music", "score": {"metal": 1}},
+        {"id": "b", "text": "The sound of ocean waves", "score": {"cool": 1}},
+        {"id": "c", "text": "Friends laughing", "score": {"warm": 1}},
+        {"id": "d", "text": "Quiet rain sounds", "score": {"dark": 1}},
+        {"id": "e", "text": "Natural sounds of insects and birds", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c78",
+      "text": "What's your preferred work environment?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "A clean and tidy desk", "score": {"metal": 1}},
+        {"id": "b", "text": "A bright, well-ventilated space", "score": {"cool": 1}},
+        {"id": "c", "text": "A place with coworkers to interact with", "score": {"warm": 1}},
+        {"id": "d", "text": "A quiet corner without interruptions", "score": {"dark": 1}},
+        {"id": "e", "text": "A space full of decor and plants", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c79",
+      "text": "What shoe style do you like?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Leather shoes or heels, formal and sharp", "score": {"metal": 1}},
+        {"id": "b", "text": "Canvas shoes or sandals, relaxed and easy", "score": {"cool": 1}},
+        {"id": "c", "text": "Sneakers, active and comfortable", "score": {"warm": 1}},
+        {"id": "d", "text": "Boots or loafers, classic and durable", "score": {"dark": 1}},
+        {"id": "e", "text": "Special designer styles, unique and fun", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c80",
+      "text": "If you joined a talent show, what would you choose?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Play an instrument", "score": {"metal": 1}},
+        {"id": "b", "text": "Recite poetry", "score": {"cool": 1}},
+        {"id": "c", "text": "Sing and dance", "score": {"warm": 1}},
+        {"id": "d", "text": "Mime or short skit", "score": {"dark": 1}},
+        {"id": "e", "text": "Magic or acrobatics", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c81",
+      "text": "What's your preferred lighting color?",
+      "category": "home",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Golden light, warm and elegant", "score": {"metal": 1}},
+        {"id": "b", "text": "White light, bright and clean", "score": {"cool": 1}},
+        {"id": "c", "text": "Orange-yellow light, warm and cozy", "score": {"warm": 1}},
+        {"id": "d", "text": "Indirect lighting, soft and non-glaring", "score": {"dark": 1}},
+        {"id": "e", "text": "Color-changing RGB LED", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c82",
+      "text": "How do you usually choose a restaurant?",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "By reviews and interior quality", "score": {"metal": 1}},
+        {"id": "b", "text": "By healthy/light options", "score": {"cool": 1}},
+        {"id": "c", "text": "Friend recommendations or online trends", "score": {"warm": 1}},
+        {"id": "d", "text": "Quiet atmosphere is most important", "score": {"dark": 1}},
+        {"id": "e", "text": "New places I have never tried before", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c83",
+      "text": "If you were a cocktail, what would you be?",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Champagne, elegant and noble", "score": {"metal": 1}},
+        {"id": "b", "text": "Gin and tonic, crisp and refreshing", "score": {"cool": 1}},
+        {"id": "c", "text": "Sex on the Beach, sweet and passionate", "score": {"warm": 1}},
+        {"id": "d", "text": "Whiskey, deep and mellow", "score": {"dark": 1}},
+        {"id": "e", "text": "Rainbow special, colorful and fun", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c84",
+      "text": "What's your attitude toward new things?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Try only after careful evaluation", "score": {"metal": 2}},
+        {"id": "b", "text": "Observe first, then decide", "score": {"cool": 2}},
+        {"id": "c", "text": "Try immediately if interested", "score": {"warm": 2}},
+        {"id": "d", "text": "Usually more conservative", "score": {"dark": 2}},
+        {"id": "e", "text": "I love trying everything new", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c85",
+      "text": "Choose a scent.",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Sandalwood or agarwood, calm and elegant", "score": {"metal": 1}},
+        {"id": "b", "text": "Mint or eucalyptus, fresh and uplifting", "score": {"cool": 1}},
+        {"id": "c", "text": "Rose or jasmine, sweet and romantic", "score": {"warm": 1}},
+        {"id": "d", "text": "Cedar or leather, steady and mysterious", "score": {"dark": 1}},
+        {"id": "e", "text": "Fruity or candy-like, lively and cute", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c86",
+      "text": "What's your ideal birthday party?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Refined dinner at an upscale restaurant", "score": {"metal": 1}},
+        {"id": "b", "text": "A short trip to the sea or mountains", "score": {"cool": 1}},
+        {"id": "c", "text": "A lively party with all your friends", "score": {"warm": 1}},
+        {"id": "d", "text": "Quiet celebration alone", "score": {"dark": 1}},
+        {"id": "e", "text": "A themed surprise party", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c87",
+      "text": "What's your wallet style?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Designer luxury", "score": {"metal": 1}},
+        {"id": "b", "text": "Minimal and practical", "score": {"cool": 1}},
+        {"id": "c", "text": "Cute design", "score": {"warm": 1}},
+        {"id": "d", "text": "Classic dark color", "score": {"dark": 1}},
+        {"id": "e", "text": "Unique design", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c88",
+      "text": "How do you deal with stress?",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Shop to reward yourself", "score": {"metal": 1}},
+        {"id": "b", "text": "Take a bath or do spa relaxation", "score": {"cool": 1}},
+        {"id": "c", "text": "Talk and vent with friends", "score": {"warm": 1}},
+        {"id": "d", "text": "Process it on your own", "score": {"dark": 1}},
+        {"id": "e", "text": "Try something new to shift focus", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c89",
+      "text": "What curtain style do you like?",
+      "category": "home",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Velvet or satin, luxurious feel", "score": {"metal": 1}},
+        {"id": "b", "text": "Sheer or linen, natural light", "score": {"cool": 1}},
+        {"id": "c", "text": "Warm cotton tones, cozy and cute", "score": {"warm": 1}},
+        {"id": "d", "text": "Blackout curtains, dark and practical", "score": {"dark": 1}},
+        {"id": "e", "text": "Prints or patterns with personality", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c90",
+      "text": "If you were to keep plants, which would you choose?",
+      "category": "home",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Orchids, elegant and graceful", "score": {"metal": 1}},
+        {"id": "b", "text": "Pothos or monstera, easy to care for", "score": {"cool": 1}},
+        {"id": "c", "text": "Sunflowers or roses, bright and pretty", "score": {"warm": 1}},
+        {"id": "d", "text": "Cactus, low maintenance", "score": {"dark": 1}},
+        {"id": "e", "text": "Various succulents, cute and healing", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c91",
+      "text": "What's your suitcase style?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Aluminum frame hard shell, premium feel", "score": {"metal": 1}},
+        {"id": "b", "text": "Lightweight soft shell, easy to carry", "score": {"cool": 1}},
+        {"id": "c", "text": "Bright colors, easy to spot and stylish", "score": {"warm": 1}},
+        {"id": "d", "text": "Classic black, low-key and practical", "score": {"dark": 1}},
+        {"id": "e", "text": "Covered with stickers, full of personality", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c92",
+      "text": "How would you describe your outfit style?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Texture first, premium pieces", "score": {"metal": 1}},
+        {"id": "b", "text": "Comfortable and natural, fresh minimalism", "score": {"cool": 1}},
+        {"id": "c", "text": "Bold and eye-catching, full of energy", "score": {"warm": 1}},
+        {"id": "d", "text": "Low-key and versatile, mostly dark tones", "score": {"dark": 1}},
+        {"id": "e", "text": "Mixed style, highly creative", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c93",
+      "text": "What type of games do you like?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Strategy/management games", "score": {"metal": 1}},
+        {"id": "b", "text": "Casual simulation games", "score": {"cool": 1}},
+        {"id": "c", "text": "Multiplayer competitive games", "score": {"warm": 1}},
+        {"id": "d", "text": "Puzzle/deduction games", "score": {"dark": 1}},
+        {"id": "e", "text": "Adventure exploration games", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c94",
+      "text": "Which word best represents you?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Taste", "score": {"metal": 2}},
+        {"id": "b", "text": "Ease", "score": {"cool": 2}},
+        {"id": "c", "text": "Passion", "score": {"warm": 2}},
+        {"id": "d", "text": "Steadiness", "score": {"dark": 2}},
+        {"id": "e", "text": "Creativity", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c95",
+      "text": "Choose a breakfast combo.",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Avocado toast with oat milk", "score": {"metal": 1}},
+        {"id": "b", "text": "Yogurt with fruit", "score": {"cool": 1}},
+        {"id": "c", "text": "Egg crepe with milk tea", "score": {"warm": 1}},
+        {"id": "d", "text": "Black coffee with a bagel", "score": {"dark": 1}},
+        {"id": "e", "text": "Whatever I'm craving", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c96",
+      "text": "What do you think is most romantic?",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Receiving a thoughtfully prepared gift", "score": {"metal": 1}},
+        {"id": "b", "text": "Watching the sea and stars together", "score": {"cool": 1}},
+        {"id": "c", "text": "Hugs and companionship", "score": {"warm": 1}},
+        {"id": "d", "text": "Quietly being by each other's side", "score": {"dark": 1}},
+        {"id": "e", "text": "Trying new experiences together", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c97",
+      "text": "What's your watch style?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Metal strap, classic and elegant", "score": {"metal": 1}},
+        {"id": "b", "text": "Silicone strap, light and comfortable", "score": {"cool": 1}},
+        {"id": "c", "text": "Colorful strap, lively and bright", "score": {"warm": 1}},
+        {"id": "d", "text": "Leather strap, low-key and refined", "score": {"dark": 1}},
+        {"id": "e", "text": "Smartwatch with many features", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c98",
+      "text": "If you were a candy, what would you be?",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Ferrero-style chocolate, refined and premium", "score": {"metal": 1}},
+        {"id": "b", "text": "Mint candy, cool and refreshing", "score": {"cool": 1}},
+        {"id": "c", "text": "Lollipop, sweet and cute", "score": {"warm": 1}},
+        {"id": "d", "text": "Dark chocolate, bittersweet and mature", "score": {"dark": 1}},
+        {"id": "e", "text": "Rainbow candy, bright and colorful", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c99",
+      "text": "Which trait do you admire most in others?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Tasteful and elegant", "score": {"metal": 2}},
+        {"id": "b", "text": "Gentle and considerate", "score": {"cool": 2}},
+        {"id": "c", "text": "Cheerful and energetic", "score": {"warm": 2}},
+        {"id": "d", "text": "Reliable and trustworthy", "score": {"dark": 2}},
+        {"id": "e", "text": "Thoughtful and creative", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c100",
+      "text": "Choose a seafood.",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Lobster, premium and delicious", "score": {"metal": 1}},
+        {"id": "b", "text": "Sashimi, fresh and sweet", "score": {"cool": 1}},
+        {"id": "c", "text": "Grilled shrimp, full of aroma", "score": {"warm": 1}},
+        {"id": "d", "text": "Squid, unique texture", "score": {"dark": 1}},
+        {"id": "e", "text": "Mixed seafood, I want it all", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c101",
+      "text": "Your energy feels like...",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Shining light", "score": {"metal": 2}},
+        {"id": "b", "text": "Flowing spring water", "score": {"cool": 2}},
+        {"id": "c", "text": "Burning flame", "score": {"warm": 2}},
+        {"id": "d", "text": "Quiet earth", "score": {"dark": 2}},
+        {"id": "e", "text": "Ever-changing wind", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c102",
+      "text": "Choose a noodle dish.",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Truffle pasta", "score": {"metal": 1}},
+        {"id": "b", "text": "Chilled Japanese soba", "score": {"cool": 1}},
+        {"id": "c", "text": "Spicy dry noodles", "score": {"warm": 1}},
+        {"id": "d", "text": "Beef noodle soup", "score": {"dark": 1}},
+        {"id": "e", "text": "Mixed stir-fried noodles", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c103",
+      "text": "What are your sleep habits?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Premium bedding, quality-focused sleep", "score": {"metal": 1}},
+        {"id": "b", "text": "Early to bed and early to rise, regular routine", "score": {"cool": 1}},
+        {"id": "c", "text": "I like scrolling my phone before bed", "score": {"warm": 1}},
+        {"id": "d", "text": "Night owl, most energetic at night", "score": {"dark": 1}},
+        {"id": "e", "text": "Irregular sleep schedule", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c104",
+      "text": "What's your preferred way to chat?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "In-person talks with a sense of occasion", "score": {"metal": 1}},
+        {"id": "b", "text": "Text messages, think first then reply", "score": {"cool": 1}},
+        {"id": "c", "text": "Phone calls, hearing voices feels closer", "score": {"warm": 1}},
+        {"id": "d", "text": "Depends on mood, no need to contact often", "score": {"dark": 1}},
+        {"id": "e", "text": "Video or voice, anything works", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c105",
+      "text": "Your kitchen would have...",
+      "category": "home",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Premium cooking appliances", "score": {"metal": 1}},
+        {"id": "b", "text": "Neatly organized seasonings", "score": {"cool": 1}},
+        {"id": "c", "text": "Cute kitchen gadgets", "score": {"warm": 1}},
+        {"id": "d", "text": "Just practical basics", "score": {"dark": 1}},
+        {"id": "e", "text": "All kinds of novel cooking tools", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c106",
+      "text": "What's your bathroom style?",
+      "category": "home",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Hotel-level luxury feel", "score": {"metal": 1}},
+        {"id": "b", "text": "Minimal, clean, and bright", "score": {"cool": 1}},
+        {"id": "c", "text": "Filled with scented candles and bath bombs", "score": {"warm": 1}},
+        {"id": "d", "text": "Practical only, not much decoration", "score": {"dark": 1}},
+        {"id": "e", "text": "Fun storage designs and decorations", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c107",
+      "text": "If you were a coffee, what would you be?",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Hand-pour single origin, flavor-focused", "score": {"metal": 1}},
+        {"id": "b", "text": "Iced latte, smooth and refreshing", "score": {"cool": 1}},
+        {"id": "c", "text": "Caramel macchiato, sweet and happy", "score": {"warm": 1}},
+        {"id": "d", "text": "Espresso, rich and intense", "score": {"dark": 1}},
+        {"id": "e", "text": "Creative signature coffee, unique and fun", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c108",
+      "text": "Choose an anime character type.",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Prince/Princess type, elegant and noble", "score": {"metal": 2}},
+        {"id": "b", "text": "Healer type, gentle and comforting", "score": {"cool": 2}},
+        {"id": "c", "text": "Hot-blooded hero type, full of justice", "score": {"warm": 2}},
+        {"id": "d", "text": "Cool and mysterious type, charismatic", "score": {"dark": 2}},
+        {"id": "e", "text": "Comedic type, always bringing joy", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c109",
+      "text": "What's your wallpaper preference?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Minimal design or famous paintings", "score": {"metal": 1}},
+        {"id": "b", "text": "Natural scenery or seascapes", "score": {"cool": 1}},
+        {"id": "c", "text": "Pet or family/friend photos", "score": {"warm": 1}},
+        {"id": "d", "text": "Solid colors or geometric patterns", "score": {"dark": 1}},
+        {"id": "e", "text": "Illustrations or anime characters", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c110",
+      "text": "What skill do you most want to have?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Investing and financial freedom", "score": {"metal": 2}},
+        {"id": "b", "text": "Meditation and inner calm", "score": {"cool": 2}},
+        {"id": "c", "text": "Social skills and broad connections", "score": {"warm": 2}},
+        {"id": "d", "text": "Deep thinking and insight", "score": {"dark": 2}},
+        {"id": "e", "text": "Creative ideation and endless inspiration", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c111",
+      "text": "Choose a vegetable.",
+      "category": "food",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Asparagus, refined and premium", "score": {"metal": 1}},
+        {"id": "b", "text": "Cucumber, crisp and refreshing", "score": {"cool": 1}},
+        {"id": "c", "text": "Tomato, sweet and tangy", "score": {"warm": 1}},
+        {"id": "d", "text": "Shiitake mushroom, rich umami", "score": {"dark": 1}},
+        {"id": "e", "text": "Bell peppers, bright and colorful", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c112",
+      "text": "What's your social post style?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Carefully edited photos to show taste", "score": {"metal": 1}},
+        {"id": "b", "text": "Natural and casual life records", "score": {"cool": 1}},
+        {"id": "c", "text": "Frequent updates and mood sharing", "score": {"warm": 1}},
+        {"id": "d", "text": "Rarely post, low-key observer", "score": {"dark": 1}},
+        {"id": "e", "text": "Funny and creative, unique style", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c113",
+      "text": "What's your ideal retirement life?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Travel the world and stay in luxury hotels", "score": {"metal": 1}},
+        {"id": "b", "text": "Relax in a seaside cottage", "score": {"cool": 1}},
+        {"id": "c", "text": "Spend time with family and loved ones", "score": {"warm": 1}},
+        {"id": "d", "text": "Read books and grow flowers quietly", "score": {"dark": 1}},
+        {"id": "e", "text": "Keep learning and trying new things", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c114",
+      "text": "Choose a drink cup material.",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Stainless steel, durable and premium", "score": {"metal": 1}},
+        {"id": "b", "text": "Glass, clear and clean", "score": {"cool": 1}},
+        {"id": "c", "text": "Ceramic, warm and cute", "score": {"warm": 1}},
+        {"id": "d", "text": "Plastic, light and practical", "score": {"dark": 1}},
+        {"id": "e", "text": "Eco-friendly material with design sense", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c115",
+      "text": "How would you celebrate success?",
+      "category": "mood",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Buy a luxury item as a reward", "score": {"metal": 1}},
+        {"id": "b", "text": "Take a break and rest well", "score": {"cool": 1}},
+        {"id": "c", "text": "Celebrate with family and friends", "score": {"warm": 1}},
+        {"id": "d", "text": "Quietly enjoy the sense of achievement", "score": {"dark": 1}},
+        {"id": "e", "text": "Set the next goal right away", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c116",
+      "text": "What's your favorite festival?",
+      "category": "lifestyle",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Christmas, romantic and festive", "score": {"metal": 1}},
+        {"id": "b", "text": "Mid-Autumn Festival, reunion and moon-viewing", "score": {"cool": 1}},
+        {"id": "c", "text": "Lunar New Year, lively and joyful", "score": {"warm": 1}},
+        {"id": "d", "text": "Tomb-Sweeping Day, honoring ancestors", "score": {"dark": 1}},
+        {"id": "e", "text": "Halloween, playful and fun", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c117",
+      "text": "If you were an architectural style?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Baroque, ornate and refined", "score": {"metal": 1}},
+        {"id": "b", "text": "Scandinavian, minimal and natural", "score": {"cool": 1}},
+        {"id": "c", "text": "Mediterranean, warm and passionate", "score": {"warm": 1}},
+        {"id": "d", "text": "Industrial, steady with character", "score": {"dark": 1}},
+        {"id": "e", "text": "Bohemian, free-spirited and bold", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c118",
+      "text": "What do you dislike the most?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Poor-quality things", "score": {"metal": 2}},
+        {"id": "b", "text": "Overly noisy environments", "score": {"cool": 2}},
+        {"id": "c", "text": "Coldness and lack of warmth", "score": {"warm": 2}},
+        {"id": "d", "text": "Hypocrisy and insincerity", "score": {"dark": 2}},
+        {"id": "e", "text": "Repetitive boredom", "score": {"colorful": 2}}
+      ]
+    },
+    {
+      "id": "c119",
+      "text": "What's your notebook/journal style?",
+      "category": "style",
+      "weight": 1,
+      "options": [
+        {"id": "a", "text": "Leather cover, premium feel", "score": {"metal": 1}},
+        {"id": "b", "text": "Plain and minimal, clean and neat", "score": {"cool": 1}},
+        {"id": "c", "text": "Cute patterns, soothing and adorable", "score": {"warm": 1}},
+        {"id": "d", "text": "Black or dark tones, low-key and practical", "score": {"dark": 1}},
+        {"id": "e", "text": "Covered with stickers, full of creativity", "score": {"colorful": 1}}
+      ]
+    },
+    {
+      "id": "c120",
+      "text": "What's your attitude toward time?",
+      "category": "personality",
+      "weight": 2,
+      "options": [
+        {"id": "a", "text": "Time is money, don't waste it", "score": {"metal": 2}},
+        {"id": "b", "text": "Go with the flow, no rush", "score": {"cool": 2}},
+        {"id": "c", "text": "Seize the moment, live in the present", "score": {"warm": 2}},
+        {"id": "d", "text": "Think deeply, don't be impatient", "score": {"dark": 2}},
+        {"id": "e", "text": "Time is for experiences", "score": {"colorful": 2}}
+      ]
+    }
+  ],
+  "dimensions": ["metal", "cool", "warm", "dark", "colorful"],
+  "tie_breaker_priority": ["metal", "cool", "warm", "dark", "colorful"],
+  "selection_rules": {
+    "total": 5,
+    "required": {
+      "personality": 1,
+      "random_from": ["food", "style", "lifestyle", "home", "mood"]
+    }
+  }
+}

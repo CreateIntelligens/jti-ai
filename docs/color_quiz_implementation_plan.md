@@ -9,7 +9,7 @@
 ## Phase 1：資料層
 
 ### 1.1 題庫與結果
-- `data/quiz_bank_color.json`（120 題）
+- `data/quiz_bank_color_zh.json`（120 題）
 - `data/color_results.json`（5 種色系）
 
 ---
@@ -87,7 +87,7 @@
 
 | 檔案 | 修改類型 | 說明 |
 |------|----------|------|
-| `data/quiz_bank_color.json` | 新增 | 色彩題庫 |
+| `data/quiz_bank_color_zh.json` | 新增 | 色彩題庫 |
 | `data/color_results.json` | 新增 | 色系結果 |
 | `app/models/session.py` | 修改 | 色彩測驗欄位 |
 | `app/tools/quiz.py` | 修改 | 色彩選題 |

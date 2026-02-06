@@ -1,0 +1,214 @@
+{
+  "quiz_sets": {
+    "mbti_quick": {
+      "name": "MBTI Quick Quiz",
+      "description": "12-question quiz to deeply understand your MBTI type",
+      "questions": [
+        {
+          "id": "q1",
+          "dimension": "E_I",
+          "text": "On weekends, you prefer?",
+          "options": [
+            {
+              "id": "a",
+              "text": "Hanging out with friends",
+              "score": {"E": 1}
+            },
+            {
+              "id": "b",
+              "text": "Relaxing at home alone",
+              "score": {"I": 1}
+            }
+          ]
+        },
+        {
+          "id": "q2",
+          "dimension": "E_I",
+          "text": "At parties, you usually?",
+          "options": [
+            {
+              "id": "a",
+              "text": "Actively meet new people",
+              "score": {"E": 1}
+            },
+            {
+              "id": "b",
+              "text": "Chat with familiar friends",
+              "score": {"I": 1}
+            }
+          ]
+        },
+        {
+          "id": "q3",
+          "dimension": "E_I",
+          "text": "After a full day of work, you feel?",
+          "options": [
+            {
+              "id": "a",
+              "text": "Want to chat with someone to relax",
+              "score": {"E": 1}
+            },
+            {
+              "id": "b",
+              "text": "Need alone time to recharge",
+              "score": {"I": 1}
+            }
+          ]
+        },
+        {
+          "id": "q4",
+          "dimension": "S_N",
+          "text": "When making decisions, you tend to?",
+          "options": [
+            {
+              "id": "a",
+              "text": "Trust intuition and possibilities",
+              "score": {"N": 1}
+            },
+            {
+              "id": "b",
+              "text": "Rely on facts and experience",
+              "score": {"S": 1}
+            }
+          ]
+        },
+        {
+          "id": "q5",
+          "dimension": "S_N",
+          "text": "When learning something new, you prefer?",
+          "options": [
+            {
+              "id": "a",
+              "text": "Understanding theory and concepts first",
+              "score": {"N": 1}
+            },
+            {
+              "id": "b",
+              "text": "Hands-on practice directly",
+              "score": {"S": 1}
+            }
+          ]
+        },
+        {
+          "id": "q6",
+          "dimension": "S_N",
+          "text": "In conversations, you prefer discussing?",
+          "options": [
+            {
+              "id": "a",
+              "text": "Future possibilities and creativity",
+              "score": {"N": 1}
+            },
+            {
+              "id": "b",
+              "text": "Realistic details and experiences",
+              "score": {"S": 1}
+            }
+          ]
+        },
+        {
+          "id": "q7",
+          "dimension": "T_F",
+          "text": "When facing a friend's problem, you?",
+          "options": [
+            {
+              "id": "a",
+              "text": "Analyze the problem and give advice",
+              "score": {"T": 1}
+            },
+            {
+              "id": "b",
+              "text": "Understand their feelings first",
+              "score": {"F": 1}
+            }
+          ]
+        },
+        {
+          "id": "q8",
+          "dimension": "T_F",
+          "text": "When making important decisions, you mainly consider?",
+          "options": [
+            {
+              "id": "a",
+              "text": "Logic and efficiency",
+              "score": {"T": 1}
+            },
+            {
+              "id": "b",
+              "text": "Interpersonal harmony and feelings",
+              "score": {"F": 1}
+            }
+          ]
+        },
+        {
+          "id": "q9",
+          "dimension": "T_F",
+          "text": "When criticized, your first reaction is?",
+          "options": [
+            {
+              "id": "a",
+              "text": "Think about whether the criticism is valid",
+              "score": {"T": 1}
+            },
+            {
+              "id": "b",
+              "text": "Care about the person's tone and attitude",
+              "score": {"F": 1}
+            }
+          ]
+        },
+        {
+          "id": "q10",
+          "dimension": "J_P",
+          "text": "When planning a trip, you prefer?",
+          "options": [
+            {
+              "id": "a",
+              "text": "Planning the itinerary in advance",
+              "score": {"J": 1}
+            },
+            {
+              "id": "b",
+              "text": "Going with the flow",
+              "score": {"P": 1}
+            }
+          ]
+        },
+        {
+          "id": "q11",
+          "dimension": "J_P",
+          "text": "In terms of work style, you tend to?",
+          "options": [
+            {
+              "id": "a",
+              "text": "Complete tasks step by step",
+              "score": {"J": 1}
+            },
+            {
+              "id": "b",
+              "text": "Stay flexible and adaptable",
+              "score": {"P": 1}
+            }
+          ]
+        },
+        {
+          "id": "q12",
+          "dimension": "J_P",
+          "text": "Facing deadlines, you usually?",
+          "options": [
+            {
+              "id": "a",
+              "text": "Finish early to avoid stress",
+              "score": {"J": 1}
+            },
+            {
+              "id": "b",
+              "text": "Last-minute sprint is more efficient",
+              "score": {"P": 1}
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
