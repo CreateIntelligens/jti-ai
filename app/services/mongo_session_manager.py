@@ -103,9 +103,9 @@ class MongoSessionManager:
                 logger.warning(f"Session not found for update: {session.session_id}")
                 return session
 
-            logger.debug(
+            logger.info(
                 f"Updated session in MongoDB: {session.session_id}, "
-                f"step={session.step.value}"
+                f"step={session.step.value}, answers={len(session.answers)}"
             )
             return session
 
@@ -179,11 +179,18 @@ class MongoSessionManager:
     ) -> Optional[Session]:
         """提交答案"""
         session = self.get_session(session_id)
-        if not session or session.step != SessionStep.QUIZ:
+        if not session:
+            logger.warning(f"submit_answer: Session not found: {session_id}")
+            return None
+
+        if session.step != SessionStep.QUIZ:
+            logger.warning(f"submit_answer: Wrong step {session.step.value}, expected QUIZ for session {session_id}")
             return None
 
         session.answers[question_id] = option_id
         session.current_q_index += 1
+
+        logger.info(f"submit_answer: Submitting {question_id}={option_id}, total answers: {len(session.answers)}")
 
         return self.update_session(session)
 

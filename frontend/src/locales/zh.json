@@ -11,7 +11,7 @@
   "quick_action_quiz": "開始色彩測驗",
   "quick_action_htp": "什麼是加熱菸?",
   "quick_action_greeting": "打個招呼",
-  "input_placeholder": "輸入訊息... (試試「我想做色彩測驗」)",
+  "input_placeholder": "輸入訊息... (Ctrl+Enter 送出，試試「我想做色彩測驗」)",
   "button_send": "發送",
   "button_restart": "重新開始",
   "restart_confirm": "確定要重新開始對話嗎？所有記錄將清除。",

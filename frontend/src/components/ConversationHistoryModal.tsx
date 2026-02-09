@@ -173,24 +173,48 @@ export default function ConversationHistoryModal({
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  // 導出對話為 JSON
-  const exportAsJSON = () => {
-    const data = {
-      mode,
-      exported_at: new Date().toISOString(),
-      sessions: filteredSessions,
-      total_sessions: filteredSessions.length,
-      total_conversations: filteredSessions.reduce((sum, s) => sum + s.total, 0),
-    };
+  // 導出對話為 JSON（打 API）
+  const exportAsJSON = async (sessionIds?: string[]) => {
+    try {
+      let url = '';
+      if (mode === 'jti') {
+        url = `/api/jti/conversations/export?mode=${mode}`;
+        if (sessionIds && sessionIds.length > 0) {
+          url += `&session_ids=${sessionIds.join(',')}`;
+        }
+      } else {
+        url = `/api/chat/conversations/export`;
+        if (storeName) {
+          url += `?store_name=${encodeURIComponent(storeName)}`;
+        }
+        if (sessionIds && sessionIds.length > 0) {
+          url += `${storeName ? '&' : '?'}session_ids=${sessionIds.join(',')}`;
+        }
+      }
 
-    const dataStr = JSON.stringify(data, null, 2);
-    const blob = new Blob([dataStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `conversations-${mode}-${new Date().getTime()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error('Failed to export conversations');
+      }
+
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+
+      const filename = sessionIds && sessionIds.length === 1
+        ? `conversation-${sessionIds[0].substring(0, 8)}-${Date.now()}.json`
+        : `conversations-${mode}-${Date.now()}.json`;
+
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error('[ConversationHistory] Export error:', error);
+      alert('匯出失敗，請稍後再試');
+    }
   };
 
   // 格式化時間
@@ -487,84 +511,118 @@ export default function ConversationHistoryModal({
                     }}
                   >
                     {/* Session 摘要 */}
-                    <button
-                      onClick={() => setExpandedSessionId(isSessionExpanded ? null : session.session_id)}
-                      style={{
-                        width: '100%',
-                        padding: '20px 24px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        cursor: 'pointer',
-                        background: 'transparent',
-                        border: 'none',
-                        textAlign: 'left',
-                      }}
-                    >
-                      <div style={{ flex: 1 }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
-                          <span
+                    <div style={{ display: 'flex', alignItems: 'stretch' }}>
+                      <button
+                        onClick={() => setExpandedSessionId(isSessionExpanded ? null : session.session_id)}
+                        style={{
+                          flex: 1,
+                          padding: '20px 24px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          cursor: 'pointer',
+                          background: 'transparent',
+                          border: 'none',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <div style={{ flex: 1 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '10px' }}>
+                            <span
+                              style={{
+                                padding: '6px 16px',
+                                background: 'linear-gradient(135deg, rgba(224, 192, 104, 0.2), rgba(205, 127, 50, 0.15))',
+                                border: '1px solid rgba(224, 192, 104, 0.35)',
+                                borderRadius: '999px',
+                                color: '#e0c068',
+                                fontSize: '13px',
+                                fontWeight: 700,
+                                fontFamily: "'Inter', sans-serif",
+                              }}
+                            >
+                              Session {sessionIndex + 1}
+                            </span>
+                            <span
+                              style={{
+                                padding: '6px 14px',
+                                background: 'rgba(100, 116, 139, 0.15)',
+                                border: '1px solid rgba(148, 163, 184, 0.25)',
+                                borderRadius: '999px',
+                                color: '#94a3b8',
+                                fontSize: '12px',
+                                fontWeight: 600,
+                                fontFamily: "'Inter', sans-serif",
+                              }}
+                            >
+                              {session.total} 則對話
+                            </span>
+                            <span
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                color: '#94a3b8',
+                                fontSize: '12px',
+                                fontFamily: "'Inter', sans-serif",
+                              }}
+                            >
+                              <Clock size={13} />
+                              {formatTime(session.first_message_time)}
+                            </span>
+                          </div>
+                          <p
                             style={{
-                              padding: '6px 16px',
-                              background: 'linear-gradient(135deg, rgba(224, 192, 104, 0.2), rgba(205, 127, 50, 0.15))',
-                              border: '1px solid rgba(224, 192, 104, 0.35)',
-                              borderRadius: '999px',
-                              color: '#e0c068',
+                              margin: 0,
+                              color: '#64748b',
                               fontSize: '13px',
-                              fontWeight: 700,
-                              fontFamily: "'Inter', sans-serif",
+                              fontFamily: "'JetBrains Mono', monospace",
+                              letterSpacing: '-0.02em',
                             }}
                           >
-                            Session {sessionIndex + 1}
-                          </span>
-                          <span
-                            style={{
-                              padding: '6px 14px',
-                              background: 'rgba(100, 116, 139, 0.15)',
-                              border: '1px solid rgba(148, 163, 184, 0.25)',
-                              borderRadius: '999px',
-                              color: '#94a3b8',
-                              fontSize: '12px',
-                              fontWeight: 600,
-                              fontFamily: "'Inter', sans-serif",
-                            }}
-                          >
-                            {session.total} 則對話
-                          </span>
-                          <span
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              color: '#94a3b8',
-                              fontSize: '12px',
-                              fontFamily: "'Inter', sans-serif",
-                            }}
-                          >
-                            <Clock size={13} />
-                            {formatTime(session.first_message_time)}
-                          </span>
+                            ID: {session.session_id.substring(0, 24)}...
+                          </p>
                         </div>
-                        <p
-                          style={{
-                            margin: 0,
-                            color: '#64748b',
-                            fontSize: '13px',
-                            fontFamily: "'JetBrains Mono', monospace",
-                            letterSpacing: '-0.02em',
-                          }}
-                        >
-                          ID: {session.session_id.substring(0, 24)}...
-                        </p>
-                      </div>
-                      <div style={{ marginLeft: '16px', flexShrink: 0 }}>
-                        {isSessionExpanded ? (
-                          <ChevronDown size={24} style={{ color: '#e0c068', strokeWidth: 2.5 }} />
-                        ) : (
-                          <ChevronRight size={24} style={{ color: '#94a3b8', strokeWidth: 2.5 }} />
-                        )}
-                      </div>
-                    </button>
+                        <div style={{ marginLeft: '16px', flexShrink: 0 }}>
+                          {isSessionExpanded ? (
+                            <ChevronDown size={24} style={{ color: '#e0c068', strokeWidth: 2.5 }} />
+                          ) : (
+                            <ChevronRight size={24} style={{ color: '#94a3b8', strokeWidth: 2.5 }} />
+                          )}
+                        </div>
+                      </button>
+
+                      {/* 匯出單個 session 按鈕 */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          exportAsJSON([session.session_id]);
+                        }}
+                        style={{
+                          padding: '0 20px',
+                          background: 'rgba(224, 192, 104, 0.1)',
+                          border: 'none',
+                          borderLeft: '1px solid rgba(224, 192, 104, 0.15)',
+                          color: '#e0c068',
+                          fontSize: '13px',
+                          fontWeight: 600,
+                          fontFamily: "'Inter', sans-serif",
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          transition: 'all 0.2s',
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(224, 192, 104, 0.15)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(224, 192, 104, 0.1)';
+                        }}
+                        title="匯出此對話"
+                      >
+                        <Download size={16} />
+                      </button>
+                    </div>
 
                     {/* 展開 Session 內的對話列表 */}
                     {isSessionExpanded && (
