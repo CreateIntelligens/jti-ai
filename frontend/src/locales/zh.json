@@ -17,5 +17,19 @@
   "restart_confirm": "確定要重新開始對話嗎？所有記錄將清除。",
   "session_label": "Session:",
   "error_network": "網路錯誤，請稍後再試",
-  "error_system": "抱歉，發生錯誤："
+  "error_system": "抱歉，發生錯誤：",
+  "history": "歷史",
+  "view_conversation_history": "查看對話歷史",
+  "conversation_history": "對話歷史",
+  "search_conversations": "搜尋對話內容...",
+  "no_conversations": "尚無對話記錄",
+  "no_results_found": "未找到符合的對話",
+  "total_conversations": "共",
+  "conversations_count": "筆對話",
+  "filtered": "已篩選自",
+  "close": "關閉",
+  "loading": "載入中...",
+  "export": "匯出",
+  "copy": "複製",
+  "copied": "已複製"
 }

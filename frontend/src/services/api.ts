@@ -217,3 +217,10 @@ export function setActiveApiKey(name: string): void {
   localStorage.setItem(STORAGE_ACTIVE, name);
 }
 
+// ========== General Chat Conversations ==========
+
+export async function getGeneralConversations(): Promise<any> {
+  const response = await fetchWithApiKey(`${API_BASE}/chat/conversations`);
+  return handleResponse<any>(response);
+}
+

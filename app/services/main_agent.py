@@ -20,7 +20,7 @@ from typing import Dict, List, Optional
 import google.genai as genai
 from google.genai import types
 from app.models.session import Session, SessionStep
-from app.services.session_manager import session_manager
+from app.services.session_manager_factory import get_session_manager, get_conversation_logger
 from app.services.gemini_service import client as gemini_client
 from app.tools.tool_executor import tool_executor
 from app.services.agent_prompts import (
@@ -29,7 +29,10 @@ from app.services.agent_prompts import (
     SESSION_STATE_TEMPLATES,
     CURRENT_QUESTION_TEMPLATE
 )
-from app.services.conversation_logger import conversation_logger
+
+# 使用工廠函數取得適當的實作（MongoDB 或記憶體）
+session_manager = get_session_manager()
+conversation_logger = get_conversation_logger()
 
 logger = logging.getLogger(__name__)
 

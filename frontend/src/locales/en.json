@@ -17,5 +17,19 @@
   "restart_confirm": "Are you sure you want to restart the conversation? All records will be cleared.",
   "session_label": "Session:",
   "error_network": "Network error, please try again later",
-  "error_system": "Sorry, an error occurred:"
+  "error_system": "Sorry, an error occurred:",
+  "history": "History",
+  "view_conversation_history": "View Conversation History",
+  "conversation_history": "Conversation History",
+  "search_conversations": "Search conversations...",
+  "no_conversations": "No conversations yet",
+  "no_results_found": "No matching conversations found",
+  "total_conversations": "Total",
+  "conversations_count": "conversations",
+  "filtered": "filtered from",
+  "close": "Close",
+  "loading": "Loading...",
+  "export": "Export",
+  "copy": "Copy",
+  "copied": "Copied"
 }

@@ -15,10 +15,10 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# 載入題庫（色彩題庫，目前以中文為主）
+# 載入題庫（色彩題庫，支援中英文）
 QUIZ_BANK_PATHS = {
     "zh": Path("data/quiz_bank_color_zh.json"),
-    "en": Path("data/quiz_bank_color_zh.json"),
+    "en": Path("data/quiz_bank_color_en.json"),
 }
 quiz_data_cache = {}
 

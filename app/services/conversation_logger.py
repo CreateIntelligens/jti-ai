@@ -36,7 +36,8 @@ class ConversationLogger:
         agent_response: str,
         tool_calls: Optional[List[Dict]] = None,
         session_state: Optional[Dict] = None,
-        error: Optional[str] = None
+        error: Optional[str] = None,
+        mode: str = "jti"
     ) -> None:
         """記錄一次對話
 
@@ -47,6 +48,7 @@ class ConversationLogger:
             tool_calls: 工具呼叫記錄
             session_state: Session 狀態
             error: 錯誤訊息（如果有）
+            mode: 對話模式 (jti 或 general)
         """
         try:
             timestamp = datetime.now()
@@ -55,6 +57,7 @@ class ConversationLogger:
             log_entry = {
                 "timestamp": timestamp.isoformat(),
                 "session_id": session_id,
+                "mode": mode,
                 "user_message": user_message,
                 "agent_response": agent_response,
                 "tool_calls": tool_calls or [],
@@ -119,10 +122,13 @@ class ConversationLogger:
         Returns:
             日誌記錄列表
         """
-        log_file = self.log_dir / f"{session_id}.jsonl"
-        if not log_file.exists():
+        # 檔名格式: YYYYMMDD_HHMMSS_{session_id}.jsonl
+        # 使用 glob 找出該 session 的檔案
+        existing_files = list(self.log_dir.glob(f"*{session_id}.jsonl"))
+        if not existing_files:
             return []
 
+        log_file = existing_files[0]
         logs = []
         try:
             with open(log_file, "r", encoding="utf-8") as f:

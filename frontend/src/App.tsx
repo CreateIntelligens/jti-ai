@@ -5,6 +5,7 @@ import ChatArea from './components/ChatArea';
 import StoreManagementModal from './components/StoreManagementModal';
 import PromptManagementModal from './components/PromptManagementModal';
 import UserApiKeyModal from './components/UserApiKeyModal';
+import ConversationHistoryModal from './components/ConversationHistoryModal';
 import JtiTest from './pages/JtiTest';
 import * as api from './services/api';
 import type { Store, FileItem, Message } from './types';
@@ -21,6 +22,7 @@ export default function App() {
   const [storeModalOpen, setStoreModalOpen] = useState(false);
   const [promptModalOpen, setPromptModalOpen] = useState(false);
   const [userApiKeyModalOpen, setUserApiKeyModalOpen] = useState(false);
+  const [conversationHistoryModalOpen, setConversationHistoryModalOpen] = useState(false);
   const [status, setStatus] = useState('');
   const [stores, setStores] = useState<Store[]>([]);
   const [currentStore, setCurrentStore] = useState<string | null>(null);
@@ -28,6 +30,7 @@ export default function App() {
   const [filesLoading, setFilesLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('theme');
     return (saved === 'light' || saved === 'dark') ? saved : 'dark';
@@ -106,6 +109,10 @@ export default function App() {
         const result = await api.startChat(storeName);
         if (result.prompt_applied) {
           showStatus('✅ 已套用自訂 Prompt');
+        }
+        // 儲存 session_id
+        if (result.session_id) {
+          setSessionId(result.session_id);
         }
       } catch (e) {
         const errorMsg = e instanceof Error ? e.message : String(e);
@@ -231,6 +238,7 @@ export default function App() {
         sidebarOpen={sidebarOpen}
         onOpenStoreManagement={() => setStoreModalOpen(true)}
         onOpenUserApiKeySettings={() => setUserApiKeyModalOpen(true)}
+        onOpenConversationHistory={() => setConversationHistoryModalOpen(true)}
         theme={theme}
         onToggleTheme={toggleTheme}
       />
@@ -279,6 +287,13 @@ export default function App() {
           refreshStores();
           refreshFiles();
         }}
+      />
+      <ConversationHistoryModal
+        isOpen={conversationHistoryModalOpen}
+        onClose={() => setConversationHistoryModalOpen(false)}
+        sessionId={sessionId}
+        storeName={currentStore || undefined}
+        mode="general"
       />
     </>
   );

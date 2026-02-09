@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
+import { History } from 'lucide-react';
+import ConversationHistoryModal from '../components/ConversationHistoryModal';
 import '../styles/JtiTest.css';
 
 interface Message {
@@ -27,6 +29,7 @@ export default function JtiTest() {
   const [sessionInfo, setSessionInfo] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -235,6 +238,14 @@ export default function JtiTest() {
               <span className="restart-label">{t('button_restart')}</span>
             </button>
             <button
+              className="history-button"
+              onClick={() => setShowHistoryModal(true)}
+              title={t('view_conversation_history') || 'View Conversation History'}
+            >
+              <History size={18} />
+              <span className="history-label">{t('history') || 'History'}</span>
+            </button>
+            <button
               className="lang-toggle"
               onClick={toggleLanguage}
               title={currentLanguage === 'zh' ? 'Switch to English' : '切換至繁體中文'}
@@ -365,6 +376,14 @@ export default function JtiTest() {
           </form>
         </div>
       </main>
+
+      {/* 對話歷史 Modal */}
+      <ConversationHistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        sessionId={sessionId || ''}
+        mode="jti"
+      />
     </div>
   );
 }

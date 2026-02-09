@@ -4,6 +4,7 @@ interface HeaderProps {
   sidebarOpen: boolean;
   onOpenStoreManagement: () => void;
   onOpenUserApiKeySettings: () => void;
+  onOpenConversationHistory?: () => void;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
 }
@@ -14,6 +15,7 @@ export default function Header({
   sidebarOpen,
   onOpenStoreManagement,
   onOpenUserApiKeySettings,
+  onOpenConversationHistory,
   theme,
   onToggleTheme,
 }: HeaderProps) {
@@ -45,6 +47,15 @@ export default function Header({
           <span className={`theme-option ${theme === 'light' ? 'active' : ''}`}>☀️</span>
           <div className={`theme-slider ${theme === 'light' ? 'light' : ''}`} />
         </div>
+        {onOpenConversationHistory && (
+          <button
+            onClick={onOpenConversationHistory}
+            className="header-link secondary"
+            aria-label="查看對話歷史"
+          >
+            📜 對話歷史
+          </button>
+        )}
         <button
           onClick={onOpenUserApiKeySettings}
           className="header-link primary"

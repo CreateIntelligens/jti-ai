@@ -14,6 +14,10 @@ from typing import Optional
 # 設定 app logger 輸出
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(name)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
+# 降低第三方套件的 log 等級（減少雜訊）
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("google").setLevel(logging.WARNING)
+
 # 過濾 Gemini AFC 警告（我們故意使用 Manual Function Calling）
 warnings.filterwarnings('ignore', message='.*automatic function calling.*')
 warnings.filterwarnings('ignore', message='.*AFC.*')
@@ -66,6 +70,10 @@ import hashlib
 from .core import FileSearchManager
 from .api_keys import APIKeyManager
 from .routers import jti
+from .services.session_manager_factory import get_conversation_logger
+
+# 使用工廠函數取得適當的實作（MongoDB 或檔案系統）
+conversation_logger = get_conversation_logger()
 
 app = FastAPI(title="Gemini File Search API")
 
@@ -235,7 +243,12 @@ def query(req: QueryRequest, x_gemini_api_key: Optional[str] = FastAPIHeader(Non
 def start_chat(req: ChatStartRequest, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
     """開始新的對話 Session。"""
     mgr = _get_or_create_manager(x_gemini_api_key)
-    
+
+    # 取得 session_id：結合 API key 和 store_name 以隔離不同知識庫的對話
+    api_key_part = x_gemini_api_key if x_gemini_api_key else 'system'
+    session_key = f"{api_key_part}:{req.store_name}"
+    session_id = hashlib.sha256(session_key.encode()).hexdigest()
+
     # 取得啟用的 prompt (如果有)
     system_instruction = None
     if prompt_manager:
@@ -245,18 +258,51 @@ def start_chat(req: ChatStartRequest, x_gemini_api_key: Optional[str] = FastAPIH
             print(f"[DEBUG] 從 MongoDB 載入 Prompt: {active_prompt.name}")
         else:
             print(f"[DEBUG] Store {req.store_name} 沒有啟用的 Prompt")
-    
+
     mgr.start_chat(req.store_name, req.model, system_instruction=system_instruction)
-    return {"ok": True, "prompt_applied": system_instruction is not None}
+    return {
+        "ok": True,
+        "prompt_applied": system_instruction is not None,
+        "session_id": session_id
+    }
 
 @app.post("/api/chat/message")
 def send_message(req: ChatMessageRequest, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
     """發送訊息到目前對話。"""
     mgr = _get_or_create_manager(x_gemini_api_key)
+
+    # 取得 session_id：結合 API key 和當前 store_name
+    api_key_part = x_gemini_api_key if x_gemini_api_key else 'system'
+    current_store = mgr.current_store if hasattr(mgr, 'current_store') else 'unknown'
+    session_key = f"{api_key_part}:{current_store}"
+    session_id = hashlib.sha256(session_key.encode()).hexdigest()
+
     try:
         response = mgr.send_message(req.message)
-        return {"answer": response.text}
+        answer = response.text
+
+        # 記錄對話
+        conversation_logger.log_conversation(
+            session_id=session_id,
+            user_message=req.message,
+            agent_response=answer,
+            tool_calls=[],
+            session_state={"store": current_store},
+            mode="general"
+        )
+
+        return {"answer": answer}
     except ValueError as e:
+        # 記錄錯誤對話
+        conversation_logger.log_conversation(
+            session_id=session_id,
+            user_message=req.message,
+            agent_response="",
+            tool_calls=[],
+            session_state={"store": current_store},
+            error=str(e),
+            mode="general"
+        )
         raise HTTPException(status_code=400, detail=str(e))
 
 
@@ -265,6 +311,177 @@ def get_history(x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
     """取得目前對話紀錄。"""
     mgr = _get_or_create_manager(x_gemini_api_key)
     return mgr.get_history()
+
+
+@app.get("/api/chat/conversations")
+def get_general_conversations(
+    store_name: Optional[str] = None,
+    x_gemini_api_key: Optional[str] = FastAPIHeader(None)
+):
+    """
+    取得 general chat 的對話歷史
+
+    Query Parameters:
+    - store_name: 知識庫名稱（必填）
+
+    回傳該知識庫的所有對話（按 session 分組）
+    """
+    try:
+        mgr = _get_or_create_manager(x_gemini_api_key)
+
+        # 決定使用哪個 store
+        current_store = store_name if store_name else (mgr.current_store if hasattr(mgr, 'current_store') else None)
+
+        if not current_store:
+            raise HTTPException(status_code=400, detail="未指定知識庫或當前無活動知識庫")
+
+        # 取得所有 general 模式的對話
+        all_conversations = conversation_logger.get_session_logs_by_mode("general")
+
+        # 篩選出屬於這個知識庫的對話
+        store_conversations = [
+            c for c in all_conversations
+            if c.get("session_snapshot", {}).get("store") == current_store
+        ]
+
+        # 按 session_id 分組
+        sessions = {}
+        for conv in store_conversations:
+            sid = conv.get("session_id")
+            if sid not in sessions:
+                sessions[sid] = {
+                    "session_id": sid,
+                    "conversations": [],
+                    "first_message_time": conv.get("timestamp"),
+                    "total": 0
+                }
+            sessions[sid]["conversations"].append(conv)
+            sessions[sid]["total"] += 1
+
+        # 轉換成列表，按時間排序
+        session_list = list(sessions.values())
+        session_list.sort(key=lambda x: x["first_message_time"], reverse=True)
+
+        return {
+            "store_name": current_store,
+            "mode": "general",
+            "sessions": session_list,
+            "total_conversations": len(store_conversations),
+            "total_sessions": len(session_list)
+        }
+
+    except Exception as e:
+        logging.error(f"Failed to get general conversations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/chat/conversations/export")
+def export_general_conversations(
+    store_name: Optional[str] = None,
+    session_ids: Optional[str] = None,
+    x_gemini_api_key: Optional[str] = FastAPIHeader(None)
+):
+    """
+    匯出 general chat 的對話歷史為 JSON 格式
+
+    Query Parameters:
+    - store_name: 知識庫名稱（必填）
+    - session_ids: (可選) 指定一個或多個 Session ID（用逗號分隔），只匯出指定的 sessions
+
+    範例:
+    - 單個 session: ?store_name=xxx&session_ids=abc123
+    - 多個 sessions: ?store_name=xxx&session_ids=abc123,def456,ghi789
+    - 所有 sessions: ?store_name=xxx (不提供 session_ids 參數)
+
+    回傳該知識庫的對話（按 session 分組）供匯出使用
+    """
+    try:
+        from datetime import datetime
+
+        mgr = _get_or_create_manager(x_gemini_api_key)
+
+        # 決定使用哪個 store
+        current_store = store_name if store_name else (mgr.current_store if hasattr(mgr, 'current_store') else None)
+
+        if not current_store:
+            raise HTTPException(status_code=400, detail="未指定知識庫或當前無活動知識庫")
+
+        if session_ids:
+            # 解析 session_ids（支援逗號分隔）
+            session_id_list = [sid.strip() for sid in session_ids.split(',') if sid.strip()]
+
+            # 收集指定 sessions 的對話
+            sessions = []
+            total_conversations = 0
+
+            for session_id in session_id_list:
+                conversations = conversation_logger.get_session_logs(session_id)
+                # 過濾出屬於這個知識庫的對話
+                conversations = [
+                    c for c in conversations
+                    if c.get("mode") == "general" and c.get("session_snapshot", {}).get("store") == current_store
+                ]
+
+                if conversations:
+                    sessions.append({
+                        "session_id": session_id,
+                        "conversations": conversations,
+                        "first_message_time": conversations[0].get("timestamp") if conversations else None,
+                        "total": len(conversations)
+                    })
+                    total_conversations += len(conversations)
+
+            # 按時間排序
+            sessions.sort(key=lambda x: x["first_message_time"] or "", reverse=True)
+
+            return {
+                "exported_at": datetime.utcnow().isoformat(),
+                "store_name": current_store,
+                "mode": "general",
+                "sessions": sessions,
+                "total_conversations": total_conversations,
+                "total_sessions": len(sessions)
+            }
+        else:
+            # 匯出所有該知識庫的對話
+            all_conversations = conversation_logger.get_session_logs_by_mode("general")
+
+            # 篩選出屬於這個知識庫的對話
+            store_conversations = [
+                c for c in all_conversations
+                if c.get("session_snapshot", {}).get("store") == current_store
+            ]
+
+            # 按 session_id 分組
+            sessions = {}
+            for conv in store_conversations:
+                sid = conv.get("session_id")
+                if sid not in sessions:
+                    sessions[sid] = {
+                        "session_id": sid,
+                        "conversations": [],
+                        "first_message_time": conv.get("timestamp"),
+                        "total": 0
+                    }
+                sessions[sid]["conversations"].append(conv)
+                sessions[sid]["total"] += 1
+
+            # 轉換成列表，按時間排序
+            session_list = list(sessions.values())
+            session_list.sort(key=lambda x: x["first_message_time"], reverse=True)
+
+            return {
+                "exported_at": datetime.utcnow().isoformat(),
+                "store_name": current_store,
+                "mode": "general",
+                "sessions": session_list,
+                "total_conversations": len(store_conversations),
+                "total_sessions": len(session_list)
+            }
+
+    except Exception as e:
+        logging.error(f"Failed to export general conversations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # ========== OpenAI Compatible API ==========

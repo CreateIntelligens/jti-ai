@@ -6,10 +6,13 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 import logging
-from app.services.session_manager import session_manager
+from app.services.session_manager_factory import get_session_manager, get_conversation_logger
 from app.services.main_agent import main_agent
 from app.models.session import GameMode
-from app.services.conversation_logger import conversation_logger
+
+# 使用工廠函數取得適當的實作（MongoDB 或記憶體）
+session_manager = get_session_manager()
+conversation_logger = get_conversation_logger()
 
 logger = logging.getLogger(__name__)
 
@@ -200,7 +203,8 @@ async def chat(request: ChatRequest):
                         "answers_count": len(updated_session.answers),
                         "color_result_id": updated_session.color_result_id,
                         "current_question_id": updated_session.current_question.get("id") if updated_session.current_question else None
-                    }
+                    },
+                    mode="jti"
                 )
 
                 logger.info(f"✅ QUIZ 作答成功: {request.message} → {user_choice}")
@@ -250,7 +254,8 @@ async def chat(request: ChatRequest):
                         "answers_count": len(session.answers),
                         "color_result_id": session.color_result_id,
                         "current_question_id": session.current_question.get("id") if session.current_question else None
-                    }
+                    },
+                    mode="jti"
                 )
 
                 logger.info(f"⚠️ QUIZ 無法判斷選項: {request.message}")
@@ -293,7 +298,8 @@ async def chat(request: ChatRequest):
                     "answers_count": len(session.answers),
                         "color_result_id": session.color_result_id,
                         "current_question_id": None
-                    }
+                    },
+                mode="jti"
                 )
 
             return ChatResponse(
@@ -334,7 +340,8 @@ async def chat(request: ChatRequest):
                         "answers_count": len(updated_session.answers),
                         "color_result_id": updated_session.color_result_id,
                         "current_question_id": updated_session.current_question.get("id") if updated_session.current_question else None
-                    }
+                    },
+                    mode="jti"
                 )
 
                 return ChatResponse(
@@ -500,4 +507,150 @@ async def list_sessions():
 
     except Exception as e:
         logger.error(f"Failed to list sessions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/conversations")
+async def get_conversations(session_id: Optional[str] = None, mode: str = "jti"):
+    """
+    取得對話歷史
+
+    Query Parameters:
+    - session_id: (可選) 指定 Session ID 則只回傳該 session 的對話
+    - mode: 對話模式，預設 "jti"
+
+    如果不提供 session_id，則回傳所有 JTI 模式的對話（按 session 分組）
+    """
+    try:
+        if session_id:
+            # 查詢特定 session
+            conversations = conversation_logger.get_session_logs(session_id)
+            conversations = [c for c in conversations if c.get("mode") == mode]
+
+            logger.info(f"Retrieved {len(conversations)} conversations for session {session_id}")
+
+            return {
+                "session_id": session_id,
+                "mode": mode,
+                "conversations": conversations,
+                "total": len(conversations)
+            }
+        else:
+            # 查詢所有 JTI 對話
+            all_conversations = conversation_logger.get_session_logs_by_mode(mode)
+
+            # 按 session_id 分組
+            sessions = {}
+            for conv in all_conversations:
+                sid = conv.get("session_id")
+                if sid not in sessions:
+                    sessions[sid] = {
+                        "session_id": sid,
+                        "conversations": [],
+                        "first_message_time": conv.get("timestamp"),
+                        "total": 0
+                    }
+                sessions[sid]["conversations"].append(conv)
+                sessions[sid]["total"] += 1
+
+            # 轉換成列表，按時間排序
+            session_list = list(sessions.values())
+            session_list.sort(key=lambda x: x["first_message_time"], reverse=True)
+
+            logger.info(f"Retrieved {len(all_conversations)} total conversations across {len(session_list)} sessions")
+
+            return {
+                "mode": mode,
+                "sessions": session_list,
+                "total_conversations": len(all_conversations),
+                "total_sessions": len(session_list)
+            }
+
+    except Exception as e:
+        logger.error(f"Failed to get conversations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/conversations/export")
+async def export_conversations(session_ids: Optional[str] = None, mode: str = "jti"):
+    """
+    匯出對話歷史為 JSON 格式
+
+    Query Parameters:
+    - session_ids: (可選) 指定一個或多個 Session ID（用逗號分隔），只匯出指定的 sessions
+    - mode: 對話模式，預設 "jti"
+
+    範例:
+    - 單個 session: ?session_ids=abc123
+    - 多個 sessions: ?session_ids=abc123,def456,ghi789
+    - 所有 sessions: 不提供 session_ids 參數
+
+    如果不提供 session_ids，則匯出所有 JTI 模式的對話（按 session 分組）
+    """
+    try:
+        from datetime import datetime
+
+        if session_ids:
+            # 解析 session_ids（支援逗號分隔）
+            session_id_list = [sid.strip() for sid in session_ids.split(',') if sid.strip()]
+
+            # 收集指定 sessions 的對話
+            sessions = []
+            total_conversations = 0
+
+            for session_id in session_id_list:
+                conversations = conversation_logger.get_session_logs(session_id)
+                conversations = [c for c in conversations if c.get("mode") == mode]
+
+                if conversations:
+                    sessions.append({
+                        "session_id": session_id,
+                        "conversations": conversations,
+                        "first_message_time": conversations[0].get("timestamp") if conversations else None,
+                        "total": len(conversations)
+                    })
+                    total_conversations += len(conversations)
+
+            # 按時間排序
+            sessions.sort(key=lambda x: x["first_message_time"] or "", reverse=True)
+
+            return {
+                "exported_at": datetime.utcnow().isoformat(),
+                "mode": mode,
+                "sessions": sessions,
+                "total_conversations": total_conversations,
+                "total_sessions": len(sessions)
+            }
+        else:
+            # 匯出所有 JTI 對話
+            all_conversations = conversation_logger.get_session_logs_by_mode(mode)
+
+            # 按 session_id 分組
+            sessions = {}
+            for conv in all_conversations:
+                sid = conv.get("session_id")
+                if sid not in sessions:
+                    sessions[sid] = {
+                        "session_id": sid,
+                        "conversations": [],
+                        "first_message_time": conv.get("timestamp"),
+                        "total": 0
+                    }
+                sessions[sid]["conversations"].append(conv)
+                sessions[sid]["total"] += 1
+
+            # 轉換成列表，按時間排序
+            session_list = list(sessions.values())
+            session_list.sort(key=lambda x: x["first_message_time"], reverse=True)
+
+            return {
+                "exported_at": datetime.utcnow().isoformat(),
+                "mode": mode,
+                "sessions": session_list,
+                "total_conversations": len(all_conversations),
+                "total_sessions": len(session_list)
+            }
+
+    except Exception as e:
+        logger.error(f"Failed to export conversations: {e}")
         raise HTTPException(status_code=500, detail=str(e))
