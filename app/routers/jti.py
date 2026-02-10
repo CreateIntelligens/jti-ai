@@ -51,6 +51,11 @@ class ChatResponse(BaseModel):
     error: Optional[str] = None
 
 
+class QuizActionRequest(BaseModel):
+    """測驗控制請求（不透過自然語言判斷）"""
+    session_id: str = Field(..., description="Session ID")
+
+
 class GetSessionResponse(BaseModel):
     """取得 session 回應"""
     session: Dict[str, Any]
@@ -147,10 +152,16 @@ async def chat(request: ChatRequest):
             remaining = total_questions - len(session.answers)
             current_q_num = len(session.answers) + 1
 
-            # 使用者想中斷測驗：回到一般問答
-            if request.message.strip() == "中斷":
-                updated_session = session_manager.abort_quiz(request.session_id)
-                response_message = "好呀，那我先幫你中斷測驗，我們回到一般問答。你想問什麼呢？"
+            msg = request.message.strip()
+            # 使用者想中斷/暫停測驗：回到一般問答（保留進度）
+            # 只對明確的「中斷」做規則判斷，其餘意圖交由 _judge_user_choice 的 LLM 輔助判斷，
+            # 避免像「我不想太華麗，所以選B」這種作答理由被誤判為想退出測驗。
+            if msg == "中斷":
+                updated_session = session_manager.pause_quiz(request.session_id)
+                response_message = (
+                    "好呀，那我先幫你暫停測驗，我們回到一般問答。"
+                    "之後想接著做，請輸入「繼續測驗」。"
+                )
 
                 # 記錄到對話日誌
                 conversation_logger.log_conversation(
@@ -184,6 +195,33 @@ async def chat(request: ChatRequest):
             user_choice = await _judge_user_choice(request.message, q)
 
             logger.info(f"[答題判斷] 使用者回答: '{request.message}' -> 判定選項: {user_choice}")
+
+            if user_choice == "PAUSE":
+                updated_session = session_manager.pause_quiz(request.session_id)
+                response_message = (
+                    "好呀，那我先幫你暫停測驗，我們回到一般問答。"
+                    "之後想接著做，請輸入「繼續測驗」。"
+                )
+
+                conversation_logger.log_conversation(
+                    session_id=request.session_id,
+                    user_message=request.message,
+                    agent_response=response_message,
+                    tool_calls=[],
+                    session_state={
+                        "step": updated_session.step.value if updated_session else session.step.value,
+                        "answers_count": len(updated_session.answers) if updated_session else len(session.answers),
+                        "color_result_id": updated_session.color_result_id if updated_session else session.color_result_id,
+                        "current_question_id": None,
+                    },
+                    mode="jti",
+                )
+
+                return ChatResponse(
+                    message=response_message,
+                    session=updated_session.model_dump() if updated_session else session.model_dump(),
+                    tool_calls=[],
+                )
 
             if user_choice:
                 # ✅ 判斷成功，呼叫 submit_answer
@@ -297,10 +335,12 @@ async def chat(request: ChatRequest):
         # 先用關鍵字判斷是否要開始測驗（不依賴 LLM 呼叫工具）
         start_keywords = ['色彩', '顏色', '配色', '保護殼', '測驗', '心理測驗', '開始', '玩', '試試', '來吧', '好啊', '開始吧', 'quiz', 'start']
         negative_keywords = ['不想', '不要', '不用', '不玩', '跳過', '算了', '不了', "don't", "dont", "no ", "not ", "skip", "pass", "never"]
+        resume_keywords = ['繼續測驗', '繼續', '接著', '接續', '回到測驗', 'continue', 'resume']
         msg_lower = request.message.lower()
 
         # 檢查是否有開始意圖
         has_start_intent = any(kw in msg_lower for kw in start_keywords)
+        wants_resume = any(kw in msg_lower for kw in resume_keywords)
         # 檢查是否有拒絕意圖
         has_rejection = any(kw in msg_lower for kw in negative_keywords) or any(kw in request.message for kw in negative_keywords)
 
@@ -308,6 +348,57 @@ async def chat(request: ChatRequest):
         should_start_quiz = has_start_intent and not has_rejection
 
         logger.info(f"[DEBUG] 測驗判斷: has_start={has_start_intent}, has_rejection={has_rejection}, should_start={should_start_quiz}")
+
+        # 若先前暫停過測驗，允許繼續（預設繼續；除非使用者明確說要重新開始）
+        paused_quiz = bool(session.metadata.get("paused_quiz")) and bool(session.selected_questions)
+        if (
+            session.step.value == "WELCOME"
+            and paused_quiz
+            and not has_rejection
+            and (wants_resume or should_start_quiz)
+        ):
+            updated_session = session_manager.resume_quiz(request.session_id)
+            resumed_q = updated_session.current_question if updated_session else None
+
+            if not resumed_q:
+                response_message = "我這邊沒有找到可接續的測驗進度喔。想重新開始的話請說「開始測驗」。"
+                return ChatResponse(
+                    message=response_message,
+                    session=(updated_session.model_dump() if updated_session else session.model_dump()),
+                    tool_calls=[],
+                )
+
+            options = resumed_q.get("options", [])
+
+            from app.tools.quiz import get_total_questions
+
+            total_questions = get_total_questions(updated_session.quiz_id) if updated_session else 5
+            current_q_num = (updated_session.current_q_index + 1) if updated_session else (len(session.answers) + 1)
+
+            options_text = _format_options_text(options)
+            response_message = f"好呀，我們接著做第{current_q_num}題。\n第{current_q_num}題：{resumed_q.get('text', '')}\n{options_text}"
+
+            conversation_logger.log_conversation(
+                session_id=request.session_id,
+                user_message=request.message,
+                agent_response=response_message,
+                tool_calls=[],
+                session_state={
+                    "step": updated_session.step.value if updated_session else session.step.value,
+                    "answers_count": len(updated_session.answers) if updated_session else len(session.answers),
+                    "color_result_id": updated_session.color_result_id if updated_session else session.color_result_id,
+                    "current_question_id": resumed_q.get("id") if isinstance(resumed_q, dict) else None,
+                },
+                mode="jti",
+            )
+
+            logger.info(f"✅ QUIZ 繼續測驗: 第 {current_q_num}/{total_questions} 題")
+
+            return ChatResponse(
+                message=response_message,
+                session=updated_session.model_dump() if updated_session else session.model_dump(),
+                tool_calls=[],
+            )
 
         # 如果已完成測驗想再測一次，拒絕
         if should_start_quiz and session.step.value == "DONE":
@@ -393,6 +484,177 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/quiz/start", response_model=ChatResponse)
+async def quiz_start(request: QuizActionRequest):
+    """
+    直接開始測驗（不依賴自然語言判斷）
+
+    用途：
+    - 前端按鈕/流程控制
+    - curl / 自動化測試
+    """
+    try:
+        session = session_manager.get_session(request.session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        if session.step.value == "DONE":
+            response_message = "你已經完成過測驗囉！這次對話只能測驗一次。如果想重新測驗，請重新整理頁面開始新的對話。"
+            return ChatResponse(
+                message=response_message,
+                session=session.model_dump(),
+                tool_calls=[],
+            )
+
+        from app.tools.tool_executor import tool_executor
+
+        tool_result = await tool_executor.execute("start_quiz", {"session_id": request.session_id})
+        updated_session = session_manager.get_session(request.session_id)
+
+        if not tool_result.get("success"):
+            return ChatResponse(
+                message=tool_result.get("error", "start_quiz failed"),
+                session=updated_session.model_dump() if updated_session else session.model_dump(),
+                tool_calls=[],
+                error=tool_result.get("error"),
+            )
+
+        q = tool_result.get("current_question") or (updated_session.current_question if updated_session else None)
+        options = q.get("options", []) if isinstance(q, dict) else []
+        options_text = _format_options_text(options)
+
+        if updated_session and updated_session.language == "en":
+            response_message = f"Let's start.\n\nQuestion 1: {q.get('text', '')}\n{options_text}"
+        else:
+            response_message = (
+                "想來做個生活品味色彩探索測驗嗎？ 簡單五個測驗，尋找你的命定手機殼，"
+                "如果中途想離開，請輸入中斷，即可繼續問答，那我們開始測驗吧！\n\n"
+                f"第1題：{q.get('text', '')}\n{options_text}"
+            )
+
+        conversation_logger.log_conversation(
+            session_id=request.session_id,
+            user_message="[API] quiz_start",
+            agent_response=response_message,
+            tool_calls=[{"tool": "start_quiz", "args": {"session_id": request.session_id}, "result": tool_result}],
+            session_state={
+                "step": updated_session.step.value if updated_session else session.step.value,
+                "answers_count": len(updated_session.answers) if updated_session else len(session.answers),
+                "color_result_id": updated_session.color_result_id if updated_session else session.color_result_id,
+                "current_question_id": q.get("id") if isinstance(q, dict) else None,
+            },
+            mode="jti",
+        )
+
+        return ChatResponse(
+            message=response_message,
+            session=updated_session.model_dump() if updated_session else session.model_dump(),
+            tool_calls=[{"tool": "start_quiz", "args": {"session_id": request.session_id}}],
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"quiz_start failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/quiz/pause", response_model=ChatResponse)
+async def quiz_pause(request: QuizActionRequest):
+    """
+    直接暫停測驗（不依賴自然語言判斷）
+    """
+    try:
+        session = session_manager.get_session(request.session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        updated_session = session_manager.pause_quiz(request.session_id)
+        response_message = (
+            "好呀，那我先幫你暫停測驗，我們回到一般問答。"
+            "之後想接著做，請輸入「繼續測驗」。"
+        )
+
+        conversation_logger.log_conversation(
+            session_id=request.session_id,
+            user_message="[API] quiz_pause",
+            agent_response=response_message,
+            tool_calls=[],
+            session_state={
+                "step": updated_session.step.value if updated_session else session.step.value,
+                "answers_count": len(updated_session.answers) if updated_session else len(session.answers),
+                "color_result_id": updated_session.color_result_id if updated_session else session.color_result_id,
+                "current_question_id": None,
+            },
+            mode="jti",
+        )
+
+        return ChatResponse(
+            message=response_message,
+            session=updated_session.model_dump() if updated_session else session.model_dump(),
+            tool_calls=[],
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"quiz_pause failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/quiz/resume", response_model=ChatResponse)
+async def quiz_resume(request: QuizActionRequest):
+    """
+    直接繼續先前暫停的測驗（不依賴自然語言判斷）
+    """
+    try:
+        session = session_manager.get_session(request.session_id)
+        if not session:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        updated_session = session_manager.resume_quiz(request.session_id)
+        resumed_q = updated_session.current_question if updated_session else None
+
+        if not resumed_q:
+            response_message = "我這邊沒有找到可接續的測驗進度喔。想開始測驗的話請呼叫 /api/jti/quiz/start。"
+            return ChatResponse(
+                message=response_message,
+                session=updated_session.model_dump() if updated_session else session.model_dump(),
+                tool_calls=[],
+            )
+
+        current_q_num = (updated_session.current_q_index + 1) if updated_session else (len(session.answers) + 1)
+        options_text = _format_options_text(resumed_q.get("options", []))
+
+        response_message = f"好呀，我們接著做第{current_q_num}題。\n第{current_q_num}題：{resumed_q.get('text', '')}\n{options_text}"
+
+        conversation_logger.log_conversation(
+            session_id=request.session_id,
+            user_message="[API] quiz_resume",
+            agent_response=response_message,
+            tool_calls=[],
+            session_state={
+                "step": updated_session.step.value if updated_session else session.step.value,
+                "answers_count": len(updated_session.answers) if updated_session else len(session.answers),
+                "color_result_id": updated_session.color_result_id if updated_session else session.color_result_id,
+                "current_question_id": resumed_q.get("id") if isinstance(resumed_q, dict) else None,
+            },
+            mode="jti",
+        )
+
+        return ChatResponse(
+            message=response_message,
+            session=updated_session.model_dump() if updated_session else session.model_dump(),
+            tool_calls=[],
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"quiz_resume failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 def _format_options_text(options: list) -> str:
     labels = "ABCDE"
     lines = []
@@ -423,9 +685,15 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
     if msg_upper in labels:
         logger.info(f"[規則判斷] 明確字母: '{user_message}' -> {msg_upper}")
         return msg_upper
-    label_hits = [label for label in labels if label in msg_upper]
+    # 只把「獨立字母」當作答案；避免像 "pause" 這種字串含有 A 而誤判為選 A
+    import re
+    label_hits = [
+        label
+        for label in labels
+        if re.search(rf"(?<![A-Z]){label}(?![A-Z])", msg_upper)
+    ]
     if len(label_hits) == 1:
-        logger.info(f"[規則判斷] 包含字母: '{user_message}' -> {label_hits[0]}")
+        logger.info(f"[規則判斷] 獨立字母: '{user_message}' -> {label_hits[0]}")
         return label_hits[0]
 
     # 快速判斷：數字或中文序號
@@ -464,7 +732,7 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
     try:
         client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-        prompt = f"""判斷使用者選擇了哪個選項。
+        prompt = f"""判斷使用者意圖：作答、或是想暫停/中斷測驗。
 
 題目：{question.get('text', '')}
 {_format_options_text(options)}
@@ -472,10 +740,11 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
 使用者回覆：「{user_message}」
 
 規則：
-- 如果使用者明確選擇或傾向某選項 → 回覆該選項的字母
+- 如果使用者明確表示要暫停/中斷/停止/結束/退出測驗 → 回覆 PAUSE
+- 如果使用者明確選擇或傾向某選項（即使在解釋理由） → 回覆該選項的字母
 - 如果無法判斷或使用者在問問題/閒聊 → 回覆 X
 
-只回覆一個字母：A 至 E 或 X"""
+只回覆：A 至 E、PAUSE 或 X"""
 
         model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.0-flash")
         response = client.models.generate_content(
@@ -488,6 +757,9 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
         if result in labels:
             logger.info(f"[LLM判斷] 成功: '{user_message}' -> {result}")
             return result
+        if result == "PAUSE":
+            logger.info(f"[LLM判斷] 暫停測驗: '{user_message}' -> PAUSE")
+            return "PAUSE"
         else:
             logger.info(f"[LLM判斷] 失敗/無法判斷: '{user_message}' -> {result}")
             return None
