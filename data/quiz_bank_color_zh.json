@@ -11,10 +11,7 @@
       "weight": 2,
       "options": [
         {"id": "a", "text": "優雅精緻", "score": {"metal": 2}},
-        {"id": "b", "text": "清新自然", "score": {"cool": 2}},
-        {"id": "c", "text": "熱情奔放", "score": {"warm": 2}},
-        {"id": "d", "text": "沉穩內斂", "score": {"dark": 2}},
-        {"id": "e", "text": "獨特創意", "score": {"colorful": 2}}
+        {"id": "b", "text": "清新自然", "score": {"cool": 2}}
       ]
     },
     {
@@ -23,11 +20,8 @@
       "category": "personality",
       "weight": 2,
       "options": [
-        {"id": "a", "text": "有品味", "score": {"metal": 2}},
-        {"id": "b", "text": "很療癒", "score": {"cool": 2}},
-        {"id": "c", "text": "超有活力", "score": {"warm": 2}},
-        {"id": "d", "text": "很可靠", "score": {"dark": 2}},
-        {"id": "e", "text": "很特別", "score": {"colorful": 2}}
+        {"id": "a", "text": "超有活力", "score": {"warm": 2}},
+        {"id": "b", "text": "很可靠", "score": {"dark": 2}}
       ]
     },
     {
@@ -36,11 +30,8 @@
       "category": "personality",
       "weight": 2,
       "options": [
-        {"id": "a", "text": "晴朗的黃昏，金色陽光灑落", "score": {"metal": 2}},
-        {"id": "b", "text": "涼爽的海風，藍天白雲", "score": {"cool": 2}},
-        {"id": "c", "text": "熱情的夏日，陽光普照", "score": {"warm": 2}},
-        {"id": "d", "text": "寧靜的夜晚，星空閃爍", "score": {"dark": 2}},
-        {"id": "e", "text": "雨後彩虹，繽紛絢麗", "score": {"colorful": 2}}
+        {"id": "a", "text": "雨後彩虹，繽紛絢麗", "score": {"colorful": 2}},
+        {"id": "b", "text": "晴朗的黃昏，金色陽光灑落", "score": {"metal": 2}}
       ]
     },
     {
@@ -49,11 +40,8 @@
       "category": "personality",
       "weight": 2,
       "options": [
-        {"id": "a", "text": "金，閃耀尊貴", "score": {"metal": 2}},
-        {"id": "b", "text": "水，清澈流動", "score": {"cool": 2}},
-        {"id": "c", "text": "火，熱烈奔放", "score": {"warm": 2}},
-        {"id": "d", "text": "土，穩重踏實", "score": {"dark": 2}},
-        {"id": "e", "text": "木，生機盎然", "score": {"colorful": 2}}
+        {"id": "a", "text": "水，清澈流動", "score": {"cool": 2}},
+        {"id": "b", "text": "火，熱烈奔放", "score": {"warm": 2}}
       ]
     },
     {
@@ -62,11 +50,8 @@
       "category": "personality",
       "weight": 2,
       "options": [
-        {"id": "a", "text": "孔雀，優雅華麗", "score": {"metal": 2}},
-        {"id": "b", "text": "海豚，自在悠遊", "score": {"cool": 2}},
-        {"id": "c", "text": "獅子，充滿魄力", "score": {"warm": 2}},
-        {"id": "d", "text": "貓頭鷹，沉穩智慧", "score": {"dark": 2}},
-        {"id": "e", "text": "蝴蝶，多彩多姿", "score": {"colorful": 2}}
+        {"id": "a", "text": "貓頭鷹，沉穩智慧", "score": {"dark": 2}},
+        {"id": "b", "text": "蝴蝶，多彩多姿", "score": {"colorful": 2}}
       ]
     },
     {
@@ -76,10 +61,7 @@
       "weight": 2,
       "options": [
         {"id": "a", "text": "有氣質", "score": {"metal": 2}},
-        {"id": "b", "text": "很舒服", "score": {"cool": 2}},
-        {"id": "c", "text": "很熱情", "score": {"warm": 2}},
-        {"id": "d", "text": "很穩重", "score": {"dark": 2}},
-        {"id": "e", "text": "很有趣", "score": {"colorful": 2}}
+        {"id": "b", "text": "很熱情", "score": {"warm": 2}}
       ]
     },
     {
@@ -98,11 +80,8 @@
       "category": "food",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "精緻的法式可頌配咖啡", "score": {"metal": 1}},
-        {"id": "b", "text": "清爽的沙拉配果汁", "score": {"cool": 1}},
-        {"id": "c", "text": "豐盛的美式早餐", "score": {"warm": 1}},
-        {"id": "d", "text": "簡單的吐司配黑咖啡", "score": {"dark": 1}},
-        {"id": "e", "text": "色彩繽紛的水果拼盤", "score": {"colorful": 1}}
+        {"id": "a", "text": "清爽的沙拉配果汁", "score": {"cool": 1}},
+        {"id": "b", "text": "簡單的吐司配黑咖啡", "score": {"dark": 1}}
       ]
     },
     {
@@ -131,11 +110,8 @@
       "category": "food",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "手沖單品咖啡，品味風味", "score": {"metal": 1}},
-        {"id": "b", "text": "冰拿鐵或冷萃咖啡", "score": {"cool": 1}},
-        {"id": "c", "text": "焦糖瑪奇朵或摩卡", "score": {"warm": 1}},
-        {"id": "d", "text": "美式黑咖啡", "score": {"dark": 1}},
-        {"id": "e", "text": "季節限定特調", "score": {"colorful": 1}}
+        {"id": "a", "text": "焦 caramel 瑪奇朵或摩卡", "score": {"warm": 1}},
+        {"id": "b", "text": "季節限定特調", "score": {"colorful": 1}}
       ]
     },
     {
@@ -155,10 +131,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "有設計感的款式，展現品味", "score": {"metal": 1}},
-        {"id": "b", "text": "清新簡約的風格", "score": {"cool": 1}},
-        {"id": "c", "text": "亮眼搶眼的顏色", "score": {"warm": 1}},
-        {"id": "d", "text": "百搭耐看的基本款", "score": {"dark": 1}},
-        {"id": "e", "text": "獨特有個性的單品", "score": {"colorful": 1}}
+        {"id": "b", "text": "亮眼搶眼的顏色", "score": {"warm": 1}}
       ]
     },
     {
@@ -167,11 +140,8 @@
       "category": "style",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "金屬質感或皮革材質", "score": {"metal": 1}},
-        {"id": "b", "text": "透明或淺色系", "score": {"cool": 1}},
-        {"id": "c", "text": "鮮豔亮麗的顏色", "score": {"warm": 1}},
-        {"id": "d", "text": "黑色或深色系", "score": {"dark": 1}},
-        {"id": "e", "text": "特殊圖案或撞色設計", "score": {"colorful": 1}}
+        {"id": "a", "text": "透明或淺色系", "score": {"cool": 1}},
+        {"id": "b", "text": "黑色或深色系", "score": {"dark": 1}}
       ]
     },
     {
@@ -180,11 +150,8 @@
       "category": "style",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "金框或銀框，質感滿分", "score": {"metal": 1}},
-        {"id": "b", "text": "透明或淺色框", "score": {"cool": 1}},
-        {"id": "c", "text": "紅色或橘色框", "score": {"warm": 1}},
-        {"id": "d", "text": "黑框，經典百搭", "score": {"dark": 1}},
-        {"id": "e", "text": "特殊造型或花紋", "score": {"colorful": 1}}
+        {"id": "a", "text": "紅色或橘色框", "score": {"warm": 1}},
+        {"id": "b", "text": "特殊造型或花紋", "score": {"colorful": 1}}
       ]
     },
     {
@@ -214,10 +181,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "去高級餐廳吃頓好的", "score": {"metal": 1}},
-        {"id": "b", "text": "在家追劇放空", "score": {"cool": 1}},
-        {"id": "c", "text": "找朋友出去玩", "score": {"warm": 1}},
-        {"id": "d", "text": "一個人安靜看書", "score": {"dark": 1}},
-        {"id": "e", "text": "嘗試新奇的體驗", "score": {"colorful": 1}}
+        {"id": "b", "text": "找朋友出去玩", "score": {"warm": 1}}
       ]
     },
     {
@@ -256,11 +220,8 @@
       "category": "lifestyle",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "精品店或設計師品牌", "score": {"metal": 1}},
-        {"id": "b", "text": "快時尚或平價品牌", "score": {"cool": 1}},
-        {"id": "c", "text": "運動用品店", "score": {"warm": 1}},
-        {"id": "d", "text": "書店或文具店", "score": {"dark": 1}},
-        {"id": "e", "text": "二手店或古著店", "score": {"colorful": 1}}
+        {"id": "a", "text": "快時尚或平價品牌", "score": {"cool": 1}},
+        {"id": "b", "text": "書店或文具店", "score": {"dark": 1}}
       ]
     },
     {
@@ -279,11 +240,8 @@
       "category": "home",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "金屬質感的擺飾或燈具", "score": {"metal": 1}},
-        {"id": "b", "text": "藍色系的抱枕或窗簾", "score": {"cool": 1}},
-        {"id": "c", "text": "暖色調的燈光或地毯", "score": {"warm": 1}},
-        {"id": "d", "text": "深色木質的家具", "score": {"dark": 1}},
-        {"id": "e", "text": "各種顏色的植物盆栽", "score": {"colorful": 1}}
+        {"id": "a", "text": "暖色調的燈光或地毯", "score": {"warm": 1}},
+        {"id": "b", "text": "各種顏色的植物盆栽", "score": {"colorful": 1}}
       ]
     },
     {
@@ -303,10 +261,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "素色高質感的材質", "score": {"metal": 1}},
-        {"id": "b", "text": "淺藍或淺綠色系", "score": {"cool": 1}},
-        {"id": "c", "text": "暖橘或暖黃色系", "score": {"warm": 1}},
-        {"id": "d", "text": "深灰或深藍色", "score": {"dark": 1}},
-        {"id": "e", "text": "有圖案或花紋的", "score": {"colorful": 1}}
+        {"id": "b", "text": "暖橘或暖黃色系", "score": {"warm": 1}}
       ]
     },
     {
@@ -315,11 +270,8 @@
       "category": "home",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "一幅有質感的掛畫", "score": {"metal": 1}},
-        {"id": "b", "text": "大片落地窗採光", "score": {"cool": 1}},
-        {"id": "c", "text": "舒適的大沙發", "score": {"warm": 1}},
-        {"id": "d", "text": "滿滿的書架", "score": {"dark": 1}},
-        {"id": "e", "text": "各種收藏品展示", "score": {"colorful": 1}}
+        {"id": "a", "text": "大片落地窗採光", "score": {"cool": 1}},
+        {"id": "b", "text": "滿滿的書架", "score": {"dark": 1}}
       ]
     },
     {
@@ -328,11 +280,8 @@
       "category": "mood",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "優雅的古典樂或爵士樂", "score": {"metal": 1}},
-        {"id": "b", "text": "輕柔的輕音樂或自然音", "score": {"cool": 1}},
-        {"id": "c", "text": "節奏感強的流行樂或電音", "score": {"warm": 1}},
-        {"id": "d", "text": "有深度的搖滾或獨立音樂", "score": {"dark": 1}},
-        {"id": "e", "text": "各種風格都聽，看心情", "score": {"colorful": 1}}
+        {"id": "a", "text": "節奏感強的流行樂或電音", "score": {"warm": 1}},
+        {"id": "b", "text": "各種風格都聽，看心情", "score": {"colorful": 1}}
       ]
     },
     {
@@ -352,10 +301,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "質感復古，帶點金色調", "score": {"metal": 1}},
-        {"id": "b", "text": "清新自然，藍色調為主", "score": {"cool": 1}},
-        {"id": "c", "text": "明亮鮮豔，暖色調", "score": {"warm": 1}},
-        {"id": "d", "text": "低調沉穩，暗色調", "score": {"dark": 1}},
-        {"id": "e", "text": "飽和繽紛，色彩豐富", "score": {"colorful": 1}}
+        {"id": "b", "text": "明亮鮮豔，暖色調", "score": {"warm": 1}}
       ]
     },
     {
@@ -364,11 +310,8 @@
       "category": "mood",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "買點好東西犒賞自己", "score": {"metal": 1}},
-        {"id": "b", "text": "去海邊或公園走走", "score": {"cool": 1}},
-        {"id": "c", "text": "約朋友出來聚聚", "score": {"warm": 1}},
-        {"id": "d", "text": "享受一個人的時光", "score": {"dark": 1}},
-        {"id": "e", "text": "嘗試新的事物", "score": {"colorful": 1}}
+        {"id": "a", "text": "去海邊或公園走走", "score": {"cool": 1}},
+        {"id": "b", "text": "享受一個人的時光", "score": {"dark": 1}}
       ]
     },
     {
@@ -377,11 +320,8 @@
       "category": "mood",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "質感文藝片", "score": {"metal": 1}},
-        {"id": "b", "text": "溫馨療癒片", "score": {"cool": 1}},
-        {"id": "c", "text": "熱血動作片", "score": {"warm": 1}},
-        {"id": "d", "text": "懸疑燒腦片", "score": {"dark": 1}},
-        {"id": "e", "text": "奇幻冒險片", "score": {"colorful": 1}}
+        {"id": "a", "text": "熱血動作片", "score": {"warm": 1}},
+        {"id": "b", "text": "奇幻冒險片", "score": {"colorful": 1}}
       ]
     },
     {
@@ -401,10 +341,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "木質調或皮革調，成熟穩重", "score": {"metal": 1}},
-        {"id": "b", "text": "海洋調或清新調，乾淨舒服", "score": {"cool": 1}},
-        {"id": "c", "text": "花果調或甜香調，甜美浪漫", "score": {"warm": 1}},
-        {"id": "d", "text": "煙燻調或麝香調，神秘深邃", "score": {"dark": 1}},
-        {"id": "e", "text": "混合調或獨特調，與眾不同", "score": {"colorful": 1}}
+        {"id": "b", "text": "海洋調或清新調，乾淨舒服", "score": {"cool": 1}}
       ]
     },
     {
@@ -413,11 +350,8 @@
       "category": "lifestyle",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "鋼琴或小提琴", "score": {"metal": 1}},
-        {"id": "b", "text": "游泳或潛水", "score": {"cool": 1}},
-        {"id": "c", "text": "舞蹈或健身", "score": {"warm": 1}},
-        {"id": "d", "text": "攝影或寫作", "score": {"dark": 1}},
-        {"id": "e", "text": "畫畫或手作", "score": {"colorful": 1}}
+        {"id": "a", "text": "舞蹈或健身", "score": {"warm": 1}},
+        {"id": "b", "text": "攝影或寫作", "score": {"dark": 1}}
       ]
     },
     {
@@ -426,11 +360,8 @@
       "category": "style",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "精心修圖的質感照", "score": {"metal": 1}},
-        {"id": "b", "text": "自然清新的風景照", "score": {"cool": 1}},
-        {"id": "c", "text": "開心笑容的自拍照", "score": {"warm": 1}},
-        {"id": "d", "text": "低調神秘的側臉或背影", "score": {"dark": 1}},
-        {"id": "e", "text": "搞怪有趣的創意照", "score": {"colorful": 1}}
+        {"id": "a", "text": "搞怪有趣的創意照", "score": {"colorful": 1}},
+        {"id": "b", "text": "精心修圖的質感照", "score": {"metal": 1}}
       ]
     },
     {
@@ -439,11 +370,8 @@
       "category": "mood",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "精緻包裝的高級禮品", "score": {"metal": 1}},
-        {"id": "b", "text": "實用貼心的生活小物", "score": {"cool": 1}},
-        {"id": "c", "text": "手作溫暖的心意禮物", "score": {"warm": 1}},
-        {"id": "d", "text": "有意義的書或專輯", "score": {"dark": 1}},
-        {"id": "e", "text": "驚喜有趣的特殊體驗", "score": {"colorful": 1}}
+        {"id": "a", "text": "實用貼心的生活小物", "score": {"cool": 1}},
+        {"id": "b", "text": "手作溫暖的心意禮物", "score": {"warm": 1}}
       ]
     },
     {
@@ -452,11 +380,8 @@
       "category": "lifestyle",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "優雅的貓咪", "score": {"metal": 1}},
-        {"id": "b", "text": "悠游的觀賞魚", "score": {"cool": 1}},
-        {"id": "c", "text": "活潑的狗狗", "score": {"warm": 1}},
-        {"id": "d", "text": "安靜的烏龜或兔子", "score": {"dark": 1}},
-        {"id": "e", "text": "特別的爬蟲或鳥類", "score": {"colorful": 1}}
+        {"id": "a", "text": "安靜的烏龜或兔子", "score": {"dark": 1}},
+        {"id": "b", "text": "特別的爬蟲或鳥類", "score": {"colorful": 1}}
       ]
     },
     {
@@ -466,10 +391,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "外型時尚有質感", "score": {"metal": 1}},
-        {"id": "b", "text": "省油環保好保養", "score": {"cool": 1}},
-        {"id": "c", "text": "馬力強動力足", "score": {"warm": 1}},
-        {"id": "d", "text": "穩定可靠耐用", "score": {"dark": 1}},
-        {"id": "e", "text": "獨特有個性", "score": {"colorful": 1}}
+        {"id": "b", "text": "馬力強動力足", "score": {"warm": 1}}
       ]
     },
     {
@@ -478,11 +400,8 @@
       "category": "mood",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "去做個 SPA 按摩放鬆", "score": {"metal": 1}},
-        {"id": "b", "text": "到海邊或山上透透氣", "score": {"cool": 1}},
-        {"id": "c", "text": "找朋友喝酒聊天紓壓", "score": {"warm": 1}},
-        {"id": "d", "text": "回家一個人安靜休息", "score": {"dark": 1}},
-        {"id": "e", "text": "做點有趣的事轉換心情", "score": {"colorful": 1}}
+        {"id": "a", "text": "到海邊或山上透透氣", "score": {"cool": 1}},
+        {"id": "b", "text": "回家一個人安靜休息", "score": {"dark": 1}}
       ]
     },
     {
@@ -491,11 +410,8 @@
       "category": "lifestyle",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "高級餐廳享用美食", "score": {"metal": 1}},
-        {"id": "b", "text": "海邊看夕陽散步", "score": {"cool": 1}},
-        {"id": "c", "text": "遊樂園玩設施", "score": {"warm": 1}},
-        {"id": "d", "text": "咖啡廳靜靜聊天", "score": {"dark": 1}},
-        {"id": "e", "text": "展覽或市集探索新奇", "score": {"colorful": 1}}
+        {"id": "a", "text": "遊樂園玩設施", "score": {"warm": 1}},
+        {"id": "b", "text": "展覽或市集探索新奇", "score": {"colorful": 1}}
       ]
     },
     {
@@ -505,10 +421,7 @@
       "weight": 2,
       "options": [
         {"id": "a", "text": "精品選物店", "score": {"metal": 2}},
-        {"id": "b", "text": "文青咖啡廳", "score": {"cool": 2}},
-        {"id": "c", "text": "熱鬧的餐酒館", "score": {"warm": 2}},
-        {"id": "d", "text": "安靜的獨立書店", "score": {"dark": 2}},
-        {"id": "e", "text": "創意手作工作室", "score": {"colorful": 2}}
+        {"id": "b", "text": "熱鬧的餐酒館", "score": {"warm": 2}}
       ]
     },
     {
@@ -517,11 +430,8 @@
       "category": "style",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "極簡設計或品牌 Logo", "score": {"metal": 1}},
-        {"id": "b", "text": "海景或天空風景", "score": {"cool": 1}},
-        {"id": "c", "text": "朋友或家人合照", "score": {"warm": 1}},
-        {"id": "d", "text": "純黑或深色系", "score": {"dark": 1}},
-        {"id": "e", "text": "插畫或藝術圖案", "score": {"colorful": 1}}
+        {"id": "a", "text": "海景或天空風景", "score": {"cool": 1}},
+        {"id": "b", "text": "純黑或深色系", "score": {"dark": 1}}
       ]
     },
     {
@@ -530,11 +440,8 @@
       "category": "style",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "不鏽鋼保溫杯，質感滿分", "score": {"metal": 1}},
-        {"id": "b", "text": "透明玻璃杯，清爽乾淨", "score": {"cool": 1}},
-        {"id": "c", "text": "可愛造型杯，看了就開心", "score": {"warm": 1}},
-        {"id": "d", "text": "霧面陶瓷杯，低調有質感", "score": {"dark": 1}},
-        {"id": "e", "text": "彩繪圖案杯，獨一無二", "score": {"colorful": 1}}
+        {"id": "a", "text": "可愛造型杯，看了就開心", "score": {"warm": 1}},
+        {"id": "b", "text": "彩繪圖案杯，獨一無二", "score": {"colorful": 1}}
       ]
     },
     {
@@ -544,10 +451,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "輕薄有質感的外型", "score": {"metal": 1}},
-        {"id": "b", "text": "續航力長、效能穩定", "score": {"cool": 1}},
-        {"id": "c", "text": "螢幕大、規格高", "score": {"warm": 1}},
-        {"id": "d", "text": "耐用可靠、不容易壞", "score": {"dark": 1}},
-        {"id": "e", "text": "可以客製化貼紙裝飾", "score": {"colorful": 1}}
+        {"id": "b", "text": "螢幕大、規格高", "score": {"warm": 1}}
       ]
     },
     {
@@ -556,11 +460,8 @@
       "category": "mood",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "經典老歌，展現歌藝", "score": {"metal": 1}},
-        {"id": "b", "text": "抒情慢歌，放鬆心情", "score": {"cool": 1}},
-        {"id": "c", "text": "嗨歌舞曲，炒熱氣氛", "score": {"warm": 1}},
-        {"id": "d", "text": "冷門好歌，展現品味", "score": {"dark": 1}},
-        {"id": "e", "text": "各種歌都唱，看心情", "score": {"colorful": 1}}
+        {"id": "a", "text": "抒情慢歌，放鬆心情", "score": {"cool": 1}},
+        {"id": "b", "text": "冷門好歌，展現品味", "score": {"dark": 1}}
       ]
     },
     {
@@ -569,11 +470,8 @@
       "category": "personality",
       "weight": 2,
       "options": [
-        {"id": "a", "text": "點石成金", "score": {"metal": 2}},
-        {"id": "b", "text": "控制水元素", "score": {"cool": 2}},
-        {"id": "c", "text": "控制火焰", "score": {"warm": 2}},
-        {"id": "d", "text": "隱身術", "score": {"dark": 2}},
-        {"id": "e", "text": "變形術", "score": {"colorful": 2}}
+        {"id": "a", "text": "控制火焰", "score": {"warm": 2}},
+        {"id": "b", "text": "變形術", "score": {"colorful": 2}}
       ]
     },
     {
@@ -583,10 +481,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "泡杯好咖啡慢慢享用", "score": {"metal": 1}},
-        {"id": "b", "text": "繼續賴床放空", "score": {"cool": 1}},
-        {"id": "c", "text": "查看朋友訊息", "score": {"warm": 1}},
-        {"id": "d", "text": "安靜看新聞或書", "score": {"dark": 1}},
-        {"id": "e", "text": "想今天要做什麼有趣的事", "score": {"colorful": 1}}
+        {"id": "b", "text": "查看朋友訊息", "score": {"warm": 1}}
       ]
     },
     {
@@ -595,11 +490,8 @@
       "category": "lifestyle",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "高級餐廳的精緻聚餐", "score": {"metal": 1}},
-        {"id": "b", "text": "咖啡廳的輕鬆下午茶", "score": {"cool": 1}},
-        {"id": "c", "text": "熱鬧的 BBQ 或火鍋趴", "score": {"warm": 1}},
-        {"id": "d", "text": "安靜的品酒或品茶會", "score": {"dark": 1}},
-        {"id": "e", "text": "主題派對或桌遊之夜", "score": {"colorful": 1}}
+        {"id": "a", "text": "咖啡廳的輕鬆下午茶", "score": {"cool": 1}},
+        {"id": "b", "text": "安靜的品酒或品茶會", "score": {"dark": 1}}
       ]
     },
     {
@@ -608,11 +500,8 @@
       "category": "lifestyle",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "巴黎，浪漫時尚", "score": {"metal": 1}},
-        {"id": "b", "text": "東京，乾淨舒適", "score": {"cool": 1}},
-        {"id": "c", "text": "紐約，熱鬧繁華", "score": {"warm": 1}},
-        {"id": "d", "text": "倫敦，沉穩內斂", "score": {"dark": 1}},
-        {"id": "e", "text": "曼谷，繽紛有趣", "score": {"colorful": 1}}
+        {"id": "a", "text": "紐約，熱鬧繁華", "score": {"warm": 1}},
+        {"id": "b", "text": "曼谷，繽紛有趣", "score": {"colorful": 1}}
       ]
     },
     {
@@ -622,10 +511,7 @@
       "weight": 2,
       "options": [
         {"id": "a", "text": "玫瑰，高貴優雅", "score": {"metal": 2}},
-        {"id": "b", "text": "薰衣草，清新舒服", "score": {"cool": 2}},
-        {"id": "c", "text": "向日葵，陽光燦爛", "score": {"warm": 2}},
-        {"id": "d", "text": "百合，沉靜高雅", "score": {"dark": 2}},
-        {"id": "e", "text": "繡球花，色彩繽紛", "score": {"colorful": 2}}
+        {"id": "b", "text": "向日葵，陽光燦爛", "score": {"warm": 2}}
       ]
     },
     {
@@ -634,11 +520,8 @@
       "category": "home",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "金屬或玻璃，現代感十足", "score": {"metal": 1}},
-        {"id": "b", "text": "淺色木頭，自然清爽", "score": {"cool": 1}},
-        {"id": "c", "text": "布面或絨毛，溫暖舒適", "score": {"warm": 1}},
-        {"id": "d", "text": "深色木頭，穩重大方", "score": {"dark": 1}},
-        {"id": "e", "text": "混搭各種材質", "score": {"colorful": 1}}
+        {"id": "a", "text": "淺色木頭，自然清爽", "score": {"cool": 1}},
+        {"id": "b", "text": "深色木頭，穩重大方", "score": {"dark": 1}}
       ]
     },
     {
@@ -647,11 +530,8 @@
       "category": "mood",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "古典主義，精緻典雅", "score": {"metal": 1}},
-        {"id": "b", "text": "印象派，柔和朦朧", "score": {"cool": 1}},
-        {"id": "c", "text": "野獸派，色彩強烈", "score": {"warm": 1}},
-        {"id": "d", "text": "極簡主義，簡潔俐落", "score": {"dark": 1}},
-        {"id": "e", "text": "普普藝術，大膽繽紛", "score": {"colorful": 1}}
+        {"id": "a", "text": "野獸派，色彩強烈", "score": {"warm": 1}},
+        {"id": "b", "text": "普普藝術，大膽繽紛", "score": {"colorful": 1}}
       ]
     },
     {
@@ -661,10 +541,7 @@
       "weight": 2,
       "options": [
         {"id": "a", "text": "品味擔當，提供建議", "score": {"metal": 2}},
-        {"id": "b", "text": "調和者，讓大家都開心", "score": {"cool": 2}},
-        {"id": "c", "text": "氣氛製造者，帶動歡樂", "score": {"warm": 2}},
-        {"id": "d", "text": "智囊團，出謀劃策", "score": {"dark": 2}},
-        {"id": "e", "text": "創意發想者，點子很多", "score": {"colorful": 2}}
+        {"id": "b", "text": "氣氛製造者，帶動歡樂", "score": {"warm": 2}}
       ]
     },
     {
@@ -673,11 +550,8 @@
       "category": "food",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "法式馬卡龍", "score": {"metal": 1}},
-        {"id": "b", "text": "日式抹茶蛋糕", "score": {"cool": 1}},
-        {"id": "c", "text": "巧克力熔岩蛋糕", "score": {"warm": 1}},
-        {"id": "d", "text": "提拉米蘇", "score": {"dark": 1}},
-        {"id": "e", "text": "彩虹千層蛋糕", "score": {"colorful": 1}}
+        {"id": "a", "text": "日式抹茶蛋糕", "score": {"cool": 1}},
+        {"id": "b", "text": "提拉米蘇", "score": {"dark": 1}}
       ]
     },
     {
@@ -686,11 +560,8 @@
       "category": "personality",
       "weight": 2,
       "options": [
-        {"id": "a", "text": "冷靜分析，找出最佳方案", "score": {"metal": 2}},
-        {"id": "b", "text": "先休息一下，讓頭腦清醒", "score": {"cool": 2}},
-        {"id": "c", "text": "找朋友討論，集思廣益", "score": {"warm": 2}},
-        {"id": "d", "text": "自己安靜思考解決方法", "score": {"dark": 2}},
-        {"id": "e", "text": "嘗試各種不同的方法", "score": {"colorful": 2}}
+        {"id": "a", "text": "找朋友討論，集思廣益", "score": {"warm": 2}},
+        {"id": "b", "text": "嘗試各種不同的方法", "score": {"colorful": 2}}
       ]
     },
     {
@@ -700,10 +571,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "米色、卡其色等大地色", "score": {"metal": 1}},
-        {"id": "b", "text": "白色、淺藍等淺色系", "score": {"cool": 1}},
-        {"id": "c", "text": "紅色、橘色等亮色系", "score": {"warm": 1}},
-        {"id": "d", "text": "黑色、深灰等深色系", "score": {"dark": 1}},
-        {"id": "e", "text": "什麼顏色都有", "score": {"colorful": 1}}
+        {"id": "b", "text": "紅色、橘色等亮色系", "score": {"warm": 1}}
       ]
     },
     {
@@ -712,11 +580,8 @@
       "category": "mood",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "黃昏的金色餘暉", "score": {"metal": 1}},
-        {"id": "b", "text": "晴朗的藍天白雲", "score": {"cool": 1}},
-        {"id": "c", "text": "火紅的朝陽日出", "score": {"warm": 1}},
-        {"id": "d", "text": "深邃的滿天星空", "score": {"dark": 1}},
-        {"id": "e", "text": "絢爛的彩虹極光", "score": {"colorful": 1}}
+        {"id": "a", "text": "晴朗的藍天白雲", "score": {"cool": 1}},
+        {"id": "b", "text": "深邃的滿天星空", "score": {"dark": 1}}
       ]
     },
     {
@@ -725,11 +590,8 @@
       "category": "food",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "法式料理，精緻擺盤", "score": {"metal": 1}},
-        {"id": "b", "text": "日式料理，清淡健康", "score": {"cool": 1}},
-        {"id": "c", "text": "中式熱炒，大火快炒", "score": {"warm": 1}},
-        {"id": "d", "text": "義式料理，簡單美味", "score": {"dark": 1}},
-        {"id": "e", "text": "各國料理都想嘗試", "score": {"colorful": 1}}
+        {"id": "a", "text": "中式熱炒，大火快炒", "score": {"warm": 1}},
+        {"id": "b", "text": "各國料理都想嘗試", "score": {"colorful": 1}}
       ]
     },
     {
@@ -739,10 +601,7 @@
       "weight": 2,
       "options": [
         {"id": "a", "text": "優雅的華爾滋", "score": {"metal": 2}},
-        {"id": "b", "text": "緩慢的療癒音樂", "score": {"cool": 2}},
-        {"id": "c", "text": "熱情的拉丁舞曲", "score": {"warm": 2}},
-        {"id": "d", "text": "沉穩的古典樂章", "score": {"dark": 2}},
-        {"id": "e", "text": "變化多端的爵士樂", "score": {"colorful": 2}}
+        {"id": "b", "text": "熱情的拉丁舞曲", "score": {"warm": 2}}
       ]
     },
     {
@@ -751,11 +610,8 @@
       "category": "style",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "鑽石，璀璨耀眼", "score": {"metal": 1}},
-        {"id": "b", "text": "藍寶石，沉靜優雅", "score": {"cool": 1}},
-        {"id": "c", "text": "紅寶石，熱情似火", "score": {"warm": 1}},
-        {"id": "d", "text": "黑曜石，神秘深邃", "score": {"dark": 1}},
-        {"id": "e", "text": "蛋白石，色彩變幻", "score": {"colorful": 1}}
+        {"id": "a", "text": "藍寶石，沉靜優雅", "score": {"cool": 1}},
+        {"id": "b", "text": "黑曜石，神秘深邃", "score": {"dark": 1}}
       ]
     },
     {
@@ -764,11 +620,8 @@
       "category": "mood",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "建築或都市街景", "score": {"metal": 1}},
-        {"id": "b", "text": "海邊或湖泊風景", "score": {"cool": 1}},
-        {"id": "c", "text": "人物或生活記錄", "score": {"warm": 1}},
-        {"id": "d", "text": "黑白或暗調風格", "score": {"dark": 1}},
-        {"id": "e", "text": "花卉或大自然", "score": {"colorful": 1}}
+        {"id": "a", "text": "人物或生活記錄", "score": {"warm": 1}},
+        {"id": "b", "text": "花卉或大自然", "score": {"colorful": 1}}
       ]
     },
     {
@@ -778,10 +631,7 @@
       "weight": 2,
       "options": [
         {"id": "a", "text": "秋天，成熟優雅", "score": {"metal": 2}},
-        {"id": "b", "text": "春天，清新溫和", "score": {"cool": 2}},
-        {"id": "c", "text": "夏天，熱情奔放", "score": {"warm": 2}},
-        {"id": "d", "text": "冬天，沉靜內斂", "score": {"dark": 2}},
-        {"id": "e", "text": "四季都喜歡，各有特色", "score": {"colorful": 2}}
+        {"id": "b", "text": "夏天，熱情奔放", "score": {"warm": 2}}
       ]
     },
     {
@@ -790,11 +640,8 @@
       "category": "lifestyle",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "商業或自我成長類", "score": {"metal": 1}},
-        {"id": "b", "text": "療癒散文或旅遊書", "score": {"cool": 1}},
-        {"id": "c", "text": "勵志故事或傳記", "score": {"warm": 1}},
-        {"id": "d", "text": "推理小說或哲學書", "score": {"dark": 1}},
-        {"id": "e", "text": "各種類型都看", "score": {"colorful": 1}}
+        {"id": "a", "text": "療癒散文或旅遊書", "score": {"cool": 1}},
+        {"id": "b", "text": "推理小說或哲學書", "score": {"dark": 1}}
       ]
     },
     {
@@ -803,11 +650,8 @@
       "category": "food",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "義式冰淇淋，綿密香醇", "score": {"metal": 1}},
-        {"id": "b", "text": "日式刨冰，清涼消暑", "score": {"cool": 1}},
-        {"id": "c", "text": "芒果冰，甜蜜滿足", "score": {"warm": 1}},
-        {"id": "d", "text": "黑芝麻冰，濃郁回甘", "score": {"dark": 1}},
-        {"id": "e", "text": "彩虹雪花冰，繽紛可愛", "score": {"colorful": 1}}
+        {"id": "a", "text": "芒果冰，甜蜜滿足", "score": {"warm": 1}},
+        {"id": "b", "text": "彩虹雪花冰，繽紛可愛", "score": {"colorful": 1}}
       ]
     },
     {
@@ -817,10 +661,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "松露，珍貴獨特", "score": {"metal": 1}},
-        {"id": "b", "text": "生魚片，清新鮮美", "score": {"cool": 1}},
-        {"id": "c", "text": "麻辣火鍋，熱情四溢", "score": {"warm": 1}},
-        {"id": "d", "text": "黑咖啡，苦中帶香", "score": {"dark": 1}},
-        {"id": "e", "text": "綜合披薩，豐富多彩", "score": {"colorful": 1}}
+        {"id": "b", "text": "麻辣火鍋，熱情四溢", "score": {"warm": 1}}
       ]
     },
     {
@@ -829,11 +670,8 @@
       "category": "mood",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "傍晚時分，金色夕陽", "score": {"metal": 1}},
-        {"id": "b", "text": "清晨時分，空氣清新", "score": {"cool": 1}},
-        {"id": "c", "text": "中午時分，陽光普照", "score": {"warm": 1}},
-        {"id": "d", "text": "深夜時分，安靜沉思", "score": {"dark": 1}},
-        {"id": "e", "text": "每個時段都有不同美好", "score": {"colorful": 1}}
+        {"id": "a", "text": "清晨時分，空氣清新", "score": {"cool": 1}},
+        {"id": "b", "text": "深夜時分，安靜沉思", "score": {"dark": 1}}
       ]
     },
     {
@@ -842,11 +680,8 @@
       "category": "home",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "市中心的高級公寓", "score": {"metal": 1}},
-        {"id": "b", "text": "海邊的悠閒小屋", "score": {"cool": 1}},
-        {"id": "c", "text": "熱鬧商圈附近", "score": {"warm": 1}},
-        {"id": "d", "text": "安靜郊區的獨棟房子", "score": {"dark": 1}},
-        {"id": "e", "text": "森林或山區的特色民宿", "score": {"colorful": 1}}
+        {"id": "a", "text": "熱鬧商圈附近", "score": {"warm": 1}},
+        {"id": "b", "text": "森林或山區的特色民宿", "score": {"colorful": 1}}
       ]
     },
     {
@@ -856,10 +691,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "高爾夫球或網球", "score": {"metal": 1}},
-        {"id": "b", "text": "游泳或衝浪", "score": {"cool": 1}},
-        {"id": "c", "text": "籃球或足球", "score": {"warm": 1}},
-        {"id": "d", "text": "登山或慢跑", "score": {"dark": 1}},
-        {"id": "e", "text": "舞蹈或體操", "score": {"colorful": 1}}
+        {"id": "b", "text": "籃球或足球", "score": {"warm": 1}}
       ]
     },
     {
@@ -868,11 +700,8 @@
       "category": "personality",
       "weight": 2,
       "options": [
-        {"id": "a", "text": "重質不重量，交往有品味的朋友", "score": {"metal": 2}},
-        {"id": "b", "text": "輕鬆自在，和誰都能聊", "score": {"cool": 2}},
-        {"id": "c", "text": "熱情外向，朋友很多", "score": {"warm": 2}},
-        {"id": "d", "text": "慢熱內斂，但朋友都很深交", "score": {"dark": 2}},
-        {"id": "e", "text": "各種類型的朋友都有", "score": {"colorful": 2}}
+        {"id": "a", "text": "輕鬆自在，和誰都能聊", "score": {"cool": 2}},
+        {"id": "b", "text": "慢熱內斂，但朋友都很深交", "score": {"dark": 2}}
       ]
     },
     {
@@ -881,11 +710,8 @@
       "category": "home",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "記憶枕或乳膠枕，高品質", "score": {"metal": 1}},
-        {"id": "b", "text": "涼感枕或竹炭枕，涼爽舒適", "score": {"cool": 1}},
-        {"id": "c", "text": "羽絨枕，柔軟溫暖", "score": {"warm": 1}},
-        {"id": "d", "text": "硬一點的枕頭，睡得安穩", "score": {"dark": 1}},
-        {"id": "e", "text": "抱枕要多買幾個裝飾", "score": {"colorful": 1}}
+        {"id": "a", "text": "羽絨枕，柔軟溫暖", "score": {"warm": 1}},
+        {"id": "b", "text": "抱枕要多買幾個裝飾", "score": {"colorful": 1}}
       ]
     },
     {
@@ -895,10 +721,7 @@
       "weight": 2,
       "options": [
         {"id": "a", "text": "金屬，堅硬閃亮", "score": {"metal": 2}},
-        {"id": "b", "text": "水晶，清澈透明", "score": {"cool": 2}},
-        {"id": "c", "text": "陽光，溫暖明亮", "score": {"warm": 2}},
-        {"id": "d", "text": "岩石，穩重堅實", "score": {"dark": 2}},
-        {"id": "e", "text": "彩虹，多彩多變", "score": {"colorful": 2}}
+        {"id": "b", "text": "陽光，溫暖明亮", "score": {"warm": 2}}
       ]
     },
     {
@@ -907,11 +730,8 @@
       "category": "style",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "跑車，時尚有型", "score": {"metal": 1}},
-        {"id": "b", "text": "帆船，自在悠閒", "score": {"cool": 1}},
-        {"id": "c", "text": "重機，熱血奔放", "score": {"warm": 1}},
-        {"id": "d", "text": "火車，穩定可靠", "score": {"dark": 1}},
-        {"id": "e", "text": "熱氣球，獨特浪漫", "score": {"colorful": 1}}
+        {"id": "a", "text": "帆船，自在悠閒", "score": {"cool": 1}},
+        {"id": "b", "text": "火車，穩定可靠", "score": {"dark": 1}}
       ]
     },
     {
@@ -920,11 +740,8 @@
       "category": "personality",
       "weight": 2,
       "options": [
-        {"id": "a", "text": "優雅的微笑", "score": {"metal": 2}},
-        {"id": "b", "text": "溫柔的笑容", "score": {"cool": 2}},
-        {"id": "c", "text": "爽朗的大笑", "score": {"warm": 2}},
-        {"id": "d", "text": "內斂的淺笑", "score": {"dark": 2}},
-        {"id": "e", "text": "傻呼呼的笑", "score": {"colorful": 2}}
+        {"id": "a", "text": "爽朗的大笑", "score": {"warm": 2}},
+        {"id": "b", "text": "傻呼呼的笑", "score": {"colorful": 2}}
       ]
     },
     {
@@ -934,10 +751,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "溫熱水或礦泉水", "score": {"metal": 1}},
-        {"id": "b", "text": "冰水或加檸檬片", "score": {"cool": 1}},
-        {"id": "c", "text": "常常忘記喝水", "score": {"warm": 1}},
-        {"id": "d", "text": "隨時帶著水壺", "score": {"dark": 1}},
-        {"id": "e", "text": "喜歡加水果或氣泡", "score": {"colorful": 1}}
+        {"id": "b", "text": "隨時帶著水壺", "score": {"dark": 1}}
       ]
     },
     {
@@ -946,11 +760,8 @@
       "category": "style",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "金箔裝飾，華麗精緻", "score": {"metal": 1}},
-        {"id": "b", "text": "鮮奶油霜，簡約清爽", "score": {"cool": 1}},
-        {"id": "c", "text": "滿滿水果，繽紛多汁", "score": {"warm": 1}},
-        {"id": "d", "text": "巧克力淋面，沉穩大方", "score": {"dark": 1}},
-        {"id": "e", "text": "翻糖造型，創意十足", "score": {"colorful": 1}}
+        {"id": "a", "text": "鮮奶油霜，簡約清爽", "score": {"cool": 1}},
+        {"id": "b", "text": "翻糖造型，創意十足", "score": {"colorful": 1}}
       ]
     },
     {
@@ -960,10 +771,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "輕柔的鋼琴聲", "score": {"metal": 1}},
-        {"id": "b", "text": "海浪拍打的聲音", "score": {"cool": 1}},
-        {"id": "c", "text": "朋友的笑聲", "score": {"warm": 1}},
-        {"id": "d", "text": "安靜的雨聲", "score": {"dark": 1}},
-        {"id": "e", "text": "蟲鳴鳥叫的自然聲", "score": {"colorful": 1}}
+        {"id": "b", "text": "朋友的笑聲", "score": {"warm": 1}}
       ]
     },
     {
@@ -972,11 +780,8 @@
       "category": "lifestyle",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "乾淨整潔的辦公桌", "score": {"metal": 1}},
-        {"id": "b", "text": "明亮通風的空間", "score": {"cool": 1}},
-        {"id": "c", "text": "有同事可以互動的環境", "score": {"warm": 1}},
-        {"id": "d", "text": "安靜不被打擾的角落", "score": {"dark": 1}},
-        {"id": "e", "text": "充滿擺飾和植物的空間", "score": {"colorful": 1}}
+        {"id": "a", "text": "明亮通風的空間", "score": {"cool": 1}},
+        {"id": "b", "text": "安靜不被打擾的角落", "score": {"dark": 1}}
       ]
     },
     {
@@ -985,11 +790,8 @@
       "category": "style",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "皮鞋或高跟鞋，正式有型", "score": {"metal": 1}},
-        {"id": "b", "text": "帆布鞋或涼鞋，輕鬆自在", "score": {"cool": 1}},
-        {"id": "c", "text": "運動鞋，好動好走", "score": {"warm": 1}},
-        {"id": "d", "text": "靴子或樂福鞋，經典耐看", "score": {"dark": 1}},
-        {"id": "e", "text": "特殊設計款，獨特有趣", "score": {"colorful": 1}}
+        {"id": "a", "text": "運動鞋，好動好走", "score": {"warm": 1}},
+        {"id": "b", "text": "特殊設計款，獨特有趣", "score": {"colorful": 1}}
       ]
     },
     {
@@ -999,10 +801,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "演奏樂器", "score": {"metal": 1}},
-        {"id": "b", "text": "朗誦詩詞", "score": {"cool": 1}},
-        {"id": "c", "text": "唱歌跳舞", "score": {"warm": 1}},
-        {"id": "d", "text": "默劇或小品", "score": {"dark": 1}},
-        {"id": "e", "text": "魔術或特技", "score": {"colorful": 1}}
+        {"id": "b", "text": "唱歌跳舞", "score": {"warm": 1}}
       ]
     },
     {
@@ -1011,11 +810,8 @@
       "category": "home",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "金黃色，溫馨高雅", "score": {"metal": 1}},
-        {"id": "b", "text": "白色，明亮清爽", "score": {"cool": 1}},
-        {"id": "c", "text": "橘黃色，溫暖舒適", "score": {"warm": 1}},
-        {"id": "d", "text": "間接照明，柔和不刺眼", "score": {"dark": 1}},
-        {"id": "e", "text": "七彩 LED，可以變換", "score": {"colorful": 1}}
+        {"id": "a", "text": "白色，明亮清爽", "score": {"cool": 1}},
+        {"id": "b", "text": "間接照明，柔和不刺眼", "score": {"dark": 1}}
       ]
     },
     {
@@ -1024,11 +820,8 @@
       "category": "food",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "看評價和裝潢品質", "score": {"metal": 1}},
-        {"id": "b", "text": "看有沒有健康清淡的選項", "score": {"cool": 1}},
-        {"id": "c", "text": "朋友推薦或網路熱門", "score": {"warm": 1}},
-        {"id": "d", "text": "安靜不吵雜最重要", "score": {"dark": 1}},
-        {"id": "e", "text": "想嘗試沒吃過的新餐廳", "score": {"colorful": 1}}
+        {"id": "a", "text": "朋友推薦或網路熱門", "score": {"warm": 1}},
+        {"id": "b", "text": "想嘗試沒吃過的新餐廳", "score": {"colorful": 1}}
       ]
     },
     {
@@ -1038,10 +831,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "香檳，優雅高貴", "score": {"metal": 1}},
-        {"id": "b", "text": "琴湯尼，清爽順口", "score": {"cool": 1}},
-        {"id": "c", "text": "性感海灘，甜蜜熱情", "score": {"warm": 1}},
-        {"id": "d", "text": "威士忌，深沉醇厚", "score": {"dark": 1}},
-        {"id": "e", "text": "彩虹特調，繽紛有趣", "score": {"colorful": 1}}
+        {"id": "b", "text": "威士忌，深沉醇厚", "score": {"dark": 1}}
       ]
     },
     {
@@ -1050,11 +840,8 @@
       "category": "personality",
       "weight": 2,
       "options": [
-        {"id": "a", "text": "審慎評估後才嘗試", "score": {"metal": 2}},
-        {"id": "b", "text": "觀望一下再決定", "score": {"cool": 2}},
-        {"id": "c", "text": "有興趣就立刻嘗試", "score": {"warm": 2}},
-        {"id": "d", "text": "通常比較保守", "score": {"dark": 2}},
-        {"id": "e", "text": "超愛嘗鮮，什麼都想試", "score": {"colorful": 2}}
+        {"id": "a", "text": "觀望一下再決定", "score": {"cool": 2}},
+        {"id": "b", "text": "超愛嘗鮮，什麼都想試", "score": {"colorful": 2}}
       ]
     },
     {
@@ -1063,11 +850,8 @@
       "category": "mood",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "檀香或沉香，沉穩高雅", "score": {"metal": 1}},
-        {"id": "b", "text": "薄荷或尤加利，清新舒暢", "score": {"cool": 1}},
-        {"id": "c", "text": "玫瑰或茉莉，甜美浪漫", "score": {"warm": 1}},
-        {"id": "d", "text": "雪松或皮革，沉穩神秘", "score": {"dark": 1}},
-        {"id": "e", "text": "水果或糖果，活潑可愛", "score": {"colorful": 1}}
+        {"id": "a", "text": "玫瑰或茉莉，甜美浪漫", "score": {"warm": 1}},
+        {"id": "b", "text": "雪松或皮革，沉穩神秘", "score": {"dark": 1}}
       ]
     },
     {
@@ -1077,10 +861,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "高級餐廳的精緻晚宴", "score": {"metal": 1}},
-        {"id": "b", "text": "海邊或山上的小旅行", "score": {"cool": 1}},
-        {"id": "c", "text": "朋友齊聚的熱鬧派對", "score": {"warm": 1}},
-        {"id": "d", "text": "一個人安靜慶祝", "score": {"dark": 1}},
-        {"id": "e", "text": "主題式的驚喜派對", "score": {"colorful": 1}}
+        {"id": "b", "text": "朋友齊聚的熱鬧派對", "score": {"warm": 1}}
       ]
     },
     {
@@ -1089,11 +870,8 @@
       "category": "style",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "名牌精品款", "score": {"metal": 1}},
-        {"id": "b", "text": "簡約實用款", "score": {"cool": 1}},
-        {"id": "c", "text": "可愛造型款", "score": {"warm": 1}},
-        {"id": "d", "text": "經典深色款", "score": {"dark": 1}},
-        {"id": "e", "text": "特殊設計款", "score": {"colorful": 1}}
+        {"id": "a", "text": "簡約實用款", "score": {"cool": 1}},
+        {"id": "b", "text": "經典深色款", "score": {"dark": 1}}
       ]
     },
     {
@@ -1102,11 +880,8 @@
       "category": "mood",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "購物犒賞自己", "score": {"metal": 1}},
-        {"id": "b", "text": "泡澡或做 SPA 放鬆", "score": {"cool": 1}},
-        {"id": "c", "text": "找朋友訴苦聊天", "score": {"warm": 1}},
-        {"id": "d", "text": "自己消化處理", "score": {"dark": 1}},
-        {"id": "e", "text": "做點新鮮事轉移注意力", "score": {"colorful": 1}}
+        {"id": "a", "text": "找朋友訴苦聊天", "score": {"warm": 1}},
+        {"id": "b", "text": "做點新鮮事轉移注意力", "score": {"colorful": 1}}
       ]
     },
     {
@@ -1116,10 +891,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "絲絨或緞面，高級感", "score": {"metal": 1}},
-        {"id": "b", "text": "薄紗或亞麻，透光自然", "score": {"cool": 1}},
-        {"id": "c", "text": "暖色棉布，溫馨可愛", "score": {"warm": 1}},
-        {"id": "d", "text": "遮光窗簾，深色實用", "score": {"dark": 1}},
-        {"id": "e", "text": "印花或圖案，有個性", "score": {"colorful": 1}}
+        {"id": "b", "text": "暖色棉布，溫馨可愛", "score": {"warm": 1}}
       ]
     },
     {
@@ -1128,11 +900,8 @@
       "category": "home",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "蘭花，高雅氣質", "score": {"metal": 1}},
-        {"id": "b", "text": "綠蘿或龜背芋，好照顧", "score": {"cool": 1}},
-        {"id": "c", "text": "向日葵或玫瑰，繽紛漂亮", "score": {"warm": 1}},
-        {"id": "d", "text": "仙人掌，不用常澆水", "score": {"dark": 1}},
-        {"id": "e", "text": "各種多肉植物，療癒可愛", "score": {"colorful": 1}}
+        {"id": "a", "text": "綠蘿或龜背芋，好照顧", "score": {"cool": 1}},
+        {"id": "b", "text": "仙人掌，不用常澆水", "score": {"dark": 1}}
       ]
     },
     {
@@ -1141,11 +910,8 @@
       "category": "style",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "鋁框硬殼，質感滿分", "score": {"metal": 1}},
-        {"id": "b", "text": "輕便軟殼，方便好拿", "score": {"cool": 1}},
-        {"id": "c", "text": "亮色系，好認又好看", "score": {"warm": 1}},
-        {"id": "d", "text": "經典黑色，低調實用", "score": {"dark": 1}},
-        {"id": "e", "text": "貼滿貼紙，展現個性", "score": {"colorful": 1}}
+        {"id": "a", "text": "亮色系，好認又好看", "score": {"warm": 1}},
+        {"id": "b", "text": "貼滿貼紙，展現個性", "score": {"colorful": 1}}
       ]
     },
     {
@@ -1155,10 +921,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "質感優先，精品單品", "score": {"metal": 1}},
-        {"id": "b", "text": "舒適自然，清新簡約", "score": {"cool": 1}},
-        {"id": "c", "text": "亮眼吸睛，活力滿滿", "score": {"warm": 1}},
-        {"id": "d", "text": "低調百搭，深色為主", "score": {"dark": 1}},
-        {"id": "e", "text": "混搭風格，創意十足", "score": {"colorful": 1}}
+        {"id": "b", "text": "舒適自然，清新簡約", "score": {"cool": 1}}
       ]
     },
     {
@@ -1167,11 +930,8 @@
       "category": "lifestyle",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "策略經營類", "score": {"metal": 1}},
-        {"id": "b", "text": "模擬放鬆類", "score": {"cool": 1}},
-        {"id": "c", "text": "多人競技類", "score": {"warm": 1}},
-        {"id": "d", "text": "解謎推理類", "score": {"dark": 1}},
-        {"id": "e", "text": "冒險探索類", "score": {"colorful": 1}}
+        {"id": "a", "text": "多人競技類", "score": {"warm": 1}},
+        {"id": "b", "text": "解謎推理類", "score": {"dark": 1}}
       ]
     },
     {
@@ -1180,11 +940,8 @@
       "category": "personality",
       "weight": 2,
       "options": [
-        {"id": "a", "text": "品味", "score": {"metal": 2}},
-        {"id": "b", "text": "自在", "score": {"cool": 2}},
-        {"id": "c", "text": "熱情", "score": {"warm": 2}},
-        {"id": "d", "text": "沉穩", "score": {"dark": 2}},
-        {"id": "e", "text": "創意", "score": {"colorful": 2}}
+        {"id": "a", "text": "自在", "score": {"cool": 2}},
+        {"id": "b", "text": "創意", "score": {"colorful": 2}}
       ]
     },
     {
@@ -1194,10 +951,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "酪梨吐司配燕麥奶", "score": {"metal": 1}},
-        {"id": "b", "text": "優格配水果", "score": {"cool": 1}},
-        {"id": "c", "text": "蛋餅配奶茶", "score": {"warm": 1}},
-        {"id": "d", "text": "黑咖啡配貝果", "score": {"dark": 1}},
-        {"id": "e", "text": "想吃什麼吃什麼", "score": {"colorful": 1}}
+        {"id": "b", "text": "蛋餅配奶茶", "score": {"warm": 1}}
       ]
     },
     {
@@ -1206,11 +960,8 @@
       "category": "mood",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "收到精心準備的禮物", "score": {"metal": 1}},
-        {"id": "b", "text": "一起看海看星星", "score": {"cool": 1}},
-        {"id": "c", "text": "擁抱和陪伴", "score": {"warm": 1}},
-        {"id": "d", "text": "靜靜待在彼此身邊", "score": {"dark": 1}},
-        {"id": "e", "text": "一起嘗試新鮮體驗", "score": {"colorful": 1}}
+        {"id": "a", "text": "一起看海看星星", "score": {"cool": 1}},
+        {"id": "b", "text": "靜靜待在彼此身邊", "score": {"dark": 1}}
       ]
     },
     {
@@ -1219,11 +970,8 @@
       "category": "style",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "金屬錶帶，經典優雅", "score": {"metal": 1}},
-        {"id": "b", "text": "矽膠錶帶，輕便舒適", "score": {"cool": 1}},
-        {"id": "c", "text": "彩色錶帶，活潑亮眼", "score": {"warm": 1}},
-        {"id": "d", "text": "皮革錶帶，低調質感", "score": {"dark": 1}},
-        {"id": "e", "text": "智慧手錶，功能多樣", "score": {"colorful": 1}}
+        {"id": "a", "text": "彩色錶帶，活潑亮眼", "score": {"warm": 1}},
+        {"id": "b", "text": "智慧手錶，功能多樣", "score": {"colorful": 1}}
       ]
     },
     {
@@ -1233,10 +981,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "金莎巧克力，精緻高級", "score": {"metal": 1}},
-        {"id": "b", "text": "薄荷糖，清涼舒服", "score": {"cool": 1}},
-        {"id": "c", "text": "棒棒糖，甜蜜可愛", "score": {"warm": 1}},
-        {"id": "d", "text": "黑巧克力，苦甜大人味", "score": {"dark": 1}},
-        {"id": "e", "text": "彩虹糖，繽紛多彩", "score": {"colorful": 1}}
+        {"id": "b", "text": "薄荷糖，清涼舒服", "score": {"cool": 1}}
       ]
     },
     {
@@ -1245,11 +990,8 @@
       "category": "personality",
       "weight": 2,
       "options": [
-        {"id": "a", "text": "有品味有氣質", "score": {"metal": 2}},
-        {"id": "b", "text": "溫柔體貼", "score": {"cool": 2}},
-        {"id": "c", "text": "開朗有活力", "score": {"warm": 2}},
-        {"id": "d", "text": "可靠值得信賴", "score": {"dark": 2}},
-        {"id": "e", "text": "有想法有創意", "score": {"colorful": 2}}
+        {"id": "a", "text": "可靠值得信賴", "score": {"dark": 2}},
+        {"id": "b", "text": "有想法有創意", "score": {"colorful": 2}}
       ]
     },
     {
@@ -1259,10 +1001,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "龍蝦，高級美味", "score": {"metal": 1}},
-        {"id": "b", "text": "生魚片，清爽鮮甜", "score": {"cool": 1}},
-        {"id": "c", "text": "烤蝦，香氣四溢", "score": {"warm": 1}},
-        {"id": "d", "text": "烏賊，口感獨特", "score": {"dark": 1}},
-        {"id": "e", "text": "綜合海鮮，什麼都想吃", "score": {"colorful": 1}}
+        {"id": "b", "text": "烤蝦，香氣四溢", "score": {"warm": 1}}
       ]
     },
     {
@@ -1271,11 +1010,8 @@
       "category": "personality",
       "weight": 2,
       "options": [
-        {"id": "a", "text": "閃耀的光芒", "score": {"metal": 2}},
-        {"id": "b", "text": "流動的清泉", "score": {"cool": 2}},
-        {"id": "c", "text": "燃燒的火焰", "score": {"warm": 2}},
-        {"id": "d", "text": "沉靜的大地", "score": {"dark": 2}},
-        {"id": "e", "text": "變換的風", "score": {"colorful": 2}}
+        {"id": "a", "text": "流動的清泉", "score": {"cool": 2}},
+        {"id": "b", "text": "沉靜的大地", "score": {"dark": 2}}
       ]
     },
     {
@@ -1284,11 +1020,8 @@
       "category": "food",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "松露義大利麵", "score": {"metal": 1}},
-        {"id": "b", "text": "日式蕎麥涼麵", "score": {"cool": 1}},
-        {"id": "c", "text": "麻辣乾拌麵", "score": {"warm": 1}},
-        {"id": "d", "text": "牛肉麵", "score": {"dark": 1}},
-        {"id": "e", "text": "什錦炒麵", "score": {"colorful": 1}}
+        {"id": "a", "text": "麻辣乾拌麵", "score": {"warm": 1}},
+        {"id": "b", "text": "什錦炒麵", "score": {"colorful": 1}}
       ]
     },
     {
@@ -1298,10 +1031,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "使用高級寢具，講究睡眠品質", "score": {"metal": 1}},
-        {"id": "b", "text": "早睡早起，作息規律", "score": {"cool": 1}},
-        {"id": "c", "text": "睡前喜歡滑手機", "score": {"warm": 1}},
-        {"id": "d", "text": "夜貓子，晚上最有精神", "score": {"dark": 1}},
-        {"id": "e", "text": "睡眠時間不固定", "score": {"colorful": 1}}
+        {"id": "b", "text": "睡前喜歡滑手機", "score": {"warm": 1}}
       ]
     },
     {
@@ -1310,11 +1040,8 @@
       "category": "lifestyle",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "見面聊，有儀式感", "score": {"metal": 1}},
-        {"id": "b", "text": "文字訊息，想好再說", "score": {"cool": 1}},
-        {"id": "c", "text": "打電話，聽到聲音比較親切", "score": {"warm": 1}},
-        {"id": "d", "text": "看心情，不一定要常聯絡", "score": {"dark": 1}},
-        {"id": "e", "text": "視訊或語音，什麼都行", "score": {"colorful": 1}}
+        {"id": "a", "text": "文字訊息，想好再說", "score": {"cool": 1}},
+        {"id": "b", "text": "看心情，不一定要常聯絡", "score": {"dark": 1}}
       ]
     },
     {
@@ -1323,11 +1050,8 @@
       "category": "home",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "高級料理家電", "score": {"metal": 1}},
-        {"id": "b", "text": "整齊收納的調味料", "score": {"cool": 1}},
-        {"id": "c", "text": "可愛的廚房小物", "score": {"warm": 1}},
-        {"id": "d", "text": "實用的基本配備就好", "score": {"dark": 1}},
-        {"id": "e", "text": "各種新奇的料理工具", "score": {"colorful": 1}}
+        {"id": "a", "text": "可愛的廚房小物", "score": {"warm": 1}},
+        {"id": "b", "text": "各種新奇的料理工具", "score": {"colorful": 1}}
       ]
     },
     {
@@ -1337,10 +1061,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "飯店級的高級感", "score": {"metal": 1}},
-        {"id": "b", "text": "簡約清爽，乾淨明亮", "score": {"cool": 1}},
-        {"id": "c", "text": "擺滿香氛蠟燭和泡澡球", "score": {"warm": 1}},
-        {"id": "d", "text": "實用就好，不需要太多裝飾", "score": {"dark": 1}},
-        {"id": "e", "text": "有趣的造型收納和擺飾", "score": {"colorful": 1}}
+        {"id": "b", "text": "簡約清爽，乾淨明亮", "score": {"cool": 1}}
       ]
     },
     {
@@ -1349,11 +1070,8 @@
       "category": "food",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "手沖單品，講究風味", "score": {"metal": 1}},
-        {"id": "b", "text": "冰拿鐵，清爽順口", "score": {"cool": 1}},
-        {"id": "c", "text": "焦糖瑪奇朵，甜蜜幸福", "score": {"warm": 1}},
-        {"id": "d", "text": "濃縮咖啡，濃郁強烈", "score": {"dark": 1}},
-        {"id": "e", "text": "特調創意咖啡，獨特有趣", "score": {"colorful": 1}}
+        {"id": "a", "text": "焦糖瑪奇朵，甜蜜幸福", "score": {"warm": 1}},
+        {"id": "b", "text": "濃縮咖啡，濃郁強烈", "score": {"dark": 1}}
       ]
     },
     {
@@ -1362,11 +1080,8 @@
       "category": "personality",
       "weight": 2,
       "options": [
-        {"id": "a", "text": "王子/公主型，優雅高貴", "score": {"metal": 2}},
-        {"id": "b", "text": "治癒型，溫柔療癒", "score": {"cool": 2}},
-        {"id": "c", "text": "熱血型，充滿正義感", "score": {"warm": 2}},
-        {"id": "d", "text": "酷帥型，神秘有魅力", "score": {"dark": 2}},
-        {"id": "e", "text": "搞笑型，總是帶來歡樂", "score": {"colorful": 2}}
+        {"id": "a", "text": "治癒型，溫柔療癒", "score": {"cool": 2}},
+        {"id": "b", "text": "搞笑型，總是帶來歡樂", "score": {"colorful": 2}}
       ]
     },
     {
@@ -1376,10 +1091,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "極簡設計或名畫", "score": {"metal": 1}},
-        {"id": "b", "text": "自然風景或海景", "score": {"cool": 1}},
-        {"id": "c", "text": "寵物或親友照片", "score": {"warm": 1}},
-        {"id": "d", "text": "純色或幾何圖案", "score": {"dark": 1}},
-        {"id": "e", "text": "插畫或動漫角色", "score": {"colorful": 1}}
+        {"id": "b", "text": "寵物或親友照片", "score": {"warm": 1}}
       ]
     },
     {
@@ -1388,11 +1100,8 @@
       "category": "personality",
       "weight": 2,
       "options": [
-        {"id": "a", "text": "投資理財，財富自由", "score": {"metal": 2}},
-        {"id": "b", "text": "冥想放鬆，內心平靜", "score": {"cool": 2}},
-        {"id": "c", "text": "社交能力，人脈廣闘", "score": {"warm": 2}},
-        {"id": "d", "text": "深度思考，洞察事理", "score": {"dark": 2}},
-        {"id": "e", "text": "創意發想，靈感不斷", "score": {"colorful": 2}}
+        {"id": "a", "text": "冥想放鬆，內心平靜", "score": {"cool": 2}},
+        {"id": "b", "text": "深度思考，洞察事理", "score": {"dark": 2}}
       ]
     },
     {
@@ -1401,11 +1110,8 @@
       "category": "food",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "蘆筍，高級精緻", "score": {"metal": 1}},
-        {"id": "b", "text": "小黃瓜，清脆爽口", "score": {"cool": 1}},
-        {"id": "c", "text": "番茄，酸甜可口", "score": {"warm": 1}},
-        {"id": "d", "text": "香菇，濃郁鮮美", "score": {"dark": 1}},
-        {"id": "e", "text": "彩椒，色彩繽紛", "score": {"colorful": 1}}
+        {"id": "a", "text": "番茄，酸甜可口", "score": {"warm": 1}},
+        {"id": "b", "text": "彩椒，色彩繽紛", "score": {"colorful": 1}}
       ]
     },
     {
@@ -1415,10 +1121,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "精心修圖，展現品味", "score": {"metal": 1}},
-        {"id": "b", "text": "自然隨性，記錄生活", "score": {"cool": 1}},
-        {"id": "c", "text": "常常更新，分享心情", "score": {"warm": 1}},
-        {"id": "d", "text": "很少發文，低調觀望", "score": {"dark": 1}},
-        {"id": "e", "text": "搞笑創意，獨特風格", "score": {"colorful": 1}}
+        {"id": "b", "text": "自然隨性，記錄生活", "score": {"cool": 1}}
       ]
     },
     {
@@ -1427,11 +1130,8 @@
       "category": "lifestyle",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "環遊世界住高級飯店", "score": {"metal": 1}},
-        {"id": "b", "text": "在海邊小屋悠閒度日", "score": {"cool": 1}},
-        {"id": "c", "text": "和親友在一起享天倫", "score": {"warm": 1}},
-        {"id": "d", "text": "靜靜地看書種花", "score": {"dark": 1}},
-        {"id": "e", "text": "學新東西嘗試新事物", "score": {"colorful": 1}}
+        {"id": "a", "text": "和親友在一起享天倫", "score": {"warm": 1}},
+        {"id": "b", "text": "靜靜地看書種花", "score": {"dark": 1}}
       ]
     },
     {
@@ -1441,10 +1141,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "不鏽鋼，質感耐用", "score": {"metal": 1}},
-        {"id": "b", "text": "玻璃，清透乾淨", "score": {"cool": 1}},
-        {"id": "c", "text": "陶瓷，溫潤可愛", "score": {"warm": 1}},
-        {"id": "d", "text": "塑膠，輕便實用", "score": {"dark": 1}},
-        {"id": "e", "text": "環保材質，有設計感", "score": {"colorful": 1}}
+        {"id": "b", "text": "環保材質，有設計感", "score": {"colorful": 1}}
       ]
     },
     {
@@ -1453,11 +1150,8 @@
       "category": "mood",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "買個精品犒賞自己", "score": {"metal": 1}},
-        {"id": "b", "text": "放個假好好休息", "score": {"cool": 1}},
-        {"id": "c", "text": "和親友一起慶祝", "score": {"warm": 1}},
-        {"id": "d", "text": "靜靜享受成就感", "score": {"dark": 1}},
-        {"id": "e", "text": "馬上設定下一個目標", "score": {"colorful": 1}}
+        {"id": "a", "text": "放個假好好休息", "score": {"cool": 1}},
+        {"id": "b", "text": "和親友一起慶祝", "score": {"warm": 1}}
       ]
     },
     {
@@ -1466,11 +1160,8 @@
       "category": "lifestyle",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "聖誕節，浪漫有氣氛", "score": {"metal": 1}},
-        {"id": "b", "text": "中秋節，團圓賞月", "score": {"cool": 1}},
-        {"id": "c", "text": "過年，熱鬧喜慶", "score": {"warm": 1}},
-        {"id": "d", "text": "清明節，慎終追遠", "score": {"dark": 1}},
-        {"id": "e", "text": "萬聖節，搞怪有趣", "score": {"colorful": 1}}
+        {"id": "a", "text": "清明節，慎終追遠", "score": {"dark": 1}},
+        {"id": "b", "text": "萬聖節，搞怪有趣", "score": {"colorful": 1}}
       ]
     },
     {
@@ -1480,10 +1171,7 @@
       "weight": 1,
       "options": [
         {"id": "a", "text": "巴洛克式，華麗精緻", "score": {"metal": 1}},
-        {"id": "b", "text": "北歐風，簡約自然", "score": {"cool": 1}},
-        {"id": "c", "text": "地中海風，溫暖熱情", "score": {"warm": 1}},
-        {"id": "d", "text": "工業風，個性沉穩", "score": {"dark": 1}},
-        {"id": "e", "text": "波西米亞風，自由奔放", "score": {"colorful": 1}}
+        {"id": "b", "text": "北歐風，簡約自然", "score": {"cool": 1}}
       ]
     },
     {
@@ -1492,11 +1180,8 @@
       "category": "personality",
       "weight": 2,
       "options": [
-        {"id": "a", "text": "品質差的東西", "score": {"metal": 2}},
-        {"id": "b", "text": "太吵雜的環境", "score": {"cool": 2}},
-        {"id": "c", "text": "冷漠沒溫度", "score": {"warm": 2}},
-        {"id": "d", "text": "虛偽不真誠", "score": {"dark": 2}},
-        {"id": "e", "text": "一成不變的無聊", "score": {"colorful": 2}}
+        {"id": "a", "text": "冷漠沒溫度", "score": {"warm": 2}},
+        {"id": "b", "text": "虛偽不真誠", "score": {"dark": 2}}
       ]
     },
     {
@@ -1505,11 +1190,8 @@
       "category": "style",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "皮革封面，質感滿分", "score": {"metal": 1}},
-        {"id": "b", "text": "素雅簡約，乾淨俐落", "score": {"cool": 1}},
-        {"id": "c", "text": "可愛圖案，療癒可愛", "score": {"warm": 1}},
-        {"id": "d", "text": "黑色或深色，低調實用", "score": {"dark": 1}},
-        {"id": "e", "text": "貼滿貼紙，充滿創意", "score": {"colorful": 1}}
+        {"id": "a", "text": "素雅簡約，乾淨俐落", "score": {"cool": 1}},
+        {"id": "b", "text": "貼滿貼紙，充滿創意", "score": {"colorful": 1}}
       ]
     },
     {
@@ -1519,10 +1201,7 @@
       "weight": 2,
       "options": [
         {"id": "a", "text": "時間就是金錢，不浪費", "score": {"metal": 2}},
-        {"id": "b", "text": "隨遇而安，不趕時間", "score": {"cool": 2}},
-        {"id": "c", "text": "把握當下，活在現在", "score": {"warm": 2}},
-        {"id": "d", "text": "深思熟慮，不急躁", "score": {"dark": 2}},
-        {"id": "e", "text": "時間是用來體驗的", "score": {"colorful": 2}}
+        {"id": "b", "text": "把握當下，活在現在", "score": {"warm": 2}}
       ]
     }
   ],
