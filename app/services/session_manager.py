@@ -82,22 +82,34 @@ class SessionManager:
         session.color_scores = {}
         session.color_result_id = None
         session.color_result = None
+        session.metadata["paused_quiz"] = False
         return self.update_session(session)
 
-    def abort_quiz(self, session_id: str) -> Optional[Session]:
-        """中斷測驗並回到初始狀態（WELCOME）"""
+    def pause_quiz(self, session_id: str) -> Optional[Session]:
+        """暫停測驗並回到一般問答（保留進度）"""
         session = self.get_session(session_id)
         if not session:
             return None
 
         session.step = SessionStep.WELCOME
-        session.current_q_index = 0
-        session.answers = {}
         session.current_question = None
-        session.selected_questions = None
-        session.color_scores = {}
-        session.color_result_id = None
-        session.color_result = None
+        session.metadata["paused_quiz"] = True
+        return self.update_session(session)
+
+    def resume_quiz(self, session_id: str) -> Optional[Session]:
+        """繼續先前暫停的測驗（接續原進度）"""
+        session = self.get_session(session_id)
+        if not session:
+            return None
+
+        if not session.selected_questions:
+            return session
+
+        # 回到測驗流程，繼續問下一題
+        session.step = SessionStep.QUIZ
+        session.metadata["paused_quiz"] = False
+        if 0 <= session.current_q_index < len(session.selected_questions):
+            session.current_question = session.selected_questions[session.current_q_index]
         return self.update_session(session)
 
     def set_current_question(self, session_id: str, question: dict) -> Optional[Session]:
