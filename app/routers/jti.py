@@ -147,6 +147,32 @@ async def chat(request: ChatRequest):
             remaining = total_questions - len(session.answers)
             current_q_num = len(session.answers) + 1
 
+            # 使用者想中斷測驗：回到一般問答
+            if request.message.strip() == "中斷":
+                updated_session = session_manager.abort_quiz(request.session_id)
+                response_message = "好呀，那我先幫你中斷測驗，我們回到一般問答。你想問什麼呢？"
+
+                # 記錄到對話日誌
+                conversation_logger.log_conversation(
+                    session_id=request.session_id,
+                    user_message=request.message,
+                    agent_response=response_message,
+                    tool_calls=[],
+                    session_state={
+                        "step": updated_session.step.value if updated_session else session.step.value,
+                        "answers_count": len(updated_session.answers) if updated_session else len(session.answers),
+                        "color_result_id": updated_session.color_result_id if updated_session else session.color_result_id,
+                        "current_question_id": None,
+                    },
+                    mode="jti",
+                )
+
+                return ChatResponse(
+                    message=response_message,
+                    session=updated_session.model_dump() if updated_session else session.model_dump(),
+                    tool_calls=[],
+                )
+
             # 格式化當前題目
             options_text = _format_options_text(q.get("options", []))
             current_q_text = f"第{current_q_num}題：{q['text']}\n{options_text}"

@@ -152,6 +152,23 @@ class MongoSessionManager:
 
         return self.update_session(session)
 
+    def abort_quiz(self, session_id: str) -> Optional[Session]:
+        """中斷測驗並回到初始狀態（WELCOME）"""
+        session = self.get_session(session_id)
+        if not session:
+            return None
+
+        session.step = SessionStep.WELCOME
+        session.current_q_index = 0
+        session.answers = {}
+        session.current_question = None
+        session.selected_questions = None
+        session.color_scores = {}
+        session.color_result_id = None
+        session.color_result = None
+
+        return self.update_session(session)
+
     def set_current_question(self, session_id: str, question: dict) -> Optional[Session]:
         """設定當前題目"""
         session = self.get_session(session_id)

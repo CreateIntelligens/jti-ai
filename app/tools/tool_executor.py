@@ -313,7 +313,7 @@ Next question to ask:
 {next_question_text}
 
 Format:
-- Keep A. B. C. D. E. labels before each option
+- Keep the letter labels (e.g., A., B.) before each option exactly as provided
 - Don't say "Thank you for your answer"
 - Keep comments under 10 words"""
             else:
@@ -329,7 +329,7 @@ Format:
 {next_question_text}
 
 格式要求：
-- 選項前面必須保留 A. B. C. D. E. 的編號
+- 選項前面必須保留字母編號（例如 A. B.），且要和題目提供的一致
 - 不要說「好的，謝謝您的回答」
 - 評論要簡短，不要超過 10 個字"""
             session_manager.set_current_question(session_id, next_question)
