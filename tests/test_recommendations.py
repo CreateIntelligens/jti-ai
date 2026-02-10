@@ -1,7 +1,9 @@
 import unittest
 
 from app.models.session import Session, SessionStep
-from app.services.session_manager import session_manager
+from app.services.session_manager_factory import get_session_manager
+
+session_manager = get_session_manager()
 from app.tools.tool_executor import tool_executor
 
 

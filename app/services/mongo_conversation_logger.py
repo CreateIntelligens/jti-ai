@@ -319,7 +319,3 @@ class MongoConversationLogger:
         except Exception as e:
             logger.error(f"Failed to delete old logs: {e}")
             return 0
-
-
-# 全域實例
-mongo_conversation_logger = MongoConversationLogger()

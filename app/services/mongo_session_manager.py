@@ -10,16 +10,16 @@ MongoDB Session 管理服務
 
 from typing import Dict, Optional, List, Any
 from datetime import datetime, timedelta
-from bson.objectid import ObjectId
 
 from app.models.session import Session, SessionStep, GameMode
 from app.services.mongo_client import get_mongo_db
+from app.services.session_state_mixin import SessionStateMixin
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class MongoSessionManager:
+class MongoSessionManager(SessionStateMixin):
     """MongoDB Session 管理器"""
 
     def __init__(self, idle_timeout_minutes: int = 30):
@@ -129,129 +129,20 @@ class MongoSessionManager:
             logger.error(f"Failed to delete session from MongoDB: {e}")
             return False
 
-    # === 狀態轉換方法 ===
-
-    def start_quiz(
-        self,
-        session_id: str,
-        selected_questions: Optional[List[Dict[str, Any]]] = None
-    ) -> Optional[Session]:
-        """開始測驗"""
-        session = self.get_session(session_id)
-        if not session:
-            return None
-
-        session.step = SessionStep.QUIZ
-        session.current_q_index = 0
-        session.answers = {}
-        session.current_question = None
-        session.selected_questions = selected_questions
-        session.color_scores = {}
-        session.color_result_id = None
-        session.color_result = None
-        session.metadata["paused_quiz"] = False
-
-        return self.update_session(session)
-
-    def pause_quiz(self, session_id: str) -> Optional[Session]:
-        """暫停測驗並回到一般問答（保留進度）"""
-        session = self.get_session(session_id)
-        if not session:
-            return None
-
-        session.step = SessionStep.WELCOME
-        session.current_question = None
-        session.metadata["paused_quiz"] = True
-
-        return self.update_session(session)
-
-    def resume_quiz(self, session_id: str) -> Optional[Session]:
-        """繼續先前暫停的測驗（接續原進度）"""
-        session = self.get_session(session_id)
-        if not session:
-            return None
-
-        if not session.selected_questions:
-            return session
-
-        session.step = SessionStep.QUIZ
-        session.metadata["paused_quiz"] = False
-        if 0 <= session.current_q_index < len(session.selected_questions):
-            session.current_question = session.selected_questions[session.current_q_index]
-
-        return self.update_session(session)
-
-    def set_current_question(self, session_id: str, question: dict) -> Optional[Session]:
-        """設定當前題目"""
-        session = self.get_session(session_id)
-        if not session:
-            return None
-
-        session.current_question = question
-        return self.update_session(session)
-
-    def add_chat_message(self, session_id: str, role: str, content: str) -> Optional[Session]:
-        """加入對話訊息"""
-        session = self.get_session(session_id)
-        if not session:
-            return None
-
-        # 保留最近 10 筆對話
-        session.chat_history.append({"role": role, "content": content})
-        if len(session.chat_history) > 10:
-            session.chat_history = session.chat_history[-10:]
-
-        return self.update_session(session)
-
-    def submit_answer(
-        self, session_id: str, question_id: str, option_id: str
-    ) -> Optional[Session]:
-        """提交答案"""
-        session = self.get_session(session_id)
-        if not session:
-            logger.warning(f"submit_answer: Session not found: {session_id}")
-            return None
-
-        if session.step != SessionStep.QUIZ:
-            logger.warning(f"submit_answer: Wrong step {session.step.value}, expected QUIZ for session {session_id}")
-            return None
-
-        session.answers[question_id] = option_id
-        session.current_q_index += 1
-
-        logger.info(f"submit_answer: Submitting {question_id}={option_id}, total answers: {len(session.answers)}")
-
-        return self.update_session(session)
-
-    def start_scoring(self, session_id: str) -> Optional[Session]:
-        """進入計分狀態"""
-        session = self.get_session(session_id)
-        if not session:
-            return None
-
-        session.step = SessionStep.SCORING
-        return self.update_session(session)
-
-    def complete_scoring(
-        self,
-        session_id: str,
-        color_result_id: str,
-        scores: Dict[str, int],
-        color_result: Optional[Dict[str, Any]] = None
-    ) -> Optional[Session]:
-        """完成計分"""
-        session = self.get_session(session_id)
-        if not session:
-            return None
-
-        session.color_result_id = color_result_id
-        session.color_scores = scores
-        session.color_result = color_result
-        session.step = SessionStep.DONE
-
-        return self.update_session(session)
-
     # === 輔助方法 ===
+
+    @staticmethod
+    def _doc_to_session(doc: Dict[str, Any]) -> Optional[Session]:
+        cleaned = dict(doc)
+        cleaned.pop("_id", None)
+        cleaned.pop("expires_at", None)
+        cleaned.pop("created_at", None)
+        cleaned.pop("updated_at", None)
+        try:
+            return Session(**cleaned)
+        except Exception as e:
+            logger.warning(f"Failed to parse session document: {e}")
+            return None
 
     def get_all_sessions(self) -> List[Session]:
         """取得所有 sessions（測試用）"""
@@ -260,17 +151,9 @@ class MongoSessionManager:
             sessions = []
 
             for doc in docs:
-                doc.pop("_id", None)
-                doc.pop("expires_at", None)
-                doc.pop("created_at", None)
-                doc.pop("updated_at", None)
-
-                try:
-                    session = Session(**doc)
+                session = self._doc_to_session(doc)
+                if session:
                     sessions.append(session)
-                except Exception as e:
-                    logger.warning(f"Failed to parse session document: {e}")
-                    continue
 
             return sessions
 
@@ -303,17 +186,9 @@ class MongoSessionManager:
             sessions = []
 
             for doc in docs:
-                doc.pop("_id", None)
-                doc.pop("expires_at", None)
-                doc.pop("created_at", None)
-                doc.pop("updated_at", None)
-
-                try:
-                    session = Session(**doc)
+                session = self._doc_to_session(doc)
+                if session:
                     sessions.append(session)
-                except Exception as e:
-                    logger.warning(f"Failed to parse session document: {e}")
-                    continue
 
             return sessions
 
@@ -328,17 +203,9 @@ class MongoSessionManager:
             sessions = []
 
             for doc in docs:
-                doc.pop("_id", None)
-                doc.pop("expires_at", None)
-                doc.pop("created_at", None)
-                doc.pop("updated_at", None)
-
-                try:
-                    session = Session(**doc)
+                session = self._doc_to_session(doc)
+                if session:
                     sessions.append(session)
-                except Exception as e:
-                    logger.warning(f"Failed to parse session document: {e}")
-                    continue
 
             return sessions
 
@@ -362,17 +229,9 @@ class MongoSessionManager:
             sessions = []
 
             for doc in docs:
-                doc.pop("_id", None)
-                doc.pop("expires_at", None)
-                doc.pop("created_at", None)
-                doc.pop("updated_at", None)
-
-                try:
-                    session = Session(**doc)
+                session = self._doc_to_session(doc)
+                if session:
                     sessions.append(session)
-                except Exception as e:
-                    logger.warning(f"Failed to parse session document: {e}")
-                    continue
 
             return sessions
 
@@ -414,7 +273,3 @@ class MongoSessionManager:
         except Exception as e:
             logger.error(f"Failed to get statistics: {e}")
             return {}
-
-
-# 全域 session manager 實例
-mongo_session_manager = MongoSessionManager()

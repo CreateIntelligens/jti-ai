@@ -41,7 +41,7 @@ chmod +x test_quiz_api.sh
 
 ## 環境變數
 
-可以透過環境變數指定 API 位址（預設為 `http://10.9.0.32:8913/api/jti`）：
+可以透過環境變數指定 API 位址（預設為 `http://localhost:8913/api/jti`）：
 
 ```bash
 API_BASE_URL=http://localhost:8913/api/jti ./test_quiz_flow.sh

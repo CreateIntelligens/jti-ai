@@ -150,7 +150,3 @@ class ConversationLogger:
         for log_file in self.log_dir.glob("*.jsonl"):
             sessions.append(log_file.stem)
         return sorted(sessions)
-
-
-# 全域實例
-conversation_logger = ConversationLogger()

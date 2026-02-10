@@ -4,7 +4,7 @@
 
 set -e
 
-API="${API_BASE_URL:-http://10.9.0.32:8913/api/jti}"
+API="${API_BASE_URL:-http://localhost:8913/api/jti}"
 
 echo "=========================================="
 echo "色彩測驗完整流程測試"

@@ -43,6 +43,14 @@ class MainAgent:
     def __init__(self):
         self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 
+    @staticmethod
+    def _format_options_text(options: list) -> str:
+        labels = "ABCDE"
+        return "\n".join(
+            f"{labels[i]}. {opt.get('text', '')}"
+            for i, opt in enumerate(options)
+        )
+
     def _get_system_instruction(self, session: Session) -> str:
         """取得靜態 System Instruction（不變的規則）"""
         return SYSTEM_INSTRUCTIONS.get(session.language, SYSTEM_INSTRUCTIONS["zh"])
@@ -414,26 +422,13 @@ class MainAgent:
             if tool_name == "start_quiz" and tool_result.get("current_question") and session.language == "zh":
                 q = tool_result["current_question"]
                 options = q.get("options", [])
-                labels = "ABCDE"
-                options_text = "\n".join(
-                    f"{labels[i]}. {opt.get('text', '')}"
-                    for i, opt in enumerate(options)
-                )
-                # 根據實際選項數量動態調整提示
-                num_options = len(options)
-                if num_options <= 1:
-                    answer_hint = "請回答。"
-                elif num_options == 2:
-                    answer_hint = "請用 A 或 B 回答。"
-                else:
-                    last_option = labels[num_options - 1]
-                    answer_hint = f"請用 A 到 {last_option} 回答。"
+                options_text = self._format_options_text(options)
 
                 opening = (
                     "想來做個生活品味色彩探索測驗嗎？ 簡單五個測驗，尋找你的命定手機殼，"
                     "如果中途想離開，請輸入中斷，即可繼續問答，那我們開始測驗吧！"
                 )
-                message = f"{opening}\n\n第1題：{q.get('text', '')}\n{options_text}\n\n{answer_hint}"
+                message = f"{opening}\n\n第1題：{q.get('text', '')}\n{options_text}"
                 return {
                     "message": message,
                     "session": session.model_dump(),
@@ -462,25 +457,13 @@ class MainAgent:
                 # 開始測驗，顯示第一題
                 q = tool_result["current_question"]
                 options = q.get("options", [])
-                labels = "ABCDE"
-                options_text = "\n".join(
-                    f"{labels[i]}. {opt.get('text', '')}"
-                    for i, opt in enumerate(options)
-                )
-                num_options = len(options)
-                if num_options <= 1:
-                    answer_hint = "請回答。"
-                elif num_options == 2:
-                    answer_hint = "請用 A 或 B 回答。"
-                else:
-                    last_option = labels[min(num_options, len(labels)) - 1]
-                    answer_hint = f"請用 A 到 {last_option} 回答。"
+                options_text = self._format_options_text(options)
                 instruction = f"""測驗已開始。
 
 	開場白請固定使用以下文字，回覆必須從這行開頭（前面不要加任何字），請逐字輸出不要改寫：
 	想來做個生活品味色彩探索測驗嗎？ 簡單五個測驗，尋找你的命定手機殼，如果中途想離開，請輸入中斷，即可繼續問答，那我們開始測驗吧！
 
-	接著請完整顯示第1題與所有選項，最後加上一句提示：「{answer_hint}」
+	接著請完整顯示第1題與所有選項：
 
 	第1題：{q['text']}
 	{options_text}"""
