@@ -2,13 +2,14 @@
 JTI 測驗系統 API Endpoints
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request, Depends
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 import logging
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 from app.services.jti.main_agent import main_agent
 from app.models.session import GameMode
+from app.auth import verify_auth, require_admin
 
 # 使用工廠函數取得適當的實作（MongoDB 或記憶體）
 session_manager = get_session_manager()
@@ -66,7 +67,7 @@ class GetSessionResponse(BaseModel):
 # === Endpoints ===
 
 @router.post("/chat/start", response_model=CreateSessionResponse)
-async def create_session(request: CreateSessionRequest):
+async def create_session(request: CreateSessionRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
     """
     建立新的 JTI 對話 Session
 
@@ -88,7 +89,7 @@ async def create_session(request: CreateSessionRequest):
 
 
 @router.get("/session/{session_id}", response_model=GetSessionResponse)
-async def get_session(session_id: str):
+async def get_session(session_id: str, request: Request = None, auth: dict = Depends(verify_auth)):
     """
     取得 session 狀態
 
@@ -112,7 +113,7 @@ async def get_session(session_id: str):
 
 
 @router.post("/chat/message", response_model=ChatResponse)
-async def chat(request: ChatRequest):
+async def chat(request: ChatRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
     """
     主要對話端點
 
@@ -410,7 +411,7 @@ async def chat(request: ChatRequest):
 
 
 @router.post("/quiz/start", response_model=ChatResponse)
-async def quiz_start(request: QuizActionRequest):
+async def quiz_start(request: QuizActionRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
     """
     直接開始測驗（不依賴自然語言判斷）
 
@@ -485,7 +486,7 @@ async def quiz_start(request: QuizActionRequest):
 
 
 @router.post("/quiz/pause", response_model=ChatResponse)
-async def quiz_pause(request: QuizActionRequest):
+async def quiz_pause(request: QuizActionRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
     """
     直接暫停測驗（不依賴自然語言判斷）
     """
@@ -508,7 +509,7 @@ async def quiz_pause(request: QuizActionRequest):
 
 
 @router.post("/quiz/resume", response_model=ChatResponse)
-async def quiz_resume(request: QuizActionRequest):
+async def quiz_resume(request: QuizActionRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
     """
     直接繼續先前暫停的測驗（不依賴自然語言判斷）
     """
@@ -734,12 +735,9 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
 
 
 @router.delete("/session/{session_id}")
-async def delete_session(session_id: str):
-    """
-    刪除 session
-
-    清除測驗記錄
-    """
+async def delete_session(session_id: str, request: Request = None, auth: dict = Depends(verify_auth)):
+    """刪除 session（Admin only）"""
+    require_admin(auth)
     try:
         success = session_manager.delete_session(session_id)
 
@@ -756,10 +754,9 @@ async def delete_session(session_id: str):
 
 
 @router.get("/sessions")
-async def list_sessions():
-    """
-    列出所有 sessions（測試用）
-    """
+async def list_sessions(request: Request = None, auth: dict = Depends(verify_auth)):
+    """列出所有 sessions（Admin only）"""
+    require_admin(auth)
     try:
         sessions = session_manager.get_all_sessions()
         return {
@@ -773,7 +770,7 @@ async def list_sessions():
 
 
 @router.get("/conversations")
-async def get_conversations(session_id: Optional[str] = None, mode: str = "jti"):
+async def get_conversations(session_id: Optional[str] = None, mode: str = "jti", request: Request = None, auth: dict = Depends(verify_auth)):
     """
     取得對話歷史
 
@@ -834,7 +831,7 @@ async def get_conversations(session_id: Optional[str] = None, mode: str = "jti")
 
 
 @router.get("/conversations/export")
-async def export_conversations(session_ids: Optional[str] = None, mode: str = "jti"):
+async def export_conversations(session_ids: Optional[str] = None, mode: str = "jti", request: Request = None, auth: dict = Depends(verify_auth)):
     """
     匯出對話歷史為 JSON 格式
 

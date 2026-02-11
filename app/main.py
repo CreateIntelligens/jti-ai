@@ -60,7 +60,7 @@ for logger_name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
     for handler in uvicorn_logger.handlers:
         handler.setFormatter(TimestampFormatter("%(levelprefix)s %(message)s"))
 
-from fastapi import FastAPI, File, HTTPException, UploadFile, Request, Header as FastAPIHeader
+from fastapi import FastAPI, File, HTTPException, UploadFile, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -70,6 +70,7 @@ import hashlib
 
 from .core import FileSearchManager
 from .api_keys import APIKeyManager
+from .auth import verify_auth, require_admin
 from .routers import jti
 from .services.session.session_manager_factory import get_conversation_logger, get_general_chat_session_manager
 
@@ -196,7 +197,7 @@ class QueryRequest(BaseModel):
 
 
 class ChatStartRequest(BaseModel):
-    store_name: str
+    store_name: Optional[str] = None  # admin 自由選，一般 key 會被強制覆蓋
     model: str = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 
 
@@ -206,54 +207,54 @@ class ChatMessageRequest(BaseModel):
 
 
 @app.get("/api/stores")
-def list_stores(x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
-    """列出所有 Store。"""
-    mgr = _get_or_create_manager(x_gemini_api_key)
+def list_stores(request: Request, auth: dict = Depends(verify_auth)):
+    """列出所有 Store。（Admin only）"""
+    require_admin(auth)
+    mgr = _get_or_create_manager()
     stores = mgr.list_stores()
     return [{"name": s.name, "display_name": s.display_name} for s in stores]
 
 
 @app.post("/api/stores")
-def create_store(req: CreateStoreRequest, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
-    """建立新 Store。"""
-    mgr = _get_or_create_manager(x_gemini_api_key)
+def create_store(req: CreateStoreRequest, request: Request, auth: dict = Depends(verify_auth)):
+    """建立新 Store。（Admin only）"""
+    require_admin(auth)
+    mgr = _get_or_create_manager()
     store_name = mgr.create_store(req.display_name)
     return {"name": store_name}
 
 
 @app.get("/api/stores/{store_name:path}/files")
-def list_files(store_name: str, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
-    """列出 Store 中的檔案。"""
-    mgr = _get_or_create_manager(x_gemini_api_key)
+def list_files(store_name: str, request: Request, auth: dict = Depends(verify_auth)):
+    """列出 Store 中的檔案。（Admin only）"""
+    require_admin(auth)
+    mgr = _get_or_create_manager()
     files = mgr.list_files(store_name)
     return [{"name": f.name, "display_name": f.display_name} for f in files]
 
 
-import traceback
-
-# ... imports ...
-
 @app.delete("/api/files/{file_name:path}")
-def delete_file(file_name: str, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
-    """刪除檔案。"""
-    mgr = _get_or_create_manager(x_gemini_api_key)
+def delete_file(file_name: str, request: Request, auth: dict = Depends(verify_auth)):
+    """刪除檔案。（Admin only）"""
+    require_admin(auth)
+    mgr = _get_or_create_manager()
     try:
         print(f"嘗試刪除檔案: {file_name}")
         mgr.delete_file(file_name)
         return {"ok": True}
     except Exception as e:
-        traceback.print_exc()  # Print full traceback to logs
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/stores/{store_name:path}/upload")
-async def upload_file(store_name: str, file: UploadFile = File(...), x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
-    """上傳檔案到 Store。"""
-    mgr = _get_or_create_manager(x_gemini_api_key)
+async def upload_file(store_name: str, file: UploadFile = File(...), request: Request = None, auth: dict = Depends(verify_auth)):
+    """上傳檔案到 Store。（Admin only）"""
+    require_admin(auth)
+    mgr = _get_or_create_manager()
 
     temp_dir = Path("/tmp/gemini-upload")
     temp_dir.mkdir(exist_ok=True)
-    # 使用 UUID + 副檔名，讓 SDK 能偵測 MIME type
     ext = Path(file.filename).suffix if file.filename else ""
     safe_filename = f"{uuid.uuid4()}{ext}"
     temp_path = temp_dir / safe_filename
@@ -262,8 +263,6 @@ async def upload_file(store_name: str, file: UploadFile = File(...), x_gemini_ap
         shutil.copyfileobj(file.file, f)
 
     try:
-        # 故意不傳入 file.content_type，讓 core.py 根據副檔名自己判斷正確的 MIME Type
-        # 這樣可以避免瀏覽器傳送錯誤的 MIME Type (例如 xlsx 被當成 application/octet-stream)
         result = mgr.upload_file(
             store_name, str(temp_path), file.filename, mime_type=None
         )
@@ -273,46 +272,67 @@ async def upload_file(store_name: str, file: UploadFile = File(...), x_gemini_ap
 
 
 @app.post("/api/query")
-def query(req: QueryRequest, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
-    """查詢 Store (單次)。"""
-    mgr = _get_or_create_manager(x_gemini_api_key)
+def query(req: QueryRequest, request: Request, auth: dict = Depends(verify_auth)):
+    """查詢 Store (單次)。（Admin only）"""
+    require_admin(auth)
+    mgr = _get_or_create_manager()
     response = mgr.query(req.store_name, req.question)
     return {"answer": response.text}
 
 
 @app.post("/api/chat/start")
-def start_chat(req: ChatStartRequest, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
+def start_chat(req: ChatStartRequest, request: Request, auth: dict = Depends(verify_auth)):
     """
     開始新的對話 Session。
 
     回傳 session_id 供後續 /api/chat/message 使用，確保對話上下文隔離。
+
+    認證：
+    - Admin → 用 request 的 store_name（必填）
+    - 一般 Key → 強制用 key 綁定的 store（忽略 request 的 store_name）
     """
-    # 生成 session_id：結合 API key 和 store_name 以隔離不同知識庫的對話
-    api_key_part = x_gemini_api_key if x_gemini_api_key else 'system'
-    session_key = f"{api_key_part}:{req.store_name}:{uuid.uuid4().hex[:8]}"  # 加入隨機 UUID 確保每次都是新 session
+    # 決定 store_name
+    if auth["role"] == "admin":
+        if not req.store_name:
+            raise HTTPException(status_code=400, detail="Admin 必須指定 store_name")
+        store_name = req.store_name
+    else:
+        # 一般 key → 強制用 key 綁定的 store
+        store_name = auth["store_name"]
+
+    # 生成 session_id
+    session_key = f"{store_name}:{uuid.uuid4().hex[:8]}"
     session_id = hashlib.sha256(session_key.encode()).hexdigest()
 
     # 取得該 session 專屬的 manager
-    mgr = _get_or_create_manager(user_api_key=x_gemini_api_key, session_id=session_id)
+    mgr = _get_or_create_manager(session_id=session_id)
 
     # 取得啟用的 prompt (如果有)
     system_instruction = None
     if prompt_manager:
-        active_prompt = prompt_manager.get_active_prompt(req.store_name)
-        if active_prompt:
-            system_instruction = active_prompt.content
-            print(f"[Session {session_id[:8]}] 從 MongoDB 載入 Prompt: {active_prompt.name}")
-        else:
-            print(f"[Session {session_id[:8]}] Store {req.store_name} 沒有啟用的 Prompt")
+        # 一般 key 有指定 prompt_index 時，優先使用
+        if auth["role"] == "user" and auth.get("prompt_index") is not None:
+            prompts = prompt_manager.list_prompts(store_name)
+            if 0 <= auth["prompt_index"] < len(prompts):
+                system_instruction = prompts[auth["prompt_index"]].content
+                print(f"[Session {session_id[:8]}] 使用 API Key 指定的 Prompt #{auth['prompt_index']}")
 
-    mgr.start_chat(req.store_name, req.model, system_instruction=system_instruction)
-    print(f"[Session {session_id[:8]}] 開始新對話: store={req.store_name}, model={req.model}")
+        if not system_instruction:
+            active_prompt = prompt_manager.get_active_prompt(store_name)
+            if active_prompt:
+                system_instruction = active_prompt.content
+                print(f"[Session {session_id[:8]}] 從 MongoDB 載入 Prompt: {active_prompt.name}")
+            else:
+                print(f"[Session {session_id[:8]}] Store {store_name} 沒有啟用的 Prompt")
+
+    mgr.start_chat(store_name, req.model, system_instruction=system_instruction)
+    print(f"[Session {session_id[:8]}] 開始新對話: store={store_name}, model={req.model}, role={auth['role']}")
 
     # 持久化到 MongoDB
     if general_session_manager:
         general_session_manager.create_session(
             session_id=session_id,
-            store_name=req.store_name,
+            store_name=store_name,
             model=req.model,
             system_instruction=system_instruction,
         )
@@ -324,7 +344,7 @@ def start_chat(req: ChatStartRequest, x_gemini_api_key: Optional[str] = FastAPIH
     }
 
 @app.post("/api/chat/message")
-def send_message(req: ChatMessageRequest, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
+def send_message(req: ChatMessageRequest, request: Request, auth: dict = Depends(verify_auth)):
     """
     發送訊息到指定的對話 Session。
 
@@ -332,16 +352,14 @@ def send_message(req: ChatMessageRequest, x_gemini_api_key: Optional[str] = Fast
     如果沒有提供 session_id，將使用全域 manager（不推薦多用戶場景）。
     """
     # 取得該 session 專屬的 manager
-    mgr = _get_or_create_manager(user_api_key=x_gemini_api_key, session_id=req.session_id)
+    mgr = _get_or_create_manager(session_id=req.session_id)
 
     # 取得 session_id（用於日誌記錄）
     if req.session_id:
         session_id = req.session_id
     else:
-        # 沒有 session_id，使用全域 manager（向下兼容舊 API）
-        api_key_part = x_gemini_api_key if x_gemini_api_key else 'system'
         current_store = mgr.current_store if hasattr(mgr, 'current_store') else 'unknown'
-        session_key = f"{api_key_part}:{current_store}"
+        session_key = f"{current_store}:{uuid.uuid4().hex[:8]}"
         session_id = hashlib.sha256(session_key.encode()).hexdigest()
         print(f"[警告] /api/chat/message 沒有提供 session_id，使用全域 manager")
 
@@ -392,7 +410,8 @@ def send_message(req: ChatMessageRequest, x_gemini_api_key: Optional[str] = Fast
 @app.get("/api/chat/history")
 def get_history(
     session_id: Optional[str] = None,
-    x_gemini_api_key: Optional[str] = FastAPIHeader(None)
+    request: Request = None,
+    auth: dict = Depends(verify_auth),
 ):
     """
     取得指定 Session 的對話紀錄。
@@ -407,14 +426,15 @@ def get_history(
             return [{"role": msg["role"], "text": msg["content"]} for msg in history]
 
     # Fallback: 從記憶體中的 manager 取得
-    mgr = _get_or_create_manager(user_api_key=x_gemini_api_key, session_id=session_id)
+    mgr = _get_or_create_manager(session_id=session_id)
     return mgr.get_history()
 
 
 @app.get("/api/chat/conversations")
 def get_general_conversations(
     store_name: Optional[str] = None,
-    x_gemini_api_key: Optional[str] = FastAPIHeader(None)
+    request: Request = None,
+    auth: dict = Depends(verify_auth),
 ):
     """
     取得 general chat 的對話歷史
@@ -425,7 +445,7 @@ def get_general_conversations(
     回傳該知識庫的所有對話（按 session 分組）
     """
     try:
-        mgr = _get_or_create_manager(x_gemini_api_key)
+        mgr = _get_or_create_manager()
 
         # 決定使用哪個 store
         current_store = store_name if store_name else (mgr.current_store if hasattr(mgr, 'current_store') else None)
@@ -477,7 +497,8 @@ def get_general_conversations(
 def export_general_conversations(
     store_name: Optional[str] = None,
     session_ids: Optional[str] = None,
-    x_gemini_api_key: Optional[str] = FastAPIHeader(None)
+    request: Request = None,
+    auth: dict = Depends(verify_auth),
 ):
     """
     匯出 general chat 的對話歷史為 JSON 格式
@@ -496,7 +517,7 @@ def export_general_conversations(
     try:
         from datetime import datetime
 
-        mgr = _get_or_create_manager(x_gemini_api_key)
+        mgr = _get_or_create_manager()
 
         # 決定使用哪個 store
         current_store = store_name if store_name else (mgr.current_store if hasattr(mgr, 'current_store') else None)
@@ -613,14 +634,6 @@ class OpenAIChatResponse(BaseModel):
     usage: dict
 
 
-def _extract_bearer_token(request: Request) -> Optional[str]:
-    """從 Authorization header 提取 Bearer token"""
-    auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer "):
-        return auth_header[7:]
-    return None
-
-
 def _get_system_prompt(api_key_info, store_name: str, messages: list) -> Optional[str]:
     """
     根據優先順序決定使用哪個 system prompt:
@@ -652,11 +665,12 @@ def _get_system_prompt(api_key_info, store_name: str, messages: list) -> Optiona
 
 
 @app.post("/v1/chat/completions")
-async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Request):
+async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Request, auth: dict = Depends(verify_auth)):
     """
     OpenAI 兼容的 Chat Completions API
 
     使用 Authorization: Bearer sk-xxx 驗證，API Key 綁定知識庫
+    也接受 Admin Key（需在 request 的 messages 中指定 store，或使用預設知識庫）
 
     Prompt 優先順序:
     1. Request 帶的 system message
@@ -666,19 +680,21 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
     if not manager:
         raise HTTPException(status_code=500, detail="未設定 Gemini API Key")
 
-    if not api_key_manager:
-        raise HTTPException(status_code=500, detail="API Key Manager 未初始化")
-
-    # 驗證 API Key
-    token = _extract_bearer_token(raw_request)
-    if not token:
-        raise HTTPException(status_code=401, detail="缺少 Authorization header")
-
-    api_key_info = api_key_manager.verify_key(token)
-    if not api_key_info:
-        raise HTTPException(status_code=401, detail="無效的 API Key")
-
-    store_name = api_key_info.store_name
+    # 決定 store_name 和 api_key_info
+    api_key_info = None
+    if auth["role"] == "admin":
+        # Admin 使用預設中文知識庫（或可從 system message 解析）
+        store_name = os.getenv("GEMINI_FILE_SEARCH_STORE_ID_ZH") or os.getenv("GEMINI_FILE_SEARCH_STORE_ID", "")
+        if not store_name:
+            raise HTTPException(status_code=400, detail="未設定知識庫，請配置 GEMINI_FILE_SEARCH_STORE_ID_ZH")
+    else:
+        # 一般 key → 從 auth 取得綁定的 store
+        if not api_key_manager:
+            raise HTTPException(status_code=500, detail="API Key Manager 未初始化")
+        from .auth import _extract_bearer_token as extract_token
+        token = extract_token(raw_request)
+        api_key_info = api_key_manager.verify_key(token) if token else None
+        store_name = auth["store_name"]
 
     # 取得最後一條用戶消息
     user_messages = [msg for msg in request.messages if msg.role == "user"]
@@ -752,8 +768,9 @@ class SetActivePromptRequest(BaseModel):
 
 
 @app.get("/api/stores/{store_name:path}/prompts")
-def list_store_prompts(store_name: str):
-    """列出 Store 的所有 Prompts"""
+def list_store_prompts(store_name: str, request: Request = None, auth: dict = Depends(verify_auth)):
+    """列出 Store 的所有 Prompts（Admin only）"""
+    require_admin(auth)
     if not prompt_manager:
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
     
@@ -768,8 +785,9 @@ def list_store_prompts(store_name: str):
 
 
 @app.post("/api/stores/{store_name:path}/prompts")
-def create_store_prompt(store_name: str, request: CreatePromptRequest):
-    """建立新的 Prompt"""
+def create_store_prompt(store_name: str, request: CreatePromptRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
+    """建立新的 Prompt（Admin only）"""
+    require_admin(auth)
     if not prompt_manager:
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
     
@@ -785,8 +803,9 @@ def create_store_prompt(store_name: str, request: CreatePromptRequest):
 
 
 @app.get("/api/stores/{store_name:path}/prompts/{prompt_id}")
-def get_store_prompt(store_name: str, prompt_id: str):
-    """取得特定 Prompt"""
+def get_store_prompt(store_name: str, prompt_id: str, request: Request = None, auth: dict = Depends(verify_auth)):
+    """取得特定 Prompt（Admin only）"""
+    require_admin(auth)
     if not prompt_manager:
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
     
@@ -798,8 +817,9 @@ def get_store_prompt(store_name: str, prompt_id: str):
 
 
 @app.put("/api/stores/{store_name:path}/prompts/{prompt_id}")
-def update_store_prompt(store_name: str, prompt_id: str, request: UpdatePromptRequest):
-    """更新 Prompt"""
+def update_store_prompt(store_name: str, prompt_id: str, request: UpdatePromptRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
+    """更新 Prompt（Admin only）"""
+    require_admin(auth)
     if not prompt_manager:
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
     
@@ -816,8 +836,9 @@ def update_store_prompt(store_name: str, prompt_id: str, request: UpdatePromptRe
 
 
 @app.delete("/api/stores/{store_name:path}/prompts/{prompt_id}")
-def delete_store_prompt(store_name: str, prompt_id: str):
-    """刪除 Prompt"""
+def delete_store_prompt(store_name: str, prompt_id: str, request: Request = None, auth: dict = Depends(verify_auth)):
+    """刪除 Prompt（Admin only）"""
+    require_admin(auth)
     if not prompt_manager:
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
     
@@ -829,8 +850,9 @@ def delete_store_prompt(store_name: str, prompt_id: str):
 
 
 @app.post("/api/stores/{store_name:path}/prompts/active")
-def set_active_store_prompt(store_name: str, request: SetActivePromptRequest):
-    """設定啟用的 Prompt"""
+def set_active_store_prompt(store_name: str, request: SetActivePromptRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
+    """設定啟用的 Prompt（Admin only）"""
+    require_admin(auth)
     if not prompt_manager:
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
     
@@ -846,8 +868,9 @@ def set_active_store_prompt(store_name: str, request: SetActivePromptRequest):
 
 
 @app.get("/api/stores/{store_name:path}/prompts/active")
-def get_active_store_prompt(store_name: str):
-    """取得當前啟用的 Prompt"""
+def get_active_store_prompt(store_name: str, request: Request = None, auth: dict = Depends(verify_auth)):
+    """取得當前啟用的 Prompt（Admin only）"""
+    require_admin(auth)
     if not prompt_manager:
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
     
@@ -859,9 +882,10 @@ def get_active_store_prompt(store_name: str):
 
 
 @app.delete("/api/stores/{store_name:path}")
-def delete_store(store_name: str, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
-    """刪除 Store。"""
-    mgr = _get_or_create_manager(x_gemini_api_key)
+def delete_store(store_name: str, request: Request, auth: dict = Depends(verify_auth)):
+    """刪除 Store。（Admin only）"""
+    require_admin(auth)
+    mgr = _get_or_create_manager()
     mgr.delete_store(store_name)
     return {"ok": True}
 
@@ -880,8 +904,9 @@ class UpdateAPIKeyRequest(BaseModel):
 
 
 @app.get("/api/keys")
-def list_api_keys(store_name: Optional[str] = None):
-    """列出 API Keys，可選篩選特定知識庫"""
+def list_api_keys(store_name: Optional[str] = None, request: Request = None, auth: dict = Depends(verify_auth)):
+    """列出 API Keys，可選篩選特定知識庫（Admin only）"""
+    require_admin(auth)
     if not api_key_manager:
         raise HTTPException(status_code=500, detail="API Key Manager 未初始化")
 
@@ -902,8 +927,9 @@ def list_api_keys(store_name: Optional[str] = None):
 
 
 @app.post("/api/keys")
-def create_api_key(request: CreateAPIKeyRequest):
-    """建立新的 API Key"""
+def create_api_key(request: CreateAPIKeyRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
+    """建立新的 API Key（Admin only）"""
+    require_admin(auth)
     if not api_key_manager:
         raise HTTPException(status_code=500, detail="API Key Manager 未初始化")
 
@@ -925,8 +951,9 @@ def create_api_key(request: CreateAPIKeyRequest):
 
 
 @app.get("/api/keys/{key_id}")
-def get_api_key(key_id: str):
-    """取得 API Key 資訊"""
+def get_api_key(key_id: str, request: Request = None, auth: dict = Depends(verify_auth)):
+    """取得 API Key 資訊（Admin only）"""
+    require_admin(auth)
     if not api_key_manager:
         raise HTTPException(status_code=500, detail="API Key Manager 未初始化")
 
@@ -946,8 +973,9 @@ def get_api_key(key_id: str):
 
 
 @app.put("/api/keys/{key_id}")
-def update_api_key(key_id: str, request: UpdateAPIKeyRequest):
-    """更新 API Key 設定"""
+def update_api_key(key_id: str, request: UpdateAPIKeyRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
+    """更新 API Key 設定（Admin only）"""
+    require_admin(auth)
     if not api_key_manager:
         raise HTTPException(status_code=500, detail="API Key Manager 未初始化")
 
@@ -970,8 +998,9 @@ def update_api_key(key_id: str, request: UpdateAPIKeyRequest):
 
 
 @app.delete("/api/keys/{key_id}")
-def delete_api_key(key_id: str):
-    """刪除 API Key"""
+def delete_api_key(key_id: str, request: Request = None, auth: dict = Depends(verify_auth)):
+    """刪除 API Key（Admin only）"""
+    require_admin(auth)
     if not api_key_manager:
         raise HTTPException(status_code=500, detail="API Key Manager 未初始化")
 
