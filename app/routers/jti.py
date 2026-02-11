@@ -161,7 +161,7 @@ async def chat(request: ChatRequest):
             # 只對明確的「中斷」做規則判斷，其餘意圖交由 _judge_user_choice 的 LLM 輔助判斷，
             # 避免像「我不想太華麗，所以選B」這種作答理由被誤判為想退出測驗。
             if msg == "中斷":
-                return _pause_quiz_and_respond(
+                return await _pause_quiz_and_respond(
                     session_id=request.session_id,
                     log_user_message=request.message,
                     session=session,
@@ -180,7 +180,7 @@ async def chat(request: ChatRequest):
             logger.info(f"[答題判斷] 使用者回答: '{request.message}' -> 判定選項: {user_choice}")
 
             if user_choice == "PAUSE":
-                return _pause_quiz_and_respond(
+                return await _pause_quiz_and_respond(
                     session_id=request.session_id,
                     log_user_message=request.message,
                     session=session,
@@ -498,7 +498,7 @@ async def quiz_pause(request: QuizActionRequest):
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
-        return _pause_quiz_and_respond(
+        return await _pause_quiz_and_respond(
             session_id=request.session_id,
             log_user_message="[API] quiz_pause",
             session=session,
@@ -544,9 +544,21 @@ def _format_options_text(options: list) -> str:
     return "\n".join(lines)
 
 
-def _pause_quiz_and_respond(session_id: str, log_user_message: str, session: Any) -> ChatResponse:
+async def _pause_quiz_and_respond(session_id: str, log_user_message: str, session: Any) -> ChatResponse:
     updated_session = session_manager.pause_quiz(session_id)
+
+    # 暫停後，將使用者訊息交給 AI 回應（暫停訊息 + 回答問題）
+    ai_result = await main_agent.chat(
+        session_id=session_id,
+        user_message=log_user_message,
+        store_id=None,
+    )
+    ai_message = ai_result.get("message", "")
+
+    # 組合：暫停提示 + AI 回應（如果 AI 有產生有意義的回答）
     response_message = QUIZ_PAUSE_MESSAGE_ZH
+    if ai_message and ai_message != log_user_message:
+        response_message = f"{QUIZ_PAUSE_MESSAGE_ZH}\n\n{ai_message}"
 
     conversation_logger.log_conversation(
         session_id=session_id,

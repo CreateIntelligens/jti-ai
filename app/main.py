@@ -5,6 +5,7 @@ Gemini File Search FastAPI 後端
 import logging
 import traceback
 import os
+import re
 import shutil
 import uuid
 import warnings
@@ -349,6 +350,9 @@ def send_message(req: ChatMessageRequest, x_gemini_api_key: Optional[str] = Fast
     try:
         response = mgr.send_message(req.message)
         answer = response.text
+
+        # 清除 Gemini File Search 的 citation 標記
+        answer = re.sub(r'\s*\[cite:\s*[^\]]*\]', '', answer).strip()
 
         # 持久化對話到 MongoDB
         if general_session_manager and session_id:
@@ -700,6 +704,8 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
 
         # 如果有警告，附加到回覆開頭
         answer_text = response.text
+        # 清除 Gemini File Search 的 citation 標記
+        answer_text = re.sub(r'\s*\[cite:\s*[^\]]*\]', '', answer_text).strip()
         if warning:
             answer_text = f"⚠️ {warning}\n\n{answer_text}"
 

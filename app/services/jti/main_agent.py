@@ -35,6 +35,8 @@ conversation_logger = get_conversation_logger()
 logger = logging.getLogger(__name__)
 
 
+import re
+
 class MainAgent:
     """主要對話 Agent"""
 
@@ -196,6 +198,9 @@ class MainAgent:
             if not final_message:
                 final_message = "AI目前故障 請聯絡"
                 logger.warning(f"LLM 未生成任何文本回應，使用者輸入：{user_message[:50]}")
+
+            # 清除 Gemini File Search 的 citation 標記（例如 [cite: 1, xxx.csv]）
+            final_message = re.sub(r'\s*\[cite:\s*[^\]]*\]', '', final_message).strip()
 
             # 8. 保存對話歷史
             updated_session = session_manager.get_session(session_id)
