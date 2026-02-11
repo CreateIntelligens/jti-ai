@@ -194,8 +194,29 @@ class FileSearchManager:
         )
         return list(files)
 
-    def start_chat(self, store_name: str, model: str = "gemini-2.5-flash", system_instruction: str = None):
-        """開始一個新的 Chat Session (多輪對話)。"""
+    @staticmethod
+    def _build_history_contents(chat_history: list) -> list:
+        """將 MongoDB 格式的 chat_history 轉換為 Gemini SDK Content 物件"""
+        contents = []
+        for msg in chat_history:
+            contents.append(
+                types.Content(
+                    role=msg["role"],
+                    parts=[types.Part.from_text(text=msg["content"])]
+                )
+            )
+        return contents
+
+    def start_chat(self, store_name: str, model: str = "gemini-2.5-flash",
+                   system_instruction: str = None, history: list = None):
+        """開始一個新的 Chat Session (多輪對話)。
+
+        Args:
+            store_name: Store 資源名稱
+            model: 使用的模型名稱
+            system_instruction: 系統指令
+            history: 既有的對話歷史 Content 物件列表（用於從 MongoDB 恢復）
+        """
         if system_instruction:
             log(f"[Core] 設定 system_instruction: {system_instruction[:50]}...")
         else:
@@ -221,7 +242,7 @@ class FileSearchManager:
         self.chat_session = self.client.chats.create(
             model=model,
             config=self.current_config,
-            history=[]
+            history=history or []
         )
         self.current_store = store_name
         return self.chat_session

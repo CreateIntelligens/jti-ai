@@ -70,7 +70,7 @@ import hashlib
 from .core import FileSearchManager
 from .api_keys import APIKeyManager
 from .routers import jti
-from .services.session.session_manager_factory import get_conversation_logger
+from .services.session.session_manager_factory import get_conversation_logger, get_general_chat_session_manager
 
 # 使用工廠函數取得適當的實作（MongoDB 或檔案系統）
 conversation_logger = get_conversation_logger()
@@ -108,6 +108,7 @@ app.add_middleware(
 manager: FileSearchManager | None = None
 prompt_manager = None
 api_key_manager: APIKeyManager | None = None
+general_session_manager = None  # GeneralChatSessionManager (MongoDB)
 # Session managers: {session_id: FileSearchManager}
 user_managers: Dict[str, FileSearchManager] = {}
 
@@ -115,35 +116,73 @@ user_managers: Dict[str, FileSearchManager] = {}
 @app.on_event("startup")
 def startup():
     """應用程式啟動時初始化 Manager。"""
-    global manager, prompt_manager, api_key_manager
+    global manager, prompt_manager, api_key_manager, general_session_manager
     try:
         manager = FileSearchManager()
         from .prompts import PromptManager
         prompt_manager = PromptManager()
         api_key_manager = APIKeyManager()
+        general_session_manager = get_general_chat_session_manager()
+        if general_session_manager:
+            print("[Startup] ✅ GeneralChatSessionManager (MongoDB) 已啟用")
+        else:
+            print("[Startup] ⚠️ GeneralChatSessionManager 未啟用，使用記憶體模式")
     except ValueError as e:
         print(f"警告: {e}")
 
 
-def _get_or_create_manager(user_api_key: Optional[str] = None) -> FileSearchManager:
-    """根據使用者提供的 API Key 取得或建立 Manager"""
-    if not user_api_key:
-        # 沒有提供 API Key，使用預設的全域 manager
-        if not manager:
-            raise HTTPException(status_code=500, detail="未設定 API Key")
-        return manager
-    
-    # 使用 API Key 的 hash 作為 session ID
-    session_id = hashlib.sha256(user_api_key.encode()).hexdigest()
-    
-    if session_id not in user_managers:
-        try:
-            user_managers[session_id] = FileSearchManager(api_key=user_api_key)
-            print(f"[Session] 建立新的使用者 Manager: {session_id[:8]}...")
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=f"無效的 API Key: {e}")
-    
-    return user_managers[session_id]
+def _get_or_create_manager(user_api_key: Optional[str] = None, session_id: Optional[str] = None) -> FileSearchManager:
+    """
+    根據 session_id 或 API Key 取得或建立 Manager
+
+    優先順序：
+    1. session_id（多用戶場景）
+    2. user_api_key（API Key 場景）
+    3. 全域 manager（預設）
+    """
+    # 1. 如果有 session_id，用 session_id 隔離
+    if session_id:
+        if session_id not in user_managers:
+            if not manager:
+                raise HTTPException(status_code=500, detail="未設定 API Key")
+            # 複製全域 manager 的 API key 建立新實例
+            new_mgr = FileSearchManager(api_key=manager.api_key if hasattr(manager, 'api_key') else None)
+
+            # 嘗試從 MongoDB 恢復 session
+            if general_session_manager:
+                saved_session = general_session_manager.get_session(session_id)
+                if saved_session:
+                    history_contents = FileSearchManager._build_history_contents(
+                        saved_session.get("chat_history", [])
+                    )
+                    new_mgr.start_chat(
+                        saved_session["store_name"],
+                        saved_session.get("model", "gemini-2.5-flash"),
+                        system_instruction=saved_session.get("system_instruction"),
+                        history=history_contents,
+                    )
+                    print(f"[Session] 從 MongoDB 恢復 Session: {session_id[:8]}... (歷史 {len(history_contents)} 則)")
+
+            user_managers[session_id] = new_mgr
+            if not (general_session_manager and general_session_manager.get_session(session_id)):
+                print(f"[Session] 建立新的 Session Manager: {session_id[:8]}...")
+        return user_managers[session_id]
+
+    # 2. 如果有 user_api_key，用 API Key hash 隔離
+    if user_api_key:
+        key_hash = hashlib.sha256(user_api_key.encode()).hexdigest()
+        if key_hash not in user_managers:
+            try:
+                user_managers[key_hash] = FileSearchManager(api_key=user_api_key)
+                print(f"[Session] 建立新的 API Key Manager: {key_hash[:8]}...")
+            except ValueError as e:
+                raise HTTPException(status_code=400, detail=f"無效的 API Key: {e}")
+        return user_managers[key_hash]
+
+    # 3. 使用預設的全域 manager
+    if not manager:
+        raise HTTPException(status_code=500, detail="未設定 API Key")
+    return manager
 
 
 class CreateStoreRequest(BaseModel):
@@ -162,6 +201,7 @@ class ChatStartRequest(BaseModel):
 
 class ChatMessageRequest(BaseModel):
     message: str
+    session_id: Optional[str] = None  # 可選：指定 session ID
 
 
 @app.get("/api/stores")
@@ -241,13 +281,18 @@ def query(req: QueryRequest, x_gemini_api_key: Optional[str] = FastAPIHeader(Non
 
 @app.post("/api/chat/start")
 def start_chat(req: ChatStartRequest, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
-    """開始新的對話 Session。"""
-    mgr = _get_or_create_manager(x_gemini_api_key)
+    """
+    開始新的對話 Session。
 
-    # 取得 session_id：結合 API key 和 store_name 以隔離不同知識庫的對話
+    回傳 session_id 供後續 /api/chat/message 使用，確保對話上下文隔離。
+    """
+    # 生成 session_id：結合 API key 和 store_name 以隔離不同知識庫的對話
     api_key_part = x_gemini_api_key if x_gemini_api_key else 'system'
-    session_key = f"{api_key_part}:{req.store_name}"
+    session_key = f"{api_key_part}:{req.store_name}:{uuid.uuid4().hex[:8]}"  # 加入隨機 UUID 確保每次都是新 session
     session_id = hashlib.sha256(session_key.encode()).hexdigest()
+
+    # 取得該 session 專屬的 manager
+    mgr = _get_or_create_manager(user_api_key=x_gemini_api_key, session_id=session_id)
 
     # 取得啟用的 prompt (如果有)
     system_instruction = None
@@ -255,11 +300,22 @@ def start_chat(req: ChatStartRequest, x_gemini_api_key: Optional[str] = FastAPIH
         active_prompt = prompt_manager.get_active_prompt(req.store_name)
         if active_prompt:
             system_instruction = active_prompt.content
-            print(f"[DEBUG] 從 MongoDB 載入 Prompt: {active_prompt.name}")
+            print(f"[Session {session_id[:8]}] 從 MongoDB 載入 Prompt: {active_prompt.name}")
         else:
-            print(f"[DEBUG] Store {req.store_name} 沒有啟用的 Prompt")
+            print(f"[Session {session_id[:8]}] Store {req.store_name} 沒有啟用的 Prompt")
 
     mgr.start_chat(req.store_name, req.model, system_instruction=system_instruction)
+    print(f"[Session {session_id[:8]}] 開始新對話: store={req.store_name}, model={req.model}")
+
+    # 持久化到 MongoDB
+    if general_session_manager:
+        general_session_manager.create_session(
+            session_id=session_id,
+            store_name=req.store_name,
+            model=req.model,
+            system_instruction=system_instruction,
+        )
+
     return {
         "ok": True,
         "prompt_applied": system_instruction is not None,
@@ -268,20 +324,38 @@ def start_chat(req: ChatStartRequest, x_gemini_api_key: Optional[str] = FastAPIH
 
 @app.post("/api/chat/message")
 def send_message(req: ChatMessageRequest, x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
-    """發送訊息到目前對話。"""
-    mgr = _get_or_create_manager(x_gemini_api_key)
+    """
+    發送訊息到指定的對話 Session。
 
-    # 取得 session_id：結合 API key 和當前 store_name
-    api_key_part = x_gemini_api_key if x_gemini_api_key else 'system'
+    必須提供 session_id（從 /api/chat/start 取得），以確保使用正確的對話上下文。
+    如果沒有提供 session_id，將使用全域 manager（不推薦多用戶場景）。
+    """
+    # 取得該 session 專屬的 manager
+    mgr = _get_or_create_manager(user_api_key=x_gemini_api_key, session_id=req.session_id)
+
+    # 取得 session_id（用於日誌記錄）
+    if req.session_id:
+        session_id = req.session_id
+    else:
+        # 沒有 session_id，使用全域 manager（向下兼容舊 API）
+        api_key_part = x_gemini_api_key if x_gemini_api_key else 'system'
+        current_store = mgr.current_store if hasattr(mgr, 'current_store') else 'unknown'
+        session_key = f"{api_key_part}:{current_store}"
+        session_id = hashlib.sha256(session_key.encode()).hexdigest()
+        print(f"[警告] /api/chat/message 沒有提供 session_id，使用全域 manager")
+
     current_store = mgr.current_store if hasattr(mgr, 'current_store') else 'unknown'
-    session_key = f"{api_key_part}:{current_store}"
-    session_id = hashlib.sha256(session_key.encode()).hexdigest()
 
     try:
         response = mgr.send_message(req.message)
         answer = response.text
 
-        # 記錄對話
+        # 持久化對話到 MongoDB
+        if general_session_manager and session_id:
+            general_session_manager.add_message(session_id, "user", req.message)
+            general_session_manager.add_message(session_id, "model", answer)
+
+        # 記錄對話日誌
         conversation_logger.log_conversation(
             session_id=session_id,
             user_message=req.message,
@@ -291,7 +365,12 @@ def send_message(req: ChatMessageRequest, x_gemini_api_key: Optional[str] = Fast
             mode="general"
         )
 
-        return {"answer": answer}
+        print(f"[Session {session_id[:8]}] 使用者: {req.message[:50]}... | 回應: {answer[:50]}...")
+
+        return {
+            "answer": answer,
+            "session_id": session_id
+        }
     except ValueError as e:
         # 記錄錯誤對話
         conversation_logger.log_conversation(
@@ -307,9 +386,24 @@ def send_message(req: ChatMessageRequest, x_gemini_api_key: Optional[str] = Fast
 
 
 @app.get("/api/chat/history")
-def get_history(x_gemini_api_key: Optional[str] = FastAPIHeader(None)):
-    """取得目前對話紀錄。"""
-    mgr = _get_or_create_manager(x_gemini_api_key)
+def get_history(
+    session_id: Optional[str] = None,
+    x_gemini_api_key: Optional[str] = FastAPIHeader(None)
+):
+    """
+    取得指定 Session 的對話紀錄。
+
+    Query Parameters:
+    - session_id: (可選) 指定要查詢的 session ID
+    """
+    # 優先從 MongoDB 取得
+    if session_id and general_session_manager:
+        history = general_session_manager.get_history(session_id)
+        if history:
+            return [{"role": msg["role"], "text": msg["content"]} for msg in history]
+
+    # Fallback: 從記憶體中的 manager 取得
+    mgr = _get_or_create_manager(user_api_key=x_gemini_api_key, session_id=session_id)
     return mgr.get_history()
 
 
