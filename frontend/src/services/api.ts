@@ -98,11 +98,16 @@ export async function startChat(storeName: string): Promise<StartChatResponse> {
   return handleResponse<StartChatResponse>(response);
 }
 
-export async function sendMessage(text: string): Promise<ChatResponse> {
+export async function sendMessage(text: string, sessionId?: string): Promise<ChatResponse> {
+  const payload: Record<string, string> = { message: text };
+  if (sessionId) {
+    payload.session_id = sessionId;
+  }
+
   const response = await fetchWithApiKey(`${API_BASE}/chat/message`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: text }),
+    body: JSON.stringify(payload),
   });
   return handleResponse<ChatResponse>(response);
 }
@@ -223,4 +228,3 @@ export async function getGeneralConversations(): Promise<any> {
   const response = await fetchWithApiKey(`${API_BASE}/chat/conversations`);
   return handleResponse<any>(response);
 }
-

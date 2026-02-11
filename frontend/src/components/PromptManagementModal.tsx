@@ -36,7 +36,8 @@ interface PromptManagementModalProps {
 }
 
 const MODELS = [
-  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash Lite', description: '輕量快速版本' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', description: '輕量快速版本' },
+  { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', description: '輕量快速版本' },
   { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash (Preview)', description: '新一代快速模型' },
   { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro (Preview)', description: '新一代最強模型' },
 ];

@@ -131,6 +131,9 @@ export default function App() {
     setMessages([]);
     try {
       const result = await api.startChat(currentStore);
+      if (result.session_id) {
+        setSessionId(result.session_id);
+      }
       if (result.prompt_applied) {
         showStatus('✅ 已套用新的 Prompt');
       }
@@ -205,7 +208,18 @@ export default function App() {
     setLoading(true);
 
     try {
-      const data = await api.sendMessage(text);
+      let activeSessionId = sessionId;
+
+      // 保險：若 session_id 不存在，先建立一個新的 chat session
+      if (!activeSessionId && currentStore) {
+        const startResult = await api.startChat(currentStore);
+        if (startResult.session_id) {
+          activeSessionId = startResult.session_id;
+          setSessionId(startResult.session_id);
+        }
+      }
+
+      const data = await api.sendMessage(text, activeSessionId || undefined);
       setMessages(prev => {
         const newMessages = [...prev];
         newMessages[newMessages.length - 1] = {

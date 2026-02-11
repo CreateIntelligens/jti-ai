@@ -52,3 +52,24 @@ def get_conversation_logger():
     _conversation_logger = ConversationLogger()
     logger.info("Using file-based ConversationLogger")
     return _conversation_logger
+
+
+_general_chat_session_manager = None
+
+
+def get_general_chat_session_manager():
+    """取得一般知識庫 Chat Session Manager"""
+    global _general_chat_session_manager
+    if _general_chat_session_manager is not None:
+        return _general_chat_session_manager
+
+    if os.getenv("MONGODB_URI"):
+        try:
+            from app.services.session.general_chat_session_manager import GeneralChatSessionManager
+            _general_chat_session_manager = GeneralChatSessionManager()
+            print("[Factory] ✅ 使用 MongoDB GeneralChatSessionManager")
+            return _general_chat_session_manager
+        except Exception as e:
+            print(f"[Factory] ⚠️ MongoDB GeneralChatSessionManager 失敗: {e}，停用 session 持久化")
+
+    return None

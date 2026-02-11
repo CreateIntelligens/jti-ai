@@ -130,7 +130,7 @@ export default function StoreManagementModal({
     return `curl -X POST ${host}/v1/chat/completions \\
   -H "Authorization: Bearer ${key}" \\
   -H "Content-Type: application/json" \\
-  -d '{"model":"gemini-2.5-flash-lite","messages":[{"role":"user","content":"你好"}]}'`;
+  -d '{"model":"gemini-2.5-flash","messages":[{"role":"user","content":"你好"}]}'`;
   };
 
   const handleCopyCurl = async () => {
