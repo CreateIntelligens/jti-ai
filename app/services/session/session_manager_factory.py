@@ -21,14 +21,14 @@ def get_session_manager():
 
     if os.getenv("MONGODB_URI"):
         try:
-            from app.services.mongo_session_manager import MongoSessionManager
+            from .mongo_session_manager import MongoSessionManager
             _session_manager = MongoSessionManager()
             logger.info("Using MongoDB SessionManager")
             return _session_manager
         except Exception as e:
             logger.warning(f"MongoDB SessionManager failed, falling back to in-memory: {e}")
 
-    from app.services.session_manager import SessionManager
+    from .session_manager import SessionManager
     _session_manager = SessionManager()
     logger.info("Using in-memory SessionManager")
     return _session_manager
@@ -41,14 +41,14 @@ def get_conversation_logger():
 
     if os.getenv("MONGODB_URI"):
         try:
-            from app.services.mongo_conversation_logger import MongoConversationLogger
+            from app.services.logging.mongo_conversation_logger import MongoConversationLogger
             _conversation_logger = MongoConversationLogger()
             logger.info("Using MongoDB ConversationLogger")
             return _conversation_logger
         except Exception as e:
             logger.warning(f"MongoDB ConversationLogger failed, falling back to file-based: {e}")
 
-    from app.services.conversation_logger import ConversationLogger
+    from app.services.logging.conversation_logger import ConversationLogger
     _conversation_logger = ConversationLogger()
     logger.info("Using file-based ConversationLogger")
     return _conversation_logger

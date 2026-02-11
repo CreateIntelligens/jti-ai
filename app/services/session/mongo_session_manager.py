@@ -13,7 +13,7 @@ from datetime import datetime, timedelta
 
 from app.models.session import Session, SessionStep, GameMode
 from app.services.mongo_client import get_mongo_db
-from app.services.session_state_mixin import SessionStateMixin
+from .session_state_mixin import SessionStateMixin
 import logging
 
 logger = logging.getLogger(__name__)

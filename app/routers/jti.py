@@ -6,8 +6,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 import logging
-from app.services.session_manager_factory import get_session_manager, get_conversation_logger
-from app.services.main_agent import main_agent
+from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
+from app.services.jti.main_agent import main_agent
 from app.models.session import GameMode
 
 # 使用工廠函數取得適當的實作（MongoDB 或記憶體）
@@ -296,7 +296,8 @@ async def chat(request: ChatRequest):
         # ========== 非 QUIZ 狀態 ==========
 
         # 先用關鍵字判斷是否要開始測驗（不依賴 LLM 呼叫工具）
-        start_keywords = ['色彩', '顏色', '配色', '保護殼', '測驗', '心理測驗', '開始', '玩', '試試', '來吧', '好啊', '開始吧', 'quiz', 'start']
+        # 移除單獨的「色彩」「顏色」避免誤判產品諮詢（如「有什麼顏色」）
+        start_keywords = ['測驗', '心理測驗', '色彩測驗', '配色測驗', '開始', '玩', '試試', '來吧', '好啊', '開始吧', 'quiz', 'start']
         negative_keywords = ['不想', '不要', '不用', '不玩', '跳過', '算了', '不了', "don't", "dont", "no ", "not ", "skip", "pass", "never"]
         resume_keywords = ['繼續測驗', '繼續', '接著', '接續', '回到測驗', 'continue', 'resume']
         msg_lower = request.message.lower()

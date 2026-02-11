@@ -12,7 +12,7 @@ Session 管理服務
 from typing import Dict, Optional
 from datetime import datetime, timedelta
 from app.models.session import Session, SessionStep, GameMode
-from app.services.session_state_mixin import SessionStateMixin
+from .session_state_mixin import SessionStateMixin
 import logging
 
 logger = logging.getLogger(__name__)

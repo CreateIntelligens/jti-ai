@@ -15,7 +15,7 @@ from app.tools.quiz import (
     get_question_from_selected,
 )
 from app.tools.color_results import calculate_color_result as calc_color_result
-from app.services.session_manager_factory import get_session_manager
+from app.services.session.session_manager_factory import get_session_manager
 
 # 使用 factory 取得正確的 session manager（MongoDB 或記憶體版）
 session_manager = get_session_manager()

@@ -70,7 +70,7 @@ import hashlib
 from .core import FileSearchManager
 from .api_keys import APIKeyManager
 from .routers import jti
-from .services.session_manager_factory import get_conversation_logger
+from .services.session.session_manager_factory import get_conversation_logger
 
 # 使用工廠函數取得適當的實作（MongoDB 或檔案系統）
 conversation_logger = get_conversation_logger()
@@ -157,7 +157,7 @@ class QueryRequest(BaseModel):
 
 class ChatStartRequest(BaseModel):
     store_name: str
-    model: str = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
+    model: str = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 
 
 class ChatMessageRequest(BaseModel):
@@ -491,8 +491,8 @@ class OpenAIChatMessage(BaseModel):
     content: str
 
 # 支援的 Gemini 模型
-SUPPORTED_MODELS = ["gemini-2.5-flash-lite", "gemini-3-flash-preview", "gemini-3-pro-preview"]
-DEFAULT_MODEL = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
+SUPPORTED_MODELS = ["gemini-2.5-flash", "gemini-3-flash-preview", "gemini-3-pro-preview"]
+DEFAULT_MODEL = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 
 class OpenAIChatRequest(BaseModel):
     model: str = DEFAULT_MODEL

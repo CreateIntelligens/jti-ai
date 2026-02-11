@@ -30,11 +30,11 @@ async function handleResponse<T>(response: Response): Promise<T> {
 async function fetchWithApiKey(url: string, options: RequestInit = {}): Promise<Response> {
   const apiKey = getUserApiKey();
   const headers = new Headers(options.headers || {});
-  
+
   if (apiKey) {
     headers.set('X-Gemini-Api-Key', apiKey);
   }
-  
+
   return fetch(url, {
     ...options,
     headers,
@@ -86,7 +86,7 @@ export async function deleteFile(fileName: string): Promise<void> {
 
 // 取得目前選擇的模型
 function getSelectedModel(): string {
-  return localStorage.getItem('selectedModel') || 'gemini-2.5-flash-lite';
+  return localStorage.getItem('selectedModel') || 'gemini-2.5-flash';
 }
 
 export async function startChat(storeName: string): Promise<StartChatResponse> {
@@ -147,7 +147,7 @@ export async function setActivePrompt(storeName: string, promptId: string): Prom
 }
 
 export async function listApiKeys(storeName?: string): Promise<any[]> {
-  const url = storeName 
+  const url = storeName
     ? `${API_BASE}/keys?store_name=${encodeURIComponent(storeName)}`
     : `${API_BASE}/keys`;
   const response = await fetch(url);

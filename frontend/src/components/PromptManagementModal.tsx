@@ -36,7 +36,7 @@ interface PromptManagementModalProps {
 }
 
 const MODELS = [
-  { id: 'gemini-2.5-flash-lite', name: 'Gemini 2.5 Flash Lite', description: '輕量快速版本' },
+  { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash Lite', description: '輕量快速版本' },
   { id: 'gemini-3-flash-preview', name: 'Gemini 3 Flash (Preview)', description: '新一代快速模型' },
   { id: 'gemini-3-pro-preview', name: 'Gemini 3 Pro (Preview)', description: '新一代最強模型' },
 ];
@@ -60,7 +60,7 @@ export default function PromptManagementModal({
   const [editContent, setEditContent] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [selectedModel, setSelectedModel] = useState(() => {
-    return localStorage.getItem('selectedModel') || 'gemini-2.5-flash-lite';
+    return localStorage.getItem('selectedModel') || 'gemini-2.5-flash';
   });
   const [activeTab, setActiveTab] = useState<'model' | 'prompt' | 'apikey'>('model');
 
@@ -286,10 +286,10 @@ export default function PromptManagementModal({
         <h2>⚙ 設置</h2>
 
         {/* 標籤切換 */}
-        <div style={{ 
-          display: 'flex', 
-          gap: '0.5rem', 
-          marginBottom: '1.5rem', 
+        <div style={{
+          display: 'flex',
+          gap: '0.5rem',
+          marginBottom: '1.5rem',
           padding: '0.25rem',
           background: 'rgba(26, 31, 58, 0.6)',
           borderRadius: '12px',
@@ -303,8 +303,8 @@ export default function PromptManagementModal({
               padding: '0.75rem 1rem',
               borderRadius: '8px',
               border: 'none',
-              background: activeTab === 'model' 
-                ? 'linear-gradient(135deg, rgba(61, 217, 211, 0.25), rgba(91, 233, 255, 0.15))' 
+              background: activeTab === 'model'
+                ? 'linear-gradient(135deg, rgba(61, 217, 211, 0.25), rgba(91, 233, 255, 0.15))'
                 : 'transparent',
               color: activeTab === 'model' ? '#5be9ff' : '#8090b0',
               fontWeight: activeTab === 'model' ? '600' : '400',
@@ -323,8 +323,8 @@ export default function PromptManagementModal({
               padding: '0.75rem 1rem',
               borderRadius: '8px',
               border: 'none',
-              background: activeTab === 'prompt' 
-                ? 'linear-gradient(135deg, rgba(255, 169, 89, 0.25), rgba(255, 205, 107, 0.15))' 
+              background: activeTab === 'prompt'
+                ? 'linear-gradient(135deg, rgba(255, 169, 89, 0.25), rgba(255, 205, 107, 0.15))'
                 : 'transparent',
               color: activeTab === 'prompt' ? '#ffa959' : '#8090b0',
               fontWeight: activeTab === 'prompt' ? '600' : '400',
@@ -343,8 +343,8 @@ export default function PromptManagementModal({
               padding: '0.75rem 1rem',
               borderRadius: '8px',
               border: 'none',
-              background: activeTab === 'apikey' 
-                ? 'linear-gradient(135deg, rgba(77, 169, 255, 0.25), rgba(91, 233, 255, 0.15))' 
+              background: activeTab === 'apikey'
+                ? 'linear-gradient(135deg, rgba(77, 169, 255, 0.25), rgba(91, 233, 255, 0.15))'
                 : 'transparent',
               color: activeTab === 'apikey' ? '#4da9ff' : '#8090b0',
               fontWeight: activeTab === 'apikey' ? '600' : '400',
@@ -426,127 +426,127 @@ export default function PromptManagementModal({
               載入中...
             </p>
           ) : (
-          <div className="modal-content">
-            <div>
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--crystal-cyan)' }}>
-                建立新 Prompt {prompts.length >= maxPrompts && <span style={{ color: 'var(--crystal-amber)' }}>（已達上限 {maxPrompts} 個）</span>}
-              </h3>
-              {prompts.length < maxPrompts && (
-                <>
-                  <input
-                    type="text"
-                    value={newPromptName}
-                    onChange={e => setNewPromptName(e.target.value)}
-                    placeholder="Prompt 名稱（可選，預設自動命名）"
-                    style={{ width: '100%', marginBottom: '0.5rem' }}
-                  />
-                  <textarea
-                    value={newPromptContent}
-                    onChange={e => setNewPromptContent(e.target.value)}
-                    placeholder="Prompt 內容..."
-                    style={{ minHeight: '150px', width: '100%', marginBottom: '0.5rem', resize: 'vertical' }}
-                  />
-                  <button 
-                    onClick={handleCreate} 
-                    disabled={creating || !newPromptContent.trim()}
-                    style={{ width: '100%' }}
-                  >
-                    {creating ? '建立中...' : '✓ 建立 Prompt'}
-                  </button>
-                </>
-              )}
-            </div>
+            <div className="modal-content">
+              <div>
+                <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--crystal-cyan)' }}>
+                  建立新 Prompt {prompts.length >= maxPrompts && <span style={{ color: 'var(--crystal-amber)' }}>（已達上限 {maxPrompts} 個）</span>}
+                </h3>
+                {prompts.length < maxPrompts && (
+                  <>
+                    <input
+                      type="text"
+                      value={newPromptName}
+                      onChange={e => setNewPromptName(e.target.value)}
+                      placeholder="Prompt 名稱（可選，預設自動命名）"
+                      style={{ width: '100%', marginBottom: '0.5rem' }}
+                    />
+                    <textarea
+                      value={newPromptContent}
+                      onChange={e => setNewPromptContent(e.target.value)}
+                      placeholder="Prompt 內容..."
+                      style={{ minHeight: '150px', width: '100%', marginBottom: '0.5rem', resize: 'vertical' }}
+                    />
+                    <button
+                      onClick={handleCreate}
+                      disabled={creating || !newPromptContent.trim()}
+                      style={{ width: '100%' }}
+                    >
+                      {creating ? '建立中...' : '✓ 建立 Prompt'}
+                    </button>
+                  </>
+                )}
+              </div>
 
-            <div>
-              <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--crystal-amber)' }}>
-                現有 Prompts
-              </h3>
-              {prompts.length === 0 ? (
-                <p style={{ color: '#8090b0', textAlign: 'center', padding: '2rem 0' }}>
-                  尚無 Prompt
-                </p>
-              ) : (
-                <ul className="file-list">
-                  {prompts.map(prompt => (
-                    <li key={prompt.id} style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.5rem' }}>
-                      {editingId === prompt.id ? (
-                        <>
-                          <input
-                            type="text"
-                            value={editName}
-                            onChange={e => setEditName(e.target.value)}
-                            style={{ width: '100%' }}
-                          />
-                          <textarea
-                            value={editContent}
-                            onChange={e => setEditContent(e.target.value)}
-                            style={{ minHeight: '300px', maxHeight: '500px', width: '100%', resize: 'vertical' }}
-                          />
-                          <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            <button onClick={saveEdit} className="small">✓ 儲存</button>
-                            <button onClick={cancelEdit} className="secondary small">✕ 取消</button>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                              <strong>{prompt.name}</strong>
-                              {prompt.id === activePromptId && (
-                                <span style={{ marginLeft: '0.5rem', color: 'var(--crystal-teal)' }}>◆ 啟用中</span>
-                              )}
-                            </div>
+              <div>
+                <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', color: 'var(--crystal-amber)' }}>
+                  現有 Prompts
+                </h3>
+                {prompts.length === 0 ? (
+                  <p style={{ color: '#8090b0', textAlign: 'center', padding: '2rem 0' }}>
+                    尚無 Prompt
+                  </p>
+                ) : (
+                  <ul className="file-list">
+                    {prompts.map(prompt => (
+                      <li key={prompt.id} style={{ flexDirection: 'column', alignItems: 'stretch', gap: '0.5rem' }}>
+                        {editingId === prompt.id ? (
+                          <>
+                            <input
+                              type="text"
+                              value={editName}
+                              onChange={e => setEditName(e.target.value)}
+                              style={{ width: '100%' }}
+                            />
+                            <textarea
+                              value={editContent}
+                              onChange={e => setEditContent(e.target.value)}
+                              style={{ minHeight: '300px', maxHeight: '500px', width: '100%', resize: 'vertical' }}
+                            />
                             <div style={{ display: 'flex', gap: '0.5rem' }}>
-                              {prompt.id !== activePromptId && (
-                                <button onClick={() => handleSetActive(prompt.id)} className="small">
-                                  ◆ 啟用
+                              <button onClick={saveEdit} className="small">✓ 儲存</button>
+                              <button onClick={cancelEdit} className="secondary small">✕ 取消</button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <div>
+                                <strong>{prompt.name}</strong>
+                                {prompt.id === activePromptId && (
+                                  <span style={{ marginLeft: '0.5rem', color: 'var(--crystal-teal)' }}>◆ 啟用中</span>
+                                )}
+                              </div>
+                              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                {prompt.id !== activePromptId && (
+                                  <button onClick={() => handleSetActive(prompt.id)} className="small">
+                                    ◆ 啟用
+                                  </button>
+                                )}
+                                <button onClick={() => startEdit(prompt)} className="secondary small">
+                                  ✎ 編輯
+                                </button>
+                                <button onClick={() => handleDelete(prompt.id)} className="danger small">
+                                  ✕ 刪除
+                                </button>
+                              </div>
+                            </div>
+                            <div style={{ position: 'relative' }}>
+                              <pre style={{
+                                fontSize: '0.85rem',
+                                color: '#8090b0',
+                                whiteSpace: 'pre-wrap',
+                                background: 'rgba(0,0,0,0.2)',
+                                padding: '0.5rem',
+                                borderRadius: '4px',
+                                margin: 0,
+                                maxHeight: expandedIds.has(prompt.id) ? '400px' : 'none',
+                                overflow: expandedIds.has(prompt.id) ? 'auto' : 'visible',
+                                transition: 'max-height 0.3s ease'
+                              }}>
+                                {expandedIds.has(prompt.id) ? prompt.content : getPreviewText(prompt.content)}
+                              </pre>
+                              {prompt.content.split('\n').length > 3 && (
+                                <button
+                                  onClick={() => toggleExpand(prompt.id)}
+                                  className="secondary small"
+                                  style={{
+                                    marginTop: '0.5rem',
+                                    fontSize: '0.8rem',
+                                    padding: '0.25rem 0.75rem'
+                                  }}
+                                >
+                                  {expandedIds.has(prompt.id) ? '▲ 收起' : '▼ 展開完整內容'}
                                 </button>
                               )}
-                              <button onClick={() => startEdit(prompt)} className="secondary small">
-                                ✎ 編輯
-                              </button>
-                              <button onClick={() => handleDelete(prompt.id)} className="danger small">
-                                ✕ 刪除
-                              </button>
                             </div>
-                          </div>
-                          <div style={{ position: 'relative' }}>
-                            <pre style={{
-                              fontSize: '0.85rem',
-                              color: '#8090b0',
-                              whiteSpace: 'pre-wrap',
-                              background: 'rgba(0,0,0,0.2)',
-                              padding: '0.5rem',
-                              borderRadius: '4px',
-                              margin: 0,
-                              maxHeight: expandedIds.has(prompt.id) ? '400px' : 'none',
-                              overflow: expandedIds.has(prompt.id) ? 'auto' : 'visible',
-                              transition: 'max-height 0.3s ease'
-                            }}>
-                              {expandedIds.has(prompt.id) ? prompt.content : getPreviewText(prompt.content)}
-                            </pre>
-                            {prompt.content.split('\n').length > 3 && (
-                              <button
-                                onClick={() => toggleExpand(prompt.id)}
-                                className="secondary small"
-                                style={{
-                                  marginTop: '0.5rem',
-                                  fontSize: '0.8rem',
-                                  padding: '0.25rem 0.75rem'
-                                }}
-                              >
-                                {expandedIds.has(prompt.id) ? '▲ 收起' : '▼ 展開完整內容'}
-                              </button>
-                            )}
-                          </div>
-                        </>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
-          </div>
           )
         )}
 

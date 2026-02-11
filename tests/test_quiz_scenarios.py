@@ -19,7 +19,7 @@ async def test_scenario(scenario_name: str, messages: list[tuple[str, str]]):
         scenario_name: 情境名稱
         messages: [(user_message, expected_pattern), ...]
     """
-    from app.services.session_manager import SessionManager
+    from app.services.session.session_manager import SessionManager
     from app.routers.jti import _judge_user_choice, _format_options_text
 
     print(f"\n{'='*60}")
@@ -142,7 +142,7 @@ async def main():
     print(f"測試情境: 暫停後繼續")
     print(f"{'='*60}")
 
-    from app.services.session_manager import SessionManager
+    from app.services.session.session_manager import SessionManager
 
     session_manager = SessionManager()
     session = session_manager.create_session(language="zh", mode="jti")

@@ -11,13 +11,13 @@ import unittest
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
-from app.services.mongo_conversation_logger import MongoConversationLogger
+from app.services.logging.mongo_conversation_logger import MongoConversationLogger
 
 
 class TestMongoConversationLogger(unittest.TestCase):
     """MongoDB ConversationLogger 測試"""
 
-    @patch("app.services.mongo_conversation_logger.get_mongo_db")
+    @patch("app.services.logging.mongo_conversation_logger.get_mongo_db")
     def setUp(self, mock_get_db):
         """測試前準備"""
         self.mock_db = MagicMock()

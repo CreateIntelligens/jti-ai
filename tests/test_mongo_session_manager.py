@@ -18,7 +18,7 @@ from app.models.session import Session, SessionStep, GameMode
 class TestMongoSessionManager(unittest.TestCase):
     """MongoDB SessionManager 測試"""
 
-    @patch("app.services.mongo_session_manager.get_mongo_db")
+    @patch("app.services.session.mongo_session_manager.get_mongo_db")
     def setUp(self, mock_get_db):
         """測試前準備"""
         self.mock_db = MagicMock()
@@ -28,7 +28,7 @@ class TestMongoSessionManager(unittest.TestCase):
         self.mock_sessions = MagicMock()
         self.mock_db.__getitem__.return_value = self.mock_sessions
 
-        from app.services.mongo_session_manager import MongoSessionManager
+        from app.services.session.mongo_session_manager import MongoSessionManager
         self.manager = MongoSessionManager()
 
     def test_create_session(self):
