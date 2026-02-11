@@ -748,7 +748,7 @@ class UpdatePromptRequest(BaseModel):
     content: Optional[str] = None
 
 class SetActivePromptRequest(BaseModel):
-    prompt_id: str
+    prompt_id: Optional[str] = None
 
 
 @app.get("/api/stores/{store_name:path}/prompts")
@@ -835,8 +835,12 @@ def set_active_store_prompt(store_name: str, request: SetActivePromptRequest):
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
     
     try:
-        prompt_manager.set_active_prompt(store_name, request.prompt_id)
-        return {"message": "已設定啟用的 Prompt", "prompt_id": request.prompt_id}
+        if request.prompt_id:
+            prompt_manager.set_active_prompt(store_name, request.prompt_id)
+            return {"message": "已設定啟用的 Prompt", "prompt_id": request.prompt_id}
+        else:
+            prompt_manager.clear_active_prompt(store_name)
+            return {"message": "已取消啟用 Prompt", "prompt_id": None}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 

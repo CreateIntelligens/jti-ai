@@ -142,7 +142,7 @@ export async function deletePrompt(storeName: string, promptId: string): Promise
   await handleResponse<void>(response);
 }
 
-export async function setActivePrompt(storeName: string, promptId: string): Promise<void> {
+export async function setActivePrompt(storeName: string, promptId: string | null): Promise<void> {
   const response = await fetch(`${API_BASE}/stores/${storeName}/prompts/active`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

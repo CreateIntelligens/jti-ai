@@ -200,7 +200,7 @@ export default function PromptManagementModal({
     }
   };
 
-  const handleSetActive = async (promptId: string) => {
+  const handleSetActive = async (promptId: string | null) => {
     if (!currentStore) return;
     try {
       await api.setActivePrompt(currentStore, promptId);
@@ -498,9 +498,13 @@ export default function PromptManagementModal({
                                 )}
                               </div>
                               <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                {prompt.id !== activePromptId && (
+                                {prompt.id !== activePromptId ? (
                                   <button onClick={() => handleSetActive(prompt.id)} className="small">
                                     ◆ 啟用
+                                  </button>
+                                ) : (
+                                  <button onClick={() => handleSetActive(null)} className="secondary small">
+                                    ○ 取消啟用
                                   </button>
                                 )}
                                 <button onClick={() => startEdit(prompt)} className="secondary small">

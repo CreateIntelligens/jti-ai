@@ -217,6 +217,13 @@ class PromptManager:
         self._save_store_prompts(store_prompts)
         log(f"[PromptManager] 設定啟用 Prompt: {prompt_id}")
 
+    def clear_active_prompt(self, store_name: str):
+        """取消啟用的 prompt（不使用任何 prompt）"""
+        store_prompts = self._load_store_prompts(store_name)
+        store_prompts.active_prompt_id = None
+        self._save_store_prompts(store_prompts)
+        log(f"[PromptManager] 取消啟用 Prompt: {store_name}")
+
     def delete_store_prompts(self, store_name: str):
         """刪除整個 Store 的 prompts"""
         result = self.collection.delete_one({"store_name": store_name})
