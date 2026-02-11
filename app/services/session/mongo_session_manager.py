@@ -26,6 +26,8 @@ class MongoSessionManager(SessionStateMixin):
         self.idle_timeout = timedelta(minutes=idle_timeout_minutes)
         self.db = get_mongo_db()
         self.sessions_collection = self.db["sessions"]
+        # TTL index：MongoDB 自動清理過期 session
+        self.sessions_collection.create_index("expires_at", expireAfterSeconds=0)
 
     def create_session(
         self,
