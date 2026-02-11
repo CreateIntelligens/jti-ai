@@ -27,16 +27,14 @@ QUIZ_PAUSE_MESSAGE_ZH = (
 
 class CreateSessionRequest(BaseModel):
     """建立 session 請求"""
-    mode: GameMode = GameMode.COLOR
     language: str = "zh"  # 語言 (zh/en)
 
 
 class CreateSessionResponse(BaseModel):
     """建立 session 回應"""
+    ok: bool = True
     session_id: str
-    mode: str
-    step: str
-    message: str = "測驗已準備好，隨時可以開始！"
+    message: str = "Session created"
 
 
 class ChatRequest(BaseModel):
@@ -67,23 +65,21 @@ class GetSessionResponse(BaseModel):
 
 # === Endpoints ===
 
-@router.post("/session/new", response_model=CreateSessionResponse)
+@router.post("/chat/start", response_model=CreateSessionResponse)
 async def create_session(request: CreateSessionRequest):
     """
-    建立新的測驗 session
+    建立新的 JTI 對話 Session
 
-    這會初始化一個新的色彩測驗流程
+    回傳 session_id 供後續 /api/jti/chat/message 使用
     """
     try:
-        session = session_manager.create_session(mode=request.mode, language=request.language)
+        session = session_manager.create_session(mode=GameMode.COLOR, language=request.language)
 
         logger.info(f"Created new session: {session.session_id} (language={request.language})")
 
         return CreateSessionResponse(
             session_id=session.session_id,
-            mode=session.mode.value,
-            step=session.step.value,
-            message="測驗已準備好，請說「開始測驗」來開始！"
+            message="Session created"
         )
 
     except Exception as e:
@@ -115,7 +111,7 @@ async def get_session(session_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/chat", response_model=ChatResponse)
+@router.post("/chat/message", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     """
     主要對話端點

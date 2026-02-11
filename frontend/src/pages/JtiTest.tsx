@@ -43,10 +43,10 @@ export default function JtiTest() {
     }
 
     try {
-      const res = await fetch('/api/jti/session/new', {
+      const res = await fetch('/api/jti/chat/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'COLOR', language: currentLanguage }),
+        body: JSON.stringify({ language: currentLanguage }),
       });
       const data = await res.json();
       setSessionId(data.session_id);
@@ -78,10 +78,10 @@ export default function JtiTest() {
 
     // 重新建立 session
     try {
-      const res = await fetch('/api/jti/session/new', {
+      const res = await fetch('/api/jti/chat/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'COLOR', language: newLang }),
+        body: JSON.stringify({ language: newLang }),
       });
       const data = await res.json();
       setSessionId(data.session_id);
@@ -96,10 +96,10 @@ export default function JtiTest() {
   // 初始化 session
   useEffect(() => {
     const lang = localStorage.getItem('language') || 'zh';
-    fetch('/api/jti/session/new', {
+    fetch('/api/jti/chat/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ mode: 'COLOR', language: lang }),
+      body: JSON.stringify({ language: lang }),
     })
       .then(res => res.json())
       .then(data => {
@@ -137,7 +137,7 @@ export default function JtiTest() {
     setIsTyping(true);
 
     try {
-      const res = await fetch('/api/jti/chat', {
+      const res = await fetch('/api/jti/chat/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, message, language: currentLanguage }),
