@@ -16,7 +16,7 @@ Agent 擁有的 Tools：
 
 import os
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
 import google.genai as genai
 from google.genai import types
 from app.models.session import Session, SessionStep
@@ -170,7 +170,6 @@ class MainAgent:
         self,
         session_id: str,
         user_message: str,
-        store_id: Optional[str] = None
     ) -> Dict:
         """處理對話（使用持久 Chat Session + File Search）"""
         try:

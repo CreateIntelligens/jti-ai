@@ -92,7 +92,7 @@ export default function ConversationHistoryModal({
 
         let url = '';
         if (mode === 'jti') {
-          url = `/api/jti/history?mode=${mode}`;
+          url = `/api/jti/history`;
         } else {
           url = `/api/chat/history${storeName ? `?store_name=${encodeURIComponent(storeName)}` : ''}`;
         }
@@ -215,9 +215,9 @@ export default function ConversationHistoryModal({
     try {
       let url = '';
       if (mode === 'jti') {
-        url = `/api/jti/history/export?mode=${mode}`;
+        url = `/api/jti/history/export`;
         if (sessionIds && sessionIds.length > 0) {
-          url += `&session_ids=${sessionIds.join(',')}`;
+          url += `?session_ids=${sessionIds.join(',')}`;
         }
       } else {
         url = `/api/chat/history/export`;

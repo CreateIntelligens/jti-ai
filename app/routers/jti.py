@@ -46,8 +46,6 @@ class ChatRequest(BaseModel):
     """對話請求"""
     session_id: str = Field(..., description="Session ID")
     message: str = Field(..., description="使用者訊息")
-    store_id: Optional[str] = Field(None, description="File Search Store ID（選用）")
-    language: Optional[str] = Field(None, description="語言 (zh/en)")
 
 
 class ChatResponse(BaseModel):
@@ -223,11 +221,6 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
 
         # 記錄用戶訊息
         logger.info(f"[用戶訊息] Session: {request.session_id[:8]}... | 狀態: {session.step.value} | 訊息: '{request.message}'")
-
-        # 如果前端傳來 language，更新 session
-        if request.language and request.language != session.language:
-            session.language = request.language
-            logger.info(f"Updated session language: {session.session_id} -> {request.language}")
 
         # ========== QUIZ 狀態：後端完全接管 ==========
         if session.step.value == "QUIZ" and session.current_question:
@@ -476,7 +469,6 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         result = await main_agent.chat(
             session_id=request.session_id,
             user_message=request.message,
-            store_id=request.store_id
         )
 
         # 記錄 AI 回應
@@ -810,16 +802,16 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
     response_model=Union[ConversationsBySessionResponse, ConversationsGroupedResponse],
     response_model_exclude_none=True,
 )
-async def get_conversations(session_id: Optional[str] = None, mode: str = "jti", auth: dict = Depends(verify_auth)):
+async def get_conversations(session_id: Optional[str] = None, auth: dict = Depends(verify_auth)):
     """
     取得對話歷史
 
     Query Parameters:
     - session_id: (可選) 指定 Session ID 則只回傳該 session 的對話
-    - mode: 對話模式，預設 "jti"
 
     如果不提供 session_id，則回傳所有 JTI 模式的對話（按 session 分組）
     """
+    mode = "jti"
     try:
         if session_id:
             # 查詢特定 session
@@ -886,13 +878,12 @@ async def delete_conversation(session_id: str, auth: dict = Depends(verify_auth)
     response_model=ExportConversationsResponse,
     response_model_exclude_none=True,
 )
-async def export_conversations(session_ids: Optional[str] = None, mode: str = "jti", auth: dict = Depends(verify_auth)):
+async def export_conversations(session_ids: Optional[str] = None, auth: dict = Depends(verify_auth)):
     """
     匯出對話歷史為 JSON 格式
 
     Query Parameters:
     - session_ids: (可選) 指定一個或多個 Session ID（用逗號分隔），只匯出指定的 sessions
-    - mode: 對話模式，預設 "jti"
 
     範例:
     - 單個 session: ?session_ids=abc123
@@ -901,6 +892,7 @@ async def export_conversations(session_ids: Optional[str] = None, mode: str = "j
 
     如果不提供 session_ids，則匯出所有 JTI 模式的對話（按 session 分組）
     """
+    mode = "jti"
     try:
         if session_ids:
             # 解析 session_ids（支援逗號分隔）

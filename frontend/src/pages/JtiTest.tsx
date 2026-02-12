@@ -142,7 +142,7 @@ export default function JtiTest() {
       const res = await fetchWithApiKey('/api/jti/chat/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, message, language: currentLanguage }),
+        body: JSON.stringify({ session_id: sessionId, message }),
       });
 
       const data = await res.json();
