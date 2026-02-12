@@ -15,8 +15,9 @@ interface SessionData {
   session_id: string;
   step: string;
   answers?: Record<string, string>;
+  color_scores?: Record<string, number>;
   color_result_id?: string;
-  color_result?: { color_name?: string };
+  color_result?: { color_name?: string; title?: string };
 }
 
 export default function JtiTest() {

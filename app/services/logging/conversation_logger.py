@@ -140,6 +140,33 @@ class ConversationLogger:
 
         return logs
 
+    def delete_session_logs(self, session_id: str) -> int:
+        """刪除特定 session 的所有對話紀錄
+
+        Args:
+            session_id: Session ID
+
+        Returns:
+            刪除的記錄數
+        """
+        existing_files = list(self.log_dir.glob(f"*{session_id}.jsonl"))
+        if not existing_files:
+            return 0
+
+        log_file = existing_files[0]
+        # 計算行數
+        count = 0
+        try:
+            with open(log_file, "r", encoding="utf-8") as f:
+                count = sum(1 for line in f if line.strip())
+            log_file.unlink()
+            logger.info(f"Deleted {count} conversation logs for session {session_id[:8]}...")
+        except Exception as e:
+            logger.error(f"Failed to delete session logs: {e}")
+            return 0
+
+        return count
+
     def list_sessions(self) -> List[str]:
         """列出所有有日誌的 session
 

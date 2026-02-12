@@ -11,8 +11,6 @@ from typing import Any, Dict, List, Optional
 
 from app.models.session import Session, SessionStep
 
-MAX_CHAT_HISTORY = 10
-
 
 class SessionStateMixin:
     """
@@ -86,8 +84,6 @@ class SessionStateMixin:
             return None
 
         session.chat_history.append({"role": role, "content": content})
-        if len(session.chat_history) > MAX_CHAT_HISTORY:
-            session.chat_history = session.chat_history[-MAX_CHAT_HISTORY:]
 
         return self.update_session(session)
 

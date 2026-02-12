@@ -12,7 +12,7 @@ export default function ChatArea({
   messages,
   onSendMessage,
   disabled,
-  loading,
+  loading: _loading,
 }: ChatAreaProps) {
   const [input, setInput] = useState('');
   const [shouldFocus, setShouldFocus] = useState(false);

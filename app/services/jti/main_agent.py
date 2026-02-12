@@ -42,6 +42,55 @@ class MainAgent:
 
     def __init__(self):
         self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+        # 持久 chat session：session_id → Gemini ChatSession
+        self._chat_sessions: Dict[str, Any] = {}
+
+    def _get_or_create_chat_session(self, session: Session):
+        """取得或建立持久 Gemini chat session（如有 MongoDB 歷史會自動恢復）"""
+        sid = session.session_id
+        if sid in self._chat_sessions:
+            return self._chat_sessions[sid]
+
+        # 從 session.chat_history 恢復歷史
+        history = []
+        if session.chat_history:
+            for msg in session.chat_history:
+                role = "user" if msg["role"] == "user" else "model"
+                history.append(
+                    types.Content(
+                        role=role,
+                        parts=[types.Part.from_text(text=msg["content"])]
+                    )
+                )
+            logger.info(f"從歷史恢復 chat session: {len(history)} 筆 (session={sid[:8]}...)")
+
+        system_instruction = self._get_system_instruction(session)
+        file_search_tools = self._build_file_search_tools(language=session.language)
+        config = types.GenerateContentConfig(
+            tools=file_search_tools,
+            system_instruction=[types.Part.from_text(text=system_instruction)]
+        )
+
+        chat_session = gemini_client.chats.create(
+            model=self.model_name,
+            config=config,
+            history=history
+        )
+        self._chat_sessions[sid] = chat_session
+        return chat_session
+
+    def _sync_history_to_db(self, session_id: str, user_message: str, assistant_message: str):
+        """將真正的 user/model 訊息同步到 MongoDB（不截斷）"""
+        session = session_manager.get_session(session_id)
+        if not session:
+            return
+        session.chat_history.append({"role": "user", "content": user_message})
+        session.chat_history.append({"role": "assistant", "content": assistant_message})
+        session_manager.update_session(session)
+
+    def remove_session(self, session_id: str):
+        """清除記憶體中的 chat session"""
+        self._chat_sessions.pop(session_id, None)
 
     @staticmethod
     def _format_options_text(options: list) -> str:
@@ -123,7 +172,7 @@ class MainAgent:
         user_message: str,
         store_id: Optional[str] = None
     ) -> Dict:
-        """處理對話（使用 Chat API 確保 File Search 正常觸發）"""
+        """處理對話（使用持久 Chat Session + File Search）"""
         try:
             if not gemini_client:
                 return {
@@ -139,40 +188,12 @@ class MainAgent:
                     "message": "找不到對話記錄，請重新開始。"
                 }
 
-            # 2. 準備 system instruction 和動態狀態
-            system_instruction = self._get_system_instruction(session)
+            # 2. 取得或建立持久 chat session
+            chat_session = self._get_or_create_chat_session(session)
 
-            # 3. 建立對話歷史
-            history = []
-            if session.chat_history:
-                logger.info(f"載入對話歷史: {len(session.chat_history)} 筆")
-                for msg in session.chat_history[-5:]:
-                    role = "user" if msg["role"] == "user" else "model"
-                    history.append(
-                        types.Content(
-                            role=role,
-                            parts=[types.Part.from_text(text=msg["content"])]
-                        )
-                    )
-            else:
-                logger.info("沒有對話歷史（新 session）")
-
-            # 4. 用 Chat API + file_search + system_instruction
-            file_search_tools = self._build_file_search_tools(language=session.language)
-            config = types.GenerateContentConfig(
-                tools=file_search_tools,
-                system_instruction=[types.Part.from_text(text=system_instruction)]
-            )
-
-            chat_session = gemini_client.chats.create(
-                model=self.model_name,
-                config=config,
-                history=history
-            )
-
-            # 5. 發送訊息
+            # 3. 發送訊息（SDK 自動維護歷史）
             logger.info(f"使用者訊息: {user_message[:200]}...")
-            response = chat_session.send_message(user_message, config=config)
+            response = chat_session.send_message(user_message)
 
             # DEBUG: 檢查 File Search grounding
             if response.candidates:
@@ -181,19 +202,12 @@ class MainAgent:
 
             tool_calls_log = []
 
-            # 7. 取得最終回應
+            # 4. 取得最終回應
             final_message = ""
             if response.candidates and response.candidates[0].content.parts:
                 for part in response.candidates[0].content.parts:
                     if hasattr(part, 'text') and part.text:
                         final_message += part.text
-
-            if not final_message and tool_calls_log:
-                last_tool_call = tool_calls_log[-1]
-                tool_result = last_tool_call.get("result", {})
-                if isinstance(tool_result, dict) and "message" in tool_result:
-                    final_message = tool_result["message"]
-                    logger.warning(f"LLM 無文字回應，改用工具 message: tool={last_tool_call.get('tool')}")
 
             if not final_message:
                 final_message = "AI目前故障 請聯絡"
@@ -202,12 +216,11 @@ class MainAgent:
             # 清除 Gemini File Search 的 citation 標記（例如 [cite: 1, xxx.csv]）
             final_message = re.sub(r'\s*\[cite:\s*[^\]]*\]', '', final_message).strip()
 
-            # 8. 保存對話歷史
+            # 5. 同步到 MongoDB（供重啟恢復用）
+            self._sync_history_to_db(session_id, user_message, final_message)
             updated_session = session_manager.get_session(session_id)
-            session_manager.add_chat_message(session_id, "user", user_message)
-            session_manager.add_chat_message(session_id, "assistant", final_message)
 
-            # 9. 記錄對話日誌
+            # 6. 記錄對話日誌
             conversation_logger.log_conversation(
                 session_id=session_id,
                 user_message=user_message,
@@ -251,7 +264,9 @@ class MainAgent:
         """
         當後端已執行工具時，讓 LLM 根據工具結果生成回應
 
-        用於 QUIZ 流程：後端判斷並呼叫工具，LLM 負責生成自然回應
+        使用持久 chat session，但只把真正的 user/model 訊息記進歷史，
+        session_state 和 instruction 透過一次性 generate_content 處理，
+        再手動將乾淨的 user message 和 model response 追加到 chat session 歷史。
         """
         try:
             session = session_manager.get_session(session_id)
@@ -269,26 +284,16 @@ class MainAgent:
                     "如果中途想離開，請輸入中斷，即可繼續問答，那我們開始測驗吧！"
                 )
                 message = f"{opening}\n\n第1題：{q.get('text', '')}\n{options_text}"
+
+                # 把乾淨的 user/model 追加到持久 chat session 歷史
+                chat_session = self._get_or_create_chat_session(session)
+                self._append_to_chat_history(chat_session, user_message, message)
+                self._sync_history_to_db(session_id, user_message, message)
+
                 return {
                     "message": message,
                     "session": session.model_dump(),
                 }
-
-            # 建立對話上下文
-            conversation_parts = []
-
-            # 加入歷史對話（最多 5 筆）
-            if session.chat_history:
-                recent_history = session.chat_history[-5:]
-                for msg in recent_history:
-                    # 轉換 role：assistant → model
-                    role = "model" if msg["role"] == "assistant" else msg["role"]
-                    conversation_parts.append(
-                        types.Content(
-                            role=role,
-                            parts=[types.Part.from_text(text=msg["content"])]
-                        )
-                    )
 
             # 根據工具結果生成指示
             if "instruction_for_llm" in tool_result:
@@ -318,25 +323,24 @@ class MainAgent:
             else:
                 instruction = "請簡短回應使用者"
 
-            # 組合：session state + 使用者訊息 + 指示
-            session_state = self._get_session_state(session)
-            full_prompt = f"""{session_state}
+            # 取得持久 chat session 的歷史作為上下文
+            chat_session = self._get_or_create_chat_session(session)
+            history = list(chat_session._curated_history) if hasattr(chat_session, '_curated_history') else []
 
-使用者說：{user_message}
-
-{instruction}"""
-
+            # 歷史 + 乾淨的 user message
+            conversation_parts = list(history)
             conversation_parts.append(
                 types.Content(
                     role="user",
-                    parts=[types.Part.from_text(text=full_prompt)]
+                    parts=[types.Part.from_text(text=user_message)]
                 )
             )
 
-            # 呼叫 LLM 生成回應（使用靜態 system instruction）
+            # 把 session state + instruction 併入 system_instruction
             system_instruction = self._get_system_instruction(session)
+            session_state = self._get_session_state(session)
             config = types.GenerateContentConfig(
-                system_instruction=system_instruction
+                system_instruction=f"{system_instruction}\n\n{session_state}\n\n{instruction}"
             )
 
             response = gemini_client.models.generate_content(
@@ -355,9 +359,9 @@ class MainAgent:
             if not final_message:
                 final_message = "收到！"
 
-            # 記錄對話（不在這裡記錄，由 API 層記錄）
-            # session_manager.add_chat_message(session_id, "user", user_message)
-            # session_manager.add_chat_message(session_id, "assistant", final_message)
+            # 把乾淨的 user/model 訊息追加到持久 chat session 歷史
+            self._append_to_chat_history(chat_session, user_message, final_message)
+            self._sync_history_to_db(session_id, user_message, final_message)
 
             return {
                 "message": final_message,
@@ -370,6 +374,17 @@ class MainAgent:
                 "error": str(e),
                 "message": "收到！"
             }
+
+    @staticmethod
+    def _append_to_chat_history(chat_session, user_message: str, model_message: str):
+        """將乾淨的 user/model 訊息追加到 SDK chat session 的內部歷史"""
+        if hasattr(chat_session, '_curated_history'):
+            chat_session._curated_history.append(
+                types.Content(role="user", parts=[types.Part.from_text(text=user_message)])
+            )
+            chat_session._curated_history.append(
+                types.Content(role="model", parts=[types.Part.from_text(text=model_message)])
+            )
 
 
 # 全域實例

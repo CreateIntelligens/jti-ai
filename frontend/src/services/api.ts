@@ -225,6 +225,14 @@ export function setActiveApiKey(name: string): void {
 // ========== General Chat Conversations ==========
 
 export async function getGeneralConversations(): Promise<any> {
-  const response = await fetchWithApiKey(`${API_BASE}/chat/conversations`);
+  const response = await fetchWithApiKey(`${API_BASE}/chat/history`);
   return handleResponse<any>(response);
+}
+
+export async function deleteConversation(mode: 'jti' | 'general', sessionId: string): Promise<void> {
+  const url = mode === 'jti'
+    ? `${API_BASE}/jti/history/${encodeURIComponent(sessionId)}`
+    : `${API_BASE}/chat/history/${encodeURIComponent(sessionId)}`;
+  const response = await fetchWithApiKey(url, { method: 'DELETE' });
+  await handleResponse<void>(response);
 }

@@ -289,7 +289,6 @@ export default function App() {
         isOpen={promptModalOpen}
         onClose={() => setPromptModalOpen(false)}
         currentStore={currentStore}
-        onRefresh={refreshStores}
         onRestartChat={handleRestartChat}
         stores={stores}
       />
@@ -305,7 +304,7 @@ export default function App() {
       <ConversationHistoryModal
         isOpen={conversationHistoryModalOpen}
         onClose={() => setConversationHistoryModalOpen(false)}
-        sessionId={sessionId}
+        sessionId={sessionId || undefined}
         storeName={currentStore || undefined}
         mode="general"
       />

@@ -31,5 +31,8 @@
   "loading": "Loading...",
   "export": "Export",
   "copy": "Copy",
-  "copied": "Copied"
+  "copied": "Copied",
+  "delete": "Delete",
+  "confirm_delete_session": "Are you sure you want to delete all conversations in this session? This action cannot be undone.",
+  "session_deleted": "Session deleted"
 }

@@ -8,8 +8,8 @@ from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Depends
 from google import genai
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional, Dict, Any, List, Union
 import logging
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 from app.services.jti.main_agent import main_agent
@@ -26,11 +26,6 @@ conversation_logger = get_conversation_logger()
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/jti", tags=["JTI Quiz"])
-
-QUIZ_PAUSE_MESSAGE_ZH = (
-    "好呀，那我先幫你暫停測驗，我們回到一般問答。"
-    "之後想接著做，請輸入「繼續測驗」。"
-)
 
 # === Request/Response Models ===
 
@@ -67,9 +62,92 @@ class QuizActionRequest(BaseModel):
     session_id: str = Field(..., description="Session ID")
 
 
-class GetSessionResponse(BaseModel):
-    """取得 session 回應"""
-    session: Dict[str, Any]
+
+class ConversationToolCall(BaseModel):
+    """工具呼叫記錄"""
+    tool: Optional[str] = None
+    tool_name: Optional[str] = None
+    args: Dict[str, Any] = Field(default_factory=dict)
+    result: Dict[str, Any] = Field(default_factory=dict)
+    execution_time_ms: Optional[float] = None
+
+    model_config = ConfigDict(extra="allow")
+
+
+class ConversationItem(BaseModel):
+    """單筆對話記錄"""
+    mongo_id: Optional[str] = Field(default=None, alias="_id", description="MongoDB document ID")
+    session_id: str
+    mode: str
+    turn_number: Optional[int] = None
+    timestamp: str
+    user_message: str
+    agent_response: str
+    tool_calls: List[ConversationToolCall] = Field(default_factory=list)
+    session_snapshot: Optional[Dict[str, Any]] = None
+    session_state: Optional[Dict[str, Any]] = None
+    error: Optional[str] = None
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+
+class ConversationSessionGroup(BaseModel):
+    """按 session 分組的對話"""
+    session_id: str
+    conversations: List[ConversationItem]
+    first_message_time: Optional[str] = None
+    total: int
+
+
+class ConversationsBySessionResponse(BaseModel):
+    """查詢單一 session 對話回應"""
+    session_id: str
+    mode: str
+    conversations: List[ConversationItem]
+    total: int
+
+
+class ConversationsGroupedResponse(BaseModel):
+    """查詢多個 sessions 對話回應"""
+    mode: str
+    sessions: List[ConversationSessionGroup]
+    total_conversations: int
+    total_sessions: int
+
+
+class DeleteConversationResponse(BaseModel):
+    """刪除對話回應"""
+    ok: bool
+    deleted_logs: int
+    deleted_session: bool
+
+
+class ExportConversationsResponse(BaseModel):
+    """匯出對話回應"""
+    exported_at: str
+    mode: str
+    sessions: List[ConversationSessionGroup]
+    total_conversations: int
+    total_sessions: int
+
+
+class GeneralConversationsResponse(BaseModel):
+    """General chat 對話查詢回應"""
+    store_name: str
+    mode: str
+    sessions: List[ConversationSessionGroup]
+    total_conversations: int
+    total_sessions: int
+
+
+class ExportGeneralConversationsResponse(BaseModel):
+    """General chat 對話匯出回應"""
+    exported_at: str
+    store_name: str
+    mode: str
+    sessions: List[ConversationSessionGroup]
+    total_conversations: int
+    total_sessions: int
 
 
 # === Endpoints ===
@@ -93,30 +171,6 @@ async def create_session(request: CreateSessionRequest, auth: dict = Depends(ver
 
     except Exception as e:
         logger.error(f"Failed to create session: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/session/{session_id}", response_model=GetSessionResponse)
-async def get_session(session_id: str, auth: dict = Depends(verify_auth)):
-    """
-    取得 session 狀態
-
-    查詢目前測驗的進度和結果
-    """
-    try:
-        session = session_manager.get_session(session_id)
-
-        if session is None:
-            raise HTTPException(status_code=404, detail="Session not found")
-
-        return GetSessionResponse(
-            session=session.model_dump()
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get session: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -266,10 +320,6 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
 
                 # 記錄 AI 回應
                 logger.info(f"[AI回應] 無法判斷選項，重問 | {response_message[:80]}...")
-
-                # 記錄對話
-                session_manager.add_chat_message(request.session_id, "user", request.message)
-                session_manager.add_chat_message(request.session_id, "assistant", response_message)
 
                 # 記錄到對話日誌
                 conversation_logger.log_conversation(
@@ -546,18 +596,13 @@ def _format_options_text(options: list) -> str:
 async def _pause_quiz_and_respond(session_id: str, log_user_message: str, session: Any) -> ChatResponse:
     updated_session = session_manager.pause_quiz(session_id)
 
-    # 暫停後，將使用者訊息交給 AI 回應（暫停訊息 + 回答問題）
+    # 暫停後，將使用者訊息交給 AI 回應
     ai_result = await main_agent.chat(
         session_id=session_id,
         user_message=log_user_message,
         store_id=None,
     )
-    ai_message = ai_result.get("message", "")
-
-    # 組合：暫停提示 + AI 回應（如果 AI 有產生有意義的回答）
-    response_message = QUIZ_PAUSE_MESSAGE_ZH
-    if ai_message and ai_message != log_user_message:
-        response_message = f"{QUIZ_PAUSE_MESSAGE_ZH}\n\n{ai_message}"
+    response_message = ai_result.get("message", "收到！")
 
     conversation_logger.log_conversation(
         session_id=session_id,
@@ -730,42 +775,11 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
         return None
 
 
-@router.delete("/session/{session_id}")
-async def delete_session(session_id: str, auth: dict = Depends(verify_auth)):
-    """刪除 session（Admin only）"""
-    require_admin(auth)
-    try:
-        success = session_manager.delete_session(session_id)
-
-        if not success:
-            raise HTTPException(status_code=404, detail="Session not found")
-
-        return {"message": "Session deleted successfully"}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to delete session: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/sessions")
-async def list_sessions(auth: dict = Depends(verify_auth)):
-    """列出所有 sessions（Admin only）"""
-    require_admin(auth)
-    try:
-        sessions = session_manager.get_all_sessions()
-        return {
-            "sessions": [s.model_dump() for s in sessions],
-            "total": len(sessions)
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to list sessions: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/conversations")
+@router.get(
+    "/history",
+    response_model=Union[ConversationsBySessionResponse, ConversationsGroupedResponse],
+    response_model_exclude_none=True,
+)
 async def get_conversations(session_id: Optional[str] = None, mode: str = "jti", auth: dict = Depends(verify_auth)):
     """
     取得對話歷史
@@ -810,7 +824,32 @@ async def get_conversations(session_id: Optional[str] = None, mode: str = "jti",
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/conversations/export")
+@router.delete("/history/{session_id}", response_model=DeleteConversationResponse)
+async def delete_conversation(session_id: str, auth: dict = Depends(verify_auth)):
+    """刪除指定 session 的對話紀錄
+
+    同時刪除：
+    - 對話日誌 (conversation logs)
+    - JTI session
+    - 記憶體中的 chat session
+    """
+
+    deleted_logs = conversation_logger.delete_session_logs(session_id)
+    deleted_session = session_manager.delete_session(session_id)
+    main_agent.remove_session(session_id)
+
+    return {
+        "ok": True,
+        "deleted_logs": deleted_logs,
+        "deleted_session": deleted_session,
+    }
+
+
+@router.get(
+    "/history/export",
+    response_model=ExportConversationsResponse,
+    response_model_exclude_none=True,
+)
 async def export_conversations(session_ids: Optional[str] = None, mode: str = "jti", auth: dict = Depends(verify_auth)):
     """
     匯出對話歷史為 JSON 格式

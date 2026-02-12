@@ -399,29 +399,38 @@ def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.get("/api/chat/history")
-def get_history(
-    session_id: Optional[str] = None,
-    auth: dict = Depends(verify_auth),
-):
+@app.delete("/api/chat/history/{session_id}", response_model=jti.DeleteConversationResponse)
+def delete_general_conversation(session_id: str, auth: dict = Depends(verify_auth)):
+    """刪除指定 session 的對話紀錄
+
+    同時刪除：
+    - 對話日誌 (conversation logs)
+    - General chat session (MongoDB)
+    - 記憶體中的 session manager
     """
-    取得指定 Session 的對話紀錄。
 
-    Query Parameters:
-    - session_id: (可選) 指定要查詢的 session ID
-    """
-    # 優先從 MongoDB 取得
-    if session_id and general_session_manager:
-        history = general_session_manager.get_history(session_id)
-        if history:
-            return [{"role": msg["role"], "text": msg["content"]} for msg in history]
+    deleted_logs = conversation_logger.delete_session_logs(session_id)
 
-    # Fallback: 從記憶體中的 manager 取得
-    mgr = _get_or_create_manager(session_id=session_id)
-    return mgr.get_history()
+    deleted_session = False
+    if general_session_manager:
+        deleted_session = general_session_manager.delete_session(session_id)
+
+    # 清除記憶體中的 manager
+    if session_id in user_managers:
+        del user_managers[session_id]
+
+    return {
+        "ok": True,
+        "deleted_logs": deleted_logs,
+        "deleted_session": deleted_session,
+    }
 
 
-@app.get("/api/chat/conversations")
+@app.get(
+    "/api/chat/history",
+    response_model=jti.GeneralConversationsResponse,
+    response_model_exclude_none=True,
+)
 def get_general_conversations(
     store_name: Optional[str] = None,
     auth: dict = Depends(verify_auth),
@@ -467,7 +476,11 @@ def get_general_conversations(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.get("/api/chat/conversations/export")
+@app.get(
+    "/api/chat/history/export",
+    response_model=jti.ExportGeneralConversationsResponse,
+    response_model_exclude_none=True,
+)
 def export_general_conversations(
     store_name: Optional[str] = None,
     session_ids: Optional[str] = None,

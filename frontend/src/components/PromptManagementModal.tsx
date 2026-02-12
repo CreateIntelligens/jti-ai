@@ -30,8 +30,8 @@ interface PromptManagementModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentStore: string | null;
-  onRefresh: () => void;
-  onRestartChat: () => void;
+  onRefresh: () => void | Promise<unknown>;
+  onRestartChat: () => void | Promise<void>;
   stores: Store[];
 }
 

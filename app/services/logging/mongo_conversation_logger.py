@@ -297,6 +297,27 @@ class MongoConversationLogger:
             logger.error(f"Failed to get tool call statistics: {e}")
             return {}
 
+    def delete_session_logs(self, session_id: str) -> int:
+        """刪除特定 session 的所有對話紀錄
+
+        Args:
+            session_id: Session ID
+
+        Returns:
+            刪除的記錄數
+        """
+        try:
+            result = self.conversations_collection.delete_many({
+                "session_id": session_id
+            })
+            deleted_count = result.deleted_count
+            logger.info(f"Deleted {deleted_count} conversation logs for session {session_id[:8]}...")
+            return deleted_count
+
+        except Exception as e:
+            logger.error(f"Failed to delete session logs: {e}")
+            return 0
+
     def delete_old_logs(self, days: int = 30) -> int:
         """刪除指定天數前的對話紀錄
 
