@@ -89,11 +89,11 @@ function getSelectedModel(): string {
   return localStorage.getItem('selectedModel') || 'gemini-2.5-flash';
 }
 
-export async function startChat(storeName: string): Promise<StartChatResponse> {
+export async function startChat(storeName: string, previousSessionId?: string | null): Promise<StartChatResponse> {
   const response = await fetchWithApiKey(`${API_BASE}/chat/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ store_name: storeName, model: getSelectedModel() }),
+    body: JSON.stringify({ store_name: storeName, model: getSelectedModel(), previous_session_id: previousSessionId || undefined }),
   });
   return handleResponse<StartChatResponse>(response);
 }

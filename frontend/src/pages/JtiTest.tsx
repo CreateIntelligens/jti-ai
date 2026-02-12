@@ -47,7 +47,7 @@ export default function JtiTest() {
       const res = await fetch('/api/jti/chat/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ language: currentLanguage }),
+        body: JSON.stringify({ language: currentLanguage, previous_session_id: sessionId }),
       });
       const data = await res.json();
       setSessionId(data.session_id);
@@ -82,7 +82,7 @@ export default function JtiTest() {
       const res = await fetch('/api/jti/chat/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ language: newLang }),
+        body: JSON.stringify({ language: newLang, previous_session_id: sessionId }),
       });
       const data = await res.json();
       setSessionId(data.session_id);

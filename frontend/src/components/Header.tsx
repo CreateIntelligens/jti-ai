@@ -5,6 +5,7 @@ interface HeaderProps {
   onOpenStoreManagement: () => void;
   onOpenUserApiKeySettings: () => void;
   onOpenConversationHistory?: () => void;
+  onRestartChat?: () => void;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
 }
@@ -16,6 +17,7 @@ export default function Header({
   onOpenStoreManagement,
   onOpenUserApiKeySettings,
   onOpenConversationHistory,
+  onRestartChat,
   theme,
   onToggleTheme,
 }: HeaderProps) {
@@ -47,6 +49,15 @@ export default function Header({
           <span className={`theme-option ${theme === 'light' ? 'active' : ''}`}>☀️</span>
           <div className={`theme-slider ${theme === 'light' ? 'light' : ''}`} />
         </div>
+        {onRestartChat && (
+          <button
+            onClick={onRestartChat}
+            className="header-link secondary"
+            aria-label="重新開始對話"
+          >
+            🔄 重新開始
+          </button>
+        )}
         {onOpenConversationHistory && (
           <button
             onClick={onOpenConversationHistory}

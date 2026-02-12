@@ -32,6 +32,7 @@ router = APIRouter(prefix="/api/jti", tags=["JTI Quiz"])
 class CreateSessionRequest(BaseModel):
     """建立 session 請求"""
     language: str = "zh"  # 語言 (zh/en)
+    previous_session_id: Optional[str] = None  # 舊 session ID，用於清理記憶體
 
 
 class CreateSessionResponse(BaseModel):
@@ -160,6 +161,11 @@ async def create_session(request: CreateSessionRequest, auth: dict = Depends(ver
     回傳 session_id 供後續 /api/jti/chat/message 使用
     """
     try:
+        # 清理舊 session 的記憶體 chat session
+        if request.previous_session_id:
+            main_agent.remove_session(request.previous_session_id)
+            logger.info(f"Cleaned up previous chat session: {request.previous_session_id[:8]}...")
+
         session = session_manager.create_session(mode=GameMode.COLOR, language=request.language)
 
         logger.info(f"Created new session: {session.session_id} (language={request.language})")

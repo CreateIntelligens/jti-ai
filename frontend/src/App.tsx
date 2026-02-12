@@ -128,9 +128,10 @@ export default function App() {
 
   const handleRestartChat = async () => {
     if (!currentStore) return;
+    if (messages.length > 0 && !window.confirm('確定要重新開始對話嗎？')) return;
     setMessages([]);
     try {
-      const result = await api.startChat(currentStore);
+      const result = await api.startChat(currentStore, sessionId);
       if (result.session_id) {
         setSessionId(result.session_id);
       }
@@ -253,6 +254,7 @@ export default function App() {
         onOpenStoreManagement={() => setStoreModalOpen(true)}
         onOpenUserApiKeySettings={() => setUserApiKeyModalOpen(true)}
         onOpenConversationHistory={() => setConversationHistoryModalOpen(true)}
+        onRestartChat={handleRestartChat}
         theme={theme}
         onToggleTheme={toggleTheme}
       />

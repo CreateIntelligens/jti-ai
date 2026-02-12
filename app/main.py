@@ -197,6 +197,7 @@ class QueryRequest(BaseModel):
 class ChatStartRequest(BaseModel):
     store_name: Optional[str] = None  # admin 自由選，一般 key 會被強制覆蓋
     model: str = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+    previous_session_id: Optional[str] = None  # 舊 session ID，用於清理記憶體
 
 
 class ChatMessageRequest(BaseModel):
@@ -285,6 +286,11 @@ def start_chat(req: ChatStartRequest, auth: dict = Depends(verify_auth)):
     - Admin → 用 request 的 store_name（必填）
     - 一般 Key → 強制用 key 綁定的 store（忽略 request 的 store_name）
     """
+    # 清理舊 session 的記憶體
+    if req.previous_session_id and req.previous_session_id in user_managers:
+        del user_managers[req.previous_session_id]
+        logging.info(f"Cleaned up previous session: {req.previous_session_id[:8]}...")
+
     # 決定 store_name
     if auth["role"] == "admin":
         if not req.store_name:
