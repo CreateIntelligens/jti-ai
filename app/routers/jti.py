@@ -2,7 +2,12 @@
 JTI 測驗系統 API Endpoints
 """
 
-from fastapi import APIRouter, HTTPException, Request, Depends
+import os
+import re
+from datetime import datetime
+
+from fastapi import APIRouter, HTTPException, Depends
+from google import genai
 from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any
 import logging
@@ -10,6 +15,9 @@ from app.services.session.session_manager_factory import get_session_manager, ge
 from app.services.jti.main_agent import main_agent
 from app.models.session import GameMode
 from app.auth import verify_auth, require_admin
+from app.tools.tool_executor import tool_executor
+from app.tools.quiz import get_total_questions
+from app.utils import group_conversations_by_session
 
 # 使用工廠函數取得適當的實作（MongoDB 或記憶體）
 session_manager = get_session_manager()
@@ -67,7 +75,7 @@ class GetSessionResponse(BaseModel):
 # === Endpoints ===
 
 @router.post("/chat/start", response_model=CreateSessionResponse)
-async def create_session(request: CreateSessionRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
+async def create_session(request: CreateSessionRequest, auth: dict = Depends(verify_auth)):
     """
     建立新的 JTI 對話 Session
 
@@ -89,7 +97,7 @@ async def create_session(request: CreateSessionRequest, raw_request: Request = N
 
 
 @router.get("/session/{session_id}", response_model=GetSessionResponse)
-async def get_session(session_id: str, request: Request = None, auth: dict = Depends(verify_auth)):
+async def get_session(session_id: str, auth: dict = Depends(verify_auth)):
     """
     取得 session 狀態
 
@@ -113,7 +121,7 @@ async def get_session(session_id: str, request: Request = None, auth: dict = Dep
 
 
 @router.post("/chat/message", response_model=ChatResponse)
-async def chat(request: ChatRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
+async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
     """
     主要對話端點
 
@@ -142,12 +150,8 @@ async def chat(request: ChatRequest, raw_request: Request = None, auth: dict = D
             session.language = request.language
             logger.info(f"Updated session language: {session.session_id} -> {request.language}")
 
-        from app.tools.tool_executor import tool_executor
-
         # ========== QUIZ 狀態：後端完全接管 ==========
         if session.step.value == "QUIZ" and session.current_question:
-            from app.tools.quiz import get_total_questions
-
             q = session.current_question
             total_questions = get_total_questions(session.quiz_id)
             remaining = total_questions - len(session.answers)
@@ -339,11 +343,11 @@ async def chat(request: ChatRequest, raw_request: Request = None, auth: dict = D
                 session_state={
                     "step": session.step.value,
                     "answers_count": len(session.answers),
-                        "color_result_id": session.color_result_id,
-                        "current_question_id": None
-                    },
+                    "color_result_id": session.color_result_id,
+                    "current_question_id": None
+                },
                 mode="jti"
-                )
+            )
 
             return ChatResponse(
                 message=response_message,
@@ -411,7 +415,7 @@ async def chat(request: ChatRequest, raw_request: Request = None, auth: dict = D
 
 
 @router.post("/quiz/start", response_model=ChatResponse)
-async def quiz_start(request: QuizActionRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
+async def quiz_start(request: QuizActionRequest, auth: dict = Depends(verify_auth)):
     """
     直接開始測驗（不依賴自然語言判斷）
 
@@ -431,8 +435,6 @@ async def quiz_start(request: QuizActionRequest, raw_request: Request = None, au
                 session=session.model_dump(),
                 tool_calls=[],
             )
-
-        from app.tools.tool_executor import tool_executor
 
         tool_result = await tool_executor.execute("start_quiz", {"session_id": request.session_id})
         updated_session = session_manager.get_session(request.session_id)
@@ -486,7 +488,7 @@ async def quiz_start(request: QuizActionRequest, raw_request: Request = None, au
 
 
 @router.post("/quiz/pause", response_model=ChatResponse)
-async def quiz_pause(request: QuizActionRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
+async def quiz_pause(request: QuizActionRequest, auth: dict = Depends(verify_auth)):
     """
     直接暫停測驗（不依賴自然語言判斷）
     """
@@ -509,7 +511,7 @@ async def quiz_pause(request: QuizActionRequest, raw_request: Request = None, au
 
 
 @router.post("/quiz/resume", response_model=ChatResponse)
-async def quiz_resume(request: QuizActionRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
+async def quiz_resume(request: QuizActionRequest, auth: dict = Depends(verify_auth)):
     """
     直接繼續先前暫停的測驗（不依賴自然語言判斷）
     """
@@ -617,8 +619,6 @@ def _resume_quiz_and_respond(
     )
 
     if log_progress:
-        from app.tools.quiz import get_total_questions
-
         total_questions = get_total_questions(updated_session.quiz_id) if updated_session else 5
         logger.info(f"✅ QUIZ 繼續測驗: 第 {current_q_num}/{total_questions} 題")
 
@@ -636,9 +636,6 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
     Returns:
         "A"~"E" 或 None（無法判斷）
     """
-    import os
-    from google import genai
-
     msg = user_message.strip()
     msg_upper = msg.upper()
     msg_lower = msg.lower()
@@ -651,7 +648,6 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
         logger.info(f"[規則判斷] 明確字母: '{user_message}' -> {msg_upper}")
         return msg_upper
     # 只把「獨立字母」當作答案；避免像 "pause" 這種字串含有 A 而誤判為選 A
-    import re
     label_hits = [
         label
         for label in labels
@@ -735,7 +731,7 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
 
 
 @router.delete("/session/{session_id}")
-async def delete_session(session_id: str, request: Request = None, auth: dict = Depends(verify_auth)):
+async def delete_session(session_id: str, auth: dict = Depends(verify_auth)):
     """刪除 session（Admin only）"""
     require_admin(auth)
     try:
@@ -754,7 +750,7 @@ async def delete_session(session_id: str, request: Request = None, auth: dict = 
 
 
 @router.get("/sessions")
-async def list_sessions(request: Request = None, auth: dict = Depends(verify_auth)):
+async def list_sessions(auth: dict = Depends(verify_auth)):
     """列出所有 sessions（Admin only）"""
     require_admin(auth)
     try:
@@ -770,7 +766,7 @@ async def list_sessions(request: Request = None, auth: dict = Depends(verify_aut
 
 
 @router.get("/conversations")
-async def get_conversations(session_id: Optional[str] = None, mode: str = "jti", request: Request = None, auth: dict = Depends(verify_auth)):
+async def get_conversations(session_id: Optional[str] = None, mode: str = "jti", auth: dict = Depends(verify_auth)):
     """
     取得對話歷史
 
@@ -798,23 +794,7 @@ async def get_conversations(session_id: Optional[str] = None, mode: str = "jti",
             # 查詢所有 JTI 對話
             all_conversations = conversation_logger.get_session_logs_by_mode(mode)
 
-            # 按 session_id 分組
-            sessions = {}
-            for conv in all_conversations:
-                sid = conv.get("session_id")
-                if sid not in sessions:
-                    sessions[sid] = {
-                        "session_id": sid,
-                        "conversations": [],
-                        "first_message_time": conv.get("timestamp"),
-                        "total": 0
-                    }
-                sessions[sid]["conversations"].append(conv)
-                sessions[sid]["total"] += 1
-
-            # 轉換成列表，按時間排序
-            session_list = list(sessions.values())
-            session_list.sort(key=lambda x: x["first_message_time"], reverse=True)
+            session_list = group_conversations_by_session(all_conversations)
 
             logger.info(f"Retrieved {len(all_conversations)} total conversations across {len(session_list)} sessions")
 
@@ -831,7 +811,7 @@ async def get_conversations(session_id: Optional[str] = None, mode: str = "jti",
 
 
 @router.get("/conversations/export")
-async def export_conversations(session_ids: Optional[str] = None, mode: str = "jti", request: Request = None, auth: dict = Depends(verify_auth)):
+async def export_conversations(session_ids: Optional[str] = None, mode: str = "jti", auth: dict = Depends(verify_auth)):
     """
     匯出對話歷史為 JSON 格式
 
@@ -847,8 +827,6 @@ async def export_conversations(session_ids: Optional[str] = None, mode: str = "j
     如果不提供 session_ids，則匯出所有 JTI 模式的對話（按 session 分組）
     """
     try:
-        from datetime import datetime
-
         if session_ids:
             # 解析 session_ids（支援逗號分隔）
             session_id_list = [sid.strip() for sid in session_ids.split(',') if sid.strip()]
@@ -884,23 +862,7 @@ async def export_conversations(session_ids: Optional[str] = None, mode: str = "j
             # 匯出所有 JTI 對話
             all_conversations = conversation_logger.get_session_logs_by_mode(mode)
 
-            # 按 session_id 分組
-            sessions = {}
-            for conv in all_conversations:
-                sid = conv.get("session_id")
-                if sid not in sessions:
-                    sessions[sid] = {
-                        "session_id": sid,
-                        "conversations": [],
-                        "first_message_time": conv.get("timestamp"),
-                        "total": 0
-                    }
-                sessions[sid]["conversations"].append(conv)
-                sessions[sid]["total"] += 1
-
-            # 轉換成列表，按時間排序
-            session_list = list(sessions.values())
-            session_list.sort(key=lambda x: x["first_message_time"], reverse=True)
+            session_list = group_conversations_by_session(all_conversations)
 
             return {
                 "exported_at": datetime.utcnow().isoformat(),

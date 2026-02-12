@@ -78,7 +78,6 @@ def verify_auth(request: Request) -> dict:
         return {"role": "admin", "store_name": None}
 
     # 4. 是一般 Key？（查 MongoDB）
-    from app.api_keys import APIKeyManager
     from app.main import api_key_manager
 
     if api_key_manager:

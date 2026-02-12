@@ -2,15 +2,17 @@
 Gemini File Search FastAPI 後端
 """
 
+import hashlib
 import logging
-import traceback
 import os
 import re
 import shutil
 import uuid
 import warnings
 from pathlib import Path
-from typing import Optional
+import time
+from datetime import datetime
+from typing import Dict, Optional
 
 # 設定 app logger 輸出
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(name)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
@@ -35,7 +37,6 @@ RESET = "\033[0m"
 class TimestampFormatter(uvicorn.logging.ColourizedFormatter):
     """在 uvicorn 原有的彩色格式前加上時間戳，並對狀態碼上色。"""
     def formatMessage(self, record):
-        from datetime import datetime
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         original = super().formatMessage(record)
 
@@ -65,14 +66,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from google.genai.errors import ClientError
-from typing import Dict
-import hashlib
 
 from .core import FileSearchManager
 from .api_keys import APIKeyManager
-from .auth import verify_auth, require_admin
+from .auth import verify_auth, require_admin, _extract_bearer_token
 from .routers import jti
 from .services.session.session_manager_factory import get_conversation_logger, get_general_chat_session_manager
+from .services.mongo_client import get_mongo_client
+from .utils import group_conversations_by_session
 
 # 使用工廠函數取得適當的實作（MongoDB 或檔案系統）
 conversation_logger = get_conversation_logger()
@@ -85,15 +86,12 @@ async def gemini_client_error_handler(request: Request, exc: ClientError):
     error_msg = str(exc)
     print(f"[Gemini API Error] {error_msg}")  # 打印完整錯誤
 
-    status_code = 500
-    detail = "Google API Error"
-
     if "RESOURCE_EXHAUSTED" in error_msg or "429" in error_msg:
         status_code = 429
         detail = "目前使用量已達上限 (429)，請稍後再試。"
     else:
-        detail = error_msg
         status_code = 400
+        detail = error_msg
 
     return JSONResponse(
         status_code=status_code,
@@ -207,7 +205,7 @@ class ChatMessageRequest(BaseModel):
 
 
 @app.get("/api/stores")
-def list_stores(request: Request, auth: dict = Depends(verify_auth)):
+def list_stores(auth: dict = Depends(verify_auth)):
     """列出所有 Store。（Admin only）"""
     require_admin(auth)
     mgr = _get_or_create_manager()
@@ -216,7 +214,7 @@ def list_stores(request: Request, auth: dict = Depends(verify_auth)):
 
 
 @app.post("/api/stores")
-def create_store(req: CreateStoreRequest, request: Request, auth: dict = Depends(verify_auth)):
+def create_store(req: CreateStoreRequest, auth: dict = Depends(verify_auth)):
     """建立新 Store。（Admin only）"""
     require_admin(auth)
     mgr = _get_or_create_manager()
@@ -225,7 +223,7 @@ def create_store(req: CreateStoreRequest, request: Request, auth: dict = Depends
 
 
 @app.get("/api/stores/{store_name:path}/files")
-def list_files(store_name: str, request: Request, auth: dict = Depends(verify_auth)):
+def list_files(store_name: str, auth: dict = Depends(verify_auth)):
     """列出 Store 中的檔案。（Admin only）"""
     require_admin(auth)
     mgr = _get_or_create_manager()
@@ -234,21 +232,17 @@ def list_files(store_name: str, request: Request, auth: dict = Depends(verify_au
 
 
 @app.delete("/api/files/{file_name:path}")
-def delete_file(file_name: str, request: Request, auth: dict = Depends(verify_auth)):
+def delete_file(file_name: str, auth: dict = Depends(verify_auth)):
     """刪除檔案。（Admin only）"""
     require_admin(auth)
     mgr = _get_or_create_manager()
-    try:
-        print(f"嘗試刪除檔案: {file_name}")
-        mgr.delete_file(file_name)
-        return {"ok": True}
-    except Exception as e:
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+    print(f"嘗試刪除檔案: {file_name}")
+    mgr.delete_file(file_name)
+    return {"ok": True}
 
 
 @app.post("/api/stores/{store_name:path}/upload")
-async def upload_file(store_name: str, file: UploadFile = File(...), request: Request = None, auth: dict = Depends(verify_auth)):
+async def upload_file(store_name: str, file: UploadFile = File(...), auth: dict = Depends(verify_auth)):
     """上傳檔案到 Store。（Admin only）"""
     require_admin(auth)
     mgr = _get_or_create_manager()
@@ -272,7 +266,7 @@ async def upload_file(store_name: str, file: UploadFile = File(...), request: Re
 
 
 @app.post("/api/query")
-def query(req: QueryRequest, request: Request, auth: dict = Depends(verify_auth)):
+def query(req: QueryRequest, auth: dict = Depends(verify_auth)):
     """查詢 Store (單次)。（Admin only）"""
     require_admin(auth)
     mgr = _get_or_create_manager()
@@ -281,7 +275,7 @@ def query(req: QueryRequest, request: Request, auth: dict = Depends(verify_auth)
 
 
 @app.post("/api/chat/start")
-def start_chat(req: ChatStartRequest, request: Request, auth: dict = Depends(verify_auth)):
+def start_chat(req: ChatStartRequest, auth: dict = Depends(verify_auth)):
     """
     開始新的對話 Session。
 
@@ -344,7 +338,7 @@ def start_chat(req: ChatStartRequest, request: Request, auth: dict = Depends(ver
     }
 
 @app.post("/api/chat/message")
-def send_message(req: ChatMessageRequest, request: Request, auth: dict = Depends(verify_auth)):
+def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
     """
     發送訊息到指定的對話 Session。
 
@@ -358,9 +352,7 @@ def send_message(req: ChatMessageRequest, request: Request, auth: dict = Depends
     if req.session_id:
         session_id = req.session_id
     else:
-        current_store = mgr.current_store if hasattr(mgr, 'current_store') else 'unknown'
-        session_key = f"{current_store}:{uuid.uuid4().hex[:8]}"
-        session_id = hashlib.sha256(session_key.encode()).hexdigest()
+        session_id = uuid.uuid4().hex
         print(f"[警告] /api/chat/message 沒有提供 session_id，使用全域 manager")
 
     current_store = mgr.current_store if hasattr(mgr, 'current_store') else 'unknown'
@@ -410,7 +402,6 @@ def send_message(req: ChatMessageRequest, request: Request, auth: dict = Depends
 @app.get("/api/chat/history")
 def get_history(
     session_id: Optional[str] = None,
-    request: Request = None,
     auth: dict = Depends(verify_auth),
 ):
     """
@@ -433,7 +424,6 @@ def get_history(
 @app.get("/api/chat/conversations")
 def get_general_conversations(
     store_name: Optional[str] = None,
-    request: Request = None,
     auth: dict = Depends(verify_auth),
 ):
     """
@@ -462,23 +452,7 @@ def get_general_conversations(
             if c.get("session_snapshot", {}).get("store") == current_store
         ]
 
-        # 按 session_id 分組
-        sessions = {}
-        for conv in store_conversations:
-            sid = conv.get("session_id")
-            if sid not in sessions:
-                sessions[sid] = {
-                    "session_id": sid,
-                    "conversations": [],
-                    "first_message_time": conv.get("timestamp"),
-                    "total": 0
-                }
-            sessions[sid]["conversations"].append(conv)
-            sessions[sid]["total"] += 1
-
-        # 轉換成列表，按時間排序
-        session_list = list(sessions.values())
-        session_list.sort(key=lambda x: x["first_message_time"], reverse=True)
+        session_list = group_conversations_by_session(store_conversations)
 
         return {
             "store_name": current_store,
@@ -497,7 +471,6 @@ def get_general_conversations(
 def export_general_conversations(
     store_name: Optional[str] = None,
     session_ids: Optional[str] = None,
-    request: Request = None,
     auth: dict = Depends(verify_auth),
 ):
     """
@@ -515,8 +488,6 @@ def export_general_conversations(
     回傳該知識庫的對話（按 session 分組）供匯出使用
     """
     try:
-        from datetime import datetime
-
         mgr = _get_or_create_manager()
 
         # 決定使用哪個 store
@@ -571,23 +542,7 @@ def export_general_conversations(
                 if c.get("session_snapshot", {}).get("store") == current_store
             ]
 
-            # 按 session_id 分組
-            sessions = {}
-            for conv in store_conversations:
-                sid = conv.get("session_id")
-                if sid not in sessions:
-                    sessions[sid] = {
-                        "session_id": sid,
-                        "conversations": [],
-                        "first_message_time": conv.get("timestamp"),
-                        "total": 0
-                    }
-                sessions[sid]["conversations"].append(conv)
-                sessions[sid]["total"] += 1
-
-            # 轉換成列表，按時間排序
-            session_list = list(sessions.values())
-            session_list.sort(key=lambda x: x["first_message_time"], reverse=True)
+            session_list = group_conversations_by_session(store_conversations)
 
             return {
                 "exported_at": datetime.utcnow().isoformat(),
@@ -691,8 +646,7 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
         # 一般 key → 從 auth 取得綁定的 store
         if not api_key_manager:
             raise HTTPException(status_code=500, detail="API Key Manager 未初始化")
-        from .auth import _extract_bearer_token as extract_token
-        token = extract_token(raw_request)
+        token = _extract_bearer_token(raw_request)
         api_key_info = api_key_manager.verify_key(token) if token else None
         store_name = auth["store_name"]
 
@@ -725,7 +679,6 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
         if warning:
             answer_text = f"⚠️ {warning}\n\n{answer_text}"
 
-        import time
         result = OpenAIChatResponse(
             id=f"chatcmpl-{uuid.uuid4().hex[:8]}",
             created=int(time.time()),
@@ -768,7 +721,7 @@ class SetActivePromptRequest(BaseModel):
 
 
 @app.get("/api/stores/{store_name:path}/prompts")
-def list_store_prompts(store_name: str, request: Request = None, auth: dict = Depends(verify_auth)):
+def list_store_prompts(store_name: str, auth: dict = Depends(verify_auth)):
     """列出 Store 的所有 Prompts（Admin only）"""
     require_admin(auth)
     if not prompt_manager:
@@ -785,7 +738,7 @@ def list_store_prompts(store_name: str, request: Request = None, auth: dict = De
 
 
 @app.post("/api/stores/{store_name:path}/prompts")
-def create_store_prompt(store_name: str, request: CreatePromptRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
+def create_store_prompt(store_name: str, request: CreatePromptRequest, auth: dict = Depends(verify_auth)):
     """建立新的 Prompt（Admin only）"""
     require_admin(auth)
     if not prompt_manager:
@@ -803,7 +756,7 @@ def create_store_prompt(store_name: str, request: CreatePromptRequest, raw_reque
 
 
 @app.get("/api/stores/{store_name:path}/prompts/{prompt_id}")
-def get_store_prompt(store_name: str, prompt_id: str, request: Request = None, auth: dict = Depends(verify_auth)):
+def get_store_prompt(store_name: str, prompt_id: str, auth: dict = Depends(verify_auth)):
     """取得特定 Prompt（Admin only）"""
     require_admin(auth)
     if not prompt_manager:
@@ -817,7 +770,7 @@ def get_store_prompt(store_name: str, prompt_id: str, request: Request = None, a
 
 
 @app.put("/api/stores/{store_name:path}/prompts/{prompt_id}")
-def update_store_prompt(store_name: str, prompt_id: str, request: UpdatePromptRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
+def update_store_prompt(store_name: str, prompt_id: str, request: UpdatePromptRequest, auth: dict = Depends(verify_auth)):
     """更新 Prompt（Admin only）"""
     require_admin(auth)
     if not prompt_manager:
@@ -836,7 +789,7 @@ def update_store_prompt(store_name: str, prompt_id: str, request: UpdatePromptRe
 
 
 @app.delete("/api/stores/{store_name:path}/prompts/{prompt_id}")
-def delete_store_prompt(store_name: str, prompt_id: str, request: Request = None, auth: dict = Depends(verify_auth)):
+def delete_store_prompt(store_name: str, prompt_id: str, auth: dict = Depends(verify_auth)):
     """刪除 Prompt（Admin only）"""
     require_admin(auth)
     if not prompt_manager:
@@ -850,7 +803,7 @@ def delete_store_prompt(store_name: str, prompt_id: str, request: Request = None
 
 
 @app.post("/api/stores/{store_name:path}/prompts/active")
-def set_active_store_prompt(store_name: str, request: SetActivePromptRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
+def set_active_store_prompt(store_name: str, request: SetActivePromptRequest, auth: dict = Depends(verify_auth)):
     """設定啟用的 Prompt（Admin only）"""
     require_admin(auth)
     if not prompt_manager:
@@ -868,7 +821,7 @@ def set_active_store_prompt(store_name: str, request: SetActivePromptRequest, ra
 
 
 @app.get("/api/stores/{store_name:path}/prompts/active")
-def get_active_store_prompt(store_name: str, request: Request = None, auth: dict = Depends(verify_auth)):
+def get_active_store_prompt(store_name: str, auth: dict = Depends(verify_auth)):
     """取得當前啟用的 Prompt（Admin only）"""
     require_admin(auth)
     if not prompt_manager:
@@ -882,7 +835,7 @@ def get_active_store_prompt(store_name: str, request: Request = None, auth: dict
 
 
 @app.delete("/api/stores/{store_name:path}")
-def delete_store(store_name: str, request: Request, auth: dict = Depends(verify_auth)):
+def delete_store(store_name: str, auth: dict = Depends(verify_auth)):
     """刪除 Store。（Admin only）"""
     require_admin(auth)
     mgr = _get_or_create_manager()
@@ -904,7 +857,7 @@ class UpdateAPIKeyRequest(BaseModel):
 
 
 @app.get("/api/keys")
-def list_api_keys(store_name: Optional[str] = None, request: Request = None, auth: dict = Depends(verify_auth)):
+def list_api_keys(store_name: Optional[str] = None, auth: dict = Depends(verify_auth)):
     """列出 API Keys，可選篩選特定知識庫（Admin only）"""
     require_admin(auth)
     if not api_key_manager:
@@ -927,7 +880,7 @@ def list_api_keys(store_name: Optional[str] = None, request: Request = None, aut
 
 
 @app.post("/api/keys")
-def create_api_key(request: CreateAPIKeyRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
+def create_api_key(request: CreateAPIKeyRequest, auth: dict = Depends(verify_auth)):
     """建立新的 API Key（Admin only）"""
     require_admin(auth)
     if not api_key_manager:
@@ -951,7 +904,7 @@ def create_api_key(request: CreateAPIKeyRequest, raw_request: Request = None, au
 
 
 @app.get("/api/keys/{key_id}")
-def get_api_key(key_id: str, request: Request = None, auth: dict = Depends(verify_auth)):
+def get_api_key(key_id: str, auth: dict = Depends(verify_auth)):
     """取得 API Key 資訊（Admin only）"""
     require_admin(auth)
     if not api_key_manager:
@@ -973,7 +926,7 @@ def get_api_key(key_id: str, request: Request = None, auth: dict = Depends(verif
 
 
 @app.put("/api/keys/{key_id}")
-def update_api_key(key_id: str, request: UpdateAPIKeyRequest, raw_request: Request = None, auth: dict = Depends(verify_auth)):
+def update_api_key(key_id: str, request: UpdateAPIKeyRequest, auth: dict = Depends(verify_auth)):
     """更新 API Key 設定（Admin only）"""
     require_admin(auth)
     if not api_key_manager:
@@ -998,7 +951,7 @@ def update_api_key(key_id: str, request: UpdateAPIKeyRequest, raw_request: Reque
 
 
 @app.delete("/api/keys/{key_id}")
-def delete_api_key(key_id: str, request: Request = None, auth: dict = Depends(verify_auth)):
+def delete_api_key(key_id: str, auth: dict = Depends(verify_auth)):
     """刪除 API Key（Admin only）"""
     require_admin(auth)
     if not api_key_manager:
@@ -1014,8 +967,6 @@ def delete_api_key(key_id: str, request: Request = None, auth: dict = Depends(ve
 @app.get("/health")
 def health_check():
     """服務健康檢查（不需認證）"""
-    from .services.mongo_client import get_mongo_client
-
     checks = {}
 
     # 1. MongoDB
@@ -1040,7 +991,6 @@ def health_check():
     all_ok = all(checks.values())
     status_code = 200 if all_ok else 503
 
-    from fastapi.responses import JSONResponse
     return JSONResponse(
         status_code=status_code,
         content={
