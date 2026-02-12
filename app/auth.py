@@ -2,9 +2,9 @@
 API 認證模組
 
 認證優先順序：
-1. 來自前端（同 origin）→ 放行，視為 admin
-2. Bearer token = ADMIN_API_KEY → admin
-3. Bearer token = sk-xxx（MongoDB api_keys）→ 一般用戶，綁定 store
+1. Authorization: Bearer <token> 或 API-Token: <token>
+2. token = ADMIN_API_KEY → admin
+3. token = sk-xxx（MongoDB api_keys）→ 一般用戶，綁定 store
 4. 無 token → 401
 """
 
@@ -23,6 +23,12 @@ def _extract_bearer_token(request: Request) -> str | None:
     if auth_header.startswith("Bearer "):
         return auth_header[7:]
     return None
+
+
+def _extract_api_token(request: Request) -> str | None:
+    """從 API-Token header 提取 token（與 Authorization: Bearer 互補）"""
+    # Backward compatibility: API-Key
+    return request.headers.get("api-token") or request.headers.get("api-key")
 
 
 def _is_same_origin(request: Request) -> bool:
@@ -60,24 +66,20 @@ def verify_auth(request: Request) -> dict:
     驗證 API 請求
 
     Returns:
-        {"role": "admin", "store_name": None}  # admin 或前端
+        {"role": "admin", "store_name": None}  # admin
         {"role": "user", "store_name": "...", "prompt_index": ...}  # 一般 key
     """
-    # 1. 來自前端（同 origin）→ 放行
-    if _is_same_origin(request):
-        return {"role": "admin", "store_name": None}
-
-    # 2. 提取 Bearer token
-    token = _extract_bearer_token(request)
+    # 提取 token（支援 Authorization: Bearer 與 API-Token）
+    token = _extract_bearer_token(request) or _extract_api_token(request)
     if not token:
-        raise HTTPException(status_code=401, detail="Missing Authorization header")
+        raise HTTPException(status_code=401, detail="Missing Authorization Bearer token or API-Token header")
 
-    # 3. 是 Admin Key？
+    # 是 Admin Key？
     admin_key = os.getenv("ADMIN_API_KEY")
     if admin_key and token == admin_key:
         return {"role": "admin", "store_name": None}
 
-    # 4. 是一般 Key？（查 MongoDB）
+    # 是一般 Key？（查 MongoDB）
     from app.main import api_key_manager
 
     if api_key_manager:
@@ -89,7 +91,7 @@ def verify_auth(request: Request) -> dict:
                 "prompt_index": api_key_info.prompt_index,
             }
 
-    raise HTTPException(status_code=401, detail="Invalid API key")
+    raise HTTPException(status_code=401, detail="Invalid API token")
 
 
 def require_admin(auth_info: dict) -> None:

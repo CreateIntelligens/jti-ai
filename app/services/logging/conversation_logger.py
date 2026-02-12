@@ -37,7 +37,8 @@ class ConversationLogger:
         tool_calls: Optional[List[Dict]] = None,
         session_state: Optional[Dict] = None,
         error: Optional[str] = None,
-        mode: str = "jti"
+        mode: str = "jti",
+        responded_at: Optional[datetime] = None
     ) -> None:
         """記錄一次對話
 
@@ -56,6 +57,7 @@ class ConversationLogger:
             # 構建日誌記錄
             log_entry = {
                 "timestamp": timestamp.isoformat(),
+                "responded_at": (responded_at or timestamp).isoformat(),
                 "session_id": session_id,
                 "mode": mode,
                 "user_message": user_message,

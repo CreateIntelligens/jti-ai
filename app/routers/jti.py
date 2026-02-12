@@ -82,6 +82,7 @@ class ConversationItem(BaseModel):
     mode: str
     turn_number: Optional[int] = None
     timestamp: str
+    responded_at: Optional[str] = None
     user_message: str
     agent_response: str
     tool_calls: List[ConversationToolCall] = Field(default_factory=list)
@@ -98,6 +99,15 @@ class ConversationSessionGroup(BaseModel):
     conversations: List[ConversationItem]
     first_message_time: Optional[str] = None
     total: int
+
+
+class ConversationSessionSummary(BaseModel):
+    """Session 摘要（不含完整對話）"""
+    session_id: str
+    first_message_time: Optional[str] = None
+    last_message_time: Optional[str] = None
+    message_count: int
+    preview: Optional[str] = None
 
 
 class ConversationsBySessionResponse(BaseModel):
@@ -132,11 +142,20 @@ class ExportConversationsResponse(BaseModel):
     total_sessions: int
 
 
-class GeneralConversationsResponse(BaseModel):
-    """General chat 對話查詢回應"""
+class GeneralConversationsBySessionResponse(BaseModel):
+    """General chat 單一 session 對話查詢回應"""
+    session_id: str
     store_name: str
     mode: str
-    sessions: List[ConversationSessionGroup]
+    conversations: List[ConversationItem]
+    total: int
+
+
+class GeneralConversationsResponse(BaseModel):
+    """General chat 對話查詢回應（摘要列表）"""
+    store_name: str
+    mode: str
+    sessions: List[ConversationSessionSummary]
     total_conversations: int
     total_sessions: int
 
@@ -782,6 +801,11 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
 
 
 @router.get(
+    "/conversations",
+    response_model=Union[ConversationsBySessionResponse, ConversationsGroupedResponse],
+    response_model_exclude_none=True,
+)
+@router.get(
     "/history",
     response_model=Union[ConversationsBySessionResponse, ConversationsGroupedResponse],
     response_model_exclude_none=True,
@@ -830,6 +854,7 @@ async def get_conversations(session_id: Optional[str] = None, mode: str = "jti",
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.delete("/conversations/{session_id}", response_model=DeleteConversationResponse)
 @router.delete("/history/{session_id}", response_model=DeleteConversationResponse)
 async def delete_conversation(session_id: str, auth: dict = Depends(verify_auth)):
     """刪除指定 session 的對話紀錄
@@ -851,6 +876,11 @@ async def delete_conversation(session_id: str, auth: dict = Depends(verify_auth)
     }
 
 
+@router.get(
+    "/conversations/export",
+    response_model=ExportConversationsResponse,
+    response_model_exclude_none=True,
+)
 @router.get(
     "/history/export",
     response_model=ExportConversationsResponse,

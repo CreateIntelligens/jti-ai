@@ -309,6 +309,13 @@ export default function App() {
         sessionId={sessionId || undefined}
         storeName={currentStore || undefined}
         mode="general"
+        onResumeSession={(sid, msgs) => {
+          setSessionId(sid);
+          setMessages(msgs.map((m) => ({
+            role: m.role === 'assistant' ? 'model' : m.role,
+            text: m.text,
+          })));
+        }}
       />
     </>
   );

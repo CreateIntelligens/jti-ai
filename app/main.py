@@ -73,7 +73,7 @@ from .auth import verify_auth, require_admin, _extract_bearer_token
 from .routers import jti
 from .services.session.session_manager_factory import get_conversation_logger, get_general_chat_session_manager
 from .services.mongo_client import get_mongo_client
-from .utils import group_conversations_by_session
+from .utils import group_conversations_by_session, group_conversations_as_summary
 
 # 使用工廠函數取得適當的實作（MongoDB 或檔案系統）
 conversation_logger = get_conversation_logger()
@@ -405,6 +405,7 @@ def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
+@app.delete("/api/chat/conversations/{session_id}", response_model=jti.DeleteConversationResponse)
 @app.delete("/api/chat/history/{session_id}", response_model=jti.DeleteConversationResponse)
 def delete_general_conversation(session_id: str, auth: dict = Depends(verify_auth)):
     """刪除指定 session 的對話紀錄
@@ -431,7 +432,11 @@ def delete_general_conversation(session_id: str, auth: dict = Depends(verify_aut
         "deleted_session": deleted_session,
     }
 
-
+@app.get(
+    "/api/chat/conversations",
+    response_model=jti.GeneralConversationsResponse,
+    response_model_exclude_none=True,
+)
 @app.get(
     "/api/chat/history",
     response_model=jti.GeneralConversationsResponse,
@@ -442,12 +447,12 @@ def get_general_conversations(
     auth: dict = Depends(verify_auth),
 ):
     """
-    取得 general chat 的對話歷史
+    取得 general chat 的對話歷史（session 列表）
 
     Query Parameters:
     - store_name: 知識庫名稱（必填）
 
-    回傳該知識庫的所有對話（按 session 分組）
+    回傳該知識庫的所有對話（按 session 分組，含摘要）
     """
     try:
         mgr = _get_or_create_manager()
@@ -467,7 +472,7 @@ def get_general_conversations(
             if c.get("session_snapshot", {}).get("store") == current_store
         ]
 
-        session_list = group_conversations_by_session(store_conversations)
+        session_list = group_conversations_as_summary(store_conversations)
 
         return {
             "store_name": current_store,
@@ -481,7 +486,11 @@ def get_general_conversations(
         logging.error(f"Failed to get general conversations: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-
+@app.get(
+    "/api/chat/conversations/export",
+    response_model=jti.ExportGeneralConversationsResponse,
+    response_model_exclude_none=True,
+)
 @app.get(
     "/api/chat/history/export",
     response_model=jti.ExportGeneralConversationsResponse,
@@ -574,6 +583,49 @@ def export_general_conversations(
 
     except Exception as e:
         logging.error(f"Failed to export general conversations: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get(
+    "/api/chat/conversations/{session_id}",
+    response_model=jti.GeneralConversationsBySessionResponse,
+    response_model_exclude_none=True,
+)
+@app.get(
+    "/api/chat/history/{session_id}",
+    response_model=jti.GeneralConversationsBySessionResponse,
+    response_model_exclude_none=True,
+)
+def get_general_conversation_detail(
+    session_id: str,
+    auth: dict = Depends(verify_auth),
+):
+    """
+    取得指定 session 的完整對話內容
+
+    Path Parameters:
+    - session_id: Session ID
+    """
+    try:
+        conversations = conversation_logger.get_session_logs(session_id)
+        conversations = [c for c in conversations if c.get("mode") == "general"]
+
+        # 從對話中推斷 store_name
+        store_name = "unknown"
+        if conversations:
+            store_name = conversations[0].get("session_snapshot", {}).get("store", "unknown")
+
+        logging.info(f"Retrieved {len(conversations)} general conversations for session {session_id[:8]}...")
+
+        return {
+            "session_id": session_id,
+            "store_name": store_name,
+            "mode": "general",
+            "conversations": conversations,
+            "total": len(conversations)
+        }
+
+    except Exception as e:
+        logging.error(f"Failed to get general conversation detail: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { History } from 'lucide-react';
 import ConversationHistoryModal from '../components/ConversationHistoryModal';
+import { fetchWithApiKey } from '../services/api';
 import '../styles/JtiTest.css';
 
 interface Message {
@@ -44,7 +45,7 @@ export default function JtiTest() {
     }
 
     try {
-      const res = await fetch('/api/jti/chat/start', {
+      const res = await fetchWithApiKey('/api/jti/chat/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ language: currentLanguage, previous_session_id: sessionId }),
@@ -79,7 +80,7 @@ export default function JtiTest() {
 
     // 重新建立 session
     try {
-      const res = await fetch('/api/jti/chat/start', {
+      const res = await fetchWithApiKey('/api/jti/chat/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ language: newLang, previous_session_id: sessionId }),
@@ -97,7 +98,7 @@ export default function JtiTest() {
   // 初始化 session
   useEffect(() => {
     const lang = localStorage.getItem('language') || 'zh';
-    fetch('/api/jti/chat/start', {
+    fetchWithApiKey('/api/jti/chat/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ language: lang }),
@@ -138,7 +139,7 @@ export default function JtiTest() {
     setIsTyping(true);
 
     try {
-      const res = await fetch('/api/jti/chat/message', {
+      const res = await fetchWithApiKey('/api/jti/chat/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ session_id: sessionId, message, language: currentLanguage }),
@@ -384,6 +385,15 @@ export default function JtiTest() {
         onClose={() => setShowHistoryModal(false)}
         sessionId={sessionId || ''}
         mode="jti"
+        onResumeSession={(sid, msgs) => {
+          setSessionId(sid);
+          setMessages(msgs.map((m) => ({
+            text: m.text,
+            type: m.role as 'user' | 'assistant',
+            timestamp: Date.now(),
+          })));
+          setSessionInfo(`#${sid.substring(0, 8)}`);
+        }}
       />
     </div>
   );

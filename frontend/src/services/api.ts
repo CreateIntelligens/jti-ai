@@ -5,7 +5,7 @@ const API_BASE = '/api';
 const STORAGE_KEYS = 'userGeminiApiKeys';
 const STORAGE_ACTIVE = 'activeGeminiApiKey';
 
-// 從 localStorage 取得目前啟用的 Gemini API Key
+// 從 localStorage 取得目前啟用的 API Key（用於呼叫後端 API）
 function getUserApiKey(): string | null {
   const activeName = localStorage.getItem(STORAGE_ACTIVE) || 'system';
   if (activeName === 'system') return null;
@@ -26,13 +26,13 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json();
 }
 
-// 通用的 fetch 函數，自動加上 API Key header
-async function fetchWithApiKey(url: string, options: RequestInit = {}): Promise<Response> {
+// 通用的 fetch 函數，自動加上 API-Token header
+export async function fetchWithApiKey(url: string, options: RequestInit = {}): Promise<Response> {
   const apiKey = getUserApiKey();
   const headers = new Headers(options.headers || {});
 
   if (apiKey) {
-    headers.set('X-Gemini-Api-Key', apiKey);
+    headers.set('API-Token', apiKey);
   }
 
   return fetch(url, {
@@ -113,12 +113,12 @@ export async function sendMessage(text: string, sessionId?: string): Promise<Cha
 }
 
 export async function listPrompts(storeName: string): Promise<any> {
-  const response = await fetch(`${API_BASE}/stores/${storeName}/prompts`);
+  const response = await fetchWithApiKey(`${API_BASE}/stores/${storeName}/prompts`);
   return handleResponse<any>(response);
 }
 
 export async function createPrompt(storeName: string, name: string, content: string): Promise<any> {
-  const response = await fetch(`${API_BASE}/stores/${storeName}/prompts`, {
+  const response = await fetchWithApiKey(`${API_BASE}/stores/${storeName}/prompts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, content }),
@@ -127,7 +127,7 @@ export async function createPrompt(storeName: string, name: string, content: str
 }
 
 export async function updatePrompt(storeName: string, promptId: string, name?: string, content?: string): Promise<any> {
-  const response = await fetch(`${API_BASE}/stores/${storeName}/prompts/${promptId}`, {
+  const response = await fetchWithApiKey(`${API_BASE}/stores/${storeName}/prompts/${promptId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, content }),
@@ -136,14 +136,14 @@ export async function updatePrompt(storeName: string, promptId: string, name?: s
 }
 
 export async function deletePrompt(storeName: string, promptId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/stores/${storeName}/prompts/${promptId}`, {
+  const response = await fetchWithApiKey(`${API_BASE}/stores/${storeName}/prompts/${promptId}`, {
     method: 'DELETE',
   });
   await handleResponse<void>(response);
 }
 
 export async function setActivePrompt(storeName: string, promptId: string | null): Promise<void> {
-  const response = await fetch(`${API_BASE}/stores/${storeName}/prompts/active`, {
+  const response = await fetchWithApiKey(`${API_BASE}/stores/${storeName}/prompts/active`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt_id: promptId }),
@@ -155,14 +155,14 @@ export async function listApiKeys(storeName?: string): Promise<any[]> {
   const url = storeName
     ? `${API_BASE}/keys?store_name=${encodeURIComponent(storeName)}`
     : `${API_BASE}/keys`;
-  const response = await fetch(url);
+  const response = await fetchWithApiKey(url);
   return handleResponse<any[]>(response);
 }
 
 export async function createApiKey(name: string, storeName: string, promptIndex?: number | null): Promise<{ key: string; message: string }> {
   const body: Record<string, unknown> = { name, store_name: storeName };
   if (promptIndex != null) body.prompt_index = promptIndex;
-  const response = await fetch(`${API_BASE}/keys`, {
+  const response = await fetchWithApiKey(`${API_BASE}/keys`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -171,7 +171,7 @@ export async function createApiKey(name: string, storeName: string, promptIndex?
 }
 
 export async function deleteServerApiKey(keyId: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/keys/${keyId}`, {
+  const response = await fetchWithApiKey(`${API_BASE}/keys/${keyId}`, {
     method: 'DELETE',
   });
   await handleResponse<void>(response);
@@ -224,8 +224,14 @@ export function setActiveApiKey(name: string): void {
 
 // ========== General Chat Conversations ==========
 
-export async function getGeneralConversations(): Promise<any> {
-  const response = await fetchWithApiKey(`${API_BASE}/chat/history`);
+export async function getGeneralConversations(storeName?: string): Promise<any> {
+  const params = storeName ? `?store_name=${encodeURIComponent(storeName)}` : '';
+  const response = await fetchWithApiKey(`${API_BASE}/chat/history${params}`);
+  return handleResponse<any>(response);
+}
+
+export async function getGeneralConversationDetail(sessionId: string): Promise<any> {
+  const response = await fetchWithApiKey(`${API_BASE}/chat/history/${encodeURIComponent(sessionId)}`);
   return handleResponse<any>(response);
 }
 

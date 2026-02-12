@@ -10,8 +10,9 @@ import {
   ChevronDown,
   ChevronRight,
   Trash2,
+  Play,
 } from 'lucide-react';
-import { deleteConversation } from '../services/api';
+import { deleteConversation, fetchWithApiKey, getGeneralConversationDetail } from '../services/api';
 
 interface ConversationEntry {
   _id: string;
@@ -36,6 +37,14 @@ interface ConversationEntry {
   error?: string;
 }
 
+interface SessionSummary {
+  session_id: string;
+  first_message_time: string;
+  last_message_time?: string;
+  message_count: number;
+  preview?: string;
+}
+
 interface Session {
   session_id: string;
   conversations: ConversationEntry[];
@@ -49,6 +58,7 @@ interface ConversationHistoryModalProps {
   sessionId?: string;
   storeName?: string;
   mode?: 'jti' | 'general';
+  onResumeSession?: (sessionId: string, messages: Array<{ role: 'user' | 'assistant'; text: string }>) => void;
 }
 
 export default function ConversationHistoryModal({
@@ -57,15 +67,18 @@ export default function ConversationHistoryModal({
   sessionId,
   storeName,
   mode = 'jti',
+  onResumeSession,
 }: ConversationHistoryModalProps) {
   const { t } = useTranslation();
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredSessions, setFilteredSessions] = useState<Session[]>([]);
+  const [filteredSessions, setFilteredSessions] = useState<SessionSummary[]>([]);
   const [expandedSessionId, setExpandedSessionId] = useState<string | null>(null);
   const [expandedTurnMap, setExpandedTurnMap] = useState<Record<string, number | null>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [detailCache, setDetailCache] = useState<Record<string, ConversationEntry[]>>({});
+  const [detailLoading, setDetailLoading] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -75,6 +88,7 @@ export default function ConversationHistoryModal({
     const fetchConversations = async () => {
       try {
         setLoading(true);
+        setDetailCache({});
 
         let url = '';
         if (mode === 'jti') {
@@ -85,7 +99,7 @@ export default function ConversationHistoryModal({
 
         console.log('[ConversationHistory] Fetching:', url);
 
-        const response = await fetch(url);
+        const response = await fetchWithApiKey(url);
         if (!response.ok) {
           console.error('[ConversationHistory] API Error:', response.status, response.statusText);
           throw new Error('Failed to fetch conversations');
@@ -98,7 +112,7 @@ export default function ConversationHistoryModal({
         setSessions(sessionsList);
         setFilteredSessions(sessionsList);
 
-        if (sessionId && sessionsList.some((s: Session) => s.session_id === sessionId)) {
+        if (sessionId && sessionsList.some((s: SessionSummary) => s.session_id === sessionId)) {
           setExpandedSessionId(sessionId);
         }
       } catch (error) {
@@ -129,33 +143,67 @@ export default function ConversationHistoryModal({
     }
 
     const query = searchQuery.toLowerCase();
-    const filtered = sessions
-      .map((session) => {
-        const matchedConversations = session.conversations.filter((conv) => {
-          return (
-            conv.user_message.toLowerCase().includes(query) ||
-            conv.agent_response.toLowerCase().includes(query) ||
-            conv.tool_calls?.some(
-              (tc) =>
-                (tc.tool_name || tc.tool || '').toLowerCase().includes(query) ||
-                JSON.stringify(tc.result || {}).toLowerCase().includes(query)
-            )
-          );
-        });
 
-        if (matchedConversations.length > 0) {
-          return {
-            ...session,
-            conversations: matchedConversations,
-            total: matchedConversations.length,
-          };
-        }
-        return null;
-      })
-      .filter((s): s is Session => s !== null);
+    if (mode === 'general') {
+      // General 模式：搜 preview 和 session_id
+      const filtered = sessions.filter((session) => {
+        return (
+          (session.preview && session.preview.toLowerCase().includes(query)) ||
+          session.session_id.toLowerCase().includes(query)
+        );
+      });
+      setFilteredSessions(filtered);
+    } else {
+      // JTI 模式：搜完整對話內容（sessions 帶 conversations）
+      const filtered = (sessions as unknown as Session[])
+        .map((session) => {
+          const matchedConversations = session.conversations.filter((conv) => {
+            return (
+              conv.user_message.toLowerCase().includes(query) ||
+              conv.agent_response.toLowerCase().includes(query) ||
+              conv.tool_calls?.some(
+                (tc) =>
+                  (tc.tool_name || tc.tool || '').toLowerCase().includes(query) ||
+                  JSON.stringify(tc.result || {}).toLowerCase().includes(query)
+              )
+            );
+          });
 
-    setFilteredSessions(filtered);
-  }, [searchQuery, sessions]);
+          if (matchedConversations.length > 0) {
+            return {
+              ...session,
+              conversations: matchedConversations,
+              total: matchedConversations.length,
+            };
+          }
+          return null;
+        })
+        .filter((s): s is Session => s !== null);
+
+      setFilteredSessions(filtered as unknown as SessionSummary[]);
+    }
+  }, [searchQuery, sessions, mode]);
+
+  const handleExpandSession = async (sid: string) => {
+    if (expandedSessionId === sid) {
+      setExpandedSessionId(null);
+      return;
+    }
+    setExpandedSessionId(sid);
+
+    // General 模式：按需載入完整對話
+    if (mode === 'general' && !detailCache[sid]) {
+      setDetailLoading(sid);
+      try {
+        const data = await getGeneralConversationDetail(sid);
+        setDetailCache((prev) => ({ ...prev, [sid]: data.conversations || [] }));
+      } catch (error) {
+        console.error('[ConversationHistory] Failed to load detail:', error);
+      } finally {
+        setDetailLoading(null);
+      }
+    }
+  };
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -181,7 +229,7 @@ export default function ConversationHistoryModal({
         }
       }
 
-      const response = await fetch(url);
+      const response = await fetchWithApiKey(url);
       if (!response.ok) {
         throw new Error('Failed to export conversations');
       }
@@ -305,6 +353,12 @@ export default function ConversationHistoryModal({
             filteredSessions.map((session, sessionIndex) => {
               const isSessionExpanded = expandedSessionId === session.session_id;
               const sessionTurnMap = expandedTurnMap[session.session_id] ?? null;
+              const msgCount = (session as SessionSummary).message_count ?? (session as unknown as Session).total ?? 0;
+
+              // 取得展開時的 conversations：general 模式用 detailCache，JTI 用 session 自帶的
+              const conversations: ConversationEntry[] = mode === 'general'
+                ? (detailCache[session.session_id] || [])
+                : ((session as unknown as Session).conversations || []);
 
               return (
                 <div
@@ -315,17 +369,20 @@ export default function ConversationHistoryModal({
                   <div className="session-card-header">
                     <button
                       className="session-card-toggle"
-                      onClick={() => setExpandedSessionId(isSessionExpanded ? null : session.session_id)}
+                      onClick={() => handleExpandSession(session.session_id)}
                     >
                       <div style={{ flex: 1 }}>
                         <div className="session-card-meta">
                           <span className="session-badge">Session {sessionIndex + 1}</span>
-                          <span className="session-count">{session.total} {t('conversations_count')}</span>
+                          <span className="session-count">{msgCount} {t('conversations_count')}</span>
                           <span className="session-time">
                             <Clock size={13} />
                             {formatTime(session.first_message_time)}
                           </span>
                         </div>
+                        {mode === 'general' && (session as SessionSummary).preview && (
+                          <p className="session-preview">{(session as SessionSummary).preview}</p>
+                        )}
                         <p className="session-id">ID: {session.session_id.substring(0, 24)}...</p>
                       </div>
                       <div className="session-card-chevron">
@@ -337,6 +394,34 @@ export default function ConversationHistoryModal({
                     </button>
 
                     <div className="session-card-actions">
+                      {onResumeSession && (
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            // General 模式：確保已載入完整對話
+                            let convs = conversations;
+                            if (mode === 'general' && !detailCache[session.session_id]) {
+                              try {
+                                const data = await getGeneralConversationDetail(session.session_id);
+                                convs = data.conversations || [];
+                                setDetailCache((prev) => ({ ...prev, [session.session_id]: convs }));
+                              } catch (error) {
+                                console.error('[ConversationHistory] Failed to load for resume:', error);
+                                return;
+                              }
+                            }
+                            const messages = convs.flatMap((conv) => [
+                              { role: 'user' as const, text: conv.user_message },
+                              { role: 'assistant' as const, text: conv.agent_response },
+                            ]);
+                            onResumeSession(session.session_id, messages);
+                            onClose();
+                          }}
+                          title={t('resume_session')}
+                        >
+                          <Play size={16} />
+                        </button>
+                      )}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -362,7 +447,14 @@ export default function ConversationHistoryModal({
                   {/* Expanded conversations */}
                   {isSessionExpanded && (
                     <div className="session-conversations">
-                      {session.conversations.map((conv, convIndex) => {
+                      {detailLoading === session.session_id ? (
+                        <div className="conversation-empty" style={{ padding: '2rem' }}>
+                          <div>
+                            <div className="conversation-spinner" />
+                            <p>{t('loading')}</p>
+                          </div>
+                        </div>
+                      ) : conversations.map((conv, convIndex) => {
                         const turnNum = conv.turn_number || convIndex + 1;
                         const isTurnExpanded = sessionTurnMap === turnNum;
 
@@ -457,14 +549,14 @@ export default function ConversationHistoryModal({
             <span className="stat-sep">|</span>
             <span>
               {t('total_conversations')}: <span className="stat-value">
-                {filteredSessions.reduce((sum, s) => sum + s.total, 0)}
+                {filteredSessions.reduce((sum, s) => sum + ((s as SessionSummary).message_count ?? (s as unknown as Session).total ?? 0), 0)}
               </span> {t('conversations_count')}
             </span>
             {searchQuery && (
               <>
                 <span className="stat-sep">|</span>
                 <span>
-                  （{t('filtered')} {sessions.length} sessions，{sessions.reduce((sum, s) => sum + s.total, 0)} {t('conversations_count')}）
+                  （{t('filtered')} {sessions.length} sessions，{sessions.reduce((sum, s) => sum + ((s as SessionSummary).message_count ?? (s as unknown as Session).total ?? 0), 0)} {t('conversations_count')}）
                 </span>
               </>
             )}

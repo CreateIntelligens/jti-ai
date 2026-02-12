@@ -39,7 +39,8 @@ class MongoConversationLogger:
         tool_calls: Optional[List[Dict]] = None,
         session_state: Optional[Dict] = None,
         error: Optional[str] = None,
-        mode: str = "jti"
+        mode: str = "jti",
+        responded_at: Optional[datetime] = None
     ) -> Optional[str]:
         """記錄一次對話
 
@@ -69,6 +70,7 @@ class MongoConversationLogger:
                 "mode": mode,
                 "turn_number": turn_number,
                 "timestamp": datetime.now(),
+                "responded_at": responded_at or datetime.now(),
                 "user_message": user_message,
                 "agent_response": agent_response,
                 "tool_calls": tool_calls or [],
@@ -121,8 +123,10 @@ class MongoConversationLogger:
             # 轉換 ObjectId 為字符串，datetime 為 ISO format
             for doc in docs:
                 doc["_id"] = str(doc["_id"])
-                if isinstance(doc["timestamp"], datetime):
+                if isinstance(doc.get("timestamp"), datetime):
                     doc["timestamp"] = doc["timestamp"].isoformat()
+                if isinstance(doc.get("responded_at"), datetime):
+                    doc["responded_at"] = doc["responded_at"].isoformat()
 
             return docs
 
@@ -147,8 +151,10 @@ class MongoConversationLogger:
 
             for doc in docs:
                 doc["_id"] = str(doc["_id"])
-                if isinstance(doc["timestamp"], datetime):
+                if isinstance(doc.get("timestamp"), datetime):
                     doc["timestamp"] = doc["timestamp"].isoformat()
+                if isinstance(doc.get("responded_at"), datetime):
+                    doc["responded_at"] = doc["responded_at"].isoformat()
 
             return docs
 
@@ -253,8 +259,10 @@ class MongoConversationLogger:
 
             for doc in docs:
                 doc["_id"] = str(doc["_id"])
-                if isinstance(doc["timestamp"], datetime):
+                if isinstance(doc.get("timestamp"), datetime):
                     doc["timestamp"] = doc["timestamp"].isoformat()
+                if isinstance(doc.get("responded_at"), datetime):
+                    doc["responded_at"] = doc["responded_at"].isoformat()
 
             return docs
 

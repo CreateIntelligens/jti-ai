@@ -199,7 +199,7 @@ export default function UserApiKeyModal({ isOpen, onClose, onApiKeySaved }: User
                 value={newKey}
                 onChange={e => setNewKey(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Gemini API Key"
+                placeholder="API Key（ADMIN / sk-xxx）"
                 style={{ flex: 1 }}
               />
               <button
@@ -212,7 +212,7 @@ export default function UserApiKeyModal({ isOpen, onClose, onApiKeySaved }: User
             </div>
           </div>
 
-          {/* 說明（整合為一條） */}
+          {/* 說明 */}
           <div style={{
             padding: '0.6rem 1rem',
             background: 'rgba(42, 49, 84, 0.3)',
@@ -222,20 +222,7 @@ export default function UserApiKeyModal({ isOpen, onClose, onApiKeySaved }: User
             color: '#6070a0',
             lineHeight: 1.6,
           }}>
-            Key 僅存於瀏覽器，不會上傳。前往{' '}
-            <a
-              href="https://aistudio.google.com/apikey"
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                color: 'var(--crystal-cyan)',
-                textDecoration: 'none',
-                borderBottom: '1px solid rgba(91, 233, 255, 0.3)',
-              }}
-            >
-              aistudio.google.com/apikey
-            </a>{' '}
-            建立免費 Key。
+            Key 僅存於瀏覽器，不會上傳。用於呼叫後端 API（Header：API-Token）。
           </div>
         </div>
 
