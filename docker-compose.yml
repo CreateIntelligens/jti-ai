@@ -18,6 +18,12 @@ services:
       - BACKEND_PORT=${PORT:-8008}
       - TZ=Asia/Taipei
     command: uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8008} --reload
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-8008}/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     restart: unless-stopped
 
   frontend:
@@ -29,7 +35,8 @@ services:
       - /app/node_modules
       - /app/dist
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "${PORT:-8008}:${PORT:-8008}"
     environment:

@@ -1011,6 +1011,45 @@ def delete_api_key(key_id: str, request: Request = None, auth: dict = Depends(ve
     return {"message": "API Key 已刪除"}
 
 
+@app.get("/health")
+def health_check():
+    """服務健康檢查（不需認證）"""
+    from .services.mongo_client import get_mongo_client
+
+    checks = {}
+
+    # 1. MongoDB
+    try:
+        mongo = get_mongo_client()
+        checks["mongodb"] = mongo.health_check()
+    except Exception:
+        checks["mongodb"] = False
+
+    # 2. Gemini API Key
+    checks["gemini_api_key"] = bool(os.getenv("GEMINI_API_KEY"))
+
+    # 3. FileSearchManager
+    checks["file_search_manager"] = manager is not None
+
+    # 4. API Key Manager
+    checks["api_key_manager"] = api_key_manager is not None
+
+    # 5. General Session Manager (MongoDB persistence)
+    checks["general_session_manager"] = general_session_manager is not None
+
+    all_ok = all(checks.values())
+    status_code = 200 if all_ok else 503
+
+    from fastapi.responses import JSONResponse
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "ok" if all_ok else "degraded",
+            "checks": checks,
+        },
+    )
+
+
 @app.get("/")
 def index():
     """API 入口。"""
