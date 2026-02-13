@@ -413,13 +413,14 @@ export default function App() {
         sessionId={sessionId || undefined}
         storeName={currentStore || undefined}
         mode="general"
-        onResumeSession={(sid, msgs) => {
+        onResumeSession={(sid, msgs, lang) => {
           setSessionId(sid);
           setMessages(msgs.map((m) => ({
             role: m.role === 'assistant' ? 'model' : m.role,
             text: m.text,
             turnNumber: m.turnNumber,
           })));
+          // General 模式目前不處理語言切換（沒有多語言支援）
         }}
       />
     </>

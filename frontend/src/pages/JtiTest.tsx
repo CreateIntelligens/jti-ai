@@ -148,6 +148,9 @@ export default function JtiTest() {
   const sendMessage = useCallback(async (message: string, turnNumber?: number) => {
     if (!message || !sessionId || loading) return;
 
+    // 清除編輯狀態（新訊息送出前就清掉，避免殘留）
+    setEditingTurn(null);
+
     // 如果不是重新生成 (turnNumber undefined)，則加入 user message
     if (turnNumber === undefined) {
       setMessages(prev => [...prev, { text: message, type: 'user', timestamp: Date.now() }]);
@@ -258,6 +261,9 @@ export default function JtiTest() {
           : colorName || t('status_chatting');
         setStatusText(status);
       }
+
+      // 清除編輯狀態（防止殘留）
+      setEditingTurn(null);
     } catch {
       setIsTyping(false);
       setMessages(prev => [...prev, {
@@ -441,7 +447,7 @@ export default function JtiTest() {
                       </span>
                     </div>
                     <div className="message-bubble">
-                      {editingTurn === msg.turnNumber && msg.type === 'user' ? (
+                      {editingTurn !== null && editingTurn === msg.turnNumber && msg.type === 'user' ? (
                         <div className="message-edit-area">
                           <textarea
                             ref={editTextareaRef}
@@ -577,7 +583,7 @@ export default function JtiTest() {
         onClose={() => setShowHistoryModal(false)}
         sessionId={sessionId || ''}
         mode="jti"
-        onResumeSession={async (sid, msgs) => {
+        onResumeSession={async (sid, msgs, lang) => {
           setSessionId(sid);
           setMessages(msgs.map((m) => ({
             text: m.text,
@@ -586,6 +592,13 @@ export default function JtiTest() {
             turnNumber: m.turnNumber,
           })));
           setSessionInfo(`#${sid.substring(0, 8)}`);
+
+          // 切換語言（如果有提供且與當前不同）
+          if (lang && lang !== currentLanguage) {
+            i18n.changeLanguage(lang);
+            setCurrentLanguage(lang);
+            localStorage.setItem('language', lang);
+          }
 
           // 自動嘗試恢復暫停的測驗
           try {

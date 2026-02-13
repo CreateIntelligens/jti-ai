@@ -56,6 +56,7 @@ def group_conversations_as_summary(conversations: list) -> list:
     for conv in conversations:
         sid = conv.get("session_id")
         ts = conv.get("timestamp")
+        language = conv.get("session_snapshot", {}).get("language")
         if sid not in sessions:
             sessions[sid] = {
                 "session_id": sid,
@@ -63,11 +64,15 @@ def group_conversations_as_summary(conversations: list) -> list:
                 "last_message_time": ts,
                 "message_count": 0,
                 "preview": (conv.get("user_message") or "")[:100] or None,
+                "language": language,
             }
         else:
             # 更新 last_message_time（取較晚的）
             if ts and (not sessions[sid]["last_message_time"] or ts > sessions[sid]["last_message_time"]):
                 sessions[sid]["last_message_time"] = ts
+            # 更新 language（如果當前對話有且之前沒有）
+            if language and not sessions[sid].get("language"):
+                sessions[sid]["language"] = language
         sessions[sid]["message_count"] += 1
 
     session_list = list(sessions.values())

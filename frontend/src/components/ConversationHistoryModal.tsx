@@ -12,8 +12,10 @@ import {
   Trash2,
   Play,
   CornerDownRight,
+  Calendar,
 } from 'lucide-react';
 import { deleteConversation, fetchWithApiKey, getGeneralConversationDetail } from '../services/api';
+import MiniCalendar from './MiniCalendar';
 
 interface ConversationEntry {
   _id: string;
@@ -34,6 +36,7 @@ interface ConversationEntry {
     step?: string;
     quiz_progress?: string;
     color_scores?: Record<string, number>;
+    language?: string;
   };
   error?: string;
 }
@@ -44,6 +47,7 @@ interface SessionSummary {
   last_message_time?: string;
   message_count: number;
   preview?: string;
+  language?: string;
 }
 
 interface Session {
@@ -59,7 +63,7 @@ interface ConversationHistoryModalProps {
   sessionId?: string;
   storeName?: string;
   mode?: 'jti' | 'general';
-  onResumeSession?: (sessionId: string, messages: Array<{ role: 'user' | 'assistant'; text: string; turnNumber?: number }>) => void;
+  onResumeSession?: (sessionId: string, messages: Array<{ role: 'user' | 'assistant'; text: string; turnNumber?: number }>, language?: string) => void;
 }
 
 export default function ConversationHistoryModal({
@@ -80,11 +84,26 @@ export default function ConversationHistoryModal({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [detailCache, setDetailCache] = useState<Record<string, ConversationEntry[]>>({});
   const [detailLoading, setDetailLoading] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [openCal, setOpenCal] = useState<'from' | 'to' | null>(null);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize] = useState(10);
+  const [totalSessions, setTotalSessions] = useState(0);
+
+  // Reset page when context changes
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentPage(1);
+    }
+  }, [isOpen, sessionId, storeName, mode]);
 
   useEffect(() => {
     if (!isOpen) return;
 
-    console.log('[ConversationHistory] Modal opened - mode:', mode, 'sessionId:', sessionId, 'storeName:', storeName);
+    console.log('[ConversationHistory] Modal opened - mode:', mode, 'sessionId:', sessionId, 'storeName:', storeName, 'page:', currentPage);
 
     const fetchConversations = async () => {
       try {
@@ -98,6 +117,9 @@ export default function ConversationHistoryModal({
           url = `/api/chat/history${storeName ? `?store_name=${encodeURIComponent(storeName)}` : ''}`;
         }
 
+        // Add pagination params
+        url += `${url.includes('?') ? '&' : '?'}page=${currentPage}&page_size=${pageSize}`;
+
         console.log('[ConversationHistory] Fetching:', url);
 
         const response = await fetchWithApiKey(url);
@@ -107,10 +129,11 @@ export default function ConversationHistoryModal({
         }
 
         const data = await response.json();
-        console.log('[ConversationHistory] Received:', data.total_sessions, 'sessions,', data.total_conversations, 'conversations');
+        console.log('[ConversationHistory] Received:', data.total_sessions, 'sessions (total),', data.sessions.length, 'sessions (page)');
 
         const sessionsList = data.sessions || [];
         setSessions(sessionsList);
+        setTotalSessions(data.total_sessions || 0);
         setFilteredSessions(sessionsList);
 
         if (sessionId && sessionsList.some((s: SessionSummary) => s.session_id === sessionId)) {
@@ -124,30 +147,58 @@ export default function ConversationHistoryModal({
     };
 
     fetchConversations();
-  }, [isOpen, sessionId, storeName, mode]);
+  }, [isOpen, sessionId, storeName, mode, currentPage, pageSize]);
 
   useEffect(() => {
     if (!isOpen) return;
 
     const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        if (openCal) { setOpenCal(null); return; }
+        onClose();
+      }
+    };
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (openCal && !(e.target as HTMLElement).closest('.date-picker-anchor')) {
+        setOpenCal(null);
+      }
     };
 
     window.addEventListener('keydown', handleEscape);
-    return () => window.removeEventListener('keydown', handleEscape);
-  }, [isOpen, onClose]);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      window.removeEventListener('keydown', handleEscape);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isOpen, onClose, openCal]);
 
   useEffect(() => {
-    if (!searchQuery.trim()) {
+    const query = searchQuery.trim().toLowerCase();
+    const fromDate = dateFrom ? new Date(dateFrom + 'T00:00:00') : null;
+    const toDate = dateTo ? new Date(dateTo + 'T23:59:59') : null;
+
+    const hasTextFilter = !!query;
+    const hasDateFilter = !!(fromDate || toDate);
+
+    // 日期篩選 helper
+    const sessionInDateRange = (s: SessionSummary | Session) => {
+      if (!hasDateFilter) return true;
+      const t = new Date(s.first_message_time);
+      if (fromDate && t < fromDate) return false;
+      if (toDate && t > toDate) return false;
+      return true;
+    };
+
+    if (!hasTextFilter && !hasDateFilter) {
       setFilteredSessions(sessions);
       return;
     }
 
-    const query = searchQuery.toLowerCase();
-
     if (mode === 'general') {
-      // General 模式：搜 preview 和 session_id
       const filtered = sessions.filter((session) => {
+        if (!sessionInDateRange(session)) return false;
+        if (!hasTextFilter) return true;
         return (
           (session.preview && session.preview.toLowerCase().includes(query)) ||
           session.session_id.toLowerCase().includes(query)
@@ -155,9 +206,12 @@ export default function ConversationHistoryModal({
       });
       setFilteredSessions(filtered);
     } else {
-      // JTI 模式：搜完整對話內容（sessions 帶 conversations）
+      // JTI 模式：搜完整對話內容 + 日期篩選
       const filtered = (sessions as unknown as Session[])
+        .filter((session) => sessionInDateRange(session))
         .map((session) => {
+          if (!hasTextFilter) return session;
+
           const matchedConversations = session.conversations.filter((conv) => {
             return (
               conv.user_message.toLowerCase().includes(query) ||
@@ -183,7 +237,7 @@ export default function ConversationHistoryModal({
 
       setFilteredSessions(filtered as unknown as SessionSummary[]);
     }
-  }, [searchQuery, sessions, mode]);
+  }, [searchQuery, dateFrom, dateTo, sessions, mode]);
 
   const handleExpandSession = async (sid: string) => {
     if (expandedSessionId === sid) {
@@ -352,6 +406,82 @@ export default function ConversationHistoryModal({
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
+          <div className="date-picker-anchor">
+            <div
+              className={`date-picker-input${openCal === 'from' ? ' active' : ''}`}
+              onClick={() => setOpenCal(openCal === 'from' ? null : 'from')}
+            >
+              <Calendar size={14} />
+              <input
+                type="text"
+                placeholder="開始"
+                value={dateFrom}
+                onChange={(e) => { setDateFrom(e.target.value); }}
+                onClick={(e) => e.stopPropagation()}
+                onFocus={() => setOpenCal('from')}
+              />
+            </div>
+            <span className="date-picker-sep">~</span>
+            <div
+              className={`date-picker-input${openCal === 'to' ? ' active' : ''}`}
+              onClick={() => setOpenCal(openCal === 'to' ? null : 'to')}
+            >
+              <Calendar size={14} />
+              <input
+                type="text"
+                placeholder="結束"
+                value={dateTo}
+                onChange={(e) => { setDateTo(e.target.value); }}
+                onClick={(e) => e.stopPropagation()}
+                onFocus={() => setOpenCal('to')}
+              />
+            </div>
+            {(dateFrom || dateTo) && (
+              <button className="date-filter-clear" onClick={(e) => { e.stopPropagation(); setDateFrom(''); setDateTo(''); setOpenCal(null); }}>
+                &times;
+              </button>
+            )}
+            {openCal && (
+              <div className="date-picker-dropdown">
+                <div className="date-picker-tabs">
+                  <button
+                    className={openCal === 'from' ? 'active' : ''}
+                    onClick={() => setOpenCal('from')}
+                  >開始</button>
+                  <button
+                    className={openCal === 'to' ? 'active' : ''}
+                    onClick={() => setOpenCal('to')}
+                  >結束</button>
+                </div>
+                <MiniCalendar
+                  label=""
+                  value={openCal === 'from' ? dateFrom : dateTo}
+                  onChange={(d) => {
+                    if (openCal === 'from') {
+                      // 選開始，若 > 已有的結束，自動交換
+                      if (d && dateTo && d > dateTo) {
+                        setDateFrom(dateTo);
+                        setDateTo(d);
+                      } else {
+                        setDateFrom(d);
+                      }
+                      if (d) setOpenCal('to'); else setOpenCal(null);
+                    } else {
+                      // 選完結束，若 from > to 自動交換
+                      if (d && dateFrom && d < dateFrom) {
+                        setDateTo(dateFrom);
+                        setDateFrom(d);
+                      } else {
+                        setDateTo(d);
+                      }
+                      setOpenCal(null);
+                    }
+                  }}
+                  highlightRange={dateFrom && dateTo ? { from: dateFrom, to: dateTo } : undefined}
+                />
+              </div>
+            )}
+          </div>
           <button
             onClick={() => exportAsJSON()}
             disabled={filteredSessions.length === 0}
@@ -403,6 +533,18 @@ export default function ConversationHistoryModal({
                         <div className="session-card-meta">
                           <span className="session-badge">Session {sessionIndex + 1}</span>
                           <span className="session-count">{msgCount} {t('conversations_count')}</span>
+                          {session.language && (
+                            <span className="session-language" style={{ 
+                              padding: '2px 6px', 
+                              borderRadius: '4px', 
+                              fontSize: '11px',
+                              background: session.language === 'en' ? '#3b82f6' : '#10b981',
+                              color: 'white',
+                              fontWeight: 600
+                            }}>
+                              {session.language === 'en' ? 'EN' : 'ZH'}
+                            </span>
+                          )}
                           <span className="session-time">
                             <Clock size={13} />
                             {formatTime(session.first_message_time)}
@@ -442,7 +584,8 @@ export default function ConversationHistoryModal({
                               { role: 'user' as const, text: conv.user_message, turnNumber: conv.turn_number },
                               { role: 'assistant' as const, text: conv.agent_response, turnNumber: conv.turn_number },
                             ]);
-                            onResumeSession(session.session_id, messages);
+                            const sessionLanguage = (session as SessionSummary).language || convs[0]?.session_snapshot?.language;
+                            onResumeSession(session.session_id, messages, sessionLanguage);
                             onClose();
                           }}
                           title={t('resume_session')}
@@ -581,6 +724,25 @@ export default function ConversationHistoryModal({
 
         {/* Footer */}
         <div className="conversation-footer">
+          {Math.ceil(totalSessions / pageSize) > 1 && (
+            <div className="pagination-controls">
+              <button
+                disabled={currentPage === 1 || loading}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              >
+                &lt; {t('prev') || 'Prev'}
+              </button>
+              <span>
+                {t('page') || 'Page'} {currentPage} / {Math.ceil(totalSessions / pageSize)}
+              </span>
+              <button
+                disabled={currentPage >= Math.ceil(totalSessions / pageSize) || loading}
+                onClick={() => setCurrentPage((p) => p + 1)}
+              >
+                {t('next') || 'Next'} &gt;
+              </button>
+            </div>
+          )}
           <div className="conversation-footer-stats">
             <span>
               Sessions: <span className="stat-value">{filteredSessions.length}</span>

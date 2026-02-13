@@ -183,6 +183,89 @@ class MongoConversationLogger:
             logger.error(f"Failed to list sessions: {e}")
             return []
 
+    def get_paginated_session_ids(
+        self,
+        query: Dict[str, Any],
+        page: int = 1,
+        page_size: int = 10
+    ) -> tuple[List[str], int]:
+        """分頁取得符合條件的 session_ids
+
+        Args:
+            query: MongoDB 查詢條件
+            page: 頁碼 (從 1 開始)
+            page_size: 每頁數量
+
+        Returns:
+            (session_ids, total_sessions)
+        """
+        try:
+            # Aggregation Pipeline
+            # 1. Match filter
+            # 2. Group by session_id to get distinct sessions and their latest timestamp
+            # 3. Sort by latest timestamp descending
+            # 4. Facet for pagination (data) and count (metadata)
+
+            pipeline = [
+                {"$match": query},
+                {"$group": {
+                    "_id": "$session_id",
+                    "last_active": {"$max": "$timestamp"}
+                }},
+                {"$sort": {"last_active": -1}},
+                {"$facet": {
+                    "metadata": [{"$count": "total"}],
+                    "data": [
+                        {"$skip": (page - 1) * page_size},
+                        {"$limit": page_size},
+                        {"$project": {"_id": 1}}
+                    ]
+                }}
+            ]
+
+            result = list(self.conversations_collection.aggregate(pipeline))
+
+            if not result:
+                return [], 0
+
+            data = result[0]["data"]
+            metadata = result[0]["metadata"]
+
+            session_ids = [item["_id"] for item in data]
+            total_sessions = metadata[0]["total"] if metadata else 0
+
+            return session_ids, total_sessions
+
+        except Exception as e:
+            logger.error(f"Failed to get paginated session ids: {e}")
+            return [], 0
+
+    def get_logs_for_sessions(self, session_ids: List[str]) -> List[Dict]:
+        """取得指定 session_ids 的所有對話紀錄"""
+        if not session_ids:
+            return []
+
+        try:
+            docs = list(
+                self.conversations_collection.find(
+                    {"session_id": {"$in": session_ids}}
+                ).sort("turn_number", 1)
+            )
+
+            # Formating
+            for doc in docs:
+                doc["_id"] = str(doc["_id"])
+                if isinstance(doc.get("timestamp"), datetime):
+                    doc["timestamp"] = doc["timestamp"].isoformat()
+                if isinstance(doc.get("responded_at"), datetime):
+                    doc["responded_at"] = doc["responded_at"].isoformat()
+
+            return docs
+
+        except Exception as e:
+            logger.error(f"Failed to get logs for sessions: {e}")
+            return []
+
     def get_statistics(self) -> Dict[str, Any]:
         """取得對話記錄統計資訊
 

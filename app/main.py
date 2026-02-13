@@ -510,6 +510,8 @@ def delete_general_conversation(session_id: str, auth: dict = Depends(verify_aut
 )
 def get_general_conversations(
     store_name: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 10,
     auth: dict = Depends(verify_auth),
 ):
     """
@@ -517,6 +519,8 @@ def get_general_conversations(
 
     Query Parameters:
     - store_name: 知識庫名稱（必填）
+    - page: (可選) 頁碼，預設 1
+    - page_size: (可選) 每頁筆數，預設 10
 
     回傳該知識庫的所有對話（按 session 分組，含摘要）
     """
@@ -529,23 +533,25 @@ def get_general_conversations(
         if not current_store:
             raise HTTPException(status_code=400, detail="未指定知識庫或當前無活動知識庫")
 
-        # 取得所有 general 模式的對話
-        all_conversations = conversation_logger.get_session_logs_by_mode("general")
+        # 使用 MongoDB 的分頁查詢
+        query = {"mode": "general", "session_snapshot.store": current_store}
 
-        # 篩選出屬於這個知識庫的對話
-        store_conversations = [
-            c for c in all_conversations
-            if c.get("session_snapshot", {}).get("store") == current_store
-        ]
+        session_ids, total_sessions = conversation_logger.get_paginated_session_ids(
+            query=query,
+            page=page,
+            page_size=page_size
+        )
 
-        session_list = group_conversations_as_summary(store_conversations)
+        all_conversations = conversation_logger.get_logs_for_sessions(session_ids)
+
+        session_list = group_conversations_as_summary(all_conversations)
 
         return {
             "store_name": current_store,
             "mode": "general",
             "sessions": session_list,
-            "total_conversations": len(store_conversations),
-            "total_sessions": len(session_list)
+            "total_conversations": len(all_conversations),
+            "total_sessions": total_sessions
         }
 
     except Exception as e:

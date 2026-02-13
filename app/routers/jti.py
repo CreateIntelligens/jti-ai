@@ -348,7 +348,8 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                         "step": updated_session.step.value,
                         "answers_count": len(updated_session.answers),
                         "color_result_id": updated_session.color_result_id,
-                        "current_question_id": updated_session.current_question.get("id") if updated_session.current_question else None
+                        "current_question_id": updated_session.current_question.get("id") if updated_session.current_question else None,
+                        "language": updated_session.language,
                     },
                     mode="jti"
                 )
@@ -368,9 +369,10 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             else:
                 # ❌ 無法判斷選項：用 AI 打哈哈 + 程式碼強制附加題目
                 nudge_instruction = (
-                    "使用者在測驗中回覆了不是選項的內容，"
-                    "請用一句話（20字以內）輕鬆回應，不要問其他問題。"
-                    "例如：「哈哈好啦～我們先繼續測驗吧！」"
+                    "使用者在測驗中回覆了不是選項的內容。"
+                    "【嚴格禁止】不要回答使用者的問題，不要提供任何產品資訊或知識。"
+                    "只需用一句話（20字以內）敷衍帶過，引導回測驗。"
+                    "例如：「哈哈好啦～先做完測驗再聊！」「這個等等再說～先答題吧！」"
                 )
 
                 nudge_result = await main_agent.chat_with_tool_result(
@@ -410,7 +412,8 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                         "step": session.step.value,
                         "answers_count": len(session.answers),
                         "color_result_id": session.color_result_id,
-                        "current_question_id": session.current_question.get("id") if session.current_question else None
+                        "current_question_id": session.current_question.get("id") if session.current_question else None,
+                        "language": session.language,
                     },
                     mode="jti"
                 )
@@ -466,48 +469,37 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 log_progress=True,
             )
 
-        # 如果已完成測驗想再測一次，拒絕
+        # 如果已完成測驗想再測一次，婉拒
         if should_start_quiz and session.step.value == "DONE":
-            response_message = "你已經完成過測驗囉！這次對話只能測驗一次。如果想重新測驗，請重新整理頁面開始新的對話。"
+            if session.language == "en":
+                response_message = "You've already completed the quiz! Please refresh the page to start a new session if you'd like to retake it."
+            else:
+                response_message = "你已經完成過測驗囉！如果想重新測驗，請重新整理頁面開始新的對話。"
 
-            # 寫入這輪 Log
-            # 計算 turn_number: 如果是 rollback 後的新訊息，turn_number 應該是 request.turn_number
-            # 如果是正常對話，則是 logs 數量 + 1
-            # 為了準確，我們先讀取目前的 logs count.
-            # 但因為可能有並發問題，且 mongo logger 沒有 atomic increment turn，我們可以用 count + 1
-            # 或者如果我們剛剛執行了 rollback，那 request.turn_number 就是當前的 turn
-
-            current_turn = request.turn_number if request.turn_number else (conversation_logger.conversations_collection.count_documents({"session_id": request.session_id}) + 1)
-
-            tool_calls_record = []
-            session_data = {
-                "step": session.step.value,
-                "answers_count": len(session.answers),
-                "color_result_id": session.color_result_id,
-                "current_question_id": None
-            }
-            response_tool_calls = []
-
-            # If request.turn_number is provided, it means a rollback happened.
-            # Delete turns from this turn number onwards before logging.
+            # 記錄對話
             if request.turn_number:
                 conversation_logger.delete_turns_from(request.session_id, request.turn_number)
-
+            
             log_result = conversation_logger.log_conversation(
                 session_id=request.session_id,
                 user_message=request.message,
                 agent_response=response_message,
                 tool_calls=[],
-                session_state=session_data,
+                session_state={
+                    "step": session.step.value,
+                    "answers_count": len(session.answers),
+                    "color_result_id": session.color_result_id,
+                    "current_question_id": None,
+                    "language": session.language,
+                },
                 mode="jti"
             )
             
-            # log_conversation 返回 (doc_id, turn_number) 或 None
             final_turn_number = log_result[1] if log_result else None
 
             return ChatResponse(
                 message=response_message,
-                session=session_data, # Corrected from session_data
+                session=session.model_dump(),
                 tool_calls=[],
                 turn_number=final_turn_number
             )
@@ -547,7 +539,8 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                         "step": updated_session.step.value,
                         "answers_count": len(updated_session.answers),
                         "color_result_id": updated_session.color_result_id,
-                        "current_question_id": updated_session.current_question.get("id") if updated_session.current_question else None
+                        "current_question_id": updated_session.current_question.get("id") if updated_session.current_question else None,
+                        "language": updated_session.language,
                     },
                     mode="jti"
                 )
@@ -581,10 +574,11 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             agent_response=result["message"],
             tool_calls=result.get("tool_calls", []),
             session_state={
-                "step": session.step.value, # For general chat, session state might not change much
+                "step": session.step.value,
                 "answers_count": len(session.answers),
                 "color_result_id": session.color_result_id,
-                "current_question_id": session.current_question.get("id") if session.current_question else None
+                "current_question_id": session.current_question.get("id") if session.current_question else None,
+                "language": session.language,
             },
             mode="jti"
         )
@@ -613,11 +607,33 @@ async def quiz_start(request: QuizActionRequest, auth: dict = Depends(verify_aut
             raise HTTPException(status_code=404, detail="Session not found")
 
         if session.step.value == "DONE":
-            response_message = "你已經完成過測驗囉！這次對話只能測驗一次。如果想重新測驗，請重新整理頁面開始新的對話。"
+            if session.language == "en":
+                response_message = "You've already completed the quiz! Please refresh the page to start a new session."
+            else:
+                response_message = "你已經完成過測驗囉！這次對話只能測驗一次。如果想重新測驗，請重新整理頁面開始新的對話。"
+            
+            log_result = conversation_logger.log_conversation(
+                session_id=request.session_id,
+                user_message="[API] quiz_start",
+                agent_response=response_message,
+                tool_calls=[],
+                session_state={
+                    "step": session.step.value,
+                    "answers_count": len(session.answers),
+                    "color_result_id": session.color_result_id,
+                    "current_question_id": None,
+                    "language": session.language,
+                },
+                mode="jti"
+            )
+            
+            final_turn_number = log_result[1] if log_result else None
+            
             return ChatResponse(
                 message=response_message,
                 session=session.model_dump(),
                 tool_calls=[],
+                turn_number=final_turn_number
             )
 
         tool_result = await tool_executor.execute("start_quiz", {"session_id": request.session_id})
@@ -654,6 +670,7 @@ async def quiz_start(request: QuizActionRequest, auth: dict = Depends(verify_aut
                 "answers_count": len(updated_session.answers) if updated_session else len(session.answers),
                 "color_result_id": updated_session.color_result_id if updated_session else session.color_result_id,
                 "current_question_id": q.get("id") if isinstance(q, dict) else None,
+                "language": updated_session.language if updated_session else session.language,
             },
             mode="jti",
         )
@@ -758,6 +775,7 @@ async def _pause_quiz_and_respond(
             "answers_count": len(updated_session.answers) if updated_session else len(session.answers),
             "color_result_id": updated_session.color_result_id if updated_session else session.color_result_id,
             "current_question_id": None,
+            "language": updated_session.language if updated_session else session.language,
         },
         mode="jti",
     )
@@ -803,7 +821,11 @@ def _resume_quiz_and_respond(
     # resumed_q might be dict or object, safe get handled above
     
     question_text = resumed_q.get('text', '') if isinstance(resumed_q, dict) else ''
-    response_message = f"好呀，我們接著做第{current_q_num}題。\n第{current_q_num}題：{question_text}\n{options_text}"
+    
+    if updated_session and updated_session.language == "en":
+        response_message = f"Sure! Let's continue with Question {current_q_num}.\n\nQuestion {current_q_num}: {question_text}\n{options_text}"
+    else:
+        response_message = f"好呀，我們接著做第{current_q_num}題。\n\n第{current_q_num}題：{question_text}\n{options_text}"
 
     log_result = conversation_logger.log_conversation(
         session_id=session_id,
@@ -815,6 +837,7 @@ def _resume_quiz_and_respond(
             "answers_count": len(updated_session.answers) if updated_session else len(session.answers),
             "color_result_id": updated_session.color_result_id if updated_session else session.color_result_id,
             "current_question_id": resumed_q.get("id") if isinstance(resumed_q, dict) else None,
+            "language": updated_session.language if updated_session else session.language,
         },
         mode="jti",
     )
@@ -939,14 +962,21 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
     response_model=Union[ConversationsBySessionResponse, ConversationsGroupedResponse],
     response_model_exclude_none=True,
 )
-async def get_conversations(session_id: Optional[str] = None, auth: dict = Depends(verify_auth)):
+async def get_conversations(
+    session_id: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 10,
+    auth: dict = Depends(verify_auth)
+):
     """
     取得對話歷史
 
     Query Parameters:
     - session_id: (可選) 指定 Session ID 則只回傳該 session 的對話
+    - page: (可選) 頁碼，預設 1
+    - page_size: (可選) 每頁筆數，預設 10
 
-    如果不提供 session_id，則回傳所有 JTI 模式的對話（按 session 分組）
+    如果不提供 session_id，則回傳所有 JTI 模式的對話（按 session 分組，支援分頁）
     """
     mode = "jti"
     try:
@@ -964,18 +994,23 @@ async def get_conversations(session_id: Optional[str] = None, auth: dict = Depen
                 "total": len(conversations)
             }
         else:
-            # 查詢所有 JTI 對話
-            all_conversations = conversation_logger.get_session_logs_by_mode(mode)
+            # 分頁查詢所有 JTI 對話
+            session_ids, total_sessions = conversation_logger.get_paginated_session_ids(
+                query={"mode": mode},
+                page=page,
+                page_size=page_size
+            )
 
+            all_conversations = conversation_logger.get_logs_for_sessions(session_ids)
             session_list = group_conversations_by_session(all_conversations)
 
-            logger.info(f"Retrieved {len(all_conversations)} total conversations across {len(session_list)} sessions")
+            logger.info(f"Retrieved {len(all_conversations)} conversations across {len(session_list)} sessions (page {page}, total {total_sessions})")
 
             return {
                 "mode": mode,
                 "sessions": session_list,
-                "total_conversations": len(all_conversations),
-                "total_sessions": len(session_list)
+                "total_conversations": len(all_conversations), # 這是當前頁面的對話總數
+                "total_sessions": total_sessions # 這是總 session 數（用於前端分頁）
             }
 
     except Exception as e:

@@ -35,5 +35,8 @@
   "delete": "Delete",
   "confirm_delete_session": "Are you sure you want to delete all conversations in this session? This action cannot be undone.",
   "session_deleted": "Session deleted",
-  "resume_session": "Resume"
+  "resume_session": "Resume",
+  "prev": "Prev",
+  "next": "Next",
+  "page": "Page"
 }

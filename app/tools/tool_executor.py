@@ -345,11 +345,18 @@ Format:
             else:
                 result["message"] = color_result.get("message", "計算完成")
                 result["color_result"] = color_result
-                result["instruction_for_llm"] = (
-                    "使用者已完成色彩測驗，請用親切溫柔的語氣回覆，"
-                    "並完整保留以下文案內容：\n"
-                    f"{result['message']}"
-                )
+                if session.language == "en":
+                    result["instruction_for_llm"] = (
+                        "User has completed the color quiz. Respond warmly with the following result:\n"
+                        f"{result['message']}\n\n"
+                        "DO NOT repeat any quiz questions. Only announce the result."
+                    )
+                else:
+                    result["instruction_for_llm"] = (
+                        "使用者已完成色彩測驗，請用親切溫柔的語氣回覆以下結果：\n"
+                        f"{result['message']}\n\n"
+                        "注意：不要重複任何測驗題目，只需宣布結果。"
+                    )
 
         return result
 

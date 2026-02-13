@@ -20,7 +20,7 @@ from typing import Dict, List
 import google.genai as genai
 from google.genai import types
 from app.models.session import Session, SessionStep
-from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
+from app.services.session.session_manager_factory import get_session_manager
 from app.services.gemini_service import client as gemini_client
 from app.tools.tool_executor import tool_executor
 from app.services.jti.agent_prompts import (
@@ -30,7 +30,6 @@ from app.services.jti.agent_prompts import (
 
 # 使用工廠函數取得適當的實作（MongoDB 或記憶體）
 session_manager = get_session_manager()
-conversation_logger = get_conversation_logger()
 
 logger = logging.getLogger(__name__)
 
@@ -220,19 +219,7 @@ class MainAgent:
             self._sync_history_to_db(session_id, user_message, final_message)
             updated_session = session_manager.get_session(session_id)
 
-            # 6. 記錄對話日誌
-            conversation_logger.log_conversation(
-                session_id=session_id,
-                user_message=user_message,
-                agent_response=final_message,
-                tool_calls=tool_calls_log,
-                session_state={
-                    "step": updated_session.step.value if updated_session else None,
-                    "answers_count": len(updated_session.answers) if updated_session else 0,
-                    "color_result_id": updated_session.color_result_id if updated_session else None,
-                    "current_question_id": updated_session.current_question.get("id") if updated_session and updated_session.current_question else None
-                } if updated_session else None
-            )
+            # 6. 對話日誌由 router 層統一記錄，這裡不重複記
 
             return {
                 "message": final_message,
@@ -242,12 +229,6 @@ class MainAgent:
 
         except Exception as e:
             logger.error(f"Chat failed: {e}", exc_info=True)
-            conversation_logger.log_conversation(
-                session_id=session_id,
-                user_message=user_message,
-                agent_response=f"[ERROR] {str(e)}",
-                error=str(e)
-            )
             return {
                 "error": str(e),
                 "message": f"抱歉，發生錯誤：{str(e)}"
@@ -274,7 +255,7 @@ class MainAgent:
                 return {"error": "Session not found", "message": "找不到 session"}
 
             # start_quiz 開場白：用固定文案避免 LLM 產生不一致文字
-            if tool_name == "start_quiz" and tool_result.get("current_question") and session.language == "zh":
+            if tool_name == "start_quiz" and tool_result.get("current_question"):
                 q = tool_result["current_question"]
                 options = q.get("options", [])
                 options_text = self._format_options_text(options)
