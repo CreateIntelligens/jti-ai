@@ -72,6 +72,9 @@ def verify_auth(request: Request) -> dict:
     # 提取 token（支援 Authorization: Bearer 與 API-Token）
     token = _extract_bearer_token(request) or _extract_api_token(request)
     if not token:
+        # 同 origin（前端）請求自動視為 admin
+        if _is_same_origin(request):
+            return {"role": "admin", "store_name": None}
         raise HTTPException(status_code=401, detail="Missing Authorization Bearer token or API-Token header")
 
     # 是 Admin Key？

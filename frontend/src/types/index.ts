@@ -17,12 +17,15 @@ export interface Message {
   text?: string;
   loading?: boolean;
   error?: boolean;
+  turnNumber?: number;
 }
 
 export interface ChatResponse {
   answer: string;
   prompt_applied?: boolean;
+  turn_number?: number;
 }
+
 
 export interface StartChatResponse {
   prompt_applied?: boolean;

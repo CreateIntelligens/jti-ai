@@ -114,6 +114,52 @@ class GeneralChatSessionManager:
             logger.error(f"Failed to get history for session {session_id}: {e}")
             return []
 
+    def truncate_history(self, session_id: str, keep_turns: int) -> bool:
+        """截斷對話歷史，只保留前 keep_turns 輪（每輪 = user + model = 2 條）
+
+        Args:
+            session_id: Session ID
+            keep_turns: 保留幾輪對話
+
+        Returns:
+            是否成功
+        """
+        try:
+            keep_count = keep_turns * 2
+            doc = self.collection.find_one(
+                {"session_id": session_id},
+                {"chat_history": 1},
+            )
+            if doc is None:
+                logger.warning(f"Session not found for truncate: {session_id}")
+                return False
+
+            current_history = doc.get("chat_history", [])
+            truncated = current_history[:keep_count]
+
+            now = datetime.now()
+            expires_at = now + timedelta(hours=DEFAULT_SESSION_EXPIRY_HOURS)
+
+            self.collection.update_one(
+                {"session_id": session_id},
+                {
+                    "$set": {
+                        "chat_history": truncated,
+                        "updated_at": now,
+                        "expires_at": expires_at,
+                    }
+                },
+            )
+            logger.info(
+                f"Truncated session {session_id[:8]}... "
+                f"from {len(current_history)} to {len(truncated)} messages "
+                f"(keep_turns={keep_turns})"
+            )
+            return True
+        except Exception as e:
+            logger.error(f"Failed to truncate session {session_id}: {e}")
+            return False
+
     def delete_session(self, session_id: str) -> bool:
         """刪除 session"""
         try:

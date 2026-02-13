@@ -54,7 +54,7 @@ class MongoConversationLogger:
             mode: 模式 ("jti" 或 "general")
 
         Returns:
-            記錄的 MongoDB document ID，若失敗返回 None
+            (document_id, turn_number) 的 tuple，若失敗返回 None
         """
         try:
             # 獲取該 session 現有的對話輪次
@@ -85,7 +85,7 @@ class MongoConversationLogger:
                 f"session={session_id[:8]}..., turn={turn_number}"
             )
 
-            return str(result.inserted_id)
+            return (str(result.inserted_id), turn_number)
 
         except Exception as e:
             logger.error(f"Failed to log conversation to MongoDB: {e}")
@@ -304,6 +304,57 @@ class MongoConversationLogger:
         except Exception as e:
             logger.error(f"Failed to get tool call statistics: {e}")
             return {}
+
+    def delete_turns_from(self, session_id: str, from_turn_number: int) -> int:
+        """刪除指定 session 中 turn_number >= from_turn_number 的紀錄
+
+        Args:
+            session_id: Session ID
+            from_turn_number: 從第幾輪開始刪除（含該輪）
+
+        Returns:
+            刪除的記錄數
+        """
+        try:
+            result = self.conversations_collection.delete_many({
+                "session_id": session_id,
+                "turn_number": {"$gte": from_turn_number},
+            })
+            deleted_count = result.deleted_count
+            logger.info(
+                f"Deleted {deleted_count} turns (>= #{from_turn_number}) "
+                f"for session {session_id[:8]}..."
+            )
+            return deleted_count
+        except Exception as e:
+            logger.error(f"Failed to delete turns from session {session_id}: {e}")
+            return 0
+
+    def get_turn(self, session_id: str, turn_number: int) -> Optional[Dict]:
+        """取得指定 session 的特定輪次紀錄
+
+        Args:
+            session_id: Session ID
+            turn_number: 輪次編號
+
+        Returns:
+            該輪的紀錄，若不存在則回傳 None
+        """
+        try:
+            doc = self.conversations_collection.find_one({
+                "session_id": session_id,
+                "turn_number": turn_number,
+            })
+            if doc:
+                doc["_id"] = str(doc["_id"])
+                if isinstance(doc.get("timestamp"), datetime):
+                    doc["timestamp"] = doc["timestamp"].isoformat()
+                if isinstance(doc.get("responded_at"), datetime):
+                    doc["responded_at"] = doc["responded_at"].isoformat()
+            return doc
+        except Exception as e:
+            logger.error(f"Failed to get turn {turn_number} for session {session_id}: {e}")
+            return None
 
     def delete_session_logs(self, session_id: str) -> int:
         """刪除特定 session 的所有對話紀錄

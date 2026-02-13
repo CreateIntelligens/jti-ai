@@ -223,9 +223,15 @@ export default function App() {
       const data = await api.sendMessage(text, activeSessionId || undefined);
       setMessages(prev => {
         const newMessages = [...prev];
+        // user message: 設定 turnNumber
+        newMessages[newMessages.length - 2] = {
+          ...newMessages[newMessages.length - 2],
+          turnNumber: data.turn_number,
+        };
         newMessages[newMessages.length - 1] = {
           role: 'model',
-          text: data.answer
+          text: data.answer,
+          turnNumber: data.turn_number,
         };
         return newMessages;
       });
@@ -237,6 +243,102 @@ export default function App() {
           role: 'model',
           text: '錯誤: ' + errorMsg,
           error: true
+        };
+        return newMessages;
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegenerate = async (turnNumber: number) => {
+    if (!sessionId || loading) return;
+
+    // 找到該 turnNumber 的 user message 文字
+    const userMsg = messages.find(
+      m => m.role === 'user' && m.turnNumber === turnNumber
+    );
+    if (!userMsg?.text) return;
+
+    // 前端截斷到該輪的 user message（含），丟掉 model 回覆及之後
+    setMessages(prev => {
+      const userIdx = prev.findIndex(
+        m => m.role === 'user' && m.turnNumber === turnNumber
+      );
+      if (userIdx === -1) return prev;
+      const truncated = prev.slice(0, userIdx + 1);
+      return [...truncated, { role: 'model', loading: true }];
+    });
+    setLoading(true);
+
+    try {
+      const data = await api.sendMessage(userMsg.text, sessionId, turnNumber);
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1] = {
+          role: 'model',
+          text: data.answer,
+          turnNumber: data.turn_number,
+        };
+        return newMessages;
+      });
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1] = {
+          role: 'model',
+          text: '錯誤: ' + errorMsg,
+          error: true,
+        };
+        return newMessages;
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditAndResend = async (turnNumber: number, newText: string) => {
+    if (!sessionId || loading) return;
+
+    // 前端截斷到該輪之前，加入新的 user message 和 loading placeholder
+    setMessages(prev => {
+      const userIdx = prev.findIndex(
+        m => m.role === 'user' && m.turnNumber === turnNumber
+      );
+      if (userIdx === -1) return prev;
+      const truncated = prev.slice(0, userIdx);
+      return [
+        ...truncated,
+        { role: 'user', text: newText },
+        { role: 'model', loading: true },
+      ];
+    });
+    setLoading(true);
+
+    try {
+      const data = await api.sendMessage(newText, sessionId, turnNumber);
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 2] = {
+          ...newMessages[newMessages.length - 2],
+          turnNumber: data.turn_number,
+        };
+        newMessages[newMessages.length - 1] = {
+          role: 'model',
+          text: data.answer,
+          turnNumber: data.turn_number,
+        };
+        return newMessages;
+      });
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      setMessages(prev => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1] = {
+          role: 'model',
+          text: '錯誤: ' + errorMsg,
+          error: true,
         };
         return newMessages;
       });
@@ -276,6 +378,8 @@ export default function App() {
           onSendMessage={handleSendMessage}
           disabled={!currentStore}
           loading={loading}
+          onRegenerate={handleRegenerate}
+          onEditAndResend={handleEditAndResend}
         />
       </div>
       <StoreManagementModal
@@ -314,6 +418,7 @@ export default function App() {
           setMessages(msgs.map((m) => ({
             role: m.role === 'assistant' ? 'model' : m.role,
             text: m.text,
+            turnNumber: m.turnNumber,
           })));
         }}
       />

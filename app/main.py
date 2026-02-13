@@ -203,6 +203,7 @@ class ChatStartRequest(BaseModel):
 class ChatMessageRequest(BaseModel):
     message: str
     session_id: Optional[str] = None  # 可選：指定 session ID
+    turn_number: Optional[int] = None  # 可選：帶此參數時，先截斷到該輪之前再送訊息（重新生成 / 編輯重送）
 
 
 @app.get("/api/stores")
@@ -350,10 +351,10 @@ def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
 
     必須提供 session_id（從 /api/chat/start 取得），以確保使用正確的對話上下文。
     如果沒有提供 session_id，將使用全域 manager（不推薦多用戶場景）。
-    """
-    # 取得該 session 專屬的 manager
-    mgr = _get_or_create_manager(session_id=req.session_id)
 
+    可選參數：
+    - turn_number: 帶此參數時，先截斷到該輪之前再送訊息（用於重新生成 / 編輯重送）
+    """
     # 取得 session_id（用於日誌記錄）
     if req.session_id:
         session_id = req.session_id
@@ -361,11 +362,66 @@ def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
         session_id = uuid.uuid4().hex
         print(f"[警告] /api/chat/message 沒有提供 session_id，使用全域 manager")
 
+    # 如果帶了 turn_number，先執行截斷
+    if req.turn_number is not None and req.session_id:
+        turn_number = req.turn_number
+
+        # 截斷 MongoDB chat_history
+        if general_session_manager:
+            general_session_manager.truncate_history(session_id, turn_number - 1)
+
+        # 刪除 conversation_logs
+        deleted_count = conversation_logger.delete_turns_from(session_id, turn_number)
+        print(f"[Regenerate] Session {session_id[:8]}... turn #{turn_number}: 刪除 {deleted_count} 筆日誌")
+
+        # 清除記憶體中的 chat session，讓它重建
+        if session_id in user_managers:
+            del user_managers[session_id]
+
+    # 取得該 session 專屬的 manager
+    mgr = _get_or_create_manager(session_id=req.session_id)
+
+    # 如果 manager 沒有 chat（general_chat_sessions 可能過期），從 conversation_logs 重建
+    if req.session_id and not (hasattr(mgr, 'current_store') and mgr.current_store):
+        remaining_logs = conversation_logger.get_session_logs(session_id)
+        remaining_logs = [l for l in remaining_logs if l.get("mode") == "general"]
+
+        store_name = None
+        if remaining_logs:
+            store_name = remaining_logs[0].get("session_snapshot", {}).get("store")
+        if not store_name:
+            store_name = os.getenv("GEMINI_FILE_SEARCH_STORE_ID_ZH", "")
+
+        history = []
+        for log in remaining_logs:
+            history.append({"role": "user", "content": log["user_message"]})
+            history.append({"role": "model", "content": log["agent_response"]})
+
+        system_instruction = None
+        if prompt_manager:
+            active_prompt = prompt_manager.get_active_prompt(store_name)
+            if active_prompt:
+                system_instruction = active_prompt.content
+
+        model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+        history_contents = FileSearchManager._build_history_contents(history)
+        mgr.start_chat(store_name, model_name, system_instruction=system_instruction, history=history_contents)
+
+        if general_session_manager:
+            general_session_manager.create_session(
+                session_id=session_id, store_name=store_name,
+                model=model_name, system_instruction=system_instruction,
+            )
+            for h in history:
+                general_session_manager.add_message(session_id, h["role"], h["content"])
+
+        print(f"[Session] 從 conversation_logs 重建: {session_id[:8]}... (歷史 {len(history)} 則)")
+
     current_store = mgr.current_store if hasattr(mgr, 'current_store') else 'unknown'
 
     try:
         response = mgr.send_message(req.message)
-        answer = response.text
+        answer = response.text or ""
 
         # 清除 Gemini File Search 的 citation 標記
         answer = re.sub(r'\s*\[cite:\s*[^\]]*\]', '', answer).strip()
@@ -376,7 +432,7 @@ def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
             general_session_manager.add_message(session_id, "model", answer)
 
         # 記錄對話日誌
-        conversation_logger.log_conversation(
+        log_result = conversation_logger.log_conversation(
             session_id=session_id,
             user_message=req.message,
             agent_response=answer,
@@ -384,12 +440,14 @@ def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
             session_state={"store": current_store},
             mode="general"
         )
+        result_turn = log_result[1] if log_result else None
 
         print(f"[Session {session_id[:8]}] 使用者: {req.message[:50]}... | 回應: {answer[:50]}...")
 
         return {
             "answer": answer,
-            "session_id": session_id
+            "session_id": session_id,
+            "turn_number": result_turn,
         }
     except ValueError as e:
         # 記錄錯誤對話

@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Trash2,
   Play,
+  CornerDownRight,
 } from 'lucide-react';
 import { deleteConversation, fetchWithApiKey, getGeneralConversationDetail } from '../services/api';
 
@@ -58,7 +59,7 @@ interface ConversationHistoryModalProps {
   sessionId?: string;
   storeName?: string;
   mode?: 'jti' | 'general';
-  onResumeSession?: (sessionId: string, messages: Array<{ role: 'user' | 'assistant'; text: string }>) => void;
+  onResumeSession?: (sessionId: string, messages: Array<{ role: 'user' | 'assistant'; text: string; turnNumber?: number }>) => void;
 }
 
 export default function ConversationHistoryModal({
@@ -275,6 +276,33 @@ export default function ConversationHistoryModal({
     }
   };
 
+  const handleResumeFromTurn = async (sid: string, turnNumber: number) => {
+    if (!onResumeSession) return;
+
+    // 確保已載入完整對話
+    let convs = detailCache[sid];
+    if (!convs) {
+      try {
+        const data = await getGeneralConversationDetail(sid);
+        convs = data.conversations || [];
+        setDetailCache((prev) => ({ ...prev, [sid]: convs }));
+      } catch (error) {
+        console.error('[ConversationHistory] Failed to load for resume from turn:', error);
+        return;
+      }
+    }
+
+    // 只取到指定 turn 為止
+    const truncated = convs.filter((conv) => (conv.turn_number || 0) <= turnNumber);
+    const messages = truncated.flatMap((conv) => [
+      { role: 'user' as const, text: conv.user_message, turnNumber: conv.turn_number },
+      { role: 'assistant' as const, text: conv.agent_response, turnNumber: conv.turn_number },
+    ]);
+
+    onResumeSession(sid, messages);
+    onClose();
+  };
+
   const formatTime = (timestamp: string) => {
     try {
       return new Date(timestamp).toLocaleString('zh-CN', {
@@ -411,8 +439,8 @@ export default function ConversationHistoryModal({
                               }
                             }
                             const messages = convs.flatMap((conv) => [
-                              { role: 'user' as const, text: conv.user_message },
-                              { role: 'assistant' as const, text: conv.agent_response },
+                              { role: 'user' as const, text: conv.user_message, turnNumber: conv.turn_number },
+                              { role: 'assistant' as const, text: conv.agent_response, turnNumber: conv.turn_number },
                             ]);
                             onResumeSession(session.session_id, messages);
                             onClose();
@@ -526,6 +554,17 @@ export default function ConversationHistoryModal({
                                       </div>
                                     ))}
                                   </div>
+                                )}
+
+                                {/* 從這裡接續 */}
+                                {onResumeSession && mode === 'general' && (
+                                  <button
+                                    className="turn-resume-btn"
+                                    onClick={() => handleResumeFromTurn(session.session_id, turnNum)}
+                                  >
+                                    <CornerDownRight size={14} />
+                                    {t('resume_from_here') || '從這裡接續'}
+                                  </button>
                                 )}
                               </div>
                             )}

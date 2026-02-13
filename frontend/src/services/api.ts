@@ -98,10 +98,13 @@ export async function startChat(storeName: string, previousSessionId?: string | 
   return handleResponse<StartChatResponse>(response);
 }
 
-export async function sendMessage(text: string, sessionId?: string): Promise<ChatResponse> {
-  const payload: Record<string, string> = { message: text };
+export async function sendMessage(text: string, sessionId?: string, turnNumber?: number): Promise<ChatResponse> {
+  const payload: Record<string, unknown> = { message: text };
   if (sessionId) {
     payload.session_id = sessionId;
+  }
+  if (turnNumber !== undefined) {
+    payload.turn_number = turnNumber;
   }
 
   const response = await fetchWithApiKey(`${API_BASE}/chat/message`, {
