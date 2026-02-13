@@ -88,6 +88,14 @@ export default function ConversationHistoryModal({
   const [dateTo, setDateTo] = useState('');
   const [openCal, setOpenCal] = useState<'from' | 'to' | null>(null);
 
+  // 自動格式化日期輸入：純數字自動加 -，允許各種分隔符
+  const formatDateInput = (raw: string): string => {
+    const digits = raw.replace(/\D/g, '');
+    if (digits.length <= 4) return digits;
+    if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+  };
+
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
@@ -416,7 +424,7 @@ export default function ConversationHistoryModal({
                 type="text"
                 placeholder="開始"
                 value={dateFrom}
-                onChange={(e) => { setDateFrom(e.target.value); }}
+                onChange={(e) => setDateFrom(formatDateInput(e.target.value))}
                 onClick={(e) => e.stopPropagation()}
                 onFocus={() => setOpenCal('from')}
               />
@@ -431,7 +439,7 @@ export default function ConversationHistoryModal({
                 type="text"
                 placeholder="結束"
                 value={dateTo}
-                onChange={(e) => { setDateTo(e.target.value); }}
+                onChange={(e) => setDateTo(formatDateInput(e.target.value))}
                 onClick={(e) => e.stopPropagation()}
                 onFocus={() => setOpenCal('to')}
               />
