@@ -4,18 +4,15 @@
 職責：
 1. 在 MongoDB 中管理一般知識庫的 Chat Session
 2. 支持多輪對話歷史持久化
-3. 自動過期清理 (TTL 24 小時)
 """
 
 from typing import Dict, Optional, List, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 import logging
 
 from app.services.mongo_client import get_mongo_db
 
 logger = logging.getLogger(__name__)
-
-DEFAULT_SESSION_EXPIRY_HOURS = 24
 
 
 class GeneralChatSessionManager:
@@ -27,7 +24,6 @@ class GeneralChatSessionManager:
 
         # 建立索引
         self.collection.create_index("session_id", unique=True)
-        self.collection.create_index("expires_at", expireAfterSeconds=0)
 
     def create_session(
         self,
@@ -38,7 +34,6 @@ class GeneralChatSessionManager:
     ) -> Dict[str, Any]:
         """建立或更新 session"""
         now = datetime.now()
-        expires_at = now + timedelta(hours=DEFAULT_SESSION_EXPIRY_HOURS)
 
         doc = {
             "session_id": session_id,
@@ -48,7 +43,6 @@ class GeneralChatSessionManager:
             "chat_history": [],
             "created_at": now,
             "updated_at": now,
-            "expires_at": expires_at,
         }
 
         try:
@@ -79,14 +73,11 @@ class GeneralChatSessionManager:
     def add_message(self, session_id: str, role: str, content: str) -> bool:
         """新增訊息到對話歷史"""
         try:
-            now = datetime.now()
-            expires_at = now + timedelta(hours=DEFAULT_SESSION_EXPIRY_HOURS)
-
             result = self.collection.update_one(
                 {"session_id": session_id},
                 {
                     "$push": {"chat_history": {"role": role, "content": content}},
-                    "$set": {"updated_at": now, "expires_at": expires_at},
+                    "$set": {"updated_at": datetime.now()},
                 },
             )
 
@@ -137,16 +128,12 @@ class GeneralChatSessionManager:
             current_history = doc.get("chat_history", [])
             truncated = current_history[:keep_count]
 
-            now = datetime.now()
-            expires_at = now + timedelta(hours=DEFAULT_SESSION_EXPIRY_HOURS)
-
             self.collection.update_one(
                 {"session_id": session_id},
                 {
                     "$set": {
                         "chat_history": truncated,
-                        "updated_at": now,
-                        "expires_at": expires_at,
+                        "updated_at": datetime.now(),
                     }
                 },
             )

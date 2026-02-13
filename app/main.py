@@ -423,6 +423,20 @@ def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
         response = mgr.send_message(req.message)
         answer = response.text or ""
 
+        # 診斷空回應
+        if not answer.strip():
+            candidates = response.candidates if hasattr(response, 'candidates') else []
+            if candidates:
+                c = candidates[0]
+                finish = getattr(c, 'finish_reason', 'unknown')
+                safety = getattr(c, 'safety_ratings', [])
+                parts = c.content.parts if hasattr(c, 'content') and c.content and c.content.parts else []
+                print(f"[Session {session_id[:8]}] ⚠️ 空回應診斷: finish_reason={finish}, safety={safety}, parts={len(parts)}")
+                for i, p in enumerate(parts):
+                    print(f"  part[{i}]: text={repr(getattr(p, 'text', None))[:100]}, thought={bool(getattr(p, 'thought', None))}")
+            else:
+                print(f"[Session {session_id[:8]}] ⚠️ 空回應: 無 candidates")
+
         # 清除 Gemini File Search 的 citation 標記
         answer = re.sub(r'\s*\[cite:\s*[^\]]*\]', '', answer).strip()
 

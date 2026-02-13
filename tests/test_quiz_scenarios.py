@@ -8,7 +8,7 @@ from typing import Optional
 
 # 設定測試環境變數
 os.environ.setdefault("GEMINI_API_KEY", "test-key")
-os.environ.setdefault("GEMINI_MODEL_NAME", "gemini-2.0-flash")
+os.environ.setdefault("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
 
 
 async def test_scenario(scenario_name: str, messages: list[tuple[str, str]]):

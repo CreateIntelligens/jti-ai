@@ -4,12 +4,11 @@ MongoDB Session 管理服務
 職責：
 1. 在 MongoDB 中進行 Session CRUD
 2. 狀態機管理
-3. 自動過期清理
-4. 支持查詢和分析
+3. 支持查詢和分析
 """
 
 from typing import Dict, Optional, List, Any
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from app.models.session import Session, SessionStep, GameMode
 from app.services.mongo_client import get_mongo_db
@@ -22,12 +21,9 @@ logger = logging.getLogger(__name__)
 class MongoSessionManager(SessionStateMixin):
     """MongoDB Session 管理器"""
 
-    def __init__(self, idle_timeout_minutes: int = 30):
-        self.idle_timeout = timedelta(minutes=idle_timeout_minutes)
+    def __init__(self):
         self.db = get_mongo_db()
         self.sessions_collection = self.db["sessions"]
-        # TTL index：MongoDB 自動清理過期 session
-        self.sessions_collection.create_index("expires_at", expireAfterSeconds=0)
 
     def create_session(
         self,
@@ -41,7 +37,6 @@ class MongoSessionManager(SessionStateMixin):
         session_dict = session.model_dump(mode="json")
 
         # 添加 MongoDB 相關字段
-        session_dict["expires_at"] = datetime.now() + self.idle_timeout
         session_dict["created_at"] = datetime.now()
         session_dict["updated_at"] = datetime.now()
 
@@ -65,13 +60,6 @@ class MongoSessionManager(SessionStateMixin):
                 logger.warning(f"Session not found in MongoDB: {session_id}")
                 return None
 
-            # 檢查是否已過期
-            expires_at = doc.get("expires_at")
-            if isinstance(expires_at, datetime) and datetime.now() > expires_at:
-                logger.info(f"Session expired, deleting: {session_id}")
-                self.delete_session(session_id)
-                return None
-
             # 移除 MongoDB 內部字段，重新構建 Session 物件
             doc.pop("_id", None)
             doc.pop("expires_at", None)
@@ -91,10 +79,7 @@ class MongoSessionManager(SessionStateMixin):
             session.update_timestamp()
             session_dict = session.model_dump(mode="json")
 
-            # 更新 updated_at 和 expires_at
-            now = datetime.now()
-            session_dict["updated_at"] = now
-            session_dict["expires_at"] = now + self.idle_timeout
+            session_dict["updated_at"] = datetime.now()
 
             result = self.sessions_collection.update_one(
                 {"session_id": session.session_id},
@@ -131,6 +116,133 @@ class MongoSessionManager(SessionStateMixin):
             logger.error(f"Failed to delete session from MongoDB: {e}")
             return False
 
+    def rebuild_session_from_logs(self, session_id: str, logs: List[Dict]) -> Optional[Session]:
+        """從 conversation logs 重建過期的 JTI session
+
+        Args:
+            session_id: 原始 session ID
+            logs: 該 session 的 conversation logs（已按 turn_number 排序）
+
+        Returns:
+            重建的 Session 物件（已寫入 MongoDB），或 None（logs 為空）
+        """
+        if not logs:
+            return None
+
+        try:
+            # === 從 logs 提取資料 ===
+            answers = {}            # {question_id: option_id}
+            selected_questions = [] # 按順序收集的題目
+            color_scores = {}
+            color_result = None
+            color_result_id = None
+            chat_history = []
+
+            for log in logs:
+                # 收集 chat_history
+                user_msg = log.get("user_message", "")
+                agent_resp = log.get("agent_response", "")
+                if user_msg:
+                    chat_history.append({"role": "user", "content": user_msg})
+                if agent_resp:
+                    chat_history.append({"role": "assistant", "content": agent_resp})
+
+                # 解析 tool_calls
+                for tc in log.get("tool_calls", []):
+                    tool = tc.get("tool") or tc.get("tool_name")
+                    result = tc.get("result", {})
+
+                    if tool == "start_quiz" and result.get("current_question"):
+                        # 第一題
+                        selected_questions.append(result["current_question"])
+
+                    elif tool == "submit_answer":
+                        if result.get("success"):
+                            question_id = result.get("answered")
+                            option_id = result.get("selected")
+                            if question_id and option_id:
+                                answers[question_id] = option_id
+
+                        if result.get("next_question"):
+                            # 後續題目
+                            selected_questions.append(result["next_question"])
+
+                        # 提取 color_result（最後一題完成時）
+                        if result.get("color_result"):
+                            cr = result["color_result"]
+                            color_scores = cr.get("color_scores", {})
+                            color_result = cr.get("result")
+
+            # === 從最後一筆 log 的 session_snapshot 取得狀態 ===
+            last_log = logs[-1]
+            snapshot = last_log.get("session_snapshot") or last_log.get("session_state") or {}
+            step = snapshot.get("step", "WELCOME")
+            color_result_id = snapshot.get("color_result_id") or color_result_id
+
+            # === 推斷語言（預設 zh） ===
+            language = "zh"
+
+            # === 計算 current_q_index 和 current_question ===
+            current_q_index = len(answers)
+            current_question = None
+
+            if step == "QUIZ" and selected_questions:
+                if current_q_index < len(selected_questions):
+                    current_question = selected_questions[current_q_index]
+                else:
+                    # selected_questions 不完整，降級為 WELCOME
+                    logger.warning(
+                        f"Rebuilding session {session_id[:8]}...: "
+                        f"selected_questions ({len(selected_questions)}) < current_q_index ({current_q_index}), "
+                        f"degrading to WELCOME"
+                    )
+                    step = "WELCOME"
+            elif step == "QUIZ" and not selected_questions:
+                # 沒有 selected_questions 資料，降級為 WELCOME
+                logger.warning(
+                    f"Rebuilding session {session_id[:8]}...: no selected_questions, degrading to WELCOME"
+                )
+                step = "WELCOME"
+
+            # === 判斷 metadata ===
+            metadata = {}
+            if step == "WELCOME" and len(answers) > 0:
+                metadata["paused_quiz"] = True
+
+            # === 建立 Session 物件 ===
+            session = Session(
+                session_id=session_id,
+                mode=GameMode.COLOR,
+                step=step,
+                language=language,
+                quiz_id="color_taste",
+                current_q_index=current_q_index,
+                answers=answers,
+                selected_questions=selected_questions if selected_questions else None,
+                color_result_id=color_result_id,
+                color_scores=color_scores,
+                color_result=color_result,
+                chat_history=chat_history,
+                current_question=current_question,
+                metadata=metadata,
+            )
+
+            # === 寫入 MongoDB ===
+            session_dict = session.model_dump(mode="json")
+            session_dict["created_at"] = datetime.now()
+            session_dict["updated_at"] = datetime.now()
+
+            self.sessions_collection.insert_one(session_dict)
+            logger.info(
+                f"Rebuilt session from {len(logs)} logs: {session_id[:8]}... "
+                f"(step={step}, answers={len(answers)}, questions={len(selected_questions)})"
+            )
+            return session
+
+        except Exception as e:
+            logger.error(f"Failed to rebuild session from logs: {e}", exc_info=True)
+            return None
+
     # === 輔助方法 ===
 
     @staticmethod
@@ -162,22 +274,6 @@ class MongoSessionManager(SessionStateMixin):
         except Exception as e:
             logger.error(f"Failed to get all sessions from MongoDB: {e}")
             return []
-
-    def clear_expired_sessions(self) -> int:
-        """清理過期 sessions"""
-        try:
-            now = datetime.now()
-            result = self.sessions_collection.delete_many(
-                {"expires_at": {"$lt": now}}
-            )
-
-            deleted_count = result.deleted_count
-            logger.info(f"Cleared {deleted_count} expired sessions from MongoDB")
-            return deleted_count
-
-        except Exception as e:
-            logger.error(f"Failed to clear expired sessions from MongoDB: {e}")
-            return 0
 
     # === 查詢和分析方法 ===
 

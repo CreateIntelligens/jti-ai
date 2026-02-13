@@ -68,7 +68,8 @@ class MainAgent:
         file_search_tools = self._build_file_search_tools(language=session.language)
         config = types.GenerateContentConfig(
             tools=file_search_tools,
-            system_instruction=[types.Part.from_text(text=system_instruction)]
+            system_instruction=[types.Part.from_text(text=system_instruction)],
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
 
         chat_session = gemini_client.chats.create(
@@ -339,7 +340,8 @@ class MainAgent:
             system_instruction = self._get_system_instruction(session)
             session_state = self._get_session_state(session)
             config = types.GenerateContentConfig(
-                system_instruction=f"{system_instruction}\n\n{session_state}\n\n{instruction}"
+                system_instruction=f"{system_instruction}\n\n{session_state}\n\n{instruction}",
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
             )
 
             response = gemini_client.models.generate_content(

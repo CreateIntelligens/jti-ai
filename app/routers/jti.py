@@ -168,6 +168,28 @@ class ExportGeneralConversationsResponse(BaseModel):
     total_sessions: int
 
 
+# === Helpers ===
+
+def _get_or_rebuild_session(session_id: str):
+    """取得 session，若已過期則嘗試從 conversation logs 重建"""
+    session = session_manager.get_session(session_id)
+    if session:
+        return session
+
+    # 嘗試從 conversation logs 重建
+    logs = conversation_logger.get_session_logs(session_id)
+    jti_logs = [l for l in logs if l.get("mode") == "jti"]
+    if not jti_logs:
+        return None
+
+    session = session_manager.rebuild_session_from_logs(session_id, jti_logs)
+    if session:
+        logger.info(f"Rebuilt expired JTI session from {len(jti_logs)} logs: {session_id[:8]}...")
+        # 清除記憶體中的舊 LLM chat session（下次呼叫時會從 chat_history 自動重建）
+        main_agent.remove_session(session_id)
+    return session
+
+
 # === Endpoints ===
 
 @router.post("/chat/start", response_model=CreateSessionResponse)
@@ -215,7 +237,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
        - **不走知識庫，鎖定作答**
     """
     try:
-        session = session_manager.get_session(request.session_id)
+        session = _get_or_rebuild_session(request.session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
@@ -320,10 +342,11 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     tool_calls=response_tool_calls
                 )
             else:
-                # ❌ 無法判斷選項：用 AI 打哈哈 + 重問當前題
+                # ❌ 無法判斷選項：用 AI 打哈哈 + 程式碼強制附加題目
                 nudge_instruction = (
-                    "使用者回覆不是選項，請用一句輕鬆的語氣敷衍回答，"
-                    f"並提醒還剩 {remaining} 題，然後重問當前題目：\n\n{current_q_text}"
+                    "使用者在測驗中回覆了不是選項的內容，"
+                    "請用一句話（20字以內）輕鬆回應，不要問其他問題。"
+                    "例如：「哈哈好啦～我們先繼續測驗吧！」"
                 )
 
                 nudge_result = await main_agent.chat_with_tool_result(
@@ -334,7 +357,9 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     tool_result={"instruction_for_llm": nudge_instruction}
                 )
 
-                response_message = nudge_result["message"]
+                # 程式碼強制附加題目，不依賴 LLM
+                nudge_text = nudge_result["message"].strip()
+                response_message = f"{nudge_text}\n\n{current_q_text}"
 
                 # 記錄 AI 回應
                 logger.info(f"[AI回應] 無法判斷選項，重問 | {response_message[:80]}...")
@@ -560,7 +585,7 @@ async def quiz_pause(request: QuizActionRequest, auth: dict = Depends(verify_aut
     直接暫停測驗（不依賴自然語言判斷）
     """
     try:
-        session = session_manager.get_session(request.session_id)
+        session = _get_or_rebuild_session(request.session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
@@ -583,7 +608,7 @@ async def quiz_resume(request: QuizActionRequest, auth: dict = Depends(verify_au
     直接繼續先前暫停的測驗（不依賴自然語言判斷）
     """
     try:
-        session = session_manager.get_session(request.session_id)
+        session = _get_or_rebuild_session(request.session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
@@ -617,7 +642,6 @@ async def _pause_quiz_and_respond(session_id: str, log_user_message: str, sessio
     ai_result = await main_agent.chat(
         session_id=session_id,
         user_message=log_user_message,
-        store_id=None,
     )
     response_message = ai_result.get("message", "收到！")
 
@@ -769,7 +793,7 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
 
 只回覆：A 至 E、PAUSE 或 X"""
 
-        model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.0-flash")
+        model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
         response = client.models.generate_content(
             model=model_name,
             contents=prompt

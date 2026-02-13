@@ -236,7 +236,8 @@ class FileSearchManager:
                     )
                 )
             ],
-            system_instruction=si
+            system_instruction=si,
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
 
         self.chat_session = self.client.chats.create(
@@ -314,7 +315,8 @@ class FileSearchManager:
                         )
                     )
                 ],
-                system_instruction=si
+                system_instruction=si,
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
             ),
         )
         return response

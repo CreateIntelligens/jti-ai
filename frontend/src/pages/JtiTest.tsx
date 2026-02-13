@@ -385,7 +385,7 @@ export default function JtiTest() {
         onClose={() => setShowHistoryModal(false)}
         sessionId={sessionId || ''}
         mode="jti"
-        onResumeSession={(sid, msgs) => {
+        onResumeSession={async (sid, msgs) => {
           setSessionId(sid);
           setMessages(msgs.map((m) => ({
             text: m.text,
@@ -393,6 +393,28 @@ export default function JtiTest() {
             timestamp: Date.now(),
           })));
           setSessionInfo(`#${sid.substring(0, 8)}`);
+
+          // 自動嘗試恢復暫停的測驗
+          try {
+            const res = await fetchWithApiKey('/api/jti/quiz/resume', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ session_id: sid }),
+            });
+            if (res.ok) {
+              const data = await res.json();
+              // 有題目代表測驗已恢復，顯示目前題目
+              if (data.session?.step === 'QUIZ' && data.message) {
+                setMessages((prev) => [...prev, {
+                  text: data.message,
+                  type: 'assistant',
+                  timestamp: Date.now(),
+                }]);
+              }
+            }
+          } catch (err) {
+            console.error('[JtiTest] Auto-resume quiz failed:', err);
+          }
         }}
       />
     </div>

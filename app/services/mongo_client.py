@@ -68,8 +68,6 @@ class MongoDBClient:
             sessions.create_index("mode")
             sessions.create_index("language")
             sessions.create_index([("created_at", -1)])
-            # TTL 索引：自動刪除過期 session
-            sessions.create_index("expires_at", expireAfterSeconds=0)
             logger.info("Created indexes for 'sessions' collection")
         except Exception as e:
             logger.warning(f"Index creation for 'sessions': {e}")

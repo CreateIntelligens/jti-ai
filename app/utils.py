@@ -27,7 +27,17 @@ def group_conversations_by_session(conversations: list) -> list:
         sessions[sid]["total"] += 1
 
     session_list = list(sessions.values())
-    session_list.sort(key=lambda x: x["first_message_time"], reverse=True)
+
+    # 每個 session 內的對話按 turn_number 升序排列（確保正確時序）
+    for s in session_list:
+        s["conversations"].sort(
+            key=lambda c: (c.get("turn_number") or 0, c.get("timestamp") or "")
+        )
+        # first_message_time 取最早的 timestamp
+        if s["conversations"]:
+            s["first_message_time"] = s["conversations"][0].get("timestamp")
+
+    session_list.sort(key=lambda x: x["first_message_time"] or "", reverse=True)
     return session_list
 
 
