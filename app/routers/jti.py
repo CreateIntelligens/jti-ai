@@ -1005,11 +1005,6 @@ async def delete_conversation(session_id: str, auth: dict = Depends(verify_auth)
 
 
 @router.get(
-    "/conversations/export",
-    response_model=ExportConversationsResponse,
-    response_model_exclude_none=True,
-)
-@router.get(
     "/history/export",
     response_model=ExportConversationsResponse,
     response_model_exclude_none=True,

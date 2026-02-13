@@ -279,11 +279,21 @@ class MainAgent:
                 options = q.get("options", [])
                 options_text = self._format_options_text(options)
 
-                opening = (
-                    "想來做個生活品味色彩探索測驗嗎？ 簡單五個測驗，尋找你的命定手機殼，"
-                    "如果中途想離開，請輸入中斷，即可繼續問答，那我們開始測驗吧！"
-                )
-                message = f"{opening}\n\n第1題：{q.get('text', '')}\n{options_text}"
+                if session.language == "en":
+                    opening = (
+                        "Would you like to take a lifestyle color exploration quiz? "
+                        "Just five questions to find your perfect phone case. "
+                        "If you want to leave midway, just type 'pause' to return to chat. Let's begin!"
+                    )
+                    question_prefix = "Question 1:"
+                else:
+                    opening = (
+                        "想來做個生活品味色彩探索測驗嗎？ 簡單五個測驗，尋找你的命定手機殼，"
+                        "如果中途想離開，請輸入中斷，即可繼續問答，那我們開始測驗吧！"
+                    )
+                    question_prefix = "第1題："
+                
+                message = f"{opening}\n\n{question_prefix} {q.get('text', '')}\n{options_text}"
 
                 # 把乾淨的 user/model 追加到持久 chat session 歷史
                 chat_session = self._get_or_create_chat_session(session)

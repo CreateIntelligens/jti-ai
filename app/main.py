@@ -477,7 +477,6 @@ def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@app.delete("/api/chat/conversations/{session_id}", response_model=jti.DeleteConversationResponse)
 @app.delete("/api/chat/history/{session_id}", response_model=jti.DeleteConversationResponse)
 def delete_general_conversation(session_id: str, auth: dict = Depends(verify_auth)):
     """刪除指定 session 的對話紀錄
@@ -504,11 +503,6 @@ def delete_general_conversation(session_id: str, auth: dict = Depends(verify_aut
         "deleted_session": deleted_session,
     }
 
-@app.get(
-    "/api/chat/conversations",
-    response_model=jti.GeneralConversationsResponse,
-    response_model_exclude_none=True,
-)
 @app.get(
     "/api/chat/history",
     response_model=jti.GeneralConversationsResponse,
@@ -558,11 +552,6 @@ def get_general_conversations(
         logging.error(f"Failed to get general conversations: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get(
-    "/api/chat/conversations/export",
-    response_model=jti.ExportGeneralConversationsResponse,
-    response_model_exclude_none=True,
-)
 @app.get(
     "/api/chat/history/export",
     response_model=jti.ExportGeneralConversationsResponse,
@@ -657,11 +646,6 @@ def export_general_conversations(
         logging.error(f"Failed to export general conversations: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get(
-    "/api/chat/conversations/{session_id}",
-    response_model=jti.GeneralConversationsBySessionResponse,
-    response_model_exclude_none=True,
-)
 @app.get(
     "/api/chat/history/{session_id}",
     response_model=jti.GeneralConversationsBySessionResponse,
