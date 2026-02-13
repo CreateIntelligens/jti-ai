@@ -10,6 +10,7 @@ interface Message {
   type: 'user' | 'assistant' | 'system';
   toolCalls?: Array<{ tool: string }>;
   timestamp: number;
+  turnNumber?: number;
 }
 
 interface SessionData {
@@ -35,6 +36,20 @@ export default function JtiTest() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // 編輯相關狀態
+  const [editingTurn, setEditingTurn] = useState<number | null>(null);
+  const [editText, setEditText] = useState('');
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // 進入編輯模式時自動 focus 編輯框
+  useEffect(() => {
+    if (editingTurn !== null && editTextareaRef.current) {
+      editTextareaRef.current.focus();
+      const len = editTextareaRef.current.value.length;
+      editTextareaRef.current.setSelectionRange(len, len);
+    }
+  }, [editingTurn]);
 
   // 重新開始對話
   const restartConversation = useCallback(async () => {
@@ -130,19 +145,28 @@ export default function JtiTest() {
     el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
   }, [userInput]);
 
-  const sendMessage = useCallback(async (message: string) => {
+  const sendMessage = useCallback(async (message: string, turnNumber?: number) => {
     if (!message || !sessionId || loading) return;
 
-    setMessages(prev => [...prev, { text: message, type: 'user', timestamp: Date.now() }]);
+    // 如果不是重新生成 (turnNumber undefined)，則加入 user message
+    if (turnNumber === undefined) {
+      setMessages(prev => [...prev, { text: message, type: 'user', timestamp: Date.now() }]);
+    }
+
     setUserInput('');
     setLoading(true);
     setIsTyping(true);
 
     try {
+      const payload: any = { session_id: sessionId, message };
+      if (turnNumber !== undefined) {
+        payload.turn_number = turnNumber;
+      }
+
       const res = await fetchWithApiKey('/api/jti/chat/message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ session_id: sessionId, message }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -151,7 +175,7 @@ export default function JtiTest() {
 
       // Console log: 對話記錄
       console.log(`[用戶] ${message}`);
-      console.log(`[AI回應] ${data.message}`);
+      console.log(`[AI回應] ${data.message} (Turn: ${data.turn_number})`);
       if (data.session) {
         const s = data.session as SessionData;
         const count = Object.keys(s.answers || {}).length;
@@ -159,8 +183,8 @@ export default function JtiTest() {
           console.log(`[測驗進度] ${count}/5 題`);
         }
         if (s.color_scores && Object.keys(s.color_scores).length > 0) {
-          const sorted = Object.entries(s.color_scores).sort(([,a],[,b]) => (b as number) - (a as number));
-          console.log(`[當前分數] ${sorted.map(([k,v]) => `${k}:${v}`).join(' | ')}`);
+          const sorted = Object.entries(s.color_scores).sort(([, a], [, b]) => (b as number) - (a as number));
+          console.log(`[當前分數] ${sorted.map(([k, v]) => `${k}:${v}`).join(' | ')}`);
         }
         if (s.color_result_id) {
           console.log(`[測驗結果] ${s.color_result_id} - ${s.color_result?.title || ''}`);
@@ -172,9 +196,58 @@ export default function JtiTest() {
 
       const newMsg: Message = data.error && !data.message
         ? { text: `⚠️ ${data.error}`, type: 'system', timestamp: Date.now() }
-        : { text: data.message, type: 'assistant', toolCalls: data.tool_calls, timestamp: Date.now() };
+        : {
+          text: data.message,
+          type: 'assistant',
+          toolCalls: data.tool_calls,
+          timestamp: Date.now(),
+          turnNumber: data.turn_number // 從後端取得 turn_number
+        };
 
-      setMessages(prev => [...prev, newMsg]);
+      // 如果是重新生成，則更新訊息列表
+      if (turnNumber !== undefined) {
+        setMessages(prev => {
+          // 找到該 turn 的 user message
+          const userIdx = prev.findIndex(m => m.type === 'user' && m.turnNumber === turnNumber); // 注意：user message 此時可能還沒有 turnNumber, 或是我們其實要找的是剛剛發送的那個
+
+          // Backend 回傳的 turn_number 是這輪對話的編號 (user answer pair)
+          // 我們需要把 user message 也標上 turnNumber
+
+          // 簡單策略：如果是 regenerate，我們已經截斷了後面的訊息 (在 handleRegenerate 中)，
+          // 所以現在最後一個 message 應該是 (如果是 edit) 或者 最後的 assistant message 是 loading (如果是 regenerate)
+
+          // 但因為我們在 handleRegenerate 已經 truncate 了，所以這裡直接 append 即可？
+          // 其實 handleRegenerate 有 truncate 邏輯。
+          // 讓我們看看 handleRegenerate 怎麼寫。
+          // 最好這裡是直接 append to end，由 handleRegenerate 負責 truncate。
+          // 但需更新剛才那個 user message 的 turnNumber (如果它沒有的話 - 雖然通常這在新對話才有)
+
+          // 為了簡單，我們假設 handleRegenerate 已經處理好了 messages 狀態 (截斷了舊的)
+          // 我們只需要 append 新的 assistant message
+          // 但是！如果是 EditAndResend，我們剛剛 append 了新的 user message
+          // 我們應該把 turnNumber 補上去給那個 user message
+
+          const newMessages = [...prev];
+          // 嘗試給最後一個 user message 補上 turnNumber (如果它對應到這次回應)
+          // 回應的 turn_number 應該跟最後一個 user message 是同一輪
+          const lastUserMsgIndex = newMessages.findLastIndex(m => m.type === 'user');
+          if (lastUserMsgIndex !== -1) {
+            newMessages[lastUserMsgIndex].turnNumber = data.turn_number;
+          }
+
+          return [...newMessages, newMsg];
+        });
+      } else {
+        // 一般發送
+        setMessages(prev => {
+          const newMessages = [...prev];
+          const lastUserMsgIndex = newMessages.findLastIndex(m => m.type === 'user');
+          if (lastUserMsgIndex !== -1) {
+            newMessages[lastUserMsgIndex].turnNumber = data.turn_number;
+          }
+          return [...newMessages, newMsg];
+        });
+      }
 
       // 更新狀態
       if (data.session) {
@@ -197,6 +270,64 @@ export default function JtiTest() {
       setTimeout(() => inputRef.current?.focus(), 100);
     }
   }, [sessionId, loading]);
+
+  const handleRegenerate = async (turnNumber: number) => {
+    if (!sessionId || loading) return;
+
+    // 找到該 turn 的 user message 文字
+    const userMsg = messages.find(
+      m => m.type === 'user' && m.turnNumber === turnNumber
+    );
+    if (!userMsg?.text) return;
+
+    // 前端截斷：保留到該 turn 的 user message (包含)，移除之後的所有訊息
+    setMessages(prev => {
+      const userIdx = prev.findIndex(
+        m => m.type === 'user' && m.turnNumber === turnNumber
+      );
+      if (userIdx === -1) return prev;
+      return prev.slice(0, userIdx + 1); // 保留 user message
+    });
+
+    // 呼叫 sendMessage，帶上 turnNumber
+    // sendMessage 內部 logic 會 handle: 
+    // 1. 不會再 add user message to list (因為我們傳了 turnNumber 參數？ 不，sendMessage 的 logic 是 `if (turnNumber === undefined)` 才 add user message)
+    // 所以我們呼叫 sendMessage(userMsg.text, turnNumber)
+    await sendMessage(userMsg.text, turnNumber);
+  };
+
+  const handleEditAndResend = async (turnNumber: number, newText: string) => {
+    if (!sessionId || loading) return;
+
+    // 前端截斷：保留到該 turn 之前的所有訊息 (移除該 turn 的 user message 及之後所有)
+    setMessages(prev => {
+      const userIdx = prev.findIndex(
+        m => m.type === 'user' && m.turnNumber === turnNumber
+      );
+      if (userIdx === -1) return prev;
+      const truncated = prev.slice(0, userIdx);
+      // 加入新的 user message
+      return [...truncated, { text: newText, type: 'user', timestamp: Date.now() }];
+    });
+
+    // 呼叫 sendMessage，帶上 turnNumber
+    // 這裡我們傳 turnNumber，backend 會 delete logs >= turnNumber
+    // 前端 sendMessage 會把 turnNumber 補給剛剛加的 user message
+    await sendMessage(newText, turnNumber);
+    setEditingTurn(null);
+  };
+
+  const handleEditKeyDown = (e: React.KeyboardEvent, turnNumber: number) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      if (editText.trim()) {
+        handleEditAndResend(turnNumber, editText.trim());
+      }
+    }
+    if (e.key === 'Escape') {
+      setEditingTurn(null);
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -310,14 +441,75 @@ export default function JtiTest() {
                       </span>
                     </div>
                     <div className="message-bubble">
-                      <div className="message-text">{msg.text}</div>
-                      {msg.toolCalls && msg.toolCalls.length > 0 && (
-                        <div className="tool-badge">
-                          <span className="tool-icon">⚡</span>
-                          <span className="tool-text">
-                            {msg.toolCalls.map(t => t.tool).join(' → ')}
-                          </span>
+                      {editingTurn === msg.turnNumber && msg.type === 'user' ? (
+                        <div className="message-edit-area">
+                          <textarea
+                            ref={editTextareaRef}
+                            className="message-edit-textarea"
+                            value={editText}
+                            onChange={e => setEditText(e.target.value)}
+                            onKeyDown={e => handleEditKeyDown(e, msg.turnNumber!)}
+                            rows={Math.min(editText.split('\n').length + 1, 5)}
+                          />
+                          <div className="message-edit-actions">
+                            <button
+                              className="message-edit-btn save"
+                              onClick={() => msg.turnNumber && handleEditAndResend(msg.turnNumber, editText.trim())}
+                              disabled={!editText.trim()}
+                            >
+                              送出
+                            </button>
+                            <button
+                              className="message-edit-btn cancel"
+                              onClick={() => setEditingTurn(null)}
+                            >
+                              取消
+                            </button>
+                          </div>
                         </div>
+                      ) : (
+                        <>
+                          <div className="message-text">{msg.text}</div>
+                          {msg.toolCalls && msg.toolCalls.length > 0 && (
+                            <div className="tool-badge">
+                              <span className="tool-icon">⚡</span>
+                              <span className="tool-text">
+                                {msg.toolCalls.map(t => t.tool).join(' → ')}
+                              </span>
+                            </div>
+                          )}
+
+                          {/* 操作按鈕 - hover 時顯示 */}
+                          {!loading && msg.turnNumber && (
+                            <div className="message-actions">
+                              {msg.type === 'user' && (
+                                <button
+                                  className="message-action-btn"
+                                  onClick={() => {
+                                    if (msg.turnNumber && !loading) {
+                                      setEditingTurn(msg.turnNumber);
+                                      setEditText(msg.text);
+                                    }
+                                  }}
+                                  title="編輯並重送"
+                                  aria-label="編輯訊息"
+                                >
+                                  ✎
+                                </button>
+                              )}
+                              {msg.type === 'assistant' && (
+                                <button
+                                  className="message-action-btn"
+                                  onClick={() => msg.turnNumber && handleRegenerate(msg.turnNumber)}
+                                  title="重新生成"
+                                  aria-label="重新生成回覆"
+                                >
+                                  ↻
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
@@ -391,6 +583,7 @@ export default function JtiTest() {
             text: m.text,
             type: m.role as 'user' | 'assistant',
             timestamp: Date.now(),
+            turnNumber: m.turnNumber,
           })));
           setSessionInfo(`#${sid.substring(0, 8)}`);
 

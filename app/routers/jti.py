@@ -46,6 +46,7 @@ class ChatRequest(BaseModel):
     """對話請求"""
     session_id: str = Field(..., description="Session ID")
     message: str = Field(..., description="使用者訊息")
+    turn_number: Optional[int] = Field(None, description="若是重新生成，則指定該訊息的 turn_number（之後的記錄會被刪除）")
 
 
 class ChatResponse(BaseModel):
@@ -53,6 +54,7 @@ class ChatResponse(BaseModel):
     message: str
     session: Optional[Dict[str, Any]] = None
     tool_calls: Optional[list] = None
+    turn_number: Optional[int] = None
     error: Optional[str] = None
 
 
@@ -244,6 +246,28 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         # 記錄用戶訊息
         logger.info(f"[用戶訊息] Session: {request.session_id[:8]}... | 狀態: {session.step.value} | 訊息: '{request.message}'")
 
+        # ========== 重新生成 / 回滾邏輯 ==========
+        if request.turn_number is not None:
+            # 1. 刪除該 turn 及之後的 logs
+            deleted_count = conversation_logger.delete_turns_from(request.session_id, request.turn_number)
+            if deleted_count > 0:
+                # 2. 重新讀取剩餘 logs 並重建 session
+                logs = conversation_logger.get_session_logs(request.session_id)
+                # 若 logs 全空（例如刪除的是第一句話），session 可能回退到初始狀態
+                session = session_manager.rebuild_session_from_logs(request.session_id, logs)
+                if not session:
+                    # 重建失敗（例如 logs 為空）→ 直接用現有 session（rollback 前的）
+                    session = _get_or_rebuild_session(request.session_id)
+                    if not session:
+                        raise HTTPException(status_code=404, detail="Session not found after rollback")
+
+                # 3. 清除 LLM 記憶體快取，確保下次建構時不會混入已刪除的歷史
+                main_agent.remove_session(request.session_id)
+
+                logger.info(f"Session {request.session_id[:8]}... rolled back to before turn {request.turn_number}")
+            else:
+                logger.warning(f"Failed to delete logs from turn {request.turn_number}")
+
         # ========== QUIZ 狀態：後端完全接管 ==========
         if session.step.value == "QUIZ" and session.current_question:
             q = session.current_question
@@ -357,15 +381,27 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     tool_result={"instruction_for_llm": nudge_instruction}
                 )
 
-                # 程式碼強制附加題目，不依賴 LLM
+                # 程式碼強制附加題目（若 LLM 已自帶題目則不重複）
                 nudge_text = nudge_result["message"].strip()
-                response_message = f"{nudge_text}\n\n{current_q_text}"
+                q_text_key = q.get("text", "")
+                if q_text_key and q_text_key in nudge_text:
+                    response_message = nudge_text
+                else:
+                    response_message = f"{nudge_text}\n\n{current_q_text}"
 
                 # 記錄 AI 回應
                 logger.info(f"[AI回應] 無法判斷選項，重問 | {response_message[:80]}...")
 
                 # 記錄到對話日誌
-                conversation_logger.log_conversation(
+                # 對於 QUIZ 錯誤處理回應，我們也需要記錄，並且需要與其他 log_turn 保持一致
+                # 但這裡原本是用 log_conversation，它會自動計算 turn_number
+                # 為了避免 rollback 後 turn_number 錯亂，我們明確傳入 turn_number
+                
+                # 如果 request.turn_number 存在，我們先執行刪除
+                if request.turn_number:
+                     conversation_logger.delete_turns_from(request.session_id, request.turn_number)
+
+                log_result = conversation_logger.log_conversation(
                     session_id=request.session_id,
                     user_message=request.message,
                     agent_response=response_message,
@@ -378,13 +414,16 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     },
                     mode="jti"
                 )
+                
+                final_turn_number = log_result[1] if log_result else None
 
                 logger.info(f"⚠️ QUIZ 無法判斷選項: {request.message}")
 
                 return ChatResponse(
                     message=response_message,
                     session=session.model_dump(),
-                    tool_calls=[]
+                    tool_calls=[],
+                    turn_number=final_turn_number
                 )
 
         # ========== 非 QUIZ 狀態 ==========
@@ -415,6 +454,10 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             and not has_rejection
             and (wants_resume or should_start_quiz)
         ):
+            # 刪除 rollback 的 logs (如果有的話)
+            if request.turn_number:
+                conversation_logger.delete_turns_from(request.session_id, request.turn_number)
+                
             return _resume_quiz_and_respond(
                 session_id=request.session_id,
                 log_user_message=request.message,
@@ -427,25 +470,46 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         if should_start_quiz and session.step.value == "DONE":
             response_message = "你已經完成過測驗囉！這次對話只能測驗一次。如果想重新測驗，請重新整理頁面開始新的對話。"
 
-            # 記錄對話
-            conversation_logger.log_conversation(
+            # 寫入這輪 Log
+            # 計算 turn_number: 如果是 rollback 後的新訊息，turn_number 應該是 request.turn_number
+            # 如果是正常對話，則是 logs 數量 + 1
+            # 為了準確，我們先讀取目前的 logs count.
+            # 但因為可能有並發問題，且 mongo logger 沒有 atomic increment turn，我們可以用 count + 1
+            # 或者如果我們剛剛執行了 rollback，那 request.turn_number 就是當前的 turn
+
+            current_turn = request.turn_number if request.turn_number else (conversation_logger.conversations_collection.count_documents({"session_id": request.session_id}) + 1)
+
+            tool_calls_record = []
+            session_data = {
+                "step": session.step.value,
+                "answers_count": len(session.answers),
+                "color_result_id": session.color_result_id,
+                "current_question_id": None
+            }
+            response_tool_calls = []
+
+            # If request.turn_number is provided, it means a rollback happened.
+            # Delete turns from this turn number onwards before logging.
+            if request.turn_number:
+                conversation_logger.delete_turns_from(request.session_id, request.turn_number)
+
+            log_result = conversation_logger.log_conversation(
                 session_id=request.session_id,
                 user_message=request.message,
                 agent_response=response_message,
                 tool_calls=[],
-                session_state={
-                    "step": session.step.value,
-                    "answers_count": len(session.answers),
-                    "color_result_id": session.color_result_id,
-                    "current_question_id": None
-                },
+                session_state=session_data,
                 mode="jti"
             )
+            
+            # log_conversation 返回 (doc_id, turn_number) 或 None
+            final_turn_number = log_result[1] if log_result else None
 
             return ChatResponse(
                 message=response_message,
-                session=session.model_dump(),
-                tool_calls=[]
+                session=session_data, # Corrected from session_data
+                tool_calls=[],
+                turn_number=final_turn_number
             )
 
         if should_start_quiz and session.step.value == "WELCOME":
@@ -470,7 +534,11 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 logger.info(f"[AI回應] 測驗開始 | {result['message'][:80]}...")
 
                 # 記錄對話
-                conversation_logger.log_conversation(
+                # 如果 request.turn_number 存在，我們先執行刪除
+                if request.turn_number:
+                     conversation_logger.delete_turns_from(request.session_id, request.turn_number)
+
+                log_result = conversation_logger.log_conversation(
                     session_id=request.session_id,
                     user_message=request.message,
                     agent_response=result["message"],
@@ -483,11 +551,14 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     },
                     mode="jti"
                 )
+                
+                final_turn_number = log_result[1] if log_result else None
 
                 return ChatResponse(
                     message=result["message"],
                     session=updated_session.model_dump(),
-                    tool_calls=[{"tool": "start_quiz", "args": {"session_id": request.session_id}}]
+                    tool_calls=[{"tool": "start_quiz", "args": {"session_id": request.session_id}}],
+                    turn_number=final_turn_number
                 )
 
         # 一般對話：走 LLM
@@ -495,11 +566,32 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             session_id=request.session_id,
             user_message=request.message,
         )
-
+        
         # 記錄 AI 回應
         logger.info(f"[AI回應] 一般對話 | {result['message'][:80]}...")
 
-        return ChatResponse(**result)
+        # 記錄對話
+        # 如果 request.turn_number 存在，我們先執行刪除
+        if request.turn_number:
+            conversation_logger.delete_turns_from(request.session_id, request.turn_number)
+
+        log_result = conversation_logger.log_conversation(
+            session_id=request.session_id,
+            user_message=request.message,
+            agent_response=result["message"],
+            tool_calls=result.get("tool_calls", []),
+            session_state={
+                "step": session.step.value, # For general chat, session state might not change much
+                "answers_count": len(session.answers),
+                "color_result_id": session.color_result_id,
+                "current_question_id": session.current_question.get("id") if session.current_question else None
+            },
+            mode="jti"
+        )
+        
+        final_turn_number = log_result[1] if log_result else None
+
+        return ChatResponse(**result, turn_number=final_turn_number)
 
     except Exception as e:
         logger.error(f"Chat failed: {e}", exc_info=True)
@@ -552,7 +644,7 @@ async def quiz_start(request: QuizActionRequest, auth: dict = Depends(verify_aut
                 f"第1題：{q.get('text', '')}\n{options_text}"
             )
 
-        conversation_logger.log_conversation(
+        log_result = conversation_logger.log_conversation(
             session_id=request.session_id,
             user_message="[API] quiz_start",
             agent_response=response_message,
@@ -565,11 +657,14 @@ async def quiz_start(request: QuizActionRequest, auth: dict = Depends(verify_aut
             },
             mode="jti",
         )
+        
+        final_turn_number = log_result[1] if log_result else None
 
         return ChatResponse(
             message=response_message,
             session=updated_session.model_dump() if updated_session else session.model_dump(),
             tool_calls=[{"tool": "start_quiz", "args": {"session_id": request.session_id}}],
+            turn_number=final_turn_number
         )
 
     except HTTPException:
@@ -635,7 +730,12 @@ def _format_options_text(options: list) -> str:
     return "\n".join(lines)
 
 
-async def _pause_quiz_and_respond(session_id: str, log_user_message: str, session: Any) -> ChatResponse:
+async def _pause_quiz_and_respond(
+    session_id: str,
+    log_user_message: str,
+    session: Any,
+    turn_number_hint: Optional[int] = None
+) -> ChatResponse:
     updated_session = session_manager.pause_quiz(session_id)
 
     # 暫停後，將使用者訊息交給 AI 回應
@@ -645,7 +745,10 @@ async def _pause_quiz_and_respond(session_id: str, log_user_message: str, sessio
     )
     response_message = ai_result.get("message", "收到！")
 
-    conversation_logger.log_conversation(
+    if turn_number_hint:
+        conversation_logger.delete_turns_from(session_id, turn_number_hint)
+
+    log_result = conversation_logger.log_conversation(
         session_id=session_id,
         user_message=log_user_message,
         agent_response=response_message,
@@ -658,11 +761,14 @@ async def _pause_quiz_and_respond(session_id: str, log_user_message: str, sessio
         },
         mode="jti",
     )
+    
+    final_turn_number = log_result[1] if log_result else None
 
     return ChatResponse(
         message=response_message,
         session=updated_session.model_dump() if updated_session else session.model_dump(),
         tool_calls=[],
+        turn_number=final_turn_number
     )
 
 
@@ -673,9 +779,15 @@ def _resume_quiz_and_respond(
     *,
     no_progress_message: str,
     log_progress: bool = False,
+    turn_number_hint: Optional[int] = None
 ) -> ChatResponse:
     updated_session = session_manager.resume_quiz(session_id)
     resumed_q = updated_session.current_question if updated_session else None
+    
+    # 這裡不需要 turn_number_hint，因為 rollback 邏輯在 caller 處理了 (chat_message endpoint)
+    # 但為了 robust，log_conversation 會自動正確計算
+    if turn_number_hint:
+        conversation_logger.delete_turns_from(session_id, turn_number_hint)
 
     if not resumed_q:
         response_message = no_progress_message
@@ -687,10 +799,13 @@ def _resume_quiz_and_respond(
 
     current_q_num = (updated_session.current_q_index + 1) if updated_session else (len(session.answers) + 1)
 
-    options_text = _format_options_text(resumed_q.get("options", []))
-    response_message = f"好呀，我們接著做第{current_q_num}題。\n第{current_q_num}題：{resumed_q.get('text', '')}\n{options_text}"
+    options_text = _format_options_text(resumed_q.get("options", []) if hasattr(resumed_q, 'get') else [])
+    # resumed_q might be dict or object, safe get handled above
+    
+    question_text = resumed_q.get('text', '') if isinstance(resumed_q, dict) else ''
+    response_message = f"好呀，我們接著做第{current_q_num}題。\n第{current_q_num}題：{question_text}\n{options_text}"
 
-    conversation_logger.log_conversation(
+    log_result = conversation_logger.log_conversation(
         session_id=session_id,
         user_message=log_user_message,
         agent_response=response_message,
@@ -703,6 +818,8 @@ def _resume_quiz_and_respond(
         },
         mode="jti",
     )
+    
+    final_turn_number = log_result[1] if log_result else None
 
     if log_progress:
         total_questions = get_total_questions(updated_session.quiz_id) if updated_session else 5
@@ -712,6 +829,7 @@ def _resume_quiz_and_respond(
         message=response_message,
         session=updated_session.model_dump() if updated_session else session.model_dump(),
         tool_calls=[],
+        turn_number=final_turn_number
     )
 
 
@@ -817,11 +935,6 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
 
 
 @router.get(
-    "/conversations",
-    response_model=Union[ConversationsBySessionResponse, ConversationsGroupedResponse],
-    response_model_exclude_none=True,
-)
-@router.get(
     "/history",
     response_model=Union[ConversationsBySessionResponse, ConversationsGroupedResponse],
     response_model_exclude_none=True,
@@ -870,7 +983,6 @@ async def get_conversations(session_id: Optional[str] = None, auth: dict = Depen
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/conversations/{session_id}", response_model=DeleteConversationResponse)
 @router.delete("/history/{session_id}", response_model=DeleteConversationResponse)
 async def delete_conversation(session_id: str, auth: dict = Depends(verify_auth)):
     """刪除指定 session 的對話紀錄

@@ -232,7 +232,11 @@ class MongoSessionManager(SessionStateMixin):
             session_dict["created_at"] = datetime.now()
             session_dict["updated_at"] = datetime.now()
 
-            self.sessions_collection.insert_one(session_dict)
+            self.sessions_collection.update_one(
+                {"session_id": session_id},
+                {"$set": session_dict},
+                upsert=True
+            )
             logger.info(
                 f"Rebuilt session from {len(logs)} logs: {session_id[:8]}... "
                 f"(step={step}, answers={len(answers)}, questions={len(selected_questions)})"

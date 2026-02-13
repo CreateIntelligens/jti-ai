@@ -134,6 +134,8 @@ class MongoConversationLogger:
             logger.error(f"Failed to get session logs from MongoDB: {e}")
             return []
 
+
+
     def get_session_logs_by_mode(self, mode: str) -> List[Dict]:
         """按模式查詢所有對話紀錄
 
