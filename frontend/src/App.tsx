@@ -10,6 +10,8 @@ import JtiTest from './pages/JtiTest';
 import * as api from './services/api';
 import type { Store, FileItem, Message } from './types';
 import './styles/App.css';
+import './styles/ChatMessages.css';
+import './styles/LightMode.css';
 
 export default function App() {
   // 簡單的路由判斷：如果路徑是 /jti，顯示 JTI 測試頁面

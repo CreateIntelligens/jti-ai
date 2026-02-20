@@ -16,16 +16,23 @@ function toStr(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${
 
 export default function MiniCalendar({ label, value, onChange, highlightRange }: MiniCalendarProps) {
   const today = new Date();
-  const initial = value ? new Date(value) : today;
+  const parsedValue = value && /^\d{4}-\d{2}(-\d{2})?$/.test(value) ? new Date(value) : null;
+  const initial = (parsedValue && !isNaN(parsedValue.getTime())) ? parsedValue : today;
   const [year, setYear] = useState(initial.getFullYear());
   const [month, setMonth] = useState(initial.getMonth());
 
-  // 當 value 從外部改變時，跳到對應月份
+  // 當 value 從外部改變時，跳到對應年/月
+  // 支援不完整的值：YYYY, YYYY-M, YYYY-MM, YYYY-MM-D, YYYY-MM-DD
   useEffect(() => {
-    if (value) {
-      const d = new Date(value);
-      setYear(d.getFullYear());
-      setMonth(d.getMonth());
+    if (!value) return;
+    const match = value.match(/^(\d{4})(?:-(\d{1,2})(?:-(\d{1,2}))?)?$/);
+    if (!match) return;
+    const y = parseInt(match[1], 10);
+    if (y < 1900 || y > 2100) return;
+    setYear(y);
+    if (match[2]) {
+      const m = parseInt(match[2], 10);
+      if (m >= 1 && m <= 12) setMonth(m - 1);
     }
   }, [value]);
 
@@ -39,7 +46,19 @@ export default function MiniCalendar({ label, value, onChange, highlightRange }:
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
   const dayStr = (day: number) => toStr(new Date(year, month, day));
-  const isSelected = (day: number) => value === dayStr(day);
+  const isSelected = (day: number) => {
+    if (!value) return false;
+    // 完整匹配 YYYY-MM-DD
+    if (value === dayStr(day)) return true;
+    // 不完整日期：YYYY-M-D 或 YYYY-MM-D → 解析並比較
+    const m = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (m) {
+      return parseInt(m[1], 10) === year
+        && parseInt(m[2], 10) === month + 1
+        && parseInt(m[3], 10) === day;
+    }
+    return false;
+  };
   const isToday = (day: number) => dayStr(day) === toStr(today);
   const isInRange = (day: number) => {
     if (!highlightRange?.from || !highlightRange?.to) return false;

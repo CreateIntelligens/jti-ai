@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import '../styles/ConversationHistory.css';
 import {
   Search,
   MessageCircle,
@@ -88,25 +89,87 @@ export default function ConversationHistoryModal({
   const [dateTo, setDateTo] = useState('');
   const [openCal, setOpenCal] = useState<'from' | 'to' | null>(null);
 
-  // 自動格式化日期輸入：純數字自動加 -，允許各種分隔符
-  const formatDateInput = (raw: string): string => {
-    const digits = raw.replace(/\D/g, '');
-    if (digits.length <= 4) return digits;
-    if (digits.length <= 6) return `${digits.slice(0, 4)}-${digits.slice(4)}`;
-    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+  // 日期輸入：邊打邊自動插入 dash (YYYY-MM-DD)
+  // 月份 2-9 即時補 0（4 → 04），日期 4-9 即時補 0
+  const handleDateChange = (
+    raw: string,
+    prevValue: string,
+    setter: (v: string) => void,
+  ) => {
+    const isDeleting = raw.length < prevValue.length;
+    let digits = raw.replace(/\D/g, '').slice(0, 8);
+
+    // 即時自動補零：月份首位 2-9、日期首位 4-9
+    if (digits.length >= 5) {
+      const m1 = parseInt(digits[4], 10);
+      if (m1 >= 2) {
+        digits = digits.slice(0, 4) + '0' + digits.slice(4);
+        digits = digits.slice(0, 8);
+      }
+    }
+    if (digits.length >= 7) {
+      const d1 = parseInt(digits[6], 10);
+      if (d1 >= 4) {
+        digits = digits.slice(0, 6) + '0' + digits.slice(6);
+        digits = digits.slice(0, 8);
+      }
+    }
+
+    // 驗證完整月份和日期
+    if (digits.length >= 6) {
+      const mm = parseInt(digits.slice(4, 6), 10);
+      if (mm < 1 || mm > 12) return setter(prevValue);
+    }
+    if (digits.length >= 8) {
+      const dd = parseInt(digits.slice(6, 8), 10);
+      if (dd < 1 || dd > 31) return setter(prevValue);
+    }
+
+    // 組合格式
+    let formatted = '';
+    if (digits.length <= 4) {
+      formatted = digits;
+    } else if (digits.length <= 6) {
+      formatted = digits.slice(0, 4) + '-' + digits.slice(4);
+    } else {
+      formatted = digits.slice(0, 4) + '-' + digits.slice(4, 6) + '-' + digits.slice(6);
+    }
+
+    if (isDeleting && formatted.endsWith('-')) {
+      formatted = formatted.slice(0, -1);
+    }
+    // 刪除時，若結尾剩自動補的前導零（xx-0 或 xx-0x 刪掉 x 後剩 xx-0），一起帶走
+    if (isDeleting) {
+      if (/^\d{4}-0$/.test(formatted) || /^\d{4}-\d{2}-0$/.test(formatted)) {
+        formatted = formatted.slice(0, -1);
+        // 再刪掉尾部的 dash
+        if (formatted.endsWith('-')) formatted = formatted.slice(0, -1);
+      }
+    }
+    setter(formatted);
+  };
+
+  // onBlur / Enter 時補零：1999-1 → 1999-01，1999-04-1 → 1999-04-01
+  const padDateValue = (value: string, setter: (v: string) => void) => {
+    let v = value;
+    if (/^\d{4}-\d$/.test(v)) v = v.slice(0, 5) + '0' + v[5];
+    if (/^\d{4}-\d{2}-\d$/.test(v)) v = v.slice(0, 8) + '0' + v[8];
+    if (v !== value) setter(v);
   };
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize] = useState(10);
-  const [totalSessions, setTotalSessions] = useState(0);
 
-  // Reset page when context changes
+
+  // Reset page when context or date filter changes
+  const activeDateFrom = /^\d{4}-\d{2}-\d{2}$/.test(dateFrom) ? dateFrom : '';
+  const activeDateTo = /^\d{4}-\d{2}-\d{2}$/.test(dateTo) ? dateTo : '';
   useEffect(() => {
     if (isOpen) {
       setCurrentPage(1);
     }
-  }, [isOpen, sessionId, storeName, mode]);
+  }, [isOpen, sessionId, storeName, mode, activeDateFrom, activeDateTo]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -125,8 +188,13 @@ export default function ConversationHistoryModal({
           url = `/api/chat/history${storeName ? `?store_name=${encodeURIComponent(storeName)}` : ''}`;
         }
 
-        // Add pagination params
-        url += `${url.includes('?') ? '&' : '?'}page=${currentPage}&page_size=${pageSize}`;
+        // Add date filter params
+        if (dateFrom && /^\d{4}-\d{2}-\d{2}$/.test(dateFrom)) {
+          url += `${url.includes('?') ? '&' : '?'}date_from=${dateFrom}`;
+        }
+        if (dateTo && /^\d{4}-\d{2}-\d{2}$/.test(dateTo)) {
+          url += `${url.includes('?') ? '&' : '?'}date_to=${dateTo}`;
+        }
 
         console.log('[ConversationHistory] Fetching:', url);
 
@@ -141,7 +209,7 @@ export default function ConversationHistoryModal({
 
         const sessionsList = data.sessions || [];
         setSessions(sessionsList);
-        setTotalSessions(data.total_sessions || 0);
+
         setFilteredSessions(sessionsList);
 
         if (sessionId && sessionsList.some((s: SessionSummary) => s.session_id === sessionId)) {
@@ -155,7 +223,7 @@ export default function ConversationHistoryModal({
     };
 
     fetchConversations();
-  }, [isOpen, sessionId, storeName, mode, currentPage, pageSize]);
+  }, [isOpen, sessionId, storeName, mode, activeDateFrom, activeDateTo]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -422,9 +490,11 @@ export default function ConversationHistoryModal({
               <Calendar size={14} />
               <input
                 type="text"
-                placeholder="開始"
+                placeholder="YYYY-MM-DD"
                 value={dateFrom}
-                onChange={(e) => setDateFrom(formatDateInput(e.target.value))}
+                onChange={(e) => handleDateChange(e.target.value, dateFrom, setDateFrom)}
+                onBlur={() => padDateValue(dateFrom, setDateFrom)}
+                onKeyDown={(e) => { if (e.key === 'Enter') padDateValue(dateFrom, setDateFrom); }}
                 onClick={(e) => e.stopPropagation()}
                 onFocus={() => setOpenCal('from')}
               />
@@ -437,9 +507,11 @@ export default function ConversationHistoryModal({
               <Calendar size={14} />
               <input
                 type="text"
-                placeholder="結束"
+                placeholder="YYYY-MM-DD"
                 value={dateTo}
-                onChange={(e) => setDateTo(formatDateInput(e.target.value))}
+                onChange={(e) => handleDateChange(e.target.value, dateTo, setDateTo)}
+                onBlur={() => padDateValue(dateTo, setDateTo)}
+                onKeyDown={(e) => { if (e.key === 'Enter') padDateValue(dateTo, setDateTo); }}
                 onClick={(e) => e.stopPropagation()}
                 onFocus={() => setOpenCal('to')}
               />
@@ -516,7 +588,8 @@ export default function ConversationHistoryModal({
               </div>
             </div>
           ) : (
-            filteredSessions.map((session, sessionIndex) => {
+            filteredSessions.slice((currentPage - 1) * pageSize, currentPage * pageSize
+            ).map((session, sessionIndex) => {
               const isSessionExpanded = expandedSessionId === session.session_id;
               const sessionTurnMap = expandedTurnMap[session.session_id] ?? null;
               const msgCount = (session as SessionSummary).message_count ?? (session as unknown as Session).total ?? 0;
@@ -732,7 +805,9 @@ export default function ConversationHistoryModal({
 
         {/* Footer */}
         <div className="conversation-footer">
-          {Math.ceil(totalSessions / pageSize) > 1 && (
+          {(() => {
+            const totalPages = Math.ceil(filteredSessions.length / pageSize);
+            return totalPages > 1 ? (
             <div className="pagination-controls">
               <button
                 disabled={currentPage === 1 || loading}
@@ -741,16 +816,17 @@ export default function ConversationHistoryModal({
                 &lt; {t('prev') || 'Prev'}
               </button>
               <span>
-                {t('page') || 'Page'} {currentPage} / {Math.ceil(totalSessions / pageSize)}
+                {t('page') || 'Page'} {currentPage} / {totalPages}
               </span>
               <button
-                disabled={currentPage >= Math.ceil(totalSessions / pageSize) || loading}
+                disabled={currentPage >= totalPages || loading}
                 onClick={() => setCurrentPage((p) => p + 1)}
               >
                 {t('next') || 'Next'} &gt;
               </button>
             </div>
-          )}
+            ) : null;
+          })()}
           <div className="conversation-footer-stats">
             <span>
               Sessions: <span className="stat-value">{filteredSessions.length}</span>
