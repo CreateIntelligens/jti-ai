@@ -83,10 +83,10 @@ def verify_auth(request: Request) -> dict:
         return {"role": "admin", "store_name": None}
 
     # 是一般 Key？（查 MongoDB）
-    from app.main import api_key_manager
+    from app import deps
 
-    if api_key_manager:
-        api_key_info = api_key_manager.verify_key(token)
+    if deps.api_key_manager:
+        api_key_info = deps.api_key_manager.verify_key(token)
         if api_key_info:
             return {
                 "role": "user",
