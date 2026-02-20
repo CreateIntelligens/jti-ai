@@ -60,14 +60,7 @@ class MongoSessionManager(SessionStateMixin):
                 logger.warning(f"Session not found in MongoDB: {session_id}")
                 return None
 
-            # 移除 MongoDB 內部字段，重新構建 Session 物件
-            doc.pop("_id", None)
-            doc.pop("expires_at", None)
-            doc.pop("created_at", None)
-            doc.pop("updated_at", None)
-
-            session = Session(**doc)
-            return session
+            return self._doc_to_session(doc)
 
         except Exception as e:
             logger.error(f"Failed to get session from MongoDB: {e}")
@@ -262,58 +255,28 @@ class MongoSessionManager(SessionStateMixin):
             logger.warning(f"Failed to parse session document: {e}")
             return None
 
+    def _find_sessions(self, query: dict) -> List[Session]:
+        """通用查詢 helper"""
+        try:
+            docs = self.sessions_collection.find(query)
+            return [s for doc in docs if (s := self._doc_to_session(doc))]
+        except Exception as e:
+            logger.error(f"Failed to find sessions: {e}")
+            return []
+
     def get_all_sessions(self) -> List[Session]:
         """取得所有 sessions（測試用）"""
-        try:
-            docs = self.sessions_collection.find()
-            sessions = []
-
-            for doc in docs:
-                session = self._doc_to_session(doc)
-                if session:
-                    sessions.append(session)
-
-            return sessions
-
-        except Exception as e:
-            logger.error(f"Failed to get all sessions from MongoDB: {e}")
-            return []
+        return self._find_sessions({})
 
     # === 查詢和分析方法 ===
 
     def get_sessions_by_mode(self, mode: GameMode) -> List[Session]:
         """按模式查詢 sessions"""
-        try:
-            docs = self.sessions_collection.find({"mode": mode.value})
-            sessions = []
-
-            for doc in docs:
-                session = self._doc_to_session(doc)
-                if session:
-                    sessions.append(session)
-
-            return sessions
-
-        except Exception as e:
-            logger.error(f"Failed to get sessions by mode: {e}")
-            return []
+        return self._find_sessions({"mode": mode.value})
 
     def get_sessions_by_language(self, language: str) -> List[Session]:
         """按語言查詢 sessions"""
-        try:
-            docs = self.sessions_collection.find({"language": language})
-            sessions = []
-
-            for doc in docs:
-                session = self._doc_to_session(doc)
-                if session:
-                    sessions.append(session)
-
-            return sessions
-
-        except Exception as e:
-            logger.error(f"Failed to get sessions by language: {e}")
-            return []
+        return self._find_sessions({"language": language})
 
     def get_sessions_by_date_range(
         self,
@@ -321,25 +284,12 @@ class MongoSessionManager(SessionStateMixin):
         end_date: datetime
     ) -> List[Session]:
         """按時間範圍查詢 sessions"""
-        try:
-            docs = self.sessions_collection.find({
-                "created_at": {
-                    "$gte": start_date,
-                    "$lte": end_date
-                }
-            })
-            sessions = []
-
-            for doc in docs:
-                session = self._doc_to_session(doc)
-                if session:
-                    sessions.append(session)
-
-            return sessions
-
-        except Exception as e:
-            logger.error(f"Failed to get sessions by date range: {e}")
-            return []
+        return self._find_sessions({
+            "created_at": {
+                "$gte": start_date,
+                "$lte": end_date
+            }
+        })
 
     def get_statistics(self) -> Dict[str, Any]:
         """取得 session 統計資訊"""

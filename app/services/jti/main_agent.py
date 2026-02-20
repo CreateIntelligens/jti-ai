@@ -22,7 +22,7 @@ from google.genai import types
 from app.models.session import Session, SessionStep
 from app.services.session.session_manager_factory import get_session_manager
 from app.services.gemini_service import client as gemini_client
-from app.tools.tool_executor import tool_executor
+from app.tools.tool_executor import tool_executor, ToolExecutor
 from app.services.jti.agent_prompts import (
     SYSTEM_INSTRUCTIONS,
     SESSION_STATE_TEMPLATES
@@ -92,13 +92,8 @@ class MainAgent:
         """清除記憶體中的 chat session"""
         self._chat_sessions.pop(session_id, None)
 
-    @staticmethod
-    def _format_options_text(options: list) -> str:
-        labels = "ABCDE"
-        return "\n".join(
-            f"{labels[i]}. {opt.get('text', '')}"
-            for i, opt in enumerate(options)
-        )
+    # 重用 ToolExecutor 的 _format_options（避免重複定義）
+    _format_options_text = staticmethod(ToolExecutor._format_options)
 
     def _get_system_instruction(self, session: Session) -> str:
         """取得靜態 System Instruction（不變的規則）"""

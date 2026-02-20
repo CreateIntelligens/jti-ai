@@ -169,28 +169,6 @@ def get_question_from_selected(selected_questions: List[Dict], question_index: i
         return None
 
 
-def get_question(quiz_id: str, question_index: int) -> Optional[Dict]:
-    """
-    取得單一題目（向後相容，但不建議使用）
-
-    Args:
-        quiz_id: 題庫 ID
-        question_index: 題目索引（0-based）
-
-    Returns:
-        題目資料或 None
-    """
-    try:
-        quiz_bank = load_quiz_bank()
-        questions = quiz_bank.get("questions", [])
-        if question_index < 0 or question_index >= len(questions):
-            return None
-
-        return questions[question_index]
-
-    except Exception as e:
-        logger.error(f"Failed to get question: {e}")
-        return None
 
 
 def get_total_questions(quiz_id: str = "color_taste") -> int:

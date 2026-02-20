@@ -9,7 +9,6 @@ import logging
 from google.genai import types
 from app.tools.quiz import (
     generate_quiz,
-    get_question as quiz_get_question,
     get_total_questions,
     generate_random_quiz,
     get_question_from_selected,
@@ -56,8 +55,9 @@ class ToolExecutor:
         labels = "ABCDE"
         return list(labels[: len(options)])
 
-    def _format_options(self, options: list) -> str:
-        labels = self._get_option_labels(options)
+    @staticmethod
+    def _format_options(options: list) -> str:
+        labels = ToolExecutor._get_option_labels(options)
         return "\n".join(
             f"{labels[i]}. {opt.get('text', '')}"
             for i, opt in enumerate(options)
@@ -286,12 +286,7 @@ class ToolExecutor:
                 )
                 answered_option_text = matched_option.get("text", "") if matched_option else ""
 
-            # 從 session 中選中的題目列表取得下一題
-            if session.selected_questions:
-                next_question = get_question_from_selected(session.selected_questions, session.current_q_index)
-            else:
-                # 向後相容：如果沒有 selected_questions，使用舊邏輯
-                next_question = quiz_get_question(session.quiz_id, session.current_q_index)
+            next_question = get_question_from_selected(session.selected_questions, session.current_q_index)
 
             result["next_question"] = next_question
 
