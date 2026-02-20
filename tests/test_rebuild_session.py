@@ -134,7 +134,7 @@ class TestRebuildSessionFromLogs(unittest.TestCase):
         self.assertEqual(len(session.selected_questions), 3)     # q1, q2, q3
         self.assertEqual(session.current_question["id"], "q3")   # next question
         self.assertEqual(len(session.chat_history), 6)            # 3 turns x 2
-        self.mock_sessions.insert_one.assert_called_once()
+        self.mock_sessions.update_one.assert_called_once()
 
     def test_rebuild_done_state(self):
         """Rebuild completed quiz session with color result"""

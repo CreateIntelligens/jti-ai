@@ -30,6 +30,7 @@ class TestColorQuizSession(unittest.TestCase):
 
     def test_calculate_color_result_tie_breaker(self):
         result = calculate_color_result({"c1": "a", "c2": "b"})
+        # c1/a → metal:2, c2/b → dark:2; tie_breaker_priority: metal first
         self.assertEqual(result["color_id"], "metal")
         self.assertEqual(result["color_scores"]["metal"], 2)
-        self.assertEqual(result["color_scores"]["cool"], 2)
+        self.assertEqual(result["color_scores"]["dark"], 2)
