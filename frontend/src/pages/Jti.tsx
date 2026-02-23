@@ -75,6 +75,8 @@ export default function Jti() {
     }
 
     try {
+      setLoading(false);
+      setIsTyping(false);
       const res = await fetchWithApiKey('/api/jti/chat/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -89,7 +91,7 @@ export default function Jti() {
     } catch {
       setStatusText(t('status_failed'));
     }
-  }, [currentLanguage, messages.length, t]);
+  }, [currentLanguage, sessionId, messages.length, t]);
 
   // 切換語言
   const toggleLanguage = useCallback(async () => {
@@ -110,6 +112,8 @@ export default function Jti() {
 
     // 重新建立 session
     try {
+      setLoading(false);
+      setIsTyping(false);
       const res = await fetchWithApiKey('/api/jti/chat/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -123,7 +127,7 @@ export default function Jti() {
     } catch {
       setStatusText(t('status_failed'));
     }
-  }, [currentLanguage, i18n, messages.length, t]);
+  }, [currentLanguage, sessionId, i18n, messages.length, t]);
 
   // 初始化 session
   useEffect(() => {
