@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { History } from 'lucide-react';
+import { History, RotateCcw, Sun, Moon } from 'lucide-react';
 import ConversationHistoryModal from '../components/ConversationHistoryModal';
 import { fetchWithApiKey } from '../services/api';
-import '../styles/JtiTest.css';
+import '../styles/Jti.css';
+import '../styles/JtiLight.css';
 
 interface Message {
   text: string;
@@ -22,7 +23,7 @@ interface SessionData {
   color_result?: { color_name?: string; title?: string };
 }
 
-export default function JtiTest() {
+export default function Jti() {
   const { t, i18n } = useTranslation();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -33,6 +34,20 @@ export default function JtiTest() {
   const [isTyping, setIsTyping] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('theme');
+    return (saved === 'light' || saved === 'dark') ? saved : 'dark';
+  });
+
+  // Apply theme to document
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+    localStorage.setItem('theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => {
+    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+  };
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -210,9 +225,7 @@ export default function JtiTest() {
       // 如果是重新生成，則更新訊息列表
       if (turnNumber !== undefined) {
         setMessages(prev => {
-          // 找到該 turn 的 user message
-          const userIdx = prev.findIndex(m => m.type === 'user' && m.turnNumber === turnNumber); // 注意：user message 此時可能還沒有 turnNumber, 或是我們其實要找的是剛剛發送的那個
-
+          // 找到該 turn 的 user message (如果需要)
           // Backend 回傳的 turn_number 是這輪對話的編號 (user answer pair)
           // 我們需要把 user message 也標上 turnNumber
 
@@ -233,7 +246,13 @@ export default function JtiTest() {
           const newMessages = [...prev];
           // 嘗試給最後一個 user message 補上 turnNumber (如果它對應到這次回應)
           // 回應的 turn_number 應該跟最後一個 user message 是同一輪
-          const lastUserMsgIndex = newMessages.findLastIndex(m => m.type === 'user');
+          let lastUserMsgIndex = -1;
+          for (let i = newMessages.length - 1; i >= 0; i--) {
+            if (newMessages[i].type === 'user') {
+              lastUserMsgIndex = i;
+              break;
+            }
+          }
           if (lastUserMsgIndex !== -1) {
             newMessages[lastUserMsgIndex].turnNumber = data.turn_number;
           }
@@ -244,7 +263,13 @@ export default function JtiTest() {
         // 一般發送
         setMessages(prev => {
           const newMessages = [...prev];
-          const lastUserMsgIndex = newMessages.findLastIndex(m => m.type === 'user');
+          let lastUserMsgIndex = -1;
+          for (let i = newMessages.length - 1; i >= 0; i--) {
+            if (newMessages[i].type === 'user') {
+              lastUserMsgIndex = i;
+              break;
+            }
+          }
           if (lastUserMsgIndex !== -1) {
             newMessages[lastUserMsgIndex].turnNumber = data.turn_number;
           }
@@ -370,26 +395,36 @@ export default function JtiTest() {
           </div>
           <div className="status-section">
             <button
-              className="restart-button"
+              className="icon-btn"
               onClick={restartConversation}
               title={t('button_restart')}
+              aria-label="Restart Conversation"
             >
-              <span className="restart-label">{t('button_restart')}</span>
+              <RotateCcw size={18} />
             </button>
             <button
-              className="history-button"
+              className="icon-btn"
               onClick={() => setShowHistoryModal(true)}
               title={t('view_conversation_history') || 'View Conversation History'}
+              aria-label="Conversation History"
             >
               <History size={18} />
-              <span className="history-label">{t('history') || 'History'}</span>
             </button>
             <button
-              className="lang-toggle"
+              className="icon-btn text-icon"
               onClick={toggleLanguage}
               title={currentLanguage === 'zh' ? 'Switch to English' : '切換至繁體中文'}
+              aria-label="Toggle Language"
             >
               {currentLanguage === 'zh' ? 'EN' : '中'}
+            </button>
+            <button
+              className="icon-btn"
+              onClick={toggleTheme}
+              title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+              aria-label="Toggle Theme"
+            >
+              {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
           </div>
         </div>
@@ -542,17 +577,25 @@ export default function JtiTest() {
         <div className="input-area">
           <form onSubmit={handleSubmit} className="input-form">
             <div className="input-container">
-              <textarea
-                ref={inputRef}
-                className="chat-input"
-                value={userInput}
-                onChange={(e) => setUserInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={loading ? t('status_ready') : t('input_placeholder')}
-                disabled={loading || !sessionId}
-                autoComplete="off"
-                spellCheck={false}
-              />
+              <div className="input-wrapper">
+                <textarea
+                  ref={inputRef}
+                  className="chat-input"
+                  value={userInput}
+                  onChange={(e) => setUserInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={loading ? t('status_ready') : t('input_placeholder')}
+                  disabled={loading || !sessionId}
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+                {/* 狀態列 (輸入框內右下角) */}
+                <div className="inline-status">
+                  <span className="status-dot"></span>
+                  <span className="status-text">{statusText}</span>
+                  {sessionInfo && <span className="session-badge">{sessionInfo}</span>}
+                </div>
+              </div>
               <button
                 type="submit"
                 className="send-button"
@@ -614,19 +657,10 @@ export default function JtiTest() {
               }
             }
           } catch (err) {
-            console.error('[JtiTest] Auto-resume quiz failed:', err);
+            console.error('[Jti] Auto-resume quiz failed:', err);
           }
         }}
       />
-
-      {/* 浮動狀態列 (右下角) */}
-      <div className="floating-status">
-        <div className="status-indicator">
-          <span className="status-dot"></span>
-          <span className="status-text">{statusText}</span>
-        </div>
-        {sessionInfo && <span className="session-badge">{sessionInfo}</span>}
-      </div>
     </div>
   );
 }

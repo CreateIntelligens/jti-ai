@@ -462,8 +462,8 @@ export default function ConversationHistoryModal({
   if (!isOpen) return null;
 
   return (
-    <div className="conversation-history-overlay" onClick={onClose}>
-      <div className="conversation-history-modal" onClick={(e) => e.stopPropagation()}>
+    <div className={`conversation-history-overlay ${mode === 'jti' ? 'jti-theme' : ''}`} onClick={onClose}>
+      <div className={`conversation-history-modal ${mode === 'jti' ? 'jti-theme' : ''}`} onClick={(e) => e.stopPropagation()}>
 
         {/* Header */}
         <div className="conversation-header">
@@ -594,11 +594,10 @@ export default function ConversationHistoryModal({
               });
             }}
             disabled={filteredSessions.length === 0}
-            className={`select-all-btn${
-              filteredSessions.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-                .every(s => selectedSessions.has(s.session_id)) && filteredSessions.length > 0
-                ? ' all-selected' : ''
-            }`}
+            className={`select-all-btn${filteredSessions.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+              .every(s => selectedSessions.has(s.session_id)) && filteredSessions.length > 0
+              ? ' all-selected' : ''
+              }`}
           >
             <Check size={16} />
             {t('select_all')}
@@ -672,9 +671,9 @@ export default function ConversationHistoryModal({
                           <span className="session-badge">Session {sessionIndex + 1}</span>
                           <span className="session-count">{msgCount} {t('conversations_count')}</span>
                           {session.language && (
-                            <span className="session-language" style={{ 
-                              padding: '2px 6px', 
-                              borderRadius: '4px', 
+                            <span className="session-language" style={{
+                              padding: '2px 6px',
+                              borderRadius: '4px',
                               fontSize: '11px',
                               background: session.language === 'en' ? '#3b82f6' : '#10b981',
                               color: 'white',
@@ -703,7 +702,7 @@ export default function ConversationHistoryModal({
 
                     <div className="session-card-actions">
                       {onResumeSession && (
-                        <button
+                        <button className="icon-action-btn"
                           onClick={async (e) => {
                             e.stopPropagation();
                             // General 模式：確保已載入完整對話
@@ -731,7 +730,7 @@ export default function ConversationHistoryModal({
                           <Play size={16} />
                         </button>
                       )}
-                      <button
+                      <button className="icon-action-btn"
                         onClick={(e) => {
                           e.stopPropagation();
                           exportAsJSON([session.session_id]);
@@ -865,23 +864,23 @@ export default function ConversationHistoryModal({
           {(() => {
             const totalPages = Math.ceil(filteredSessions.length / pageSize);
             return totalPages > 1 ? (
-            <div className="pagination-controls">
-              <button
-                disabled={currentPage === 1 || loading}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              >
-                &lt; {t('prev') || 'Prev'}
-              </button>
-              <span>
-                {t('page') || 'Page'} {currentPage} / {totalPages}
-              </span>
-              <button
-                disabled={currentPage >= totalPages || loading}
-                onClick={() => setCurrentPage((p) => p + 1)}
-              >
-                {t('next') || 'Next'} &gt;
-              </button>
-            </div>
+              <div className="pagination-controls">
+                <button
+                  disabled={currentPage === 1 || loading}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                >
+                  &lt; {t('prev') || 'Prev'}
+                </button>
+                <span>
+                  {t('page') || 'Page'} {currentPage} / {totalPages}
+                </span>
+                <button
+                  disabled={currentPage >= totalPages || loading}
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                >
+                  {t('next') || 'Next'} &gt;
+                </button>
+              </div>
             ) : null;
           })()}
           <div className="conversation-footer-stats">

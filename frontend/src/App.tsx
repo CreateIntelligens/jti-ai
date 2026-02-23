@@ -6,7 +6,7 @@ import StoreManagementModal from './components/StoreManagementModal';
 import PromptManagementModal from './components/PromptManagementModal';
 import UserApiKeyModal from './components/UserApiKeyModal';
 import ConversationHistoryModal from './components/ConversationHistoryModal';
-import JtiTest from './pages/JtiTest';
+import Jti from './pages/Jti';
 import * as api from './services/api';
 import type { Store, FileItem, Message } from './types';
 import './styles/App.css';
@@ -18,7 +18,7 @@ export default function App() {
   const isJtiPage = window.location.pathname === '/jti';
 
   if (isJtiPage) {
-    return <JtiTest />;
+    return <Jti />;
   }
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [storeModalOpen, setStoreModalOpen] = useState(false);
