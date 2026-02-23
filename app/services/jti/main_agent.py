@@ -328,7 +328,7 @@ class MainAgent:
             config = types.GenerateContentConfig(
                 system_instruction=f"{system_instruction}\n\n{session_state}\n\n{instruction}",
                 thinking_config=types.ThinkingConfig(thinking_budget=0),
-            )
+                )
 
             response = gemini_client.models.generate_content(
                 model=self.model_name,
