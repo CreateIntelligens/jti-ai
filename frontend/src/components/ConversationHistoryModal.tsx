@@ -15,7 +15,7 @@ import {
   CornerDownRight,
   Calendar,
 } from 'lucide-react';
-import { deleteConversation, fetchWithApiKey, getGeneralConversationDetail } from '../services/api';
+import { deleteConversations, fetchWithApiKey, getGeneralConversationDetail } from '../services/api';
 import MiniCalendar from './MiniCalendar';
 
 interface ConversationEntry {
@@ -156,6 +156,9 @@ export default function ConversationHistoryModal({
     if (/^\d{4}-\d{2}-\d$/.test(v)) v = v.slice(0, 8) + '0' + v[8];
     if (v !== value) setter(v);
   };
+
+  // Selection state
+  const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -385,21 +388,30 @@ export default function ConversationHistoryModal({
     }
   };
 
-  const handleDeleteSession = async (sid: string) => {
-    if (!window.confirm(t('confirm_delete_session'))) return;
+  const handleDeleteSessions = async (sids: string[]) => {
+    if (sids.length === 0) return;
+    const msg = sids.length === 1
+      ? t('confirm_delete_session')
+      : t('confirm_delete_sessions', { count: sids.length });
+    if (!window.confirm(msg)) return;
 
     try {
-      await deleteConversation(mode, sid);
+      await deleteConversations(mode, sids);
 
-      const updated = sessions.filter((s) => s.session_id !== sid);
+      const sidSet = new Set(sids);
+      const updated = sessions.filter((s) => !sidSet.has(s.session_id));
       setSessions(updated);
-      // filteredSessions will be updated by the searchQuery useEffect
 
-      if (expandedSessionId === sid) {
+      if (expandedSessionId && sidSet.has(expandedSessionId)) {
         setExpandedSessionId(null);
       }
+      setSelectedSessions(prev => {
+        const next = new Set(prev);
+        sids.forEach(id => next.delete(id));
+        return next;
+      });
 
-      console.log('[ConversationHistory] Deleted session:', sid);
+      console.log('[ConversationHistory] Deleted sessions:', sids.length);
     } catch (error) {
       console.error('[ConversationHistory] Delete error:', error);
       alert('刪除失敗，請稍後再試');
@@ -569,6 +581,37 @@ export default function ConversationHistoryModal({
             <Download size={16} />
             {t('export')}
           </button>
+          <button
+            onClick={() => {
+              const pageIds = filteredSessions
+                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                .map(s => s.session_id);
+              const allSelected = pageIds.every(id => selectedSessions.has(id));
+              setSelectedSessions(prev => {
+                const next = new Set(prev);
+                pageIds.forEach(id => allSelected ? next.delete(id) : next.add(id));
+                return next;
+              });
+            }}
+            disabled={filteredSessions.length === 0}
+            className={`select-all-btn${
+              filteredSessions.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                .every(s => selectedSessions.has(s.session_id)) && filteredSessions.length > 0
+                ? ' all-selected' : ''
+            }`}
+          >
+            <Check size={16} />
+            {t('select_all')}
+          </button>
+          {selectedSessions.size > 0 && (
+            <button
+              className="batch-delete-btn"
+              onClick={() => handleDeleteSessions([...selectedSessions])}
+            >
+              <Trash2 size={16} />
+              {t('delete')} ({selectedSessions.size})
+            </button>
+          )}
         </div>
 
         {/* Content */}
@@ -606,6 +649,20 @@ export default function ConversationHistoryModal({
                 >
                   {/* Session header */}
                   <div className="session-card-header">
+                    <input
+                      type="checkbox"
+                      className="session-checkbox"
+                      checked={selectedSessions.has(session.session_id)}
+                      onChange={(e) => {
+                        e.stopPropagation();
+                        setSelectedSessions(prev => {
+                          const next = new Set(prev);
+                          next.has(session.session_id) ? next.delete(session.session_id) : next.add(session.session_id);
+                          return next;
+                        });
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
                     <button
                       className="session-card-toggle"
                       onClick={() => handleExpandSession(session.session_id)}
@@ -687,7 +744,7 @@ export default function ConversationHistoryModal({
                         className="session-delete-btn"
                         onClick={(e) => {
                           e.stopPropagation();
-                          handleDeleteSession(session.session_id);
+                          handleDeleteSessions([session.session_id]);
                         }}
                         title={t('delete')}
                       >

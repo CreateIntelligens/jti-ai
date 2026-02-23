@@ -8,7 +8,7 @@ import os
 import re
 import uuid
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
@@ -236,30 +236,30 @@ def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/history/{session_id}", response_model=jti.DeleteConversationResponse)
-def delete_general_conversation(session_id: str, auth: dict = Depends(verify_auth)):
-    """刪除指定 session 的對話紀錄
+@router.delete("/history", response_model=jti.DeleteConversationResponse)
+def delete_general_conversations(request: jti.DeleteConversationRequest, auth: dict = Depends(verify_auth)):
+    """批量刪除對話紀錄
 
-    同時刪除：
+    Body:
+    - session_ids: 要刪除的 session ID 列表
+
+    同時刪除每個 session 的：
     - 對話日誌 (conversation logs)
     - General chat session (MongoDB)
     - 記憶體中的 session manager
     """
-
-    deleted_logs = deps.conversation_logger.delete_session_logs(session_id)
-
-    deleted_session = False
-    if deps.general_session_manager:
-        deleted_session = deps.general_session_manager.delete_session(session_id)
-
-    # 清除記憶體中的 manager
-    if session_id in deps.user_managers:
-        del deps.user_managers[session_id]
+    total_logs = 0
+    deleted_count = 0
+    for sid in request.session_ids:
+        total_logs += deps.conversation_logger.delete_session_logs(sid)
+        if deps.general_session_manager and deps.general_session_manager.delete_session(sid):
+            deleted_count += 1
+        deps.user_managers.pop(sid, None)
 
     return {
         "ok": True,
-        "deleted_logs": deleted_logs,
-        "deleted_session": deleted_session,
+        "deleted_count": deleted_count,
+        "deleted_logs": total_logs,
     }
 
 

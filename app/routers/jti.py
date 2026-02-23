@@ -130,11 +130,16 @@ class ConversationsGroupedResponse(BaseModel):
     total_sessions: int
 
 
+class DeleteConversationRequest(BaseModel):
+    """刪除對話請求"""
+    session_ids: List[str]
+
+
 class DeleteConversationResponse(BaseModel):
     """刪除對話回應"""
     ok: bool
+    deleted_count: int
     deleted_logs: int
-    deleted_session: bool
 
 
 class ExportConversationsResponse(BaseModel):
@@ -790,24 +795,31 @@ async def get_conversations(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/history/{session_id}", response_model=DeleteConversationResponse)
-async def delete_conversation(session_id: str, auth: dict = Depends(verify_auth)):
-    """刪除指定 session 的對話紀錄
+@router.delete("/history", response_model=DeleteConversationResponse)
+async def delete_conversations(request: DeleteConversationRequest, auth: dict = Depends(verify_auth)):
+    """批量刪除對話紀錄
 
-    同時刪除：
+    Body:
+    - session_ids: 要刪除的 session ID 列表
+
+    同時刪除每個 session 的：
     - 對話日誌 (conversation logs)
     - JTI session
     - 記憶體中的 chat session
     """
-
-    deleted_logs = conversation_logger.delete_session_logs(session_id)
-    deleted_session = session_manager.delete_session(session_id)
-    main_agent.remove_session(session_id)
+    total_logs = 0
+    deleted_count = 0
+    for sid in request.session_ids:
+        logs = conversation_logger.delete_session_logs(sid)
+        total_logs += logs
+        if session_manager.delete_session(sid):
+            deleted_count += 1
+        main_agent.remove_session(sid)
 
     return {
         "ok": True,
-        "deleted_logs": deleted_logs,
-        "deleted_session": deleted_session,
+        "deleted_count": deleted_count,
+        "deleted_logs": total_logs,
     }
 
 

@@ -34,6 +34,8 @@
   "copied": "Copied",
   "delete": "Delete",
   "confirm_delete_session": "Are you sure you want to delete all conversations in this session? This action cannot be undone.",
+  "confirm_delete_sessions": "Are you sure you want to delete {{count}} sessions? This action cannot be undone.",
+  "select_all": "Select All",
   "session_deleted": "Session deleted",
   "resume_session": "Resume",
   "prev": "Prev",

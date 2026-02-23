@@ -391,11 +391,6 @@ export default function JtiTest() {
             >
               {currentLanguage === 'zh' ? 'EN' : '中'}
             </button>
-            <div className="status-indicator">
-              <span className="status-dot"></span>
-              <span className="status-text">{statusText}</span>
-            </div>
-            {sessionInfo && <span className="session-badge">{sessionInfo}</span>}
           </div>
         </div>
       </header>
@@ -623,6 +618,15 @@ export default function JtiTest() {
           }
         }}
       />
+
+      {/* 浮動狀態列 (右下角) */}
+      <div className="floating-status">
+        <div className="status-indicator">
+          <span className="status-dot"></span>
+          <span className="status-text">{statusText}</span>
+        </div>
+        {sessionInfo && <span className="session-badge">{sessionInfo}</span>}
+      </div>
     </div>
   );
 }

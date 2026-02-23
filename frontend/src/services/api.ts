@@ -238,10 +238,14 @@ export async function getGeneralConversationDetail(sessionId: string): Promise<a
   return handleResponse<any>(response);
 }
 
-export async function deleteConversation(mode: 'jti' | 'general', sessionId: string): Promise<void> {
+export async function deleteConversations(mode: 'jti' | 'general', sessionIds: string[]): Promise<void> {
   const url = mode === 'jti'
-    ? `${API_BASE}/jti/history/${encodeURIComponent(sessionId)}`
-    : `${API_BASE}/chat/history/${encodeURIComponent(sessionId)}`;
-  const response = await fetchWithApiKey(url, { method: 'DELETE' });
+    ? `${API_BASE}/jti/history`
+    : `${API_BASE}/chat/history`;
+  const response = await fetchWithApiKey(url, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_ids: sessionIds }),
+  });
   await handleResponse<void>(response);
 }

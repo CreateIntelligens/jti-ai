@@ -2,8 +2,7 @@
 
 /* 淺色背景漸變 */
 [data-theme="light"] body {
-  background: #fafaf9;
-  background-image: linear-gradient(160deg, #fafaf9 0%, #f5f5f4 40%, #e7e5e4 100%);
+  background-color: var(--bg-primary);
 }
 
 /* 淡化背景動畫球體 */
@@ -20,16 +19,10 @@
   border-bottom-color: rgba(15, 118, 110, 0.1);
 }
 
-[data-theme="light"] header::after {
-  background: linear-gradient(90deg, transparent, var(--crystal-teal), transparent);
-  opacity: 0.3;
-}
+
 
 [data-theme="light"] header h1 {
-  background: linear-gradient(135deg, var(--crystal-teal), var(--crystal-cyan));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--primary-color);
   filter: none;
   text-shadow: none;
 }
@@ -40,9 +33,7 @@
   border-color: rgba(15, 118, 110, 0.1);
 }
 
-[data-theme="light"] aside::before {
-  background: radial-gradient(ellipse at top, rgba(15, 118, 110, 0.05), transparent);
-}
+
 
 [data-theme="light"] .sidebar-section {
   border-bottom-color: rgba(15, 118, 110, 0.08);
@@ -62,9 +53,7 @@
   border-color: rgba(15, 118, 110, 0.1);
 }
 
-[data-theme="light"] main::after {
-  background: radial-gradient(circle, rgba(180, 83, 9, 0.03), transparent 70%);
-}
+
 
 /* Messages */
 [data-theme="light"] .message.user {
@@ -90,10 +79,7 @@
   border-top-color: rgba(15, 118, 110, 0.1);
 }
 
-[data-theme="light"] .input-area::before {
-  background: linear-gradient(90deg, transparent, var(--crystal-amber), transparent);
-  opacity: 0.25;
-}
+
 
 /* Form controls */
 [data-theme="light"] input,
@@ -119,7 +105,7 @@
 
 /* Buttons */
 [data-theme="light"] button {
-  background: linear-gradient(135deg, var(--crystal-teal), var(--crystal-cyan));
+  background: var(--primary-color);
   color: #fff;
   box-shadow: 0 2px 8px rgba(15, 118, 110, 0.2);
 }
@@ -259,10 +245,8 @@
 
 /* Skeleton loading */
 [data-theme="light"] .skeleton-bar {
-  background: linear-gradient(
-    90deg,
-    rgba(15, 118, 110, 0.06) 25%,
-    rgba(15, 118, 110, 0.12) 50%,
-    rgba(15, 118, 110, 0.06) 75%
-  );
+  background: linear-gradient(90deg,
+      rgba(15, 118, 110, 0.06) 25%,
+      rgba(15, 118, 110, 0.12) 50%,
+      rgba(15, 118, 110, 0.06) 75%);
 }
