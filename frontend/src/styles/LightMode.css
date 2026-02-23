@@ -14,21 +14,21 @@
 }
 
 /* Header */
-[data-theme="light"] header {
+[data-theme="light"] .app-container header {
   background: rgba(255, 255, 255, 0.8);
   border-bottom-color: rgba(15, 118, 110, 0.1);
 }
 
 
 
-[data-theme="light"] header h1 {
+[data-theme="light"] .app-container header h1 {
   color: var(--primary-color);
   filter: none;
   text-shadow: none;
 }
 
 /* Sidebar */
-[data-theme="light"] aside {
+[data-theme="light"] .app-container aside {
   background: rgba(255, 255, 255, 0.75);
   border-color: rgba(15, 118, 110, 0.1);
 }
@@ -48,7 +48,7 @@
 }
 
 /* Main chat area */
-[data-theme="light"] main {
+[data-theme="light"] .app-container main {
   background: rgba(255, 255, 255, 0.65);
   border-color: rgba(15, 118, 110, 0.1);
 }
@@ -56,25 +56,25 @@
 
 
 /* Messages */
-[data-theme="light"] .message.user {
+[data-theme="light"] .app-container .message.user {
   background: linear-gradient(135deg, rgba(15, 118, 110, 0.12), rgba(14, 116, 144, 0.08));
   border: 1px solid rgba(15, 118, 110, 0.2);
   color: var(--text-primary);
 }
 
-[data-theme="light"] .message.model {
+[data-theme="light"] .app-container .message.model {
   background: linear-gradient(135deg, rgba(180, 83, 9, 0.08), rgba(161, 98, 7, 0.05));
   border: 1px solid rgba(180, 83, 9, 0.15);
   color: var(--text-primary);
 }
 
-[data-theme="light"] .message.error {
+[data-theme="light"] .app-container .message.error {
   background: linear-gradient(135deg, rgba(190, 24, 93, 0.1), rgba(190, 24, 93, 0.05));
   border-color: rgba(190, 24, 93, 0.2);
 }
 
 /* Input area */
-[data-theme="light"] .input-area {
+[data-theme="light"] .app-container .input-area {
   background: rgba(255, 255, 255, 0.85);
   border-top-color: rgba(15, 118, 110, 0.1);
 }
@@ -82,55 +82,64 @@
 
 
 /* Form controls */
-[data-theme="light"] input,
-[data-theme="light"] select,
-[data-theme="light"] textarea {
+[data-theme="light"] .app-container input,
+[data-theme="light"] .app-container select,
+[data-theme="light"] .app-container textarea,
+[data-theme="light"] .conversation-history-modal input {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(15, 118, 110, 0.15);
   color: var(--text-primary);
 }
 
-[data-theme="light"] input::placeholder,
-[data-theme="light"] textarea::placeholder {
+[data-theme="light"] .app-container input::placeholder,
+[data-theme="light"] .app-container textarea::placeholder,
+[data-theme="light"] .conversation-history-modal input::placeholder {
   color: var(--text-muted);
 }
 
-[data-theme="light"] input:focus,
-[data-theme="light"] select:focus,
-[data-theme="light"] textarea:focus {
+[data-theme="light"] .app-container input:focus,
+[data-theme="light"] .app-container select:focus,
+[data-theme="light"] .app-container textarea:focus,
+[data-theme="light"] .conversation-history-modal input:focus {
   background: #fff;
   border-color: var(--crystal-teal);
   box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.1);
 }
 
 /* Buttons */
-[data-theme="light"] button {
+[data-theme="light"] .app-container button,
+[data-theme="light"] .conversation-history-modal button:not([class]) {
   background: var(--primary-color);
   color: #fff;
   box-shadow: 0 2px 8px rgba(15, 118, 110, 0.2);
 }
 
-[data-theme="light"] button:hover {
+[data-theme="light"] .app-container button:hover,
+[data-theme="light"] .conversation-history-modal button:not([class]):hover {
   box-shadow: 0 4px 16px rgba(15, 118, 110, 0.25);
 }
 
-[data-theme="light"] button.secondary {
+[data-theme="light"] .app-container button.secondary,
+[data-theme="light"] .conversation-history-modal button.secondary {
   background: rgba(255, 255, 255, 0.9);
   color: var(--crystal-teal);
   border: 1px solid rgba(15, 118, 110, 0.2);
   box-shadow: none;
 }
 
-[data-theme="light"] button.secondary:hover {
+[data-theme="light"] .app-container button.secondary:hover,
+[data-theme="light"] .conversation-history-modal button.secondary:hover {
   background: #fff;
   border-color: var(--crystal-teal);
 }
 
-[data-theme="light"] button.danger {
+[data-theme="light"] .app-container button.danger,
+[data-theme="light"] .conversation-history-modal button.danger {
   background: linear-gradient(135deg, var(--crystal-rose), #e11d48);
 }
 
-[data-theme="light"] button:disabled {
+[data-theme="light"] .app-container button:disabled,
+[data-theme="light"] .conversation-history-modal button:not([class]):disabled {
   background: rgba(168, 162, 158, 0.3);
   color: rgba(120, 113, 108, 0.6);
 }

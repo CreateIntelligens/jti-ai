@@ -14,21 +14,24 @@
   --bg-hover: #3c4043;
   --bg-active: #4a4d51;
 
-  --primary-color: #8ab4f8; /* Google Blue */
+  --primary-color: #8ab4f8;
+  /* Google Blue */
   --primary-hover: #9bbff9;
   --secondary-color: #f1f3f4;
-  --accent-color: #fbbc04; /* Google Yellow */
-  --danger-color: #f28b82; /* Google Red */
+  --accent-color: #fbbc04;
+  /* Google Yellow */
+  --danger-color: #f28b82;
+  /* Google Red */
 
   /* Borders & Dividers */
   --border-color: #5f6368;
   --border-light: #3c4043;
 
   /* Shadows (Material Elevation) */
-  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.3), 0 1px 3px 1px rgba(0,0,0,0.15);
-  --shadow-md: 0 1px 2px 0 rgba(0,0,0,0.3), 0 2px 6px 2px rgba(0,0,0,0.15);
-  --shadow-lg: 0 4px 6px 0 rgba(0,0,0,0.3), 0 4px 8px 3px rgba(0,0,0,0.15);
-  --shadow-xl: 0 6px 10px 0 rgba(0,0,0,0.3), 0 8px 16px 4px rgba(0,0,0,0.15);
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 1px 2px 0 rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 4px 6px 0 rgba(0, 0, 0, 0.3), 0 4px 8px 3px rgba(0, 0, 0, 0.15);
+  --shadow-xl: 0 6px 10px 0 rgba(0, 0, 0, 0.3), 0 8px 16px 4px rgba(0, 0, 0, 0.15);
 
   /* Text Colors */
   --text-primary: #e8eaed;
@@ -77,10 +80,10 @@
   --border-color: #dadce0;
   --border-light: #f1f3f4;
 
-  --shadow-sm: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
-  --shadow-md: 0 1px 2px 0 rgba(60,64,67,0.3), 0 2px 6px 2px rgba(60,64,67,0.15);
-  --shadow-lg: 0 4px 6px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
-  --shadow-xl: 0 6px 10px 0 rgba(60,64,67,0.3), 0 8px 16px 4px rgba(60,64,67,0.15);
+  --shadow-sm: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+  --shadow-md: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 2px 6px 2px rgba(60, 64, 67, 0.15);
+  --shadow-lg: 0 4px 6px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+  --shadow-xl: 0 6px 10px 0 rgba(60, 64, 67, 0.3), 0 8px 16px 4px rgba(60, 64, 67, 0.15);
 
   --text-primary: #202124;
   --text-secondary: #5f6368;
@@ -102,16 +105,27 @@ body {
 }
 
 /* Animated Background Orbs */
-body::before { display: none; }
+body::before {
+  display: none;
+}
 
 /* 尊重用戶的動畫偏好設定 */
 @media (prefers-reduced-motion: reduce) {
-  body::before { display: none; }
+  body::before {
+    display: none;
+  }
 }
 
 @keyframes crystalShift {
-  0%, 100% { transform: translate(0, 0) rotate(0deg); }
-  50% { transform: translate(5%, 5%) rotate(2deg); }
+
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+
+  50% {
+    transform: translate(5%, 5%) rotate(2deg);
+  }
 }
 
 #root {
@@ -124,7 +138,7 @@ body::before { display: none; }
 
 /* ==================== HEADER ==================== */
 
-header {
+.app-container header {
   background: var(--glass-bg);
   border-bottom: 1px solid var(--glass-border);
   padding: 1.5rem 2.5rem;
@@ -144,7 +158,7 @@ header {
   gap: 1.5rem;
 }
 
-header h1 {
+.app-container header h1 {
   font-family: 'Inter', -apple-system, sans-serif;
   font-size: 1.75rem;
   font-weight: 700;
@@ -154,12 +168,17 @@ header h1 {
 }
 
 @keyframes titleGlow {
-  from { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1)); }
-  to { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1)); }
+  from {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+  }
+
+  to {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  header h1 {
+  .app-container header h1 {
     animation: none;
     filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
   }
@@ -177,8 +196,15 @@ header h1 {
 }
 
 @keyframes statusFade {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .header-actions {
@@ -200,7 +226,7 @@ header h1 {
 
 /* ==================== SIDEBAR ==================== */
 
-aside {
+.app-container aside {
   width: 380px;
   min-width: 380px;
   flex-shrink: 0;
@@ -217,7 +243,7 @@ aside {
 
 
 
-aside.closed {
+.app-container aside.closed {
   width: 0;
   min-width: 0;
   opacity: 0;
@@ -252,8 +278,17 @@ aside.closed {
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 0.5; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.2); }
+
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
 }
 
 .fixed-section {
@@ -296,7 +331,7 @@ aside.closed {
 
 /* ==================== CHAT AREA ==================== */
 
-main {
+.app-container main {
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -311,13 +346,20 @@ main {
 
 
 @keyframes ambientPulse {
-  0%, 100% { opacity: 0.3; transform: translate(0, 0); }
-  50% { opacity: 0.6; transform: translate(-10%, 10%); }
+
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: translate(0, 0);
+  }
+
+  50% {
+    opacity: 0.6;
+    transform: translate(-10%, 10%);
+  }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  
-}
+@media (prefers-reduced-motion: reduce) {}
 
 .chat-history {
   flex: 1;
@@ -357,7 +399,10 @@ main {
 
 /* ==================== FORM CONTROLS ==================== */
 
-input, select, textarea {
+.app-container input,
+.app-container select,
+.app-container textarea,
+.conversation-history-modal input {
   padding: 0.9rem 1.2rem;
   background: rgba(26, 31, 58, 0.5);
   border: 1px solid rgba(61, 217, 211, 0.2);
@@ -369,13 +414,16 @@ input, select, textarea {
   transition: var(--transition-smooth);
 }
 
-input:focus, select:focus, textarea:focus {
+.app-container input:focus,
+.app-container select:focus,
+.app-container textarea:focus,
+.conversation-history-modal input:focus {
   border-color: var(--crystal-teal);
   box-shadow: 0 0 0 3px rgba(61, 217, 211, 0.15), var(--glow-teal);
   background: rgba(26, 31, 58, 0.7);
 }
 
-textarea {
+.app-container textarea {
   flex: 1;
   resize: none;
   min-height: 56px;
@@ -383,7 +431,8 @@ textarea {
   line-height: 1.6;
 }
 
-button {
+.app-container button,
+.conversation-history-modal button:not([class]) {
   padding: 0.9rem 1.75rem;
   background: var(--primary-color);
   color: var(--crystal-dark);
@@ -401,49 +450,59 @@ button {
 
 
 
-button:hover::before {
+.app-container button:hover::before,
+.conversation-history-modal button:not([class]):hover::before {
   width: 300px;
   height: 300px;
 }
 
-button:hover {
+.app-container button:hover,
+.conversation-history-modal button:not([class]):hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 24px rgba(61, 217, 211, 0.4), var(--glow-teal);
 }
 
-button:active {
+.app-container button:active,
+.conversation-history-modal button:not([class]):active {
   transform: translateY(0);
 }
 
-button:disabled {
+.app-container button:disabled,
+.conversation-history-modal button:not([class]):disabled {
   background: rgba(100, 100, 120, 0.3);
   color: rgba(200, 200, 220, 0.5);
   cursor: not-allowed;
   box-shadow: none;
 }
 
-button.secondary {
+.app-container button.secondary,
+.conversation-history-modal button.secondary {
   background: rgba(42, 49, 84, 0.6);
   color: var(--crystal-cyan);
   border: 1px solid rgba(61, 217, 211, 0.3);
   box-shadow: none;
 }
 
-button.secondary:hover {
+.app-container button.secondary:hover,
+.conversation-history-modal button.secondary:hover {
   background: rgba(42, 49, 84, 0.8);
   border-color: var(--crystal-teal);
 }
 
-button.danger { background: var(--danger-color);
+.app-container button.danger,
+.conversation-history-modal button.danger {
+  background: var(--danger-color);
   color: white;
   box-shadow: 0 4px 16px rgba(255, 107, 157, 0.3);
 }
 
-button.danger:hover {
+.app-container button.danger:hover,
+.conversation-history-modal button.danger:hover {
   box-shadow: 0 8px 24px rgba(255, 107, 157, 0.4), 0 0 30px rgba(255, 107, 157, 0.2);
 }
 
-button.small {
+.app-container button.small,
+.conversation-history-modal button.small {
   padding: 0.5rem 1rem;
   font-size: 0.85rem;
 }
@@ -495,6 +554,7 @@ button.small {
     opacity: 0;
     transform: translateX(-8px);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
@@ -510,19 +570,22 @@ button.small {
 .skeleton-bar {
   height: 14px;
   border-radius: 6px;
-  background: linear-gradient(
-    90deg,
-    rgba(61, 217, 211, 0.06) 25%,
-    rgba(61, 217, 211, 0.12) 50%,
-    rgba(61, 217, 211, 0.06) 75%
-  );
+  background: linear-gradient(90deg,
+      rgba(61, 217, 211, 0.06) 25%,
+      rgba(61, 217, 211, 0.12) 50%,
+      rgba(61, 217, 211, 0.06) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.4s ease-in-out infinite;
 }
 
 @keyframes shimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
 }
 
 /* ==================== DROP ZONE ==================== */
@@ -553,11 +616,13 @@ button.small {
   border-radius: 50%;
 }
 
-.drop-zone:hover::before, .drop-zone.dragover::before {
+.drop-zone:hover::before,
+.drop-zone.dragover::before {
   transform: translate(-50%, -50%) scale(2);
 }
 
-.drop-zone:hover, .drop-zone.dragover {
+.drop-zone:hover,
+.drop-zone.dragover {
   border-color: var(--crystal-teal);
   background: rgba(61, 217, 211, 0.08);
   box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.06);
@@ -605,8 +670,15 @@ button.small {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ==================== OVERLAY ==================== */
@@ -626,8 +698,13 @@ button.small {
 }
 
 @keyframes overlayFade {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 /* ==================== MODAL ==================== */
@@ -651,6 +728,7 @@ button.small {
     opacity: 0;
     transform: translateY(-50px) scale(0.9);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -680,18 +758,53 @@ button.small {
 
 /* ==================== UTILITIES ==================== */
 
-.flex { display: flex; }
-.flex-1 { flex: 1; }
-.gap-sm { gap: 0.5rem; }
-.gap-md { gap: 1rem; }
-.gap-lg { gap: 1.5rem; }
-.mt-sm { margin-top: 0.5rem; }
-.mt-md { margin-top: 1rem; }
-.mb-sm { margin-bottom: 0.5rem; }
-.mb-md { margin-bottom: 1rem; }
-.w-full { width: 100%; }
-.items-center { align-items: center; }
-.justify-between { justify-content: space-between; }
+.flex {
+  display: flex;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.gap-sm {
+  gap: 0.5rem;
+}
+
+.gap-md {
+  gap: 1rem;
+}
+
+.gap-lg {
+  gap: 1.5rem;
+}
+
+.mt-sm {
+  margin-top: 0.5rem;
+}
+
+.mt-md {
+  margin-top: 1rem;
+}
+
+.mb-sm {
+  margin-bottom: 0.5rem;
+}
+
+.mb-md {
+  margin-bottom: 1rem;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
 
 /* ==================== HEADER LINK ==================== */
 
@@ -768,7 +881,7 @@ button.small {
     gap: 1rem;
   }
 
-  header {
+  .app-container header {
     padding: 1rem 1.5rem;
     height: 70px;
   }
@@ -782,7 +895,7 @@ button.small {
     z-index: 20;
   }
 
-  aside.closed {
+  .app-container aside.closed {
     transform: translateX(-100%);
   }
 }
@@ -855,4 +968,3 @@ button.small {
   border-color: var(--crystal-teal);
   box-shadow: 0 2px 12px rgba(15, 118, 110, 0.15);
 }
-

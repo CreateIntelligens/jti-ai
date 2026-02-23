@@ -1,6 +1,6 @@
 /* ==================== MESSAGES ==================== */
 
-.message {
+.app-container .message {
   max-width: 75%;
   padding: 1.25rem 1.75rem;
   border-radius: 16px;
@@ -16,6 +16,7 @@
     opacity: 0;
     transform: translateY(20px) scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -23,17 +24,22 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .message {
+  .app-container .message {
     animation: messageFade 0.2s ease-out;
   }
 
   @keyframes messageFade {
-    from { opacity: 0; }
-    to { opacity: 1; }
+    from {
+      opacity: 0;
+    }
+
+    to {
+      opacity: 1;
+    }
   }
 }
 
-.message.user {
+.app-container .message.user {
   align-self: flex-end;
   background: var(--primary-color);
   border: 1px solid rgba(61, 217, 211, 0.3);
@@ -42,7 +48,7 @@
   box-shadow: var(--shadow-md);
 }
 
-.message.user::before {
+.app-container .message.user::before {
   content: '';
   position: absolute;
   top: -1px;
@@ -56,11 +62,11 @@
   transition: opacity 0.3s;
 }
 
-.message.user:hover::before {
+.app-container .message.user:hover::before {
   opacity: 0.1;
 }
 
-.message.model {
+.app-container .message.model {
   align-self: flex-start;
   background: var(--bg-surface);
   border: 1px solid rgba(255, 255, 255, 0.1);
@@ -69,14 +75,14 @@
   box-shadow: var(--shadow-sm);
 }
 
-.message.error {
+.app-container .message.error {
   background: var(--danger-color);
   border: 1px solid rgba(255, 107, 157, 0.3);
   color: #ffb3d9;
 }
 
 /* Message action buttons (edit / regenerate) */
-.message {
+.app-container .message {
   position: relative;
 }
 
@@ -89,15 +95,15 @@
   gap: 4px;
 }
 
-.message.user .message-actions {
+.app-container .message.user .message-actions {
   right: 8px;
 }
 
-.message.model .message-actions {
+.app-container .message.model .message-actions {
   left: 8px;
 }
 
-.message:hover .message-actions {
+.app-container .message:hover .message-actions {
   opacity: 1;
 }
 
@@ -233,8 +239,25 @@
 }
 
 @keyframes crystalLoad {
-  0%, 100% { content: '⬡'; opacity: 0.3; }
-  25% { content: '⬡⬡'; opacity: 0.6; }
-  50% { content: '⬡⬡⬡'; opacity: 1; }
-  75% { content: '⬡⬡'; opacity: 0.6; }
+
+  0%,
+  100% {
+    content: '⬡';
+    opacity: 0.3;
+  }
+
+  25% {
+    content: '⬡⬡';
+    opacity: 0.6;
+  }
+
+  50% {
+    content: '⬡⬡⬡';
+    opacity: 1;
+  }
+
+  75% {
+    content: '⬡⬡';
+    opacity: 0.6;
+  }
 }
