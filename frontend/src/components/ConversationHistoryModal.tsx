@@ -602,15 +602,18 @@ export default function ConversationHistoryModal({
             <Check size={16} />
             {t('select_all')}
           </button>
-          {selectedSessions.size > 0 && (
-            <button
-              className="batch-delete-btn"
-              onClick={() => handleDeleteSessions([...selectedSessions])}
-            >
-              <Trash2 size={16} />
-              {t('delete')} ({selectedSessions.size})
-            </button>
-          )}
+          <button
+            className="batch-delete-btn"
+            onClick={() => {
+              if (selectedSessions.size === 0) {
+                alert(t('no_selection'));
+                return;
+              }
+              handleDeleteSessions([...selectedSessions]);
+            }}
+          >
+            <Trash2 size={16} />
+          </button>
         </div>
 
         {/* Content */}

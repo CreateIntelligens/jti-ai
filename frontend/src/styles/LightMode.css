@@ -85,7 +85,7 @@
 [data-theme="light"] .app-container input,
 [data-theme="light"] .app-container select,
 [data-theme="light"] .app-container textarea,
-[data-theme="light"] .conversation-history-modal input {
+[data-theme="light"] .conversation-history-modal input:not([type="checkbox"]) {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(15, 118, 110, 0.15);
   color: var(--text-primary);
@@ -93,14 +93,14 @@
 
 [data-theme="light"] .app-container input::placeholder,
 [data-theme="light"] .app-container textarea::placeholder,
-[data-theme="light"] .conversation-history-modal input::placeholder {
+[data-theme="light"] .conversation-history-modal input:not([type="checkbox"])::placeholder {
   color: var(--text-muted);
 }
 
 [data-theme="light"] .app-container input:focus,
 [data-theme="light"] .app-container select:focus,
 [data-theme="light"] .app-container textarea:focus,
-[data-theme="light"] .conversation-history-modal input:focus {
+[data-theme="light"] .conversation-history-modal input:not([type="checkbox"]):focus {
   background: #fff;
   border-color: var(--crystal-teal);
   box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.1);

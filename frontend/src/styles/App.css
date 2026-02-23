@@ -402,7 +402,7 @@ body::before {
 .app-container input,
 .app-container select,
 .app-container textarea,
-.conversation-history-modal input {
+.conversation-history-modal input:not([type="checkbox"]) {
   padding: 0.9rem 1.2rem;
   background: rgba(26, 31, 58, 0.5);
   border: 1px solid rgba(61, 217, 211, 0.2);
