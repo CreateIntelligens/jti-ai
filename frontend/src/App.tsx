@@ -351,38 +351,40 @@ export default function App() {
 
   return (
     <>
-      <Header
-        status={status}
-        onToggleSidebar={toggleSidebar}
-        sidebarOpen={sidebarOpen}
-        onOpenStoreManagement={() => setStoreModalOpen(true)}
-        onOpenUserApiKeySettings={() => setUserApiKeyModalOpen(true)}
-        onOpenConversationHistory={() => setConversationHistoryModalOpen(true)}
-        onRestartChat={handleRestartChat}
-        theme={theme}
-        onToggleTheme={toggleTheme}
-      />
       <div className="app-container">
-        <Sidebar
-          isOpen={sidebarOpen}
-          stores={stores}
-          currentStore={currentStore}
-          files={files}
-          filesLoading={filesLoading}
-          onStoreChange={handleStoreChange}
-          onUploadFile={handleUploadFile}
-          onDeleteFile={handleDeleteFile}
-          onRefresh={refreshStores}
-          onOpenPromptManagement={() => setPromptModalOpen(true)}
+        <Header
+          status={status}
+          onToggleSidebar={toggleSidebar}
+          sidebarOpen={sidebarOpen}
+          onOpenStoreManagement={() => setStoreModalOpen(true)}
+          onOpenUserApiKeySettings={() => setUserApiKeyModalOpen(true)}
+          onOpenConversationHistory={() => setConversationHistoryModalOpen(true)}
+          onRestartChat={handleRestartChat}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
-        <ChatArea
-          messages={messages}
-          onSendMessage={handleSendMessage}
-          disabled={!currentStore}
-          loading={loading}
-          onRegenerate={handleRegenerate}
-          onEditAndResend={handleEditAndResend}
-        />
+        <div className="app-content">
+          <Sidebar
+            isOpen={sidebarOpen}
+            stores={stores}
+            currentStore={currentStore}
+            files={files}
+            filesLoading={filesLoading}
+            onStoreChange={handleStoreChange}
+            onUploadFile={handleUploadFile}
+            onDeleteFile={handleDeleteFile}
+            onRefresh={refreshStores}
+            onOpenPromptManagement={() => setPromptModalOpen(true)}
+          />
+          <ChatArea
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            disabled={!currentStore}
+            loading={loading}
+            onRegenerate={handleRegenerate}
+            onEditAndResend={handleEditAndResend}
+          />
+        </div>
       </div>
       <StoreManagementModal
         isOpen={storeModalOpen}
