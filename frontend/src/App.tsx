@@ -417,7 +417,7 @@ export default function App() {
         sessionId={sessionId || undefined}
         storeName={currentStore || undefined}
         mode="general"
-        onResumeSession={(sid, msgs, lang) => {
+        onResumeSession={(sid, msgs, _lang) => {
           setSessionId(sid);
           setMessages(msgs.map((m) => ({
             role: m.role === 'assistant' ? 'model' : m.role,
