@@ -353,23 +353,20 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     tool_calls=response_tool_calls
                 )
             else:
-                # ❌ 無法判斷選項：用 AI 打哈哈 + 程式碼強制附加題目
-                nudge_instruction = (
-                    "使用者在測驗中回覆了不是選項的內容。"
-                    "【嚴格禁止】不要回答使用者的問題，不要提供任何產品資訊或知識。"
-                    "只需用一句話（20字以內）敷衍帶過，引導回測驗。"
-                    "例如：「哈哈好啦～先做完測驗再聊！」「這個等等再說～先答題吧！」"
-                )
-
+                # ❌ 無法判斷選項：AI 打哈哈引導回測驗
+                # 不傳原始 user_message，避免 AI 回答使用者的問題
                 nudge_result = await main_agent.chat_with_tool_result(
                     session_id=request.session_id,
-                    user_message=request.message,
+                    user_message="（使用者回覆了非選項內容）",
                     tool_name="quiz_nudge",
                     tool_args={},
-                    tool_result={"instruction_for_llm": nudge_instruction}
+                    tool_result={"instruction_for_llm":
+                        "使用者在測驗中回覆了不是選項的內容。"
+                        "不要回答任何問題，不要提供任何資訊。"
+                        "用一句話（20字以內）輕鬆帶過，引導回測驗。"
+                    }
                 )
 
-                # 程式碼強制附加題目（若 LLM 已自帶題目則不重複）
                 nudge_text = nudge_result["message"].strip()
                 q_text_key = q.get("text", "")
                 if q_text_key and q_text_key in nudge_text:
