@@ -463,7 +463,7 @@ export default function ConversationHistoryModal({
 
   return (
     <div className={`conversation-history-overlay ${mode === 'jti' ? 'jti-theme' : ''}`} onClick={onClose}>
-      <div className={`conversation-history-modal ${mode === 'jti' ? 'jti-theme' : ''}`} onClick={(e) => e.stopPropagation()}>
+      <div className={`conversation-history-modal app-container ${mode === 'jti' ? 'jti-theme' : ''}`} onClick={(e) => e.stopPropagation()}>
 
         {/* Header */}
         <div className="conversation-header">

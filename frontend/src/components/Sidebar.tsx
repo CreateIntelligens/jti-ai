@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import type { Store, FileItem } from '../types';
+import CustomSelect from './CustomSelect';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -68,21 +69,17 @@ export default function Sidebar({
     <aside className={isOpen ? '' : 'closed'} aria-label="側邊欄">
       <div className="sidebar-section fixed-section">
         <h2>知識庫</h2>
-        <select
+        <CustomSelect
           value={currentStore || ''}
-          onChange={e => onStoreChange(e.target.value)}
+          onChange={onStoreChange}
+          options={stores.length === 0 ? [
+            { value: "", label: "尚無知識庫" }
+          ] : stores.map(store => ({
+            value: store.name,
+            label: store.display_name || store.name
+          }))}
           className="w-full"
-          aria-label="選擇知識庫"
-        >
-          {stores.length === 0 && (
-            <option value="">尚無知識庫</option>
-          )}
-          {stores.map(store => (
-            <option key={store.name} value={store.name}>
-              {store.display_name || store.name}
-            </option>
-          ))}
-        </select>
+        />
         <button
           onClick={onRefresh}
           className="secondary w-full mt-sm"

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as api from '../services/api';
+import CustomSelect from './CustomSelect';
 
 interface UserApiKeyModalProps {
   isOpen: boolean;
@@ -61,6 +62,10 @@ export default function UserApiKeyModal({ isOpen, onClose, onApiKeySaved }: User
     onApiKeySaved();
   };
 
+  const handleSelectKey = (value: string) => {
+    handleSelect(value);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && newName.trim() && newKey.trim()) {
       handleSave();
@@ -76,7 +81,7 @@ export default function UserApiKeyModal({ isOpen, onClose, onApiKeySaved }: User
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '680px' }}>
+      <div className="modal app-container" onClick={e => e.stopPropagation()} style={{ maxWidth: '680px' }}>
         <h2>◈ API Key 設定</h2>
 
         <div className="modal-content">
@@ -94,18 +99,18 @@ export default function UserApiKeyModal({ isOpen, onClose, onApiKeySaved }: User
             }}>
               使用中的 Key
             </label>
-            <select
+            <CustomSelect
               value={activeKey}
-              onChange={e => handleSelect(e.target.value)}
-              aria-label="選擇 API Key"
-            >
-              <option value="system">◈ 系統預設</option>
-              {keys.map(k => (
-                <option key={k.name} value={k.name}>
-                  ◇ {k.name}
-                </option>
-              ))}
-            </select>
+              onChange={handleSelectKey}
+              options={[
+                { value: "system", label: "◈ 系統預設" },
+                ...keys.map(k => ({
+                  value: k.name,
+                  label: `◇ ${k.name}`
+                }))
+              ]}
+              className="w-full"
+            />
           </div>
 
           {/* 已儲存的 Key 列表 */}
@@ -199,7 +204,7 @@ export default function UserApiKeyModal({ isOpen, onClose, onApiKeySaved }: User
                 value={newKey}
                 onChange={e => setNewKey(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="API Key（ADMIN / sk-xxx）"
+                placeholder="API Key（AIza...）"
                 style={{ flex: 1 }}
               />
               <button

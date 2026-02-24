@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import * as api from '../services/api';
 import type { Store } from '../types';
+import CustomSelect from './CustomSelect';
 
 interface Prompt {
   id: string;
@@ -283,7 +284,7 @@ export default function PromptManagementModal({
 
   return (
     <div className="overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px' }}>
+      <div className="modal app-container prompt-management-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px' }}>
         <h2>⚙ 設置</h2>
 
         {/* 標籤切換 */}
@@ -594,18 +595,18 @@ export default function PromptManagementModal({
                 <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
                   選擇知識庫
                 </label>
-                <select
+                <CustomSelect
                   value={apiKeyStore}
-                  onChange={e => setApiKeyStore(e.target.value)}
+                  onChange={setApiKeyStore}
+                  options={[
+                    { value: "", label: "選擇知識庫..." },
+                    ...stores.map(store => ({
+                      value: store.name,
+                      label: store.display_name || store.name
+                    }))
+                  ]}
                   className="w-full"
-                >
-                  <option value="">選擇知識庫...</option>
-                  {stores.map(store => (
-                    <option key={store.name} value={store.name}>
-                      {store.display_name || store.name}
-                    </option>
-                  ))}
-                </select>
+                />
               </div>
               {apiKeyStore && (
                 <>
@@ -614,18 +615,18 @@ export default function PromptManagementModal({
                       <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
                         指定 Prompt（可選）
                       </label>
-                      <select
+                      <CustomSelect
                         value={apiKeyPromptIndex}
-                        onChange={e => setApiKeyPromptIndex(e.target.value)}
+                        onChange={setApiKeyPromptIndex}
+                        options={[
+                          { value: "", label: "使用預設（啟用中的 Prompt）" },
+                          ...apiKeyPrompts.map((p, idx) => ({
+                            value: String(idx),
+                            label: `${p.name}${p.is_active ? ' (目前啟用)' : ''}`
+                          }))
+                        ]}
                         className="w-full"
-                      >
-                        <option value="">使用預設（啟用中的 Prompt）</option>
-                        {apiKeyPrompts.map((p, idx) => (
-                          <option key={p.id} value={idx}>
-                            {p.name}{p.is_active ? ' (目前啟用)' : ''}
-                          </option>
-                        ))}
-                      </select>
+                      />
                     </div>
                   )}
                   <div className="flex gap-md">
