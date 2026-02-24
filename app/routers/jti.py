@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any, List, Union
 import logging
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 from app.services.jti.main_agent import main_agent
-from app.models.session import GameMode
+from app.models.session import GameMode, SessionStep
 from app.auth import verify_auth, require_admin
 from app.tools.tool_executor import tool_executor
 from app.tools.quiz import get_total_questions
@@ -19,7 +19,6 @@ from app.services.jti.quiz_helpers import (
     _get_or_rebuild_session,
     _format_options_text,
     _pause_quiz_and_respond,
-    _resume_quiz_and_respond,
     _judge_user_choice,
 )
 
@@ -436,60 +435,14 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
 
         logger.info(f"[DEBUG] 測驗判斷: has_start={has_start_intent}, has_rejection={has_rejection}, should_start={should_start_quiz}")
 
-        # 若先前暫停過測驗，允許繼續（預設繼續；除非使用者明確說要重新開始）
-        paused_quiz = bool(session.metadata.get("paused_quiz")) and bool(session.selected_questions)
-        if (
-            session.step.value == "WELCOME"
-            and paused_quiz
-            and not has_rejection
-            and (wants_resume or should_start_quiz)
-        ):
-            # 刪除 rollback 的 logs (如果有的話)
-            if request.turn_number:
-                conversation_logger.delete_turns_from(request.session_id, request.turn_number)
-                
-            return ChatResponse(**_resume_quiz_and_respond(
-                session_id=request.session_id,
-                log_user_message=request.message,
-                session=session,
-                no_progress_message="我這邊沒有找到可接續的測驗進度喔。想重新開始的話請說「開始測驗」。",
-                log_progress=True,
-            ))
+        # 暫停或繼續都視為重新開始（也納入 resume keywords 判斷）
+        if (wants_resume or should_start_quiz) and session.step.value in ("DONE", "WELCOME"):
+            # 不論之前狀態，一律重置讓下方 start_quiz 處理
+            should_start_quiz = True
 
-        # 如果已完成測驗想再測一次，婉拒
         if should_start_quiz and session.step.value == "DONE":
-            if session.language == "en":
-                response_message = "You've already completed the quiz! Please refresh the page to start a new session if you'd like to retake it."
-            else:
-                response_message = "你已經完成過測驗囉！如果想重新測驗，請重新整理頁面開始新的對話。"
-
-            # 記錄對話
-            if request.turn_number:
-                conversation_logger.delete_turns_from(request.session_id, request.turn_number)
-            
-            log_result = conversation_logger.log_conversation(
-                session_id=request.session_id,
-                user_message=request.message,
-                agent_response=response_message,
-                tool_calls=[],
-                session_state={
-                    "step": session.step.value,
-                    "answers_count": len(session.answers),
-                    "color_result_id": session.color_result_id,
-                    "current_question_id": None,
-                    "language": session.language,
-                },
-                mode="jti"
-            )
-            
-            final_turn_number = log_result[1] if log_result else None
-
-            return ChatResponse(
-                message=response_message,
-                session=session.model_dump(),
-                tool_calls=[],
-                turn_number=final_turn_number
-            )
+            session.step = SessionStep.WELCOME
+            session_manager.update_session(session)
 
         if should_start_quiz and session.step.value == "WELCOME":
             # 直接呼叫 start_quiz，不依賴 LLM
@@ -704,25 +657,9 @@ async def quiz_pause(request: QuizActionRequest, auth: dict = Depends(verify_aut
 @router.post("/quiz/resume", response_model=ChatResponse)
 async def quiz_resume(request: QuizActionRequest, auth: dict = Depends(verify_auth)):
     """
-    直接繼續先前暫停的測驗（不依賴自然語言判斷）
+    重新開始測驗（不再接續，一律從頭開始）
     """
-    try:
-        session = _get_or_rebuild_session(request.session_id)
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
-
-        return ChatResponse(**_resume_quiz_and_respond(
-            session_id=request.session_id,
-            log_user_message="[API] quiz_resume",
-            session=session,
-            no_progress_message="我這邊沒有找到可接續的測驗進度喔。想開始測驗的話請呼叫 /api/jti/quiz/start。",
-        ))
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"quiz_resume failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
+    return await quiz_start(request, auth)
 
 
 @router.get(

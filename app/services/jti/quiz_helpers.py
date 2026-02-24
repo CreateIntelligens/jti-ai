@@ -11,7 +11,6 @@ from google import genai
 
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 from app.services.jti.main_agent import main_agent
-from app.tools.quiz import get_total_questions
 
 logger = logging.getLogger(__name__)
 
@@ -57,12 +56,15 @@ async def _pause_quiz_and_respond(
     """暫停測驗並回應（returns dict, caller wraps in ChatResponse）"""
     updated_session = session_manager.pause_quiz(session_id)
 
-    # 暫停後，將使用者訊息交給 AI 回應
-    ai_result = await main_agent.chat(
-        session_id=session_id,
-        user_message=log_user_message,
-    )
-    response_message = ai_result.get("message", "收到！")
+    # 用固定文案，不走 AI（避免 AI 從 chat history 撈出測驗中被忽略的問題來回答）
+    lang = updated_session.language if updated_session else (session.language if session else "zh")
+    if lang == "en":
+        response_message = "Sure! The quiz is paused. You can start a new quiz anytime by saying 'start quiz'."
+    else:
+        response_message = "好的，測驗先暫停囉。想重新測驗的話跟我說「開始測驗」就好，或是你也可以問我其他問題。"
+
+    # 同步到 chat history（讓 AI 恢復時知道測驗已暫停）
+    main_agent._sync_history_to_db(session_id, log_user_message, response_message)
 
     if turn_number_hint:
         conversation_logger.delete_turns_from(session_id, turn_number_hint)
@@ -91,68 +93,6 @@ async def _pause_quiz_and_respond(
         "turn_number": final_turn_number,
     }
 
-
-def _resume_quiz_and_respond(
-    session_id: str,
-    log_user_message: str,
-    session: Any,
-    *,
-    no_progress_message: str,
-    log_progress: bool = False,
-    turn_number_hint: Optional[int] = None
-) -> dict:
-    """繼續測驗並回應（returns dict, caller wraps in ChatResponse）"""
-    updated_session = session_manager.resume_quiz(session_id)
-    resumed_q = updated_session.current_question if updated_session else None
-
-    if turn_number_hint:
-        conversation_logger.delete_turns_from(session_id, turn_number_hint)
-
-    if not resumed_q:
-        return {
-            "message": no_progress_message,
-            "session": (updated_session.model_dump() if updated_session else session.model_dump()),
-            "tool_calls": [],
-        }
-
-    current_q_num = (updated_session.current_q_index + 1) if updated_session else (len(session.answers) + 1)
-
-    options_text = _format_options_text(resumed_q.get("options", []) if hasattr(resumed_q, 'get') else [])
-
-    question_text = resumed_q.get('text', '') if isinstance(resumed_q, dict) else ''
-
-    if updated_session and updated_session.language == "en":
-        response_message = f"Sure! Let's continue with Question {current_q_num}.\n\nQuestion {current_q_num}: {question_text}\n{options_text}"
-    else:
-        response_message = f"好呀，我們接著做第{current_q_num}題。\n\n第{current_q_num}題：{question_text}\n{options_text}"
-
-    log_result = conversation_logger.log_conversation(
-        session_id=session_id,
-        user_message=log_user_message,
-        agent_response=response_message,
-        tool_calls=[],
-        session_state={
-            "step": updated_session.step.value if updated_session else session.step.value,
-            "answers_count": len(updated_session.answers) if updated_session else len(session.answers),
-            "color_result_id": updated_session.color_result_id if updated_session else session.color_result_id,
-            "current_question_id": resumed_q.get("id") if isinstance(resumed_q, dict) else None,
-            "language": updated_session.language if updated_session else session.language,
-        },
-        mode="jti",
-    )
-
-    final_turn_number = log_result[1] if log_result else None
-
-    if log_progress:
-        total_questions = get_total_questions(updated_session.quiz_id) if updated_session else 5
-        logger.info(f"✅ QUIZ 繼續測驗: 第 {current_q_num}/{total_questions} 題")
-
-    return {
-        "message": response_message,
-        "session": updated_session.model_dump() if updated_session else session.model_dump(),
-        "tool_calls": [],
-        "turn_number": final_turn_number,
-    }
 
 
 async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]:

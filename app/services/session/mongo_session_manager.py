@@ -197,10 +197,7 @@ class MongoSessionManager(SessionStateMixin):
                 )
                 step = "WELCOME"
 
-            # === 判斷 metadata ===
             metadata = {}
-            if step == "WELCOME" and len(answers) > 0:
-                metadata["paused_quiz"] = True
 
             # === 建立 Session 物件 ===
             session = Session(

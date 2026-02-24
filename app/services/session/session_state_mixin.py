@@ -38,33 +38,23 @@ class SessionStateMixin:
         session.color_scores = {}
         session.color_result_id = None
         session.color_result = None
-        session.metadata["paused_quiz"] = False
 
         return self.update_session(session)
 
     def pause_quiz(self, session_id: str) -> Optional[Session]:
+        """中斷測驗，完全重置進度"""
         session = self.get_session(session_id)
         if not session:
             return None
 
         session.step = SessionStep.WELCOME
         session.current_question = None
-        session.metadata["paused_quiz"] = True
-
-        return self.update_session(session)
-
-    def resume_quiz(self, session_id: str) -> Optional[Session]:
-        session = self.get_session(session_id)
-        if not session:
-            return None
-
-        if not session.selected_questions:
-            return session
-
-        session.step = SessionStep.QUIZ
-        session.metadata["paused_quiz"] = False
-        if 0 <= session.current_q_index < len(session.selected_questions):
-            session.current_question = session.selected_questions[session.current_q_index]
+        session.current_q_index = 0
+        session.answers = {}
+        session.selected_questions = None
+        session.color_scores = {}
+        session.color_result_id = None
+        session.color_result = None
 
         return self.update_session(session)
 
