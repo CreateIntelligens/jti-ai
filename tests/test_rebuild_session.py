@@ -214,7 +214,7 @@ class TestRebuildSessionFromLogs(unittest.TestCase):
         self.assertIsNotNone(session)
         self.assertEqual(session.step, SessionStep.WELCOME)
         self.assertEqual(len(session.answers), 1)
-        self.assertTrue(session.metadata.get("paused_quiz"))
+        # paused_quiz metadata was removed along with resume logic
 
     def test_degrade_missing_questions(self):
         """When step=QUIZ but no selected_questions, degrade to WELCOME"""

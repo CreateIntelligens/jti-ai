@@ -36,7 +36,7 @@ class MainAgent:
     """主要對話 Agent"""
 
     def __init__(self):
-        self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+        self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
         # 持久 chat session：session_id → Gemini ChatSession
         self._chat_sessions: Dict[str, any] = {}
 
