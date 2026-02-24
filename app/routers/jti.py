@@ -353,23 +353,20 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     tool_calls=response_tool_calls
                 )
             else:
-                # ❌ 無法判斷選項：用 AI 打哈哈 + 程式碼強制附加題目
-                nudge_instruction = (
-                    "使用者在測驗中回覆了不是選項的內容。"
-                    "【嚴格禁止】不要回答使用者的問題，不要提供任何產品資訊或知識。"
-                    "只需用一句話（20字以內）敷衍帶過，引導回測驗。"
-                    "例如：「哈哈好啦～先做完測驗再聊！」「這個等等再說～先答題吧！」"
-                )
-
+                # ❌ 無法判斷選項：AI 打哈哈引導回測驗
+                # 不傳原始 user_message，避免 AI 回答使用者的問題
                 nudge_result = await main_agent.chat_with_tool_result(
                     session_id=request.session_id,
-                    user_message=request.message,
+                    user_message="（使用者回覆了非選項內容）",
                     tool_name="quiz_nudge",
                     tool_args={},
-                    tool_result={"instruction_for_llm": nudge_instruction}
+                    tool_result={"instruction_for_llm":
+                        "使用者在測驗中回覆了不是選項的內容。"
+                        "不要回答任何問題，不要提供任何資訊。"
+                        "用一句話（20字以內）輕鬆帶過，引導回測驗。"
+                    }
                 )
 
-                # 程式碼強制附加題目（若 LLM 已自帶題目則不重複）
                 nudge_text = nudge_result["message"].strip()
                 q_text_key = q.get("text", "")
                 if q_text_key and q_text_key in nudge_text:
@@ -419,7 +416,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
 
         # 先用關鍵字判斷是否要開始測驗（不依賴 LLM 呼叫工具）
         # 移除單獨的「色彩」「顏色」避免誤判產品諮詢（如「有什麼顏色」）
-        start_keywords = ['測驗', '心理測驗', '色彩測驗', '配色測驗', '開始', '玩', '試試', '來吧', '好啊', '開始吧', 'quiz', 'start']
+        start_keywords = ['測驗', '心理測驗', '色彩測驗', '配色測驗', '開始測驗', '玩測驗', '試試測驗', 'quiz', 'start quiz']
         negative_keywords = ['不想', '不要', '不用', '不玩', '跳過', '算了', '不了', "don't", "dont", "no ", "not ", "skip", "pass", "never"]
         resume_keywords = ['繼續測驗', '繼續', '接著', '接續', '回到測驗', 'continue', 'resume']
         msg_lower = request.message.lower()

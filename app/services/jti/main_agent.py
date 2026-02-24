@@ -2,8 +2,9 @@
 Main Agent - 核心對話邏輯
 
 架構：
-- 每次對話先用 flash-lite 跑 File Search 查知識庫（不帶 system_instruction）
-- 把使用者問題 + 知識庫結果送給主 agent（flash-lite）生成回應
+- 併發跑 Intent Check + File Search（都用 flash-lite）
+- Intent=NO（無關話題）→ 跳過知識庫結果，直接讓主 agent 回應（自然婉拒）
+- Intent=YES → 帶知識庫結果給主 agent 回應
 """
 
 import asyncio
@@ -85,7 +86,7 @@ class MainAgent:
     def _sync_history_to_db_background(self, session_id: str, user_message: str, assistant_message: str):
         """背景非同步寫入 DB，不阻塞回應"""
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             loop.run_in_executor(None, self._sync_history_to_db, session_id, user_message, assistant_message)
         except Exception:
             self._sync_history_to_db(session_id, user_message, assistant_message)
@@ -148,38 +149,27 @@ class MainAgent:
                 logger.error(f"[File Search] 失敗: {e}")
                 return None
 
-    def _build_function_tools(self, language: str = "zh") -> List[types.Tool]:
-        """建立只有 Function Declarations 的 tools（測驗判斷用）"""
-        tool_descriptions = {
-            "zh": {
-                "start_quiz": "開始色彩測驗。⚠️ 重要：僅在使用者明確表達「想要」開始的意願時呼叫（例如：「我想做測驗」「開始吧」）。如果使用者表達否定或拒絕（例如：「不想」「不要」「跳過」），絕對禁止呼叫此工具。",
-                "session_id": "Session ID"
-            },
-            "en": {
-                "start_quiz": "Start the color quiz. ⚠️ IMPORTANT: Only call when user explicitly expresses WILLINGNESS to start (e.g., 'I want to take the quiz', 'let's begin'). If user expresses negation or refusal (e.g., 'don't want', 'no', 'skip'), absolutely DO NOT call this tool.",
-                "session_id": "Session ID"
-            }
-        }
-        desc = tool_descriptions.get(language, tool_descriptions["zh"])
+    def _check_intent_fast(self, query: str) -> str:
+        """快速判斷是否為不相關話題 (File Search 前置過濾)"""
+        try:
+            prompt = f"""判斷以下使用者語句是否與「JTI傑太日煙、Ploom X加熱菸、菸彈、配件、生活色彩測驗」相關。
+如果使用者在詢問完全無關的知識（例如：天氣、美食清單、旅遊景點、寫程式設計問題、政治等），請回覆 NO。
+如果是打招呼、表達感謝、日常簡短對話，或是與上述相關的主題，請回覆 YES。
 
-        return [
-            types.Tool(function_declarations=[
-                types.FunctionDeclaration(
-                    name="start_quiz",
-                    description=desc["start_quiz"],
-                    parameters={
-                        "type": "object",
-                        "properties": {
-                            "session_id": {
-                                "type": "string",
-                                "description": desc["session_id"]
-                            }
-                        },
-                        "required": ["session_id"]
-                    }
-                ),
-            ])
-        ]
+使用者訊息：「{query}」
+
+只能回覆 YES 或 NO："""
+            response = gemini_client.models.generate_content(
+                model=FILE_SEARCH_MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=0)),
+            )
+            res = response.text.strip().upper() if response.text else "YES"
+            logger.info(f"[Intent Check] 結果: {res} | 訊息: '{query[:30]}...'")
+            return "NO" if "NO" in res else "YES"
+        except Exception as e:
+            logger.error(f"[Intent Check] failed: {e}")
+            return "YES"
 
     async def chat(
         self,
@@ -190,8 +180,9 @@ class MainAgent:
         處理對話
 
         流程：
-        1. 用 flash-lite 跑 File Search 查知識庫
-        2. 把知識庫結果 + user message 送給主 agent 生成回應
+        1. 併發跑 Intent Check + File Search
+        2. Intent=NO → 跳過知識庫，直接讓主 agent 自然婉拒
+        3. Intent=YES → 帶知識庫結果給主 agent 回應
         """
         try:
             if not gemini_client:
@@ -207,11 +198,29 @@ class MainAgent:
                     "message": "找不到對話記錄，請重新開始。"
                 }
 
-            # 1. File Search
+            # 1. 併發執行 Intent Check 和 File Search
+            loop = asyncio.get_running_loop()
             t0 = time.time()
-            kb_result = self._file_search(user_message, session.language)
-            t1 = time.time()
-            logger.info(f"[計時] File Search: {(t1-t0)*1000:.0f}ms")
+
+            intent_task = asyncio.ensure_future(
+                loop.run_in_executor(None, self._check_intent_fast, user_message))
+            search_task = asyncio.ensure_future(
+                loop.run_in_executor(None, self._file_search, user_message, session.language))
+
+            # 等第一個完成；若 intent 先回 NO 就不等 File Search
+            done, _ = await asyncio.wait(
+                [intent_task, search_task],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+
+            if intent_task in done and intent_task.result() == "NO":
+                kb_result = None
+                logger.info(f"[計時] Intent=NO 快速攔截: {(time.time()-t0)*1000:.0f}ms")
+            else:
+                await asyncio.gather(intent_task, search_task)
+                intent = intent_task.result()
+                kb_result = search_task.result() if intent == "YES" else None
+                logger.info(f"[計時] Intent={intent}, File Search: {(time.time()-t0)*1000:.0f}ms")
 
             # 2. 組合訊息送給主 agent
             if kb_result:
