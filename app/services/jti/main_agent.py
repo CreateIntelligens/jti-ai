@@ -1,21 +1,16 @@
 """
 Main Agent - 核心對話邏輯
 
-職責：
-1. 處理一般對話
-2. 判斷使用者意圖
-3. 在適當時機呼叫色彩測驗工具
-4. 商品問答（可用 RAG）
-
-Agent 擁有的 Tools：
-- start_quiz: 開始色彩測驗
-- get_question: 取得當前題目
-- submit_answer: 提交答案
-- calculate_color_result: 計算色系結果
+架構：
+- 每次對話先用 flash-lite 跑 File Search 查知識庫（不帶 system_instruction）
+- 把使用者問題 + 知識庫結果送給主 agent（flash-lite）生成回應
 """
 
+import asyncio
 import os
 import logging
+import re
+import time
 from typing import Dict, List
 import google.genai as genai
 from google.genai import types
@@ -25,7 +20,7 @@ from app.services.gemini_service import client as gemini_client
 from app.tools.tool_executor import tool_executor, ToolExecutor
 from app.services.jti.agent_prompts import (
     SYSTEM_INSTRUCTIONS,
-    SESSION_STATE_TEMPLATES
+    SESSION_STATE_TEMPLATES,
 )
 
 # 使用工廠函數取得適當的實作（MongoDB 或記憶體）
@@ -33,8 +28,9 @@ session_manager = get_session_manager()
 
 logger = logging.getLogger(__name__)
 
+# File Search 用 flash-lite（不帶 system_instruction 即可正常 grounding）
+FILE_SEARCH_MODEL = "gemini-2.5-flash-lite"
 
-import re
 
 class MainAgent:
     """主要對話 Agent"""
@@ -42,10 +38,10 @@ class MainAgent:
     def __init__(self):
         self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
         # 持久 chat session：session_id → Gemini ChatSession
-        self._chat_sessions: Dict[str, Any] = {}
+        self._chat_sessions: Dict[str, any] = {}
 
     def _get_or_create_chat_session(self, session: Session):
-        """取得或建立持久 Gemini chat session（如有 MongoDB 歷史會自動恢復）"""
+        """取得或建立持久 Gemini chat session（不帶任何 tool）"""
         sid = session.session_id
         if sid in self._chat_sessions:
             return self._chat_sessions[sid]
@@ -64,9 +60,7 @@ class MainAgent:
             logger.info(f"從歷史恢復 chat session: {len(history)} 筆 (session={sid[:8]}...)")
 
         system_instruction = self._get_system_instruction(session)
-        file_search_tools = self._build_file_search_tools(language=session.language)
         config = types.GenerateContentConfig(
-            tools=file_search_tools,
             system_instruction=[types.Part.from_text(text=system_instruction)],
             thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
@@ -80,13 +74,21 @@ class MainAgent:
         return chat_session
 
     def _sync_history_to_db(self, session_id: str, user_message: str, assistant_message: str):
-        """將真正的 user/model 訊息同步到 MongoDB（不截斷）"""
+        """將 user/model 訊息同步到 MongoDB（不截斷）"""
         session = session_manager.get_session(session_id)
         if not session:
             return
         session.chat_history.append({"role": "user", "content": user_message})
         session.chat_history.append({"role": "assistant", "content": assistant_message})
         session_manager.update_session(session)
+
+    def _sync_history_to_db_background(self, session_id: str, user_message: str, assistant_message: str):
+        """背景非同步寫入 DB，不阻塞回應"""
+        try:
+            loop = asyncio.get_event_loop()
+            loop.run_in_executor(None, self._sync_history_to_db, session_id, user_message, assistant_message)
+        except Exception:
+            self._sync_history_to_db(session_id, user_message, assistant_message)
 
     def remove_session(self, session_id: str):
         """清除記憶體中的 chat session"""
@@ -108,25 +110,43 @@ class MainAgent:
             color_result=session.color_result_id or ('Not calculated yet' if session.language == 'en' else '尚未計算')
         )
 
-    def _build_file_search_tools(self, language: str = "zh") -> List[types.Tool]:
-        """建立只有 File Search 的 tools（一般問答用）"""
+    def _file_search(self, query: str, language: str) -> str | None:
+        """用 flash 跑 File Search 查知識庫"""
         store_env_key = f"GEMINI_FILE_SEARCH_STORE_ID_{language.upper()}"
-        file_search_store_id = os.getenv(store_env_key)
-        if not file_search_store_id:
-            file_search_store_id = os.getenv("GEMINI_FILE_SEARCH_STORE_ID")
+        store_id = os.getenv(store_env_key) or os.getenv("GEMINI_FILE_SEARCH_STORE_ID")
+        if not store_id:
+            logger.warning("未設定知識庫，跳過 File Search")
+            return None
 
-        if file_search_store_id:
-            logger.info(f"使用知識庫: {store_env_key}={file_search_store_id}")
-            return [
-                types.Tool(
-                    file_search=types.FileSearch(
-                        file_search_store_names=[f"fileSearchStores/{file_search_store_id}"]
-                    )
+        store_name = f"fileSearchStores/{store_id}"
+        logger.info(f"[File Search] 查詢: {query[:100]}...")
+
+        for attempt in range(3):
+            try:
+                response = gemini_client.models.generate_content(
+                    model=FILE_SEARCH_MODEL,
+                    contents=query,
+                    config=types.GenerateContentConfig(
+                        tools=[
+                            types.Tool(
+                                file_search=types.FileSearch(
+                                    file_search_store_names=[store_name]
+                                )
+                            )
+                        ],
+                        thinking_config=types.ThinkingConfig(thinking_budget=0),
+                    ),
                 )
-            ]
-        else:
-            logger.warning(f"未設定知識庫: {store_env_key}")
-            return []
+                result = response.text.strip() if response.text else None
+                logger.info(f"[File Search] 結果: {len(result) if result else 0} 字")
+                return result
+            except Exception as e:
+                if "503" in str(e) and attempt < 2:
+                    logger.warning(f"[File Search] 503，{attempt+1}/3 次重試...")
+                    time.sleep(1)
+                    continue
+                logger.error(f"[File Search] 失敗: {e}")
+                return None
 
     def _build_function_tools(self, language: str = "zh") -> List[types.Tool]:
         """建立只有 Function Declarations 的 tools（測驗判斷用）"""
@@ -166,7 +186,13 @@ class MainAgent:
         session_id: str,
         user_message: str,
     ) -> Dict:
-        """處理對話（使用持久 Chat Session + File Search）"""
+        """
+        處理對話
+
+        流程：
+        1. 用 flash-lite 跑 File Search 查知識庫
+        2. 把知識庫結果 + user message 送給主 agent 生成回應
+        """
         try:
             if not gemini_client:
                 return {
@@ -174,7 +200,6 @@ class MainAgent:
                     "message": "系統未正確初始化，請檢查 API Key 設定。"
                 }
 
-            # 1. 取得 session
             session = session_manager.get_session(session_id)
             if session is None:
                 return {
@@ -182,21 +207,29 @@ class MainAgent:
                     "message": "找不到對話記錄，請重新開始。"
                 }
 
-            # 2. 取得或建立持久 chat session
+            # 1. File Search
+            t0 = time.time()
+            kb_result = self._file_search(user_message, session.language)
+            t1 = time.time()
+            logger.info(f"[計時] File Search: {(t1-t0)*1000:.0f}ms")
+
+            # 2. 組合訊息送給主 agent
+            if kb_result:
+                enriched_message = f"<知識庫查詢結果>\n{kb_result}\n</知識庫查詢結果>\n\n使用者問題：{user_message}"
+            else:
+                enriched_message = user_message
+
             chat_session = self._get_or_create_chat_session(session)
 
-            # 3. 發送訊息（SDK 自動維護歷史）
             logger.info(f"使用者訊息: {user_message[:200]}...")
-            response = chat_session.send_message(user_message)
-
-            # DEBUG: 檢查 File Search grounding
-            if response.candidates:
-                gm = getattr(response.candidates[0], 'grounding_metadata', None)
-                print(f"[DEBUG FILE_SEARCH] grounding_metadata: {gm is not None}")
+            t2 = time.time()
+            response = chat_session.send_message(enriched_message)
+            t3 = time.time()
+            logger.info(f"[計時] 主 Agent: {(t3-t2)*1000:.0f}ms | 總計: {(t3-t0)*1000:.0f}ms")
 
             tool_calls_log = []
 
-            # 4. 取得最終回應
+            # 3. 取得回應
             final_message = ""
             if response.candidates and response.candidates[0].content.parts:
                 for part in response.candidates[0].content.parts:
@@ -207,14 +240,11 @@ class MainAgent:
                 final_message = "AI目前故障 請聯絡"
                 logger.warning(f"LLM 未生成任何文本回應，使用者輸入：{user_message[:50]}")
 
-            # 清除 Gemini File Search 的 citation 標記（例如 [cite: 1, xxx.csv]）
             final_message = re.sub(r'\s*\[cite:\s*[^\]]*\]', '', final_message).strip()
 
-            # 5. 同步到 MongoDB（供重啟恢復用）
-            self._sync_history_to_db(session_id, user_message, final_message)
+            # 4. 同步 DB（背景）
+            self._sync_history_to_db_background(session_id, user_message, final_message)
             updated_session = session_manager.get_session(session_id)
-
-            # 6. 對話日誌由 router 層統一記錄，這裡不重複記
 
             return {
                 "message": final_message,
@@ -239,17 +269,13 @@ class MainAgent:
     ) -> dict:
         """
         當後端已執行工具時，讓 LLM 根據工具結果生成回應
-
-        使用持久 chat session，但只把真正的 user/model 訊息記進歷史，
-        session_state 和 instruction 透過一次性 generate_content 處理，
-        再手動將乾淨的 user message 和 model response 追加到 chat session 歷史。
         """
         try:
             session = session_manager.get_session(session_id)
             if not session:
                 return {"error": "Session not found", "message": "找不到 session"}
 
-            # start_quiz 開場白：用固定文案避免 LLM 產生不一致文字
+            # start_quiz 開場白：用固定文案
             if tool_name == "start_quiz" and tool_result.get("current_question"):
                 q = tool_result["current_question"]
                 options = q.get("options", [])
@@ -268,13 +294,12 @@ class MainAgent:
                         "如果中途想離開，請輸入中斷，即可繼續問答，那我們開始測驗吧！"
                     )
                     question_prefix = "第1題："
-                
+
                 message = f"{opening}\n\n{question_prefix} {q.get('text', '')}\n{options_text}"
 
-                # 把乾淨的 user/model 追加到持久 chat session 歷史
                 chat_session = self._get_or_create_chat_session(session)
                 self._append_to_chat_history(chat_session, user_message, message)
-                self._sync_history_to_db(session_id, user_message, message)
+                self._sync_history_to_db_background(session_id, user_message, message)
 
                 return {
                     "message": message,
@@ -285,7 +310,6 @@ class MainAgent:
             if "instruction_for_llm" in tool_result:
                 instruction = tool_result["instruction_for_llm"]
             elif tool_name == "start_quiz" and tool_result.get("current_question"):
-                # 開始測驗，顯示第一題
                 q = tool_result["current_question"]
                 options = q.get("options", [])
                 options_text = self._format_options_text(options)
@@ -309,11 +333,9 @@ class MainAgent:
             else:
                 instruction = "請簡短回應使用者"
 
-            # 取得持久 chat session 的歷史作為上下文
             chat_session = self._get_or_create_chat_session(session)
             history = list(chat_session._curated_history) if hasattr(chat_session, '_curated_history') else []
 
-            # 歷史 + 乾淨的 user message
             conversation_parts = list(history)
             conversation_parts.append(
                 types.Content(
@@ -322,7 +344,6 @@ class MainAgent:
                 )
             )
 
-            # 把 session state + instruction 併入 system_instruction
             system_instruction = self._get_system_instruction(session)
             session_state = self._get_session_state(session)
             config = types.GenerateContentConfig(
@@ -336,7 +357,6 @@ class MainAgent:
                 config=config
             )
 
-            # 提取回應
             final_message = ""
             if response.candidates and response.candidates[0].content.parts:
                 for part in response.candidates[0].content.parts:
@@ -346,9 +366,8 @@ class MainAgent:
             if not final_message:
                 final_message = "收到！"
 
-            # 把乾淨的 user/model 訊息追加到持久 chat session 歷史
             self._append_to_chat_history(chat_session, user_message, final_message)
-            self._sync_history_to_db(session_id, user_message, final_message)
+            self._sync_history_to_db_background(session_id, user_message, final_message)
 
             return {
                 "message": final_message,

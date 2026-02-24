@@ -13,6 +13,8 @@ services:
       - ./logs:/app/logs
     expose:
       - "${PORT:-8008}"
+    ports:
+      - "${PORT:-8008}:${PORT:-8008}"
     environment:
       - PYTHONDONTWRITEBYTECODE=1
       - BACKEND_PORT=${PORT:-8008}
