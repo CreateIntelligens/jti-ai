@@ -416,7 +416,11 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
 
         # 先用關鍵字判斷是否要開始測驗（不依賴 LLM 呼叫工具）
         # 移除單獨的「色彩」「顏色」避免誤判產品諮詢（如「有什麼顏色」）
-        start_keywords = ['測驗', '心理測驗', '色彩測驗', '配色測驗', '開始測驗', '玩測驗', '試試測驗', 'quiz', 'start quiz']
+        start_keywords = [
+            '測驗', '心理測驗', '色彩測驗', '配色測驗', '開始測驗', '玩測驗', '試試測驗',
+            '再測', '重測', '重新測', '再來一次', '再測一次', '重新開始',
+            'quiz', 'start quiz', 'again', 'retry', 'redo',
+        ]
         negative_keywords = ['不想', '不要', '不用', '不玩', '跳過', '算了', '不了', "don't", "dont", "no ", "not ", "skip", "pass", "never"]
         resume_keywords = ['繼續測驗', '繼續', '接著', '接續', '回到測驗', 'continue', 'resume']
         msg_lower = request.message.lower()
