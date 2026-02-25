@@ -82,64 +82,107 @@
 
 
 /* Form controls */
-[data-theme="light"] .app-container input,
+[data-theme="light"] .app-container input:not([type="checkbox"]),
 [data-theme="light"] .app-container select,
-[data-theme="light"] .app-container textarea,
-[data-theme="light"] .conversation-history-modal input:not([type="checkbox"]) {
+[data-theme="light"] .app-container textarea {
   background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(15, 118, 110, 0.15);
   color: var(--text-primary);
 }
 
 [data-theme="light"] .app-container input::placeholder,
-[data-theme="light"] .app-container textarea::placeholder,
-[data-theme="light"] .conversation-history-modal input:not([type="checkbox"])::placeholder {
+[data-theme="light"] .app-container textarea::placeholder {
   color: var(--text-muted);
 }
 
-[data-theme="light"] .app-container input:focus,
+[data-theme="light"] .app-container input:not([type="checkbox"]):focus,
 [data-theme="light"] .app-container select:focus,
-[data-theme="light"] .app-container textarea:focus,
-[data-theme="light"] .conversation-history-modal input:not([type="checkbox"]):focus {
+[data-theme="light"] .app-container textarea:focus {
   background: #fff;
   border-color: var(--crystal-teal);
   box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.1);
 }
 
-/* Buttons */
-[data-theme="light"] .app-container button,
-[data-theme="light"] .conversation-history-modal button:not([class]) {
+/* Custom Select */
+[data-theme="light"] .custom-select-trigger {
+  background: rgba(255, 255, 255, 0.9);
+  border: 1px solid rgba(15, 118, 110, 0.15);
+  color: var(--text-muted);
+}
+
+[data-theme="light"] .custom-select-trigger.has-value {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .custom-select-trigger.open {
+  background: #fff;
+  border-color: var(--crystal-teal);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.1);
+}
+
+[data-theme="light"] .custom-select-trigger svg {
+  stroke: var(--crystal-teal);
+}
+
+[data-theme="light"] .custom-select-dropdown {
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(15, 118, 110, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme="light"] .custom-select-option {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .custom-select-option:hover {
+  background: rgba(15, 118, 110, 0.05);
+}
+
+[data-theme="light"] .custom-select-option.selected {
+  color: var(--crystal-teal);
+  background: rgba(15, 118, 110, 0.08);
+}
+
+/* Buttons — same scope as App.css base */
+[data-theme="light"] .app-content button,
+[data-theme="light"] .modal button,
+[data-theme="light"] .overlay button {
   background: var(--primary-color);
   color: #fff;
   box-shadow: 0 2px 8px rgba(15, 118, 110, 0.2);
 }
 
-[data-theme="light"] .app-container button:hover,
-[data-theme="light"] .conversation-history-modal button:not([class]):hover {
+[data-theme="light"] .app-content button:hover,
+[data-theme="light"] .modal button:hover,
+[data-theme="light"] .overlay button:hover {
   box-shadow: 0 4px 16px rgba(15, 118, 110, 0.25);
 }
 
-[data-theme="light"] .app-container button.secondary,
-[data-theme="light"] .conversation-history-modal button.secondary {
+[data-theme="light"] .app-content button.secondary,
+[data-theme="light"] .modal button.secondary,
+[data-theme="light"] .overlay button.secondary {
   background: rgba(255, 255, 255, 0.9);
   color: var(--crystal-teal);
   border: 1px solid rgba(15, 118, 110, 0.2);
   box-shadow: none;
 }
 
-[data-theme="light"] .app-container button.secondary:hover,
-[data-theme="light"] .conversation-history-modal button.secondary:hover {
+[data-theme="light"] .app-content button.secondary:hover,
+[data-theme="light"] .modal button.secondary:hover,
+[data-theme="light"] .overlay button.secondary:hover {
   background: #fff;
   border-color: var(--crystal-teal);
 }
 
-[data-theme="light"] .app-container button.danger,
-[data-theme="light"] .conversation-history-modal button.danger {
+[data-theme="light"] .app-content button.danger,
+[data-theme="light"] .modal button.danger,
+[data-theme="light"] .overlay button.danger {
   background: linear-gradient(135deg, var(--crystal-rose), #e11d48);
 }
 
-[data-theme="light"] .app-container button:disabled,
-[data-theme="light"] .conversation-history-modal button:not([class]):disabled {
+[data-theme="light"] .app-content button:disabled,
+[data-theme="light"] .modal button:disabled,
+[data-theme="light"] .overlay button:disabled {
   background: rgba(168, 162, 158, 0.3);
   color: rgba(120, 113, 108, 0.6);
 }
