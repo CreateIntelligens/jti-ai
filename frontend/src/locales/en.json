@@ -11,7 +11,7 @@
   "quick_action_quiz": "Start Color Quiz",
   "quick_action_htp": "What is Heated Tobacco?",
   "quick_action_greeting": "Say Hello",
-  "input_placeholder": "Type a message... (Ctrl+Enter to send, try \"I want to take the color quiz\")",
+  "input_placeholder": "Type a message... (Enter to send, Shift+Enter for new line)",
   "button_send": "Send",
   "button_restart": "Restart",
   "restart_confirm": "Are you sure you want to restart the conversation? All records will be cleared.",

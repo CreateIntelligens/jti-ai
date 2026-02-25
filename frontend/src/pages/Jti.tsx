@@ -371,7 +371,7 @@ export default function Jti() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+    if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       const msg = userInput.trim();
       if (msg && !loading) sendMessage(msg);
