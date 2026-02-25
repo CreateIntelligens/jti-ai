@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { History, RotateCcw, Sun, Moon } from 'lucide-react';
+import { History, RotateCcw, Sun, Moon, Settings } from 'lucide-react';
 import ConversationHistoryModal from '../components/ConversationHistoryModal';
+import JtiSettingsModal from '../components/JtiSettingsModal';
 import { fetchWithApiKey } from '../services/api';
 import '../styles/Jti.css';
 import '../styles/JtiLight.css';
@@ -34,6 +35,7 @@ export default function Jti() {
   const [isTyping, setIsTyping] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('theme');
     return (saved === 'light' || saved === 'dark') ? saved : 'dark';
@@ -92,6 +94,27 @@ export default function Jti() {
       setStatusText(t('status_failed'));
     }
   }, [currentLanguage, sessionId, messages.length, t]);
+
+  // 靜默重啟（切換 prompt 後使用，不需確認）
+  const silentRestart = useCallback(async () => {
+    try {
+      setLoading(false);
+      setIsTyping(false);
+      const res = await fetchWithApiKey('/api/jti/chat/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: currentLanguage, previous_session_id: sessionId }),
+      });
+      const data = await res.json();
+      setSessionId(data.session_id);
+      setMessages([]);
+      setStatusText(t('status_connected'));
+      setSessionInfo(`#${data.session_id.substring(0, 8)}`);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    } catch {
+      setStatusText(t('status_failed'));
+    }
+  }, [currentLanguage, sessionId, t]);
 
   // 切換語言
   const toggleLanguage = useCallback(async () => {
@@ -402,6 +425,14 @@ export default function Jti() {
           <div className="status-section">
             <button
               className="icon-btn"
+              onClick={() => setShowSettingsModal(true)}
+              title={t('settings') || '設定'}
+              aria-label="Settings"
+            >
+              <Settings size={18} />
+            </button>
+            <button
+              className="icon-btn"
               onClick={restartConversation}
               title={t('button_restart')}
               aria-label="Restart Conversation"
@@ -620,6 +651,13 @@ export default function Jti() {
           </form>
         </div>
       </main>
+
+      {/* 設定 Modal */}
+      <JtiSettingsModal
+        isOpen={showSettingsModal}
+        onClose={() => setShowSettingsModal(false)}
+        onPromptChange={silentRestart}
+      />
 
       {/* 對話歷史 Modal */}
       <ConversationHistoryModal

@@ -181,6 +181,148 @@
   background: transparent;
 }
 
+/* ==================== JTI SETTINGS MODAL (LIGHT) ==================== */
+
+[data-theme="light"] .jti-settings-overlay {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="light"] .jti-settings-modal {
+  background: #faf8f3;
+  border-color: rgba(180, 150, 60, 0.2);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15), 0 0 60px rgba(180, 150, 60, 0.05);
+}
+
+[data-theme="light"] .jti-settings-header {
+  border-bottom-color: rgba(180, 150, 60, 0.12);
+}
+
+[data-theme="light"] .jti-settings-title {
+  color: #8b6914;
+}
+
+[data-theme="light"] .jti-settings-close {
+  border-color: rgba(180, 150, 60, 0.2);
+  color: #8b7a65;
+}
+
+[data-theme="light"] .jti-settings-close:hover {
+  background: rgba(180, 150, 60, 0.08);
+  color: #8b6914;
+  border-color: #8b6914;
+}
+
+[data-theme="light"] .jti-settings-tabs {
+  border-bottom-color: rgba(180, 150, 60, 0.1);
+}
+
+[data-theme="light"] .jti-settings-tab {
+  color: #8b7a65;
+}
+
+[data-theme="light"] .jti-settings-tab.active {
+  color: #8b6914;
+  border-bottom-color: #8b6914;
+}
+
+[data-theme="light"] .jti-settings-tab:hover:not(.disabled) {
+  color: #8b6914;
+}
+
+[data-theme="light"] .jti-settings-loading {
+  color: #8b6914;
+}
+
+[data-theme="light"] .jti-prompt-card {
+  background: #fff;
+  border-color: rgba(180, 150, 60, 0.12);
+}
+
+[data-theme="light"] .jti-prompt-card.active {
+  border-color: #8b6914;
+  background: rgba(180, 150, 60, 0.04);
+}
+
+[data-theme="light"] .jti-prompt-card:hover {
+  border-color: rgba(180, 150, 60, 0.3);
+}
+
+[data-theme="light"] .jti-prompt-name {
+  color: #2c2417;
+}
+
+[data-theme="light"] .jti-prompt-badge {
+  background: rgba(180, 150, 60, 0.08);
+  border-color: rgba(180, 150, 60, 0.25);
+  color: #8b6914;
+}
+
+[data-theme="light"] .jti-prompt-active-badge {
+  background: rgba(76, 175, 80, 0.08);
+  border-color: rgba(76, 175, 80, 0.25);
+  color: #388e3c;
+}
+
+[data-theme="light"] .jti-prompt-content {
+  background: rgba(0, 0, 0, 0.03);
+  color: #6b5d4d;
+}
+
+[data-theme="light"] .jti-prompt-input,
+[data-theme="light"] .jti-prompt-textarea {
+  background: #fff;
+  border-color: rgba(180, 150, 60, 0.2);
+  color: #2c2417;
+}
+
+[data-theme="light"] .jti-prompt-input:focus,
+[data-theme="light"] .jti-prompt-textarea:focus {
+  border-color: #8b6914;
+}
+
+[data-theme="light"] .jti-btn.primary {
+  background: linear-gradient(135deg, #c9a83e, #a68520);
+  color: #fff;
+  border-color: transparent;
+}
+
+[data-theme="light"] .jti-btn.primary:hover {
+  background: linear-gradient(135deg, #b4913c, #8b6914);
+}
+
+[data-theme="light"] .jti-btn.secondary {
+  background: #fff;
+  color: #6b5d4d;
+  border-color: rgba(180, 150, 60, 0.2);
+}
+
+[data-theme="light"] .jti-btn.secondary:hover {
+  background: rgba(180, 150, 60, 0.05);
+  color: #2c2417;
+}
+
+[data-theme="light"] .jti-btn.danger {
+  color: #d32f2f;
+  border-color: rgba(211, 47, 47, 0.25);
+}
+
+[data-theme="light"] .jti-btn.danger:hover {
+  background: rgba(211, 47, 47, 0.05);
+}
+
+[data-theme="light"] .jti-prompt-create {
+  border-top-color: rgba(180, 150, 60, 0.1);
+}
+
+[data-theme="light"] .jti-prompt-create-title {
+  color: #8b6914;
+}
+
+[data-theme="light"] .jti-prompt-limit {
+  color: #8b7a65;
+  border-top-color: rgba(180, 150, 60, 0.1);
+}
+
 /* ==================== MODAL OVERRIDES ==================== */
 [data-theme="light"] .conversation-history-modal.jti-theme {
   --crystal-teal: #8b6914;

@@ -180,6 +180,55 @@ export async function deleteServerApiKey(keyId: string): Promise<void> {
   await handleResponse<void>(response);
 }
 
+// ========== JTI Prompt Management ==========
+
+export async function listJtiPrompts(): Promise<any> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/`);
+  return handleResponse<any>(response);
+}
+
+export async function createJtiPrompt(name: string, content: string): Promise<any> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, content }),
+  });
+  return handleResponse<any>(response);
+}
+
+export async function updateJtiPrompt(promptId: string, name?: string, content?: string): Promise<any> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/${promptId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name, content }),
+  });
+  return handleResponse<any>(response);
+}
+
+export async function deleteJtiPrompt(promptId: string): Promise<void> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/${promptId}`, {
+    method: 'DELETE',
+  });
+  await handleResponse<void>(response);
+}
+
+export async function setActiveJtiPrompt(promptId: string | null): Promise<void> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/active`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt_id: promptId }),
+  });
+  await handleResponse<void>(response);
+}
+
+export async function cloneDefaultJtiPrompt(): Promise<any> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/clone`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  return handleResponse<any>(response);
+}
+
 // ========== 使用者 Gemini API Key 管理（多組）==========
 
 interface SavedApiKey {

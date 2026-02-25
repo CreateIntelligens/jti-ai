@@ -95,11 +95,27 @@ class MainAgent:
         """清除記憶體中的 chat session"""
         self._chat_sessions.pop(session_id, None)
 
+    def remove_all_sessions(self):
+        """清除所有記憶體中的 chat sessions（切換 prompt 時使用）"""
+        count = len(self._chat_sessions)
+        self._chat_sessions.clear()
+        if count > 0:
+            logger.info(f"已清除 {count} 個 chat sessions")
+
     # 重用 ToolExecutor 的 _format_options（避免重複定義）
     _format_options_text = staticmethod(ToolExecutor._format_options)
 
     def _get_system_instruction(self, session: Session) -> str:
-        """取得靜態 System Instruction（不變的規則）"""
+        """取得靜態 System Instruction（優先從 DB 讀取 active prompt）"""
+        try:
+            from app import deps
+            if deps.prompt_manager:
+                active = deps.prompt_manager.get_active_prompt("__jti__")
+                if active:
+                    return active.content
+        except Exception:
+            pass
+        # Fallback 到硬寫的預設
         return SYSTEM_INSTRUCTIONS.get(session.language, SYSTEM_INSTRUCTIONS["zh"])
 
     def _get_session_state(self, session: Session) -> str:

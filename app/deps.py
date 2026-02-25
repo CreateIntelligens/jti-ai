@@ -38,8 +38,38 @@ def init_managers():
             print("[Startup] ✅ GeneralChatSessionManager (MongoDB) 已啟用")
         else:
             print("[Startup] ⚠️ GeneralChatSessionManager 未啟用，使用記憶體模式")
+
+        # 初始化 JTI 預設 prompt
+        _init_jti_default_prompt()
     except ValueError as e:
         print(f"警告: {e}")
+
+
+def _init_jti_default_prompt():
+    """清理 MongoDB 中舊的 system_default prompt（向下相容）
+
+    預設提示詞現在直接從 agent_prompts.py 讀取，不再存 MongoDB。
+    """
+    if not prompt_manager:
+        return
+
+    JTI_STORE = "__jti__"
+    DEFAULT_ID = "system_default"
+
+    prompts = prompt_manager.list_prompts(JTI_STORE)
+    has_old_default = any(p.id == DEFAULT_ID for p in prompts)
+
+    if has_old_default:
+        # 移除舊的 system_default，預設提示詞改為從程式碼讀取
+        store_prompts = prompt_manager._load_store_prompts(JTI_STORE)
+        store_prompts.prompts = [p for p in store_prompts.prompts if p.id != DEFAULT_ID]
+        # 如果啟用的是 system_default，清除啟用狀態（回到使用程式碼預設）
+        if store_prompts.active_prompt_id == DEFAULT_ID:
+            store_prompts.active_prompt_id = None
+        prompt_manager._save_store_prompts(store_prompts)
+        print(f"[Startup] 🔄 已清理 MongoDB 中的舊預設提示詞 (id={DEFAULT_ID})")
+
+    print("[Startup] ✅ JTI 預設提示詞從 agent_prompts.py 讀取（地端唯讀）")
 
 
 def _get_or_create_manager(user_api_key: Optional[str] = None, session_id: Optional[str] = None) -> FileSearchManager:
