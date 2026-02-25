@@ -353,6 +353,7 @@ export default function Jti() {
   };
 
   const handleEditKeyDown = (e: React.KeyboardEvent, turnNumber: number) => {
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       if (editText.trim()) {
@@ -371,6 +372,7 @@ export default function Jti() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       const msg = userInput.trim();
