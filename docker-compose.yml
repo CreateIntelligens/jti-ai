@@ -41,6 +41,8 @@ services:
       - "${PORT:-8008}:${PORT:-8008}"
     environment:
       - VITE_API_URL=http://localhost:${PORT:-8008}
+      - VITE_PUBLIC_ALLOWED_PAGES=${VITE_PUBLIC_ALLOWED_PAGES:-jti}
+      - VITE_PUBLIC_RESTRICTED_HOSTS=${VITE_PUBLIC_RESTRICTED_HOSTS:-}
       - PORT=${PORT:-8008}
       - TZ=Asia/Taipei
     restart: unless-stopped

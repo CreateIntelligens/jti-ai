@@ -14,8 +14,20 @@ import './styles/ChatMessages.css';
 import './styles/LightMode.css';
 
 export default function App() {
-  // 簡單的路由判斷：如果路徑是 /jti，顯示 JTI 測試頁面
-  const isJtiPage = window.location.pathname === '/jti';
+  // 受限 hostname（外網 domain）只顯示 ALLOWED_PAGES；其餘顯示全部
+  const restrictedHosts = (import.meta.env.VITE_PUBLIC_RESTRICTED_HOSTS || '')
+    .split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
+  const isRestricted = restrictedHosts.includes(window.location.hostname.toLowerCase());
+
+  const allowedPages = (import.meta.env.VITE_PUBLIC_ALLOWED_PAGES || 'jti')
+    .split(',').map((s: string) => s.trim().toLowerCase());
+  const canShow = (p: string) => !isRestricted || allowedPages.includes(p);
+
+  const page = window.location.pathname.replace(/^\//, '').toLowerCase() || 'home';
+
+  const isJtiPage =
+    (page === 'jti' && canShow('jti')) ||
+    (!canShow('home') && canShow('jti'));
 
   if (isJtiPage) {
     return <Jti />;
