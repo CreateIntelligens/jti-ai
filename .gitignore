@@ -85,7 +85,7 @@ desktop.ini
 # Data directory (keep JSON quiz data tracked)
 data/*.db
 data/*.sqlite
+data/knowledge/
 
 # Git worktrees
 .worktrees/
-

@@ -102,6 +102,23 @@ class MongoDBClient:
         except Exception as e:
             logger.warning(f"Index creation for 'quizzes': {e}")
 
+        # ===== knowledge_files 集合 =====
+        if "knowledge_files" not in db.list_collection_names():
+            db.create_collection("knowledge_files")
+            logger.info("Created 'knowledge_files' collection")
+
+        knowledge_files = db["knowledge_files"]
+
+        try:
+            knowledge_files.create_index(
+                [("language", 1), ("filename", 1)],
+                unique=True,
+            )
+            knowledge_files.create_index("language")
+            logger.info("Created indexes for 'knowledge_files' collection")
+        except Exception as e:
+            logger.warning(f"Index creation for 'knowledge_files': {e}")
+
     def get_client(self) -> MongoClient:
         """取得 MongoDB 客戶端"""
         if self._client is None:
