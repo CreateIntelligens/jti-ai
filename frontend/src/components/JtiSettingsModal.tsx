@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X, Lock, Copy } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { X, Upload, FileText, Trash2, Download, Eye, Pencil, Lock, Copy } from 'lucide-react';
 import * as api from '../services/api';
 
 interface Prompt {
@@ -17,12 +17,13 @@ interface JtiSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onPromptChange: () => void;
+  language?: string;
 }
 
 const SYSTEM_DEFAULT_ID = 'system_default';
 const MAX_CUSTOM = 3;
 
-export default function JtiSettingsModal({ isOpen, onClose, onPromptChange }: JtiSettingsModalProps) {
+export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, language = 'zh' }: JtiSettingsModalProps) {
   const [activeTab, setActiveTab] = useState<'prompt' | 'quiz' | 'kb'>('prompt');
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [activePromptId, setActivePromptId] = useState<string | null>(null);
@@ -52,9 +53,29 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange }: Jt
   // 成功訊息
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
+  // === 知識庫狀態 ===
+  interface KBFile { name: string; display_name: string; size?: number; editable?: boolean; }
+  const [kbFiles, setKbFiles] = useState<KBFile[]>([]);
+  const [kbLoading, setKbLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [confirmDeleteFile, setConfirmDeleteFile] = useState<string | null>(null);
+  const [deletingFile, setDeletingFile] = useState(false);
+  const [dragOver, setDragOver] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // === 檔案檢視/編輯 ===
+  const [viewingFile, setViewingFile] = useState<string | null>(null);
+  const [fileContent, setFileContent] = useState<string>('');
+  const [fileEditable, setFileEditable] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [fileEditContent, setFileEditContent] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [fileLoading, setFileLoading] = useState(false);
+
   useEffect(() => {
     if (isOpen) {
       loadPrompts();
+      if (activeTab === 'kb') loadKbFiles();
     }
   }, [isOpen]);
 
@@ -88,6 +109,115 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange }: Jt
 
   const customPrompts = prompts.filter(p => p.id !== SYSTEM_DEFAULT_ID);
   const defaultPrompt = prompts.find(p => p.id === SYSTEM_DEFAULT_ID);
+
+  // === 知識庫 handlers ===
+  const loadKbFiles = async () => {
+    setKbLoading(true);
+    try {
+      const data = await api.listJtiKnowledgeFiles(language);
+      setKbFiles(data.files || []);
+    } catch (e) {
+      console.error('Failed to load KB files:', e);
+    } finally {
+      setKbLoading(false);
+    }
+  };
+
+  const handleUploadFiles = async (files: FileList | File[]) => {
+    setUploading(true);
+    try {
+      for (const file of Array.from(files)) {
+        await api.uploadJtiKnowledgeFile(language, file);
+      }
+      await loadKbFiles();
+      setSuccessMsg(`✅ 已上傳 ${files.length} 個檔案`);
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      alert('上傳失敗: ' + msg);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteFileClick = (fileName: string) => {
+    setConfirmDeleteFile(fileName);
+  };
+
+  const handleDeleteFileCancel = () => {
+    setConfirmDeleteFile(null);
+  };
+
+  const handleDeleteFileConfirm = async () => {
+    if (!confirmDeleteFile) return;
+    setDeletingFile(true);
+    try {
+      await api.deleteJtiKnowledgeFile(confirmDeleteFile, language);
+      setConfirmDeleteFile(null);
+      await loadKbFiles();
+      setSuccessMsg('✅ 已刪除檔案');
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      alert('刪除失敗: ' + msg);
+    } finally {
+      setDeletingFile(false);
+    }
+  };
+
+  // === 檢視/編輯 handlers ===
+  const handleViewFile = async (filename: string) => {
+    setViewingFile(filename);
+    setFileLoading(true);
+    setIsEditing(false);
+    try {
+      const data = await api.getJtiKnowledgeFileContent(filename, language);
+      setFileContent(data.content || '');
+      setFileEditable(data.editable || false);
+    } catch (e) {
+      setFileContent('無法載入檔案內容');
+      setFileEditable(false);
+    } finally {
+      setFileLoading(false);
+    }
+  };
+
+  const handleDownloadFile = (filename: string) => {
+    const url = api.getJtiKnowledgeFileDownloadUrl(filename, language);
+    window.open(url, '_blank');
+  };
+
+  const handleStartEdit = () => {
+    setFileEditContent(fileContent);
+    setIsEditing(true);
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!viewingFile) return;
+    setSaving(true);
+    try {
+      await api.updateJtiKnowledgeFileContent(viewingFile, fileEditContent, language);
+      setFileContent(fileEditContent);
+      setIsEditing(false);
+      setSuccessMsg('✅ 已儲存變更');
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      alert('儲存失敗: ' + msg);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const closeViewer = () => {
+    setViewingFile(null);
+    setFileContent('');
+    setIsEditing(false);
+  };
 
   const handleCreate = async () => {
     if (!newContent.trim()) return;
@@ -233,9 +363,8 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange }: Jt
             題庫
           </button>
           <button
-            className={`jti-settings-tab disabled`}
-            disabled
-            title="即將推出"
+            className={`jti-settings-tab ${activeTab === 'kb' ? 'active' : ''}`}
+            onClick={() => { setActiveTab('kb'); loadKbFiles(); }}
           >
             知識庫
           </button>
@@ -250,9 +379,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange }: Jt
               <>
                 {/* Success message */}
                 {successMsg && (
-                  <div style={{ padding: '0.5rem 0.75rem', marginBottom: '0.75rem', background: 'rgba(61,217,211,0.12)', borderRadius: '0.5rem', color: '#3dd9d3', fontSize: '0.875rem' }}>
-                    {successMsg}
-                  </div>
+                  <div className="jti-success-banner">{successMsg}</div>
                 )}
                 {/* Prompt list */}
                 <div className="jti-prompt-list">
@@ -261,10 +388,10 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange }: Jt
                     <div className={`jti-prompt-card ${defaultPrompt.is_active ? 'active' : ''}`}>
                       <div className="jti-prompt-card-header">
                         <div className="jti-prompt-name-row">
-                          <Lock size={14} style={{ opacity: 0.6, marginRight: '0.25rem' }} />
+                          <Lock size={14} className="jti-prompt-lock-icon" />
                           <span className="jti-prompt-name">{defaultPrompt.name}</span>
                           <span className="jti-prompt-badge">預設</span>
-                          <span className="jti-prompt-badge" style={{ background: 'rgba(128,144,176,0.2)', color: '#8090b0' }}>唯讀</span>
+                          <span className="jti-prompt-badge readonly">唯讀</span>
                           {defaultPrompt.is_active && (
                             <span className="jti-prompt-active-badge">使用中</span>
                           )}
@@ -285,7 +412,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange }: Jt
                               disabled={cloning}
                               title="複製預設內容到新的自訂提示詞"
                             >
-                              <Copy size={12} style={{ marginRight: '0.25rem' }} />
+                              <Copy size={12} className="jti-prompt-clone-icon" />
                               {cloning ? '複製中...' : '以此為基礎建立副本'}
                             </button>
                           )}
@@ -343,7 +470,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange }: Jt
                           <div className="jti-prompt-card-header">
                             <div className="jti-prompt-name-row">
                               <span className="jti-prompt-name">{prompt.name}</span>
-                              <span className="jti-prompt-badge" style={{ background: 'rgba(61,217,211,0.15)', color: '#3dd9d3' }}>自訂</span>
+                              <span className="jti-prompt-badge custom">自訂</span>
                               {prompt.is_active && (
                                 <span className="jti-prompt-active-badge">啟用中</span>
                               )}
@@ -441,35 +568,108 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange }: Jt
           )}
 
           {activeTab === 'kb' && (
-            <div className="jti-settings-coming-soon">
-              即將推出
-            </div>
+            kbLoading ? (
+              <div className="jti-settings-loading">載入中...</div>
+            ) : (
+              <>
+                {successMsg && (
+                  <div className="jti-success-banner">{successMsg}</div>
+                )}
+
+                {/* Upload area */}
+                <div
+                  className={`jti-kb-upload-zone${dragOver ? ' drag-over' : ''}${uploading ? ' uploading' : ''}`}
+                  onClick={() => !uploading && fileInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragOver(false);
+                    if (e.dataTransfer.files.length > 0) handleUploadFiles(e.dataTransfer.files);
+                  }}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    hidden
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        handleUploadFiles(e.target.files);
+                        e.target.value = '';
+                      }
+                    }}
+                  />
+                  <Upload size={24} className="jti-kb-upload-icon" />
+                  <p className="jti-kb-upload-text">
+                    {uploading ? '上傳中...' : '點擊或拖放檔案上傳'}
+                  </p>
+                  <p className="jti-kb-upload-hint">
+                    支援 PDF、TXT、Word 等格式
+                  </p>
+                </div>
+
+                {/* File list */}
+                <div className="jti-kb-file-count">
+                  共 {kbFiles.length} 個檔案（{language === 'zh' ? '中文' : 'English'} 知識庫）
+                </div>
+                {kbFiles.length === 0 ? (
+                  <div className="jti-kb-empty">知識庫尚無檔案</div>
+                ) : (
+                  <div className="jti-kb-file-list">
+                    {kbFiles.map((file) => (
+                      <div key={file.name} className="jti-kb-file-item">
+                        <div
+                          className="jti-kb-file-info"
+                          onClick={() => handleViewFile(file.name)}
+                        >
+                          <FileText size={16} className="jti-kb-file-icon" />
+                          <span className="jti-kb-file-name">{file.display_name}</span>
+                          {file.size && (
+                            <span className="jti-kb-file-size">
+                              {file.size > 1024 ? `${(file.size / 1024).toFixed(1)}KB` : `${file.size}B`}
+                            </span>
+                          )}
+                        </div>
+                        <div className="jti-kb-file-actions">
+                          <button
+                            className="jti-btn small secondary"
+                            onClick={() => handleViewFile(file.name)}
+                            title="檢視"
+                          >
+                            <Eye size={12} />
+                          </button>
+                          <button
+                            className="jti-btn small secondary"
+                            onClick={() => handleDownloadFile(file.name)}
+                            title="下載"
+                          >
+                            <Download size={12} />
+                          </button>
+                          <button
+                            className="jti-btn small secondary"
+                            onClick={() => handleDeleteFileClick(file.name)}
+                            title="刪除"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )
           )}
         </div>
       </div>
 
       {/* Delete confirmation popup */}
       {confirmDeleteId && (
-        <div
-          style={{
-            position: 'fixed', inset: 0, zIndex: 10000,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(2px)',
-          }}
-          onClick={handleDeleteCancel}
-        >
-          <div
-            style={{
-              background: '#1e2030', border: '1px solid rgba(255,255,255,0.1)',
-              borderRadius: '0.75rem', padding: '1.5rem', maxWidth: '320px',
-              textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
-            }}
-            onClick={e => e.stopPropagation()}
-          >
-            <p style={{ marginBottom: '1rem', color: '#e0e0e0', fontSize: '0.95rem' }}>
-              確定要刪除此提示詞嗎？
-            </p>
-            <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+        <div className="jti-confirm-overlay" onClick={handleDeleteCancel}>
+          <div className="jti-confirm-box" onClick={e => e.stopPropagation()}>
+            <p className="jti-confirm-text">確定要刪除此提示詞嗎？</p>
+            <div className="jti-confirm-actions">
               <button
                 className="jti-btn small secondary"
                 onClick={handleDeleteCancel}
@@ -485,6 +685,92 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange }: Jt
                 {deleting ? '刪除中...' : '確認刪除'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Delete file confirmation popup */}
+      {confirmDeleteFile && (
+        <div className="jti-confirm-overlay" onClick={handleDeleteFileCancel}>
+          <div className="jti-confirm-box" onClick={e => e.stopPropagation()}>
+            <p className="jti-confirm-text">確定要刪除此檔案嗎？</p>
+            <div className="jti-confirm-actions">
+              <button
+                className="jti-btn small secondary"
+                onClick={handleDeleteFileCancel}
+                disabled={deletingFile}
+              >
+                取消
+              </button>
+              <button
+                className="jti-btn small danger"
+                onClick={handleDeleteFileConfirm}
+                disabled={deletingFile}
+              >
+                {deletingFile ? '刪除中...' : '確認刪除'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* File viewer/editor modal */}
+      {viewingFile && (
+        <div className="jti-viewer-overlay" onClick={closeViewer}>
+          <div className="jti-viewer-modal" onClick={e => e.stopPropagation()}>
+            {/* Header */}
+            <div className="jti-viewer-header">
+              <div className="jti-viewer-title">
+                <FileText size={16} className="jti-viewer-title-icon" />
+                <span className="jti-viewer-title-text">{viewingFile}</span>
+              </div>
+              <div className="jti-viewer-header-actions">
+                <button className="jti-btn small secondary" onClick={() => handleDownloadFile(viewingFile)} title="下載">
+                  <Download size={14} />
+                </button>
+                {fileEditable && !isEditing && (
+                  <button className="jti-btn small secondary" onClick={handleStartEdit} title="編輯">
+                    <Pencil size={14} />
+                  </button>
+                )}
+                <button className="jti-btn small secondary" onClick={closeViewer}>
+                  <X size={14} />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="jti-viewer-body">
+              {fileLoading ? (
+                <div className="jti-viewer-loading">載入中...</div>
+              ) : isEditing ? (
+                <textarea
+                  className="jti-viewer-textarea"
+                  value={fileEditContent}
+                  onChange={e => setFileEditContent(e.target.value)}
+                />
+              ) : fileContent ? (
+                <pre className="jti-viewer-pre">{fileContent}</pre>
+              ) : (
+                <div className="jti-viewer-empty">
+                  此檔案格式不支援線上預覽，請下載查看
+                </div>
+              )}
+            </div>
+
+            {/* Footer - edit actions */}
+            {isEditing && (
+              <div className="jti-viewer-footer">
+                <button className="jti-btn small secondary" onClick={handleCancelEdit} disabled={saving}>
+                  取消
+                </button>
+                <button
+                  className="jti-btn small save"
+                  onClick={handleSaveEdit}
+                  disabled={saving}
+                >
+                  {saving ? '儲存中...' : '儲存'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

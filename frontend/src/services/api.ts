@@ -228,6 +228,47 @@ export async function cloneDefaultJtiPrompt(): Promise<any> {
   });
   return handleResponse<any>(response);
 }
+// ========== JTI 知識庫管理 ==========
+
+export async function listJtiKnowledgeFiles(language: string = 'zh'): Promise<any> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/knowledge/files/?language=${language}`);
+  return handleResponse<any>(response);
+}
+
+export async function getJtiKnowledgeFileContent(filename: string, language: string = 'zh'): Promise<any> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/knowledge/files/${encodeURIComponent(filename)}/content?language=${language}`);
+  return handleResponse<any>(response);
+}
+
+export function getJtiKnowledgeFileDownloadUrl(filename: string, language: string = 'zh'): string {
+  return `${API_BASE}/jti/knowledge/files/${encodeURIComponent(filename)}/download?language=${language}`;
+}
+
+export async function updateJtiKnowledgeFileContent(filename: string, content: string, language: string = 'zh'): Promise<any> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/knowledge/files/${encodeURIComponent(filename)}/content?language=${language}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  return handleResponse<any>(response);
+}
+
+export async function uploadJtiKnowledgeFile(language: string, file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await fetchWithApiKey(`${API_BASE}/jti/knowledge/upload/?language=${language}`, {
+    method: 'POST',
+    body: formData,
+  });
+  return handleResponse<any>(response);
+}
+
+export async function deleteJtiKnowledgeFile(fileName: string, language: string = 'zh'): Promise<any> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/knowledge/files/${encodeURIComponent(fileName)}?language=${language}`, {
+    method: 'DELETE',
+  });
+  return handleResponse<any>(response);
+}
 
 // ========== 使用者 Gemini API Key 管理（多組）==========
 

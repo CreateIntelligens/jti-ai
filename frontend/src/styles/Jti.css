@@ -1301,6 +1301,295 @@
   background: rgba(224, 192, 104, 0.3);
 }
 
+/* ========== Prompt Icon Helpers ========== */
+.jti-prompt-lock-icon {
+  opacity: 0.6;
+  margin-right: 0.25rem;
+}
+
+.jti-prompt-clone-icon {
+  margin-right: 0.25rem;
+}
+
+/* ========== Success Banner ========== */
+.jti-success-banner {
+  padding: 0.5rem 0.75rem;
+  margin-bottom: 0.75rem;
+  background: rgba(61, 217, 211, 0.12);
+  border-radius: 0.5rem;
+  color: #3dd9d3;
+  font-size: 0.875rem;
+}
+
+/* ========== Badge Variants ========== */
+.jti-prompt-badge.readonly {
+  background: rgba(128, 144, 176, 0.2);
+  color: #8090b0;
+  border-color: transparent;
+}
+
+.jti-prompt-badge.custom {
+  background: rgba(61, 217, 211, 0.15);
+  color: #3dd9d3;
+  border-color: transparent;
+}
+
+/* ========== KB Upload Zone ========== */
+.jti-kb-upload-zone {
+  border: 2px dashed rgba(255, 255, 255, 0.15);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  text-align: center;
+  margin-bottom: 1rem;
+  background: transparent;
+  transition: all 0.2s;
+  cursor: pointer;
+}
+
+.jti-kb-upload-zone.drag-over {
+  border-color: #c8a96e;
+  background: rgba(200, 169, 110, 0.08);
+}
+
+.jti-kb-upload-zone.uploading {
+  cursor: wait;
+}
+
+.jti-kb-upload-icon {
+  opacity: 0.5;
+  margin-bottom: 0.5rem;
+}
+
+.jti-kb-upload-text {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.jti-kb-upload-hint {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+}
+
+/* ========== KB File List ========== */
+.jti-kb-file-count {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 0.5rem;
+}
+
+.jti-kb-empty {
+  text-align: center;
+  padding: 2rem;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.jti-kb-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.jti-kb-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.jti-kb-file-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow: hidden;
+  cursor: pointer;
+  flex: 1;
+}
+
+.jti-kb-file-icon {
+  opacity: 0.5;
+  flex-shrink: 0;
+}
+
+.jti-kb-file-name {
+  color: #e0e0e0;
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jti-kb-file-size {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 0.7rem;
+  flex-shrink: 0;
+}
+
+.jti-kb-file-actions {
+  display: flex;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+/* ========== Confirm Popup ========== */
+.jti-confirm-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(2px);
+}
+
+.jti-confirm-box {
+  background: #1e2030;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  max-width: 320px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.jti-confirm-text {
+  margin-bottom: 1rem;
+  color: #e0e0e0;
+  font-size: 0.95rem;
+}
+
+.jti-confirm-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+/* ========== File Viewer Modal ========== */
+.jti-viewer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+}
+
+.jti-viewer-modal {
+  background: #1a1c2e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.75rem;
+  width: 90%;
+  max-width: 700px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+}
+
+.jti-viewer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.jti-viewer-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  overflow: hidden;
+}
+
+.jti-viewer-title-icon {
+  opacity: 0.5;
+}
+
+.jti-viewer-title-text {
+  color: #e0e0e0;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jti-viewer-header-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.jti-viewer-body {
+  flex: 1;
+  overflow: auto;
+  padding: 1rem 1.25rem;
+}
+
+.jti-viewer-loading {
+  text-align: center;
+  padding: 2rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.jti-viewer-textarea {
+  width: 100%;
+  min-height: 300px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(200, 169, 110, 0.3);
+  border-radius: 0.5rem;
+  color: #e0e0e0;
+  padding: 0.75rem;
+  font-size: 0.85rem;
+  font-family: monospace;
+  resize: vertical;
+  outline: none;
+}
+
+.jti-viewer-textarea:focus {
+  border-color: var(--gold);
+}
+
+.jti-viewer-pre {
+  color: #d0d0d0;
+  font-size: 0.85rem;
+  font-family: monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.jti-viewer-empty {
+  text-align: center;
+  padding: 2rem;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.jti-viewer-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.jti-btn.save {
+  background: #c8a96e;
+  color: #1a1c2e;
+  border-color: transparent;
+}
+
+.jti-btn.save:hover {
+  background: var(--gold-dark);
+}
+
 @media (max-width: 768px) {
   .jti-settings-modal {
     width: 95%;
