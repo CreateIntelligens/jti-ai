@@ -20,8 +20,10 @@ from app.services.session.session_manager_factory import get_session_manager
 from app.services.gemini_service import client as gemini_client
 from app.tools.tool_executor import tool_executor, ToolExecutor
 from app.services.jti.agent_prompts import (
+    PERSONA,
     SYSTEM_INSTRUCTIONS,
     SESSION_STATE_TEMPLATES,
+    build_system_instruction,
 )
 
 # 使用工廠函數取得適當的實作（MongoDB 或記憶體）
@@ -106,17 +108,19 @@ class MainAgent:
     _format_options_text = staticmethod(ToolExecutor._format_options)
 
     def _get_system_instruction(self, session: Session) -> str:
-        """取得靜態 System Instruction（優先從 DB 讀取 active prompt）"""
+        """取得靜態 System Instruction（persona from DB + system rules from code）"""
+        persona = None
         try:
             from app import deps
             if deps.prompt_manager:
                 active = deps.prompt_manager.get_active_prompt("__jti__")
                 if active:
-                    return active.content
+                    persona = active.content
         except Exception:
             pass
-        # Fallback 到硬寫的預設
-        return SYSTEM_INSTRUCTIONS.get(session.language, SYSTEM_INSTRUCTIONS["zh"])
+        if not persona:
+            persona = PERSONA.get(session.language, PERSONA["zh"])
+        return build_system_instruction(persona, session.language)
 
     def _get_session_state(self, session: Session) -> str:
         """取得動態 Session 狀態（會變化的資訊）"""

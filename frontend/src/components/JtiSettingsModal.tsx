@@ -35,7 +35,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   const [newContent, setNewContent] = useState('');
   const [creating, setCreating] = useState(false);
 
-  // 編輯（僅用於自訂提示詞）
+  // 編輯（僅用於自訂人物設定）
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editContent, setEditContent] = useState('');
@@ -236,7 +236,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
     if (!newContent.trim()) return;
     setCreating(true);
     try {
-      const name = newName.trim() || `自訂提示詞 ${customPrompts.length + 1}`;
+      const name = newName.trim() || `自訂人物設定 ${customPrompts.length + 1}`;
       await api.createJtiPrompt(name, newContent.trim());
       setNewName('');
       setNewContent('');
@@ -255,7 +255,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
       await api.cloneDefaultJtiPrompt();
       await loadPrompts();
       onPromptChange();
-      setSuccessMsg('✅ 已複製預設提示詞並啟用');
+      setSuccessMsg('✅ 已複製預設人物設定並啟用');
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -295,7 +295,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
       if (promptId === activePromptId) {
         onPromptChange();
       }
-      setSuccessMsg('✅ 已刪除提示詞');
+      setSuccessMsg('✅ 已刪除人物設定');
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -366,7 +366,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
             className={`jti-settings-tab ${activeTab === 'prompt' ? 'active' : ''}`}
             onClick={() => setActiveTab('prompt')}
           >
-            提示詞
+            人物設定
           </button>
           <button
             className={`jti-settings-tab disabled`}
@@ -396,7 +396,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
                 )}
                 {/* Prompt list */}
                 <div className="jti-prompt-list">
-                  {/* === 預設提示詞（唯讀）=== */}
+                  {/* === 預設人物設定（唯讀）=== */}
                   {defaultPrompt && (
                     <div className={`jti-prompt-card ${defaultPrompt.is_active ? 'active' : ''}`}>
                       <div className="jti-prompt-card-header">
@@ -423,7 +423,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
                               className="jti-btn small secondary"
                               onClick={handleCloneDefault}
                               disabled={cloning}
-                              title="複製預設內容到新的自訂提示詞"
+                              title="複製預設內容到新的自訂人物設定"
                             >
                               <Copy size={12} className="jti-prompt-clone-icon" />
                               {cloning ? '複製中...' : '以此為基礎建立副本'}
@@ -447,7 +447,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
                     </div>
                   )}
 
-                  {/* === 自訂提示詞（可編輯）=== */}
+                  {/* === 自訂人物設定（可編輯）=== */}
                   {customPrompts.map(prompt => (
                     <div
                       key={prompt.id}
@@ -466,7 +466,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
                             className="jti-prompt-textarea"
                             value={editContent}
                             onChange={e => setEditContent(e.target.value)}
-                            placeholder="提示詞內容..."
+                            placeholder="人物設定內容..."
                             rows={10}
                           />
                           <div className="jti-prompt-edit-actions">
@@ -537,11 +537,11 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
                   ))}
                 </div>
 
-                {/* Create new prompt */}
+                {/* Create new persona */}
                 {customPrompts.length < maxCustom ? (
                   <div className="jti-prompt-create">
                     <h3 className="jti-prompt-create-title">
-                      新增自訂提示詞（{customPrompts.length}/{maxCustom}）
+                      新增自訂人物設定（{customPrompts.length}/{maxCustom}）
                     </h3>
                     <input
                       type="text"
@@ -554,7 +554,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
                       className="jti-prompt-textarea"
                       value={newContent}
                       onChange={e => setNewContent(e.target.value)}
-                      placeholder="提示詞內容..."
+                      placeholder="人物設定內容..."
                       rows={6}
                     />
                     <button
@@ -562,12 +562,12 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
                       onClick={handleCreate}
                       disabled={creating || !newContent.trim()}
                     >
-                      {creating ? '建立中...' : '建立提示詞'}
+                      {creating ? '建立中...' : '建立人物設定'}
                     </button>
                   </div>
                 ) : (
                   <div className="jti-prompt-limit">
-                    自訂提示詞已達上限（{maxCustom} 個）
+                    自訂人物設定已達上限（{maxCustom} 個）
                   </div>
                 )}
               </>
@@ -681,7 +681,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
       {confirmDeleteId && (
         <div className="jti-confirm-overlay" onClick={handleDeleteCancel}>
           <div className="jti-confirm-box" onClick={e => e.stopPropagation()}>
-            <p className="jti-confirm-text">確定要刪除此提示詞嗎？</p>
+            <p className="jti-confirm-text">確定要刪除此人物設定嗎？</p>
             <div className="jti-confirm-actions">
               <button
                 className="jti-btn small secondary"

@@ -651,13 +651,6 @@ async def quiz_pause(request: QuizActionRequest, auth: dict = Depends(verify_aut
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/quiz/resume", response_model=ChatResponse)
-async def quiz_resume(request: QuizActionRequest, auth: dict = Depends(verify_auth)):
-    """
-    重新開始測驗（不再接續，一律從頭開始）
-    """
-    return await quiz_start(request, auth)
-
 
 @router.get(
     "/history",
