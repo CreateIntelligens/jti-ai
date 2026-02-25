@@ -240,8 +240,22 @@ export async function getJtiKnowledgeFileContent(filename: string, language: str
   return handleResponse<any>(response);
 }
 
-export function getJtiKnowledgeFileDownloadUrl(filename: string, language: string = 'zh'): string {
-  return `${API_BASE}/jti/knowledge/files/${encodeURIComponent(filename)}/download?language=${language}`;
+export async function downloadJtiKnowledgeFile(filename: string, language: string = 'zh'): Promise<void> {
+  const url = `${API_BASE}/jti/knowledge/files/${encodeURIComponent(filename)}/download?language=${language}`;
+  const response = await fetchWithApiKey(url);
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(error || response.statusText);
+  }
+  const blob = await response.blob();
+  const objectUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = objectUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(objectUrl);
 }
 
 export async function updateJtiKnowledgeFileContent(filename: string, content: string, language: string = 'zh'): Promise<any> {

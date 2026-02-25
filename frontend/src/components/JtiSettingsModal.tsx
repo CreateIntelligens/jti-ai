@@ -82,7 +82,16 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isOpen) {
-        if (editingId) {
+        if (confirmDeleteId || confirmDeleteFile) {
+          setConfirmDeleteId(null);
+          setConfirmDeleteFile(null);
+        } else if (viewingFile) {
+          if (isEditing) {
+            handleCancelEdit();
+          } else {
+            closeViewer();
+          }
+        } else if (editingId) {
           cancelEdit();
         } else {
           onClose();
@@ -91,7 +100,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
     };
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
-  }, [isOpen, onClose, editingId]);
+  }, [isOpen, onClose, editingId, confirmDeleteId, confirmDeleteFile, viewingFile, isEditing]);
 
   const loadPrompts = async () => {
     setLoading(true);
@@ -182,9 +191,13 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
     }
   };
 
-  const handleDownloadFile = (filename: string) => {
-    const url = api.getJtiKnowledgeFileDownloadUrl(filename, language);
-    window.open(url, '_blank');
+  const handleDownloadFile = async (filename: string) => {
+    try {
+      await api.downloadJtiKnowledgeFile(filename, language);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      alert('下載失敗: ' + msg);
+    }
   };
 
   const handleStartEdit = () => {

@@ -30,6 +30,7 @@ export default function App() {
     (!canShow('home') && canShow('jti'));
 
   if (isJtiPage) {
+    if (page !== 'jti') window.history.replaceState(null, '', '/jti');
     return <Jti />;
   }
   const [sidebarOpen, setSidebarOpen] = useState(true);
