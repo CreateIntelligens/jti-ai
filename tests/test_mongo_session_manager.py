@@ -11,7 +11,7 @@ import unittest
 from datetime import datetime, timedelta
 from unittest.mock import patch, MagicMock
 
-from app.models.session import Session, SessionStep, GameMode
+from app.models.session import Session, SessionStep
 
 
 class TestMongoSessionManager(unittest.TestCase):
@@ -57,13 +57,9 @@ class TestMongoSessionManager(unittest.TestCase):
         mock_result.inserted_id = "test_id"
         self.mock_sessions.insert_one.return_value = mock_result
 
-        session = self.manager.create_session(
-            mode=GameMode.COLOR,
-            language="zh"
-        )
+        session = self.manager.create_session(language="zh")
 
         self.assertIsNotNone(session)
-        self.assertEqual(session.mode, GameMode.COLOR)
         self.assertEqual(session.language, "zh")
         self.assertEqual(session.step, SessionStep.WELCOME)
         self.mock_sessions.insert_one.assert_called_once()
@@ -77,7 +73,6 @@ class TestMongoSessionManager(unittest.TestCase):
 
         self.assertIsNotNone(session)
         self.assertEqual(session.session_id, "test-123")
-        self.assertEqual(session.mode, GameMode.COLOR)
         self.mock_sessions.find_one.assert_called_once_with(
             {"session_id": "test-123"}
         )
@@ -92,7 +87,7 @@ class TestMongoSessionManager(unittest.TestCase):
 
     def test_update_session(self):
         """測試更新 session"""
-        session = Session(mode=GameMode.COLOR, language="zh")
+        session = Session(language="zh")
         session.step = SessionStep.QUIZ
 
         mock_result = MagicMock()
@@ -144,18 +139,6 @@ class TestMongoSessionManager(unittest.TestCase):
         self.assertIsNotNone(session)
         self.assertEqual(session.answers, {"q1": "a"})
         self.assertEqual(session.current_q_index, 1)
-
-    def test_get_sessions_by_mode(self):
-        """測試按模式查詢 sessions"""
-        mock_docs = [
-            self._make_valid_mock_doc(session_id="test-1", _id="id1")
-        ]
-        self.mock_sessions.find.return_value = mock_docs
-
-        sessions = self.manager.get_sessions_by_mode(GameMode.COLOR)
-
-        self.assertEqual(len(sessions), 1)
-        self.assertEqual(sessions[0].session_id, "test-1")
 
     def test_get_statistics(self):
         """測試統計功能"""

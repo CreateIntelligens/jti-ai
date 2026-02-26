@@ -10,7 +10,7 @@ MongoDB Session 管理服務
 from typing import Dict, Optional, List, Any
 from datetime import datetime
 
-from app.models.session import Session, SessionStep, GameMode
+from app.models.session import Session, SessionStep
 from app.services.mongo_client import get_mongo_db
 from .session_state_mixin import SessionStateMixin
 import logging
@@ -25,13 +25,9 @@ class MongoSessionManager(SessionStateMixin):
         self.db = get_mongo_db()
         self.sessions_collection = self.db["sessions"]
 
-    def create_session(
-        self,
-        mode: GameMode = GameMode.COLOR,
-        language: str = "zh"
-    ) -> Session:
+    def create_session(self, language: str = "zh") -> Session:
         """建立新 session"""
-        session = Session(mode=mode, language=language)
+        session = Session(language=language)
 
         # 轉換為可序列化的字典
         session_dict = session.model_dump(mode="json")
@@ -44,7 +40,7 @@ class MongoSessionManager(SessionStateMixin):
             result = self.sessions_collection.insert_one(session_dict)
             logger.info(
                 f"Created session in MongoDB: {session.session_id} "
-                f"(mode={mode.value}, language={language})"
+                f"(language={language})"
             )
             return session
         except Exception as e:
@@ -202,7 +198,6 @@ class MongoSessionManager(SessionStateMixin):
             # === 建立 Session 物件 ===
             session = Session(
                 session_id=session_id,
-                mode=GameMode.COLOR,
                 step=step,
                 language=language,
                 quiz_id="color_taste",
@@ -267,10 +262,6 @@ class MongoSessionManager(SessionStateMixin):
 
     # === 查詢和分析方法 ===
 
-    def get_sessions_by_mode(self, mode: GameMode) -> List[Session]:
-        """按模式查詢 sessions"""
-        return self._find_sessions({"mode": mode.value})
-
     def get_sessions_by_language(self, language: str) -> List[Session]:
         """按語言查詢 sessions"""
         return self._find_sessions({"language": language})
@@ -293,13 +284,6 @@ class MongoSessionManager(SessionStateMixin):
         try:
             total_sessions = self.sessions_collection.count_documents({})
 
-            # 按模式分組統計
-            mode_stats = list(
-                self.sessions_collection.aggregate([
-                    {"$group": {"_id": "$mode", "count": {"$sum": 1}}}
-                ])
-            )
-
             # 按狀態分組統計
             step_stats = list(
                 self.sessions_collection.aggregate([
@@ -314,7 +298,6 @@ class MongoSessionManager(SessionStateMixin):
 
             return {
                 "total_sessions": total_sessions,
-                "mode_distribution": {s["_id"]: s["count"] for s in mode_stats},
                 "step_distribution": {s["_id"]: s["count"] for s in step_stats},
                 "completed_quizzes": completed_quizzes
             }

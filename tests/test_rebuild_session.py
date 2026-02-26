@@ -19,7 +19,7 @@ mock_mongo_client_module = MagicMock()
 mock_mongo_client_module.get_mongo_db.return_value = mock_db
 sys.modules.setdefault("app.services.mongo_client", mock_mongo_client_module)
 
-from app.models.session import Session, SessionStep, GameMode
+from app.models.session import Session, SessionStep
 from app.services.session.mongo_session_manager import MongoSessionManager
 
 

@@ -10,7 +10,7 @@ from typing import Optional, Dict, Any, List, Union
 import logging
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 from app.services.jti.main_agent import main_agent
-from app.models.session import GameMode, SessionStep
+from app.models.session import SessionStep
 from app.auth import verify_auth, require_admin
 from app.tools.tool_executor import tool_executor
 from app.tools.quiz import get_total_questions
@@ -193,7 +193,7 @@ async def create_session(request: CreateSessionRequest, auth: dict = Depends(ver
             main_agent.remove_session(request.previous_session_id)
             logger.info(f"Cleaned up previous chat session: {request.previous_session_id[:8]}...")
 
-        session = session_manager.create_session(mode=GameMode.COLOR, language=request.language)
+        session = session_manager.create_session(language=request.language)
 
         logger.info(f"Created new session: {session.session_id} (language={request.language})")
 

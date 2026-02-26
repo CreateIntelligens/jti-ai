@@ -9,7 +9,7 @@ Session 管理服務
 """
 
 from typing import Dict, Optional
-from app.models.session import Session, SessionStep, GameMode
+from app.models.session import Session, SessionStep
 from .session_state_mixin import SessionStateMixin
 import logging
 
@@ -22,9 +22,9 @@ class SessionManager(SessionStateMixin):
     def __init__(self):
         self._sessions: Dict[str, Session] = {}
 
-    def create_session(self, mode: GameMode = GameMode.COLOR, language: str = "zh") -> Session:
+    def create_session(self, language: str = "zh") -> Session:
         """建立新 session"""
-        session = Session(mode=mode, language=language)
+        session = Session(language=language)
         self._sessions[session.session_id] = session
         logger.info(f"Created session: {session.session_id} (language={language})")
         return session

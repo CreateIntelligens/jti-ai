@@ -21,15 +21,9 @@ class SessionStep(str, Enum):
     DONE = "DONE"          # 流程完成
 
 
-class GameMode(str, Enum):
-    """遊戲模式"""
-    COLOR = "COLOR"         # 色彩測驗
-
-
 class Session(BaseModel):
     """Session 資料結構"""
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    mode: GameMode = GameMode.COLOR
     step: SessionStep = SessionStep.WELCOME
     language: str = "zh"  # 語言設定 (zh/en)
 
