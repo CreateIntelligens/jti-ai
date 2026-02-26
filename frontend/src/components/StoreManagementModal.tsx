@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import type { Store } from '../types';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface StoreManagementModalProps {
   isOpen: boolean;
@@ -23,15 +24,7 @@ export default function StoreManagementModal({
   const [newStoreName, setNewStoreName] = useState('');
   const [creating, setCreating] = useState(false);
 
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [isOpen, onClose]);
+  useEscapeKey(onClose, isOpen);
 
   if (!isOpen) return null;
 

@@ -1,0 +1,244 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* ==================== RESET ==================== */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ==================== CSS VARIABLES (Dark Mode) ==================== */
+
+:root {
+  /* Google Material Color Palette (Dark Mode Base) */
+  --bg-primary: #202124;
+  --bg-secondary: #292a2d;
+  --bg-surface: #303134;
+  --bg-hover: #3c4043;
+  --bg-active: #4a4d51;
+
+  --primary-color: #8ab4f8;
+  /* Google Blue */
+  --primary-hover: #9bbff9;
+  --secondary-color: #f1f3f4;
+  --accent-color: #fbbc04;
+  /* Google Yellow */
+  --danger-color: #f28b82;
+  /* Google Red */
+
+  /* Borders & Dividers */
+  --border-color: #5f6368;
+  --border-light: #3c4043;
+
+  /* Shadows (Material Elevation) */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  --shadow-md: 0 1px 2px 0 rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  --shadow-lg: 0 4px 6px 0 rgba(0, 0, 0, 0.3), 0 4px 8px 3px rgba(0, 0, 0, 0.15);
+  --shadow-xl: 0 6px 10px 0 rgba(0, 0, 0, 0.3), 0 8px 16px 4px rgba(0, 0, 0, 0.15);
+
+  /* Text Colors */
+  --text-primary: #e8eaed;
+  --text-secondary: #9aa0a6;
+  --text-muted: #80868b;
+
+  /* Transitions */
+  --transition-smooth: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Legacy mappings */
+  --crystal-void: var(--bg-primary);
+  --crystal-dark: var(--bg-primary);
+  --crystal-deep: var(--bg-secondary);
+  --crystal-mid: var(--bg-surface);
+  --crystal-light: var(--border-color);
+  --crystal-teal: var(--primary-color);
+  --crystal-cyan: var(--primary-hover);
+  --crystal-blue: var(--primary-color);
+  --crystal-amber: var(--accent-color);
+  --crystal-gold: var(--accent-color);
+  --crystal-rose: var(--danger-color);
+  --glass-bg: var(--bg-surface);
+  --glass-border: var(--border-light);
+  --glass-highlight: transparent;
+  --glow-teal: none;
+  --glow-amber: none;
+  --shadow-deep: var(--shadow-xl);
+  --shadow-float: var(--shadow-lg);
+}
+
+/* Light Mode Theme */
+[data-theme="light"] {
+  --bg-primary: #f8f9fa;
+  --bg-secondary: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-hover: #f1f3f4;
+  --bg-active: #e8eaed;
+
+  --primary-color: #1a73e8;
+  --primary-hover: #1557b0;
+  --secondary-color: #5f6368;
+  --accent-color: #f9ab00;
+  --danger-color: #d93025;
+
+  --border-color: #dadce0;
+  --border-light: #f1f3f4;
+
+  --shadow-sm: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 1px 3px 1px rgba(60, 64, 67, 0.15);
+  --shadow-md: 0 1px 2px 0 rgba(60, 64, 67, 0.3), 0 2px 6px 2px rgba(60, 64, 67, 0.15);
+  --shadow-lg: 0 4px 6px 0 rgba(60, 64, 67, 0.3), 0 4px 8px 3px rgba(60, 64, 67, 0.15);
+  --shadow-xl: 0 6px 10px 0 rgba(60, 64, 67, 0.3), 0 8px 16px 4px rgba(60, 64, 67, 0.15);
+
+  --text-primary: #202124;
+  --text-secondary: #5f6368;
+  --text-muted: #70757a;
+}
+
+/* ==================== BASE ==================== */
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  background: var(--crystal-void);
+  background-color: var(--bg-primary);
+  background-attachment: fixed;
+  height: 100vh;
+  color: var(--text-primary);
+  overflow: hidden;
+  position: relative;
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Animated Background Orbs */
+body::before {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before {
+    display: none;
+  }
+}
+
+#root {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 1;
+}
+
+/* ==================== SHARED KEYFRAMES ==================== */
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes overlayFade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-50px) scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==================== SHARED SCROLLBAR ==================== */
+
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(61, 217, 211, 0.3) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(61, 217, 211, 0.3);
+  border-radius: 3px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(61, 217, 211, 0.5);
+}
+
+/* ==================== UTILITIES ==================== */
+
+.flex {
+  display: flex;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.gap-sm {
+  gap: 0.5rem;
+}
+
+.gap-md {
+  gap: 1rem;
+}
+
+.gap-lg {
+  gap: 1.5rem;
+}
+
+.mt-sm {
+  margin-top: 0.5rem;
+}
+
+.mt-md {
+  margin-top: 1rem;
+}
+
+.mb-sm {
+  margin-bottom: 0.5rem;
+}
+
+.mb-md {
+  margin-bottom: 1rem;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}

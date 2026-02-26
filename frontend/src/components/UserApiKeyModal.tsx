@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import * as api from '../services/api';
 import CustomSelect from './CustomSelect';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface UserApiKeyModalProps {
   isOpen: boolean;
@@ -28,13 +29,7 @@ export default function UserApiKeyModal({ isOpen, onClose, onApiKeySaved }: User
     }
   }, [isOpen]);
 
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) onClose();
-    };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [isOpen, onClose]);
+  useEscapeKey(onClose, isOpen);
 
   const handleSave = () => {
     if (!newName.trim() || !newKey.trim()) return;

@@ -3,9 +3,18 @@ import { useTranslation } from 'react-i18next';
 import { History, RotateCcw, Sun, Moon, Settings } from 'lucide-react';
 import ConversationHistoryModal from '../components/ConversationHistoryModal';
 import JtiSettingsModal from '../components/JtiSettingsModal';
+import JtiMessageList from '../components/jti/JtiMessageList';
+import JtiInputArea from '../components/jti/JtiInputArea';
 import { fetchWithApiKey } from '../services/api';
-import '../styles/Jti.css';
-import '../styles/JtiLight.css';
+import { useTheme } from '../hooks/useTheme';
+import { useAutoResize } from '../hooks/useAutoResize';
+import { useScrollToBottom } from '../hooks/useScrollToBottom';
+import '../styles/shared/index.css';
+import '../styles/jti/layout.css';
+import '../styles/jti/messages.css';
+import '../styles/jti/settings.css';
+import '../styles/jti/theme-overrides.css';
+import '../styles/jti/light.css';
 
 interface Message {
   text: string;
@@ -36,20 +45,7 @@ export default function Jti() {
   const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
-    const saved = localStorage.getItem('theme');
-    return (saved === 'light' || saved === 'dark') ? saved : 'dark';
-  });
-
-  // Apply theme to document
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
-  };
+  const { theme, toggleTheme } = useTheme();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -170,22 +166,8 @@ export default function Jti() {
       .catch(() => setStatusText(t('status_failed')));
   }, [t]);
 
-  // 自動滾動到底部
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages]);
-
-  // 自動調整輸入框高度（直到上限）
-  useEffect(() => {
-    const el = inputRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    const styles = window.getComputedStyle(el);
-    const maxHeight = parseFloat(styles.maxHeight || '160');
-    const nextHeight = Math.min(el.scrollHeight, maxHeight);
-    el.style.height = `${nextHeight}px`;
-    el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
-  }, [userInput]);
+  useScrollToBottom(messagesEndRef, [messages]);
+  useAutoResize(inputRef, userInput);
 
   const sendMessage = useCallback(async (message: string, turnNumber?: number) => {
     if (!message || !sessionId || loading) return;
@@ -468,188 +450,36 @@ export default function Jti() {
       </header>
 
       <main className="jti-main">
-        <div className="messages-area">
-          {messages.length === 0 ? (
-            <div className="welcome-screen">
-              <div className="welcome-hero">
-                <div className="hero-icon-wrapper">
-                  <span className="hero-icon">🚬</span>
-                  <div className="icon-glow"></div>
-                </div>
-                <h2 className="hero-title">{t('welcome_title')}</h2>
-                <p className="hero-description">
-                  {t('welcome_description')}
-                </p>
-              </div>
-
-              <div className="quick-start">
-                <p className="quick-start-label">{t('quick_start')}</p>
-                <div className="quick-actions">
-                  {quickActions.map((action, i) => (
-                    <button
-                      key={i}
-                      className={`quick-action ${action.primary ? 'primary' : ''}`}
-                      onClick={() => sendMessage(action.msg)}
-                      disabled={loading || !sessionId}
-                    >
-                      {action.icon && <span className="action-icon">{action.icon}</span>}
-                      <span className="action-text">{action.text}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="messages-container">
-              {messages.map((msg, idx) => (
-                <div
-                  key={`${msg.timestamp}-${idx}`}
-                  className={`message ${msg.type}`}
-                  style={{ animationDelay: `${idx * 0.05}s` }}
-                >
-                  <div className="message-wrapper">
-                    <div className="message-avatar">
-                      <span className="avatar-icon">
-                        {msg.type === 'user' ? '👤' : msg.type === 'assistant' ? '🤖' : '💡'}
-                      </span>
-                    </div>
-                    <div className="message-bubble">
-                      {editingTurn !== null && editingTurn === msg.turnNumber && msg.type === 'user' ? (
-                        <div className="message-edit-area">
-                          <textarea
-                            ref={editTextareaRef}
-                            className="message-edit-textarea"
-                            value={editText}
-                            onChange={e => setEditText(e.target.value)}
-                            onKeyDown={e => handleEditKeyDown(e, msg.turnNumber!)}
-                            rows={Math.min(editText.split('\n').length + 1, 5)}
-                          />
-                          <div className="message-edit-actions">
-                            <button
-                              className="message-edit-btn save"
-                              onClick={() => msg.turnNumber && handleEditAndResend(msg.turnNumber, editText.trim())}
-                              disabled={!editText.trim()}
-                            >
-                              送出
-                            </button>
-                            <button
-                              className="message-edit-btn cancel"
-                              onClick={() => setEditingTurn(null)}
-                            >
-                              取消
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="message-text">{msg.text}</div>
-                          {msg.toolCalls && msg.toolCalls.length > 0 && (
-                            <div className="tool-badge">
-                              <span className="tool-icon">⚡</span>
-                              <span className="tool-text">
-                                {msg.toolCalls.map(t => t.tool).join(' → ')}
-                              </span>
-                            </div>
-                          )}
-
-                          {/* 操作按鈕 - hover 時顯示 */}
-                          {!loading && msg.turnNumber && (
-                            <div className="message-actions">
-                              {msg.type === 'user' && (
-                                <button
-                                  className="message-action-btn"
-                                  onClick={() => {
-                                    if (msg.turnNumber && !loading) {
-                                      setEditingTurn(msg.turnNumber);
-                                      setEditText(msg.text);
-                                    }
-                                  }}
-                                  title="編輯並重送"
-                                  aria-label="編輯訊息"
-                                >
-                                  ✎
-                                </button>
-                              )}
-                              {msg.type === 'assistant' && (
-                                <button
-                                  className="message-action-btn"
-                                  onClick={() => msg.turnNumber && handleRegenerate(msg.turnNumber)}
-                                  title="重新生成"
-                                  aria-label="重新生成回覆"
-                                >
-                                  ↻
-                                </button>
-                              )}
-                            </div>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-
-              {isTyping && (
-                <div className="message assistant typing-indicator">
-                  <div className="message-wrapper">
-                    <div className="message-avatar">
-                      <span className="avatar-icon">🤖</span>
-                    </div>
-                    <div className="message-bubble">
-                      <div className="typing-dots">
-                        <span className="dot"></span>
-                        <span className="dot"></span>
-                        <span className="dot"></span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              <div ref={messagesEndRef} />
-            </div>
-          )}
-        </div>
-
-        <div className="input-area">
-          <form onSubmit={handleSubmit} className="input-form">
-            <div className="input-container">
-              <div className="input-wrapper">
-                <textarea
-                  ref={inputRef}
-                  className="chat-input"
-                  value={userInput}
-                  onChange={(e) => setUserInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={loading ? t('status_ready') : t('input_placeholder')}
-                  disabled={loading || !sessionId}
-                  autoComplete="off"
-                  spellCheck={false}
-                />
-                {/* 狀態列 (輸入框內右下角) */}
-                <div className="inline-status">
-                  <span className="status-dot"></span>
-                  <span className="status-text">{statusText}</span>
-                  {sessionInfo && <span className="session-badge">{sessionInfo}</span>}
-                </div>
-              </div>
-              <button
-                type="submit"
-                className="send-button"
-                disabled={loading || !sessionId || !userInput.trim()}
-                aria-label="發送訊息"
-              >
-                {loading ? (
-                  <span className="button-spinner"></span>
-                ) : (
-                  <svg className="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-                    <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
-                  </svg>
-                )}
-              </button>
-            </div>
-          </form>
-        </div>
+        <JtiMessageList
+          messages={messages}
+          loading={loading}
+          sessionId={sessionId}
+          isTyping={isTyping}
+          editingTurn={editingTurn}
+          editText={editText}
+          editTextareaRef={editTextareaRef}
+          messagesEndRef={messagesEndRef}
+          sendMessage={sendMessage}
+          handleRegenerate={handleRegenerate}
+          handleEditAndResend={handleEditAndResend}
+          setEditingTurn={setEditingTurn}
+          setEditText={setEditText}
+          handleEditKeyDown={handleEditKeyDown}
+          quickActions={quickActions}
+          t={t}
+        />
+        <JtiInputArea
+          userInput={userInput}
+          loading={loading}
+          sessionId={sessionId}
+          statusText={statusText}
+          sessionInfo={sessionInfo}
+          setUserInput={setUserInput}
+          handleSubmit={handleSubmit}
+          handleKeyDown={handleKeyDown}
+          inputRef={inputRef}
+          t={t}
+        />
       </main>
 
       {/* 設定 Modal */}

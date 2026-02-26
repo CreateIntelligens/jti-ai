@@ -1,0 +1,247 @@
+/* ==================== FORM CONTROLS ==================== */
+
+.app-container input:not([type="checkbox"]),
+.app-container select,
+.app-container textarea {
+  padding: 0.9rem 1.2rem;
+  background: rgba(26, 31, 58, 0.5);
+  border: 1px solid rgba(61, 217, 211, 0.2);
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: #e0e6ff;
+  outline: none;
+  transition: var(--transition-smooth);
+}
+
+/* Custom styling specifically for Selects to look better */
+.app-container select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%233dd9d3%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem top 50%;
+  background-size: 0.65rem auto;
+  cursor: pointer;
+}
+
+.app-container select option {
+  background-color: var(--crystal-dark);
+  color: #e0e6ff;
+  padding: 10px;
+}
+
+.app-container input:not([type="checkbox"]):focus,
+.app-container select:focus,
+.app-container textarea:focus {
+  border-color: var(--crystal-teal);
+  box-shadow: 0 0 0 3px rgba(61, 217, 211, 0.15), var(--glow-teal);
+  background: rgba(26, 31, 58, 0.7);
+}
+
+.app-container textarea {
+  flex: 1;
+  resize: none;
+  min-height: 56px;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.6;
+}
+
+/* Base button styles — scope to non-header areas */
+.app-content button,
+.modal button,
+.overlay button {
+  padding: 0.9rem 1.75rem;
+  background: var(--primary-color);
+  color: var(--crystal-dark);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  transition: var(--transition-smooth);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(61, 217, 211, 0.3);
+}
+
+.app-content button:hover,
+.modal button:hover,
+.overlay button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(61, 217, 211, 0.4), var(--glow-teal);
+}
+
+.app-content button:active,
+.modal button:active,
+.overlay button:active {
+  transform: translateY(0);
+}
+
+.app-content button:disabled,
+.modal button:disabled,
+.overlay button:disabled {
+  background: rgba(100, 100, 120, 0.3);
+  color: rgba(200, 200, 220, 0.5);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.app-content button.secondary,
+.modal button.secondary,
+.overlay button.secondary {
+  background: rgba(42, 49, 84, 0.6);
+  color: var(--crystal-cyan);
+  border: 1px solid rgba(61, 217, 211, 0.3);
+  box-shadow: none;
+}
+
+.app-content button.secondary:hover,
+.modal button.secondary:hover,
+.overlay button.secondary:hover {
+  background: rgba(42, 49, 84, 0.8);
+  border-color: var(--crystal-teal);
+}
+
+.app-content button.danger,
+.modal button.danger,
+.overlay button.danger {
+  background: var(--danger-color);
+  color: white;
+  box-shadow: 0 4px 16px rgba(255, 107, 157, 0.3);
+}
+
+.app-content button.danger:hover,
+.modal button.danger:hover,
+.overlay button.danger:hover {
+  box-shadow: 0 8px 24px rgba(255, 107, 157, 0.4), 0 0 30px rgba(255, 107, 157, 0.2);
+}
+
+.app-content button.small,
+.modal button.small,
+.overlay button.small {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+}
+
+/* ==================== CUSTOM SELECT ==================== */
+.custom-select-container {
+  position: relative;
+  width: 100%;
+}
+
+.custom-select-trigger {
+  padding: 0.9rem 1.2rem;
+  background: rgba(26, 31, 58, 0.5);
+  border: 1px solid rgba(61, 217, 211, 0.2);
+  border-radius: 12px;
+  font-size: 0.95rem;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: var(--transition-smooth);
+}
+
+.custom-select-trigger.has-value {
+  color: #e0e6ff;
+}
+
+.custom-select-container.disabled .custom-select-trigger {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.custom-select-trigger.open {
+  background: rgba(26, 31, 58, 0.7);
+  border-color: var(--crystal-teal);
+  box-shadow: 0 0 0 3px rgba(61, 217, 211, 0.15), var(--glow-teal);
+}
+
+.custom-select-trigger svg {
+  transition: transform 0.3s ease;
+}
+
+.custom-select-trigger.open svg {
+  transform: rotate(180deg);
+}
+
+.custom-select-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: rgba(15, 20, 35, 0.95);
+  border: 1px solid rgba(61, 217, 211, 0.3);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), var(--glow-teal);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  z-index: 1000;
+  max-height: 240px;
+  overflow-y: auto;
+  padding: 0.5rem;
+  animation: dropdownFadeIn 0.2s ease-out forwards;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(61, 217, 211, 0.3) transparent;
+}
+
+.custom-select-dropdown::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-select-dropdown::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-select-dropdown::-webkit-scrollbar-thumb {
+  background: rgba(61, 217, 211, 0.3);
+  border-radius: 3px;
+}
+
+.custom-select-dropdown::-webkit-scrollbar-thumb:hover {
+  background: rgba(61, 217, 211, 0.5);
+}
+
+.custom-select-option {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #e0e6ff;
+  background: transparent;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  transition: all 0.2s ease;
+}
+
+.custom-select-option:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.custom-select-option.selected {
+  color: var(--crystal-cyan);
+  background: rgba(61, 217, 211, 0.1);
+}
+
+.custom-select-empty {
+  padding: 0.75rem 1rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

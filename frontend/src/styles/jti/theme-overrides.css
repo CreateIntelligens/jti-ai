@@ -1,0 +1,109 @@
+/* ==================== MODAL OVERRIDES ==================== */
+.conversation-history-modal.jti-theme {
+  --crystal-teal: var(--gold);
+  --crystal-cyan: var(--gold-dark);
+  --primary-color: var(--gold);
+  --primary-hover: var(--gold-dark);
+  background: linear-gradient(135deg, rgba(26, 31, 46, 0.95), rgba(10, 13, 18, 0.98)) !important;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5), 0 0 60px rgba(224, 192, 104, 0.08) !important;
+  border-color: rgba(224, 192, 104, 0.2) !important;
+}
+
+.conversation-history-modal.jti-theme .conversation-header-icon {
+  background: rgba(224, 192, 104, 0.1) !important;
+  border-color: rgba(224, 192, 104, 0.25) !important;
+  color: var(--gold) !important;
+}
+
+.conversation-history-modal.jti-theme .session-badge,
+.conversation-history-modal.jti-theme .turn-badge {
+  background: rgba(224, 192, 104, 0.12) !important;
+  border-color: rgba(224, 192, 104, 0.3) !important;
+  color: var(--gold) !important;
+}
+
+.conversation-history-modal.jti-theme .turn-detail-response {
+  background: rgba(224, 192, 104, 0.05) !important;
+  border-color: rgba(224, 192, 104, 0.12) !important;
+}
+
+.conversation-history-modal.jti-theme .date-picker-input:hover,
+.conversation-history-modal.jti-theme .date-picker-input:focus-within,
+.conversation-history-modal.jti-theme .date-picker-input.active {
+  box-shadow: 0 0 0 2px rgba(224, 192, 104, 0.15) !important;
+  border-color: var(--gold) !important;
+}
+
+.conversation-history-modal.jti-theme .session-checkbox:checked {
+  background: var(--gold) !important;
+  border-color: var(--gold) !important;
+}
+
+.conversation-history-modal.jti-theme .session-card:hover {
+  border-color: var(--gold) !important;
+}
+
+.conversation-history-modal.jti-theme .date-picker-tabs button.active {
+  color: var(--gold) !important;
+  background: rgba(224, 192, 104, 0.08) !important;
+  box-shadow: inset 0 -2px 0 var(--gold) !important;
+}
+
+.conversation-history-modal.jti-theme .mini-cal-day.selected,
+.conversation-history-modal.jti-theme .mini-cal-day.in-range {
+  background: var(--gold) !important;
+}
+
+.conversation-history-modal.jti-theme .mini-cal-day.today {
+  color: var(--gold) !important;
+}
+
+.conversation-history-modal.jti-theme .session-checkbox:checked {
+  background: var(--gold) !important;
+  border-color: var(--gold) !important;
+}
+
+.conversation-history-modal.jti-theme .session-checkbox:checked::after {
+  color: var(--bg) !important;
+}
+
+.conversation-history-modal.jti-theme .select-all-btn {
+  color: var(--gold) !important;
+  border-color: rgba(224, 192, 104, 0.4) !important;
+  background: transparent !important;
+}
+
+.conversation-history-modal.jti-theme .select-all-btn:hover {
+  background: rgba(224, 192, 104, 0.1) !important;
+}
+
+.conversation-history-modal.jti-theme .select-all-btn.all-selected {
+  background: var(--gold) !important;
+  color: var(--bg) !important;
+}
+
+.conversation-history-modal.jti-theme .batch-delete-btn {
+  color: #e57373 !important;
+  border-color: rgba(229, 115, 115, 0.4) !important;
+  background: transparent !important;
+}
+
+.conversation-history-modal.jti-theme .batch-delete-btn:hover {
+  background: rgba(229, 115, 115, 0.1) !important;
+}
+
+.conversation-history-modal.jti-theme .turn-resume-btn {
+  background: rgba(224, 192, 104, 0.1) !important;
+  border-color: var(--gold) !important;
+  color: var(--gold) !important;
+}
+
+.conversation-history-modal.jti-theme .turn-resume-btn:hover {
+  background: rgba(224, 192, 104, 0.2) !important;
+  box-shadow: 0 0 12px rgba(224, 192, 104, 0.2) !important;
+}
+
+.conversation-history-modal.jti-theme .conversation-spinner {
+  border-color: rgba(224, 192, 104, 0.15) !important;
+  border-top-color: var(--gold) !important;
+}
