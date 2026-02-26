@@ -130,12 +130,13 @@ def _normalize_runtime_settings(raw: Optional[Dict[str, Any]]) -> JtiRuntimeSett
 def load_runtime_settings_from_prompt_manager(
     prompt_manager,
     prompt_id: Optional[str] = None,
+    store_name: str = JTI_STORE_NAME,
 ) -> JtiRuntimeSettings:
     """Load effective runtime settings from PromptManager."""
     if not prompt_manager:
         return get_default_runtime_settings()
 
-    store_prompts = prompt_manager._load_store_prompts(JTI_STORE_NAME)
+    store_prompts = prompt_manager._load_store_prompts(store_name)
     runtime_prompt_id = _resolve_runtime_prompt_id(store_prompts, prompt_id)
     raw = _load_raw_runtime_settings(store_prompts, runtime_prompt_id)
 
@@ -153,9 +154,10 @@ def save_runtime_settings_to_prompt_manager(
     prompt_manager,
     settings: JtiRuntimeSettings,
     prompt_id: Optional[str] = None,
+    store_name: str = JTI_STORE_NAME,
 ) -> str:
     """Persist runtime settings in PromptManager under JTI store document."""
-    store_prompts = prompt_manager._load_store_prompts(JTI_STORE_NAME)
+    store_prompts = prompt_manager._load_store_prompts(store_name)
     runtime_prompt_id = _resolve_runtime_prompt_id(store_prompts, prompt_id)
 
     runtime_map = getattr(store_prompts, "jti_runtime_settings_by_prompt", None)

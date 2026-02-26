@@ -131,7 +131,8 @@ class TestRebuildSessionFromLogs(unittest.TestCase):
         self.assertEqual(session.step, SessionStep.QUIZ)
         self.assertEqual(session.answers, {"q1": "q1_a", "q2": "q2_b"})
         self.assertEqual(session.current_q_index, 2)
-        self.assertEqual(len(session.selected_questions), 3)     # q1, q2, q3
+        # Rebuild now deterministically補齊到完整題數，避免 rollback 後缺題。
+        self.assertEqual(len(session.selected_questions), 5)
         self.assertEqual(session.current_question["id"], "q3")   # next question
         self.assertEqual(len(session.chat_history), 6)            # 3 turns x 2
         self.mock_sessions.update_one.assert_called_once()

@@ -2,7 +2,7 @@ import random
 import unittest
 
 from app.models.session import Session
-from app.tools.quiz import generate_random_quiz, load_quiz_bank
+from app.tools.quiz import generate_random_quiz, load_quiz_bank, complete_selected_questions
 from app.tools.color_results import calculate_color_result
 
 
@@ -34,3 +34,14 @@ class TestColorQuizSession(unittest.TestCase):
         self.assertEqual(result["color_id"], "metal")
         self.assertEqual(result["color_scores"]["metal"], 2)
         self.assertEqual(result["color_scores"]["dark"], 2)
+
+    def test_complete_selected_questions_fills_missing_slots(self):
+        random.seed(42)
+        selected = generate_random_quiz(language="zh")
+        partial = selected[:3]
+
+        completed = complete_selected_questions(partial, language="zh")
+
+        self.assertEqual(len(completed), 5)
+        self.assertEqual([q["id"] for q in completed[:3]], [q["id"] for q in partial])
+        self.assertEqual(len({q["id"] for q in completed}), 5)

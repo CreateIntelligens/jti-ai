@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Lock, Copy } from 'lucide-react';
 import ConfirmDialog from '../ConfirmDialog';
+import type { JtiRuntimeSettings } from '../../services/api';
 
 interface Prompt {
   id: string;
@@ -13,33 +14,11 @@ interface Prompt {
   is_active?: boolean;
 }
 
-interface RuntimeWelcome {
-  title: string;
-  description: string;
-}
-
-interface RuntimeRuleSections {
-  role_scope: string;
-  scope_limits: string;
-  response_style: string;
-  knowledge_rules: string;
-}
-
-interface RuntimeSettings {
-  response_rule_sections: {
-    zh: RuntimeRuleSections;
-    en: RuntimeRuleSections;
-  };
-  welcome: {
-    zh: RuntimeWelcome;
-    en: RuntimeWelcome;
-  };
-  max_response_chars: number;
-}
+type RuntimeSettings = JtiRuntimeSettings;
+type RuntimeRuleSections = JtiRuntimeSettings['response_rule_sections']['zh'];
 
 export interface JtiPersonaTabProps {
   prompts: Prompt[];
-  activePromptId: string | null;
   maxCustom: number;
   loading: boolean;
   successMsg: string | null;
@@ -63,16 +42,17 @@ export interface JtiPersonaTabProps {
   onDeleteConfirm: () => Promise<void>;
   onDeleteCancel: () => void;
   runtimeSettings: RuntimeSettings | null;
+  runtimePromptId: string;
   defaultRuntimeSettings: RuntimeSettings | null;
   savingRuntimeSettings: boolean;
-  onSaveRuntimeSettings: (settings: RuntimeSettings) => Promise<void>;
+  onSelectRuntimePrompt: (promptId: string) => Promise<void>;
+  onSaveRuntimeSettings: (settings: RuntimeSettings, promptId: string) => Promise<void>;
 }
 
 const SYSTEM_DEFAULT_ID = 'system_default';
 
 export default function JtiPersonaTab({
   prompts,
-  activePromptId,
   maxCustom,
   loading,
   successMsg,
@@ -96,8 +76,10 @@ export default function JtiPersonaTab({
   onDeleteConfirm,
   onDeleteCancel,
   runtimeSettings,
+  runtimePromptId,
   defaultRuntimeSettings,
   savingRuntimeSettings,
+  onSelectRuntimePrompt,
   onSaveRuntimeSettings,
 }: JtiPersonaTabProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
@@ -105,11 +87,11 @@ export default function JtiPersonaTab({
   const [newContent, setNewContent] = useState('');
   const [runtimeDraft, setRuntimeDraft] = useState<RuntimeSettings | null>(runtimeSettings);
 
-  const currentLang = language === 'en' ? 'en' : 'zh';
+  const currentLang = typeof language === 'string' && language.trim().toLowerCase().startsWith('en')
+    ? 'en'
+    : 'zh';
   const customPrompts = prompts.filter(p => p.id !== SYSTEM_DEFAULT_ID);
   const defaultPrompt = prompts.find(p => p.id === SYSTEM_DEFAULT_ID);
-  const activeRuntimePromptId = activePromptId || SYSTEM_DEFAULT_ID;
-  const isRuntimeReadonly = activeRuntimePromptId === SYSTEM_DEFAULT_ID;
   const showRoleScopeField = currentLang !== 'zh';
 
   useEffect(() => {
@@ -118,11 +100,28 @@ export default function JtiPersonaTab({
 
   const toggleExpand = (id: string) => {
     setExpandedIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      const next = new Set<string>();
+      if (!prev.has(id)) {
+        next.add(id);
+      }
       return next;
     });
+  };
+
+  const handleToggleExpand = (id: string) => {
+    const willExpand = !expandedIds.has(id);
+    toggleExpand(id);
+    if (willExpand) {
+      void onSelectRuntimePrompt(id);
+    }
+  };
+
+  const handleStartEdit = (prompt: Prompt) => {
+    onStartEdit(prompt);
+    if (!expandedIds.has(prompt.id)) {
+      setExpandedIds(new Set([prompt.id]));
+      void onSelectRuntimePrompt(prompt.id);
+    }
   };
 
   const getPreview = (content: string, maxLines = 3) => {
@@ -131,9 +130,7 @@ export default function JtiPersonaTab({
     return lines.slice(0, maxLines).join('\n') + '...';
   };
 
-  const shouldShowExpandButton = (content: string, isActive?: boolean) => (
-    content.split('\n').length > 3 || !!isActive
-  );
+  const shouldShowExpandButton = (_content?: string, _isActive?: boolean) => true;
 
   const getExpandButtonText = (expanded: boolean, _isActive?: boolean) => {
     return expanded ? '收起完整內容' : '展開完整內容';
@@ -145,22 +142,6 @@ export default function JtiPersonaTab({
     await onCreate(name, newContent.trim());
     setNewName('');
     setNewContent('');
-  };
-
-  const updateResponseRule = (value: string) => {
-    setRuntimeDraft(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        response_rule_sections: {
-          ...prev.response_rule_sections,
-          [currentLang]: {
-            ...prev.response_rule_sections[currentLang],
-            response_style: value,
-          },
-        },
-      };
-    });
   };
 
   const updateRuleSection = (field: keyof RuntimeRuleSections, value: string) => {
@@ -238,11 +219,16 @@ export default function JtiPersonaTab({
     );
   };
 
-  const renderRuntimeSettings = () => {
-    if (!runtimeDraft) return null;
-
-    if (isRuntimeReadonly) {
+  const renderRuntimeSettings = (targetPromptId: string) => {
+    if (targetPromptId === SYSTEM_DEFAULT_ID) {
       return renderReadonlyRuntimeSettings(defaultRuntimeSettings);
+    }
+    if (!runtimeDraft || runtimePromptId !== targetPromptId) {
+      return (
+        <div className="jti-runtime-settings">
+          <div className="jti-settings-loading">載入回覆規則中...</div>
+        </div>
+      );
     }
 
     return (
@@ -288,7 +274,7 @@ export default function JtiPersonaTab({
           className="jti-prompt-textarea"
           rows={6}
           value={runtimeDraft.response_rule_sections[currentLang].response_style}
-          onChange={e => updateResponseRule(e.target.value)}
+          onChange={e => updateRuleSection('response_style', e.target.value)}
           placeholder="回覆格式規則..."
         />
 
@@ -303,7 +289,7 @@ export default function JtiPersonaTab({
 
         <button
           className="jti-btn primary full-width"
-          onClick={() => onSaveRuntimeSettings(runtimeDraft)}
+          onClick={() => onSaveRuntimeSettings(runtimeDraft, targetPromptId)}
           disabled={savingRuntimeSettings}
         >
           {savingRuntimeSettings ? '儲存中...' : '儲存回覆規則'}
@@ -359,7 +345,7 @@ export default function JtiPersonaTab({
                 {shouldShowExpandButton(defaultPrompt.content, defaultPrompt.is_active) && (
                   <button
                     className="jti-btn small secondary jti-prompt-expand"
-                    onClick={() => toggleExpand(defaultPrompt.id)}
+                    onClick={() => handleToggleExpand(defaultPrompt.id)}
                   >
                     {getExpandButtonText(expandedIds.has(defaultPrompt.id), defaultPrompt.is_active)}
                   </button>
@@ -371,8 +357,7 @@ export default function JtiPersonaTab({
                 {expandedIds.has(defaultPrompt.id) ? defaultPrompt.content : getPreview(defaultPrompt.content)}
               </pre>
             </div>
-            {expandedIds.has(defaultPrompt.id) &&
-              renderReadonlyRuntimeSettings(defaultRuntimeSettings)}
+            {expandedIds.has(defaultPrompt.id) && renderRuntimeSettings(defaultPrompt.id)}
           </div>
         )}
 
@@ -435,7 +420,7 @@ export default function JtiPersonaTab({
                     )}
                     <button
                       className="jti-btn small secondary"
-                      onClick={() => onStartEdit(prompt)}
+                      onClick={() => handleStartEdit(prompt)}
                     >
                       編輯
                     </button>
@@ -448,7 +433,7 @@ export default function JtiPersonaTab({
                     {shouldShowExpandButton(prompt.content, prompt.is_active) && (
                       <button
                         className="jti-btn small secondary jti-prompt-expand"
-                        onClick={() => toggleExpand(prompt.id)}
+                        onClick={() => handleToggleExpand(prompt.id)}
                       >
                         {getExpandButtonText(expandedIds.has(prompt.id), prompt.is_active)}
                       </button>
@@ -462,7 +447,7 @@ export default function JtiPersonaTab({
                 </div>
               </>
             )}
-            {prompt.is_active && expandedIds.has(prompt.id) && renderRuntimeSettings()}
+            {(expandedIds.has(prompt.id) || editingId === prompt.id) && renderRuntimeSettings(prompt.id)}
           </div>
         ))}
       </div>

@@ -215,13 +215,15 @@ export interface JtiRuntimeSettingsResponse {
   settings: JtiRuntimeSettings;
 }
 
-export async function listJtiPrompts(): Promise<any> {
-  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/`);
+export async function listJtiPrompts(language: string = 'zh'): Promise<any> {
+  const normalizedLanguage = language.toLowerCase().startsWith('en') ? 'en' : 'zh';
+  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/?language=${normalizedLanguage}`);
   return handleResponse<any>(response);
 }
 
-export async function createJtiPrompt(name: string, content: string): Promise<any> {
-  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/`, {
+export async function createJtiPrompt(name: string, content: string, language: string = 'zh'): Promise<any> {
+  const normalizedLanguage = language.toLowerCase().startsWith('en') ? 'en' : 'zh';
+  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/?language=${normalizedLanguage}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, content }),
@@ -229,8 +231,14 @@ export async function createJtiPrompt(name: string, content: string): Promise<an
   return handleResponse<any>(response);
 }
 
-export async function updateJtiPrompt(promptId: string, name?: string, content?: string): Promise<any> {
-  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/${promptId}`, {
+export async function updateJtiPrompt(
+  promptId: string,
+  name?: string,
+  content?: string,
+  language: string = 'zh',
+): Promise<any> {
+  const normalizedLanguage = language.toLowerCase().startsWith('en') ? 'en' : 'zh';
+  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/${promptId}?language=${normalizedLanguage}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, content }),
@@ -238,15 +246,17 @@ export async function updateJtiPrompt(promptId: string, name?: string, content?:
   return handleResponse<any>(response);
 }
 
-export async function deleteJtiPrompt(promptId: string): Promise<void> {
-  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/${promptId}`, {
+export async function deleteJtiPrompt(promptId: string, language: string = 'zh'): Promise<void> {
+  const normalizedLanguage = language.toLowerCase().startsWith('en') ? 'en' : 'zh';
+  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/${promptId}?language=${normalizedLanguage}`, {
     method: 'DELETE',
   });
   await handleResponse<void>(response);
 }
 
-export async function setActiveJtiPrompt(promptId: string | null): Promise<void> {
-  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/active`, {
+export async function setActiveJtiPrompt(promptId: string | null, language: string = 'zh'): Promise<void> {
+  const normalizedLanguage = language.toLowerCase().startsWith('en') ? 'en' : 'zh';
+  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/active?language=${normalizedLanguage}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt_id: promptId }),
@@ -254,17 +264,25 @@ export async function setActiveJtiPrompt(promptId: string | null): Promise<void>
   await handleResponse<void>(response);
 }
 
-export async function cloneDefaultJtiPrompt(): Promise<any> {
-  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/clone`, {
+export async function cloneDefaultJtiPrompt(language: string = 'zh'): Promise<any> {
+  const normalizedLanguage = language.toLowerCase().startsWith('en') ? 'en' : 'zh';
+  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/clone?language=${normalizedLanguage}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   });
   return handleResponse<any>(response);
 }
 
-export async function getJtiRuntimeSettings(promptId?: string): Promise<JtiRuntimeSettingsResponse> {
-  const query = promptId ? `?prompt_id=${encodeURIComponent(promptId)}` : '';
-  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/runtime-settings${query}`, {
+export async function getJtiRuntimeSettings(
+  promptId?: string,
+  language: string = 'zh',
+): Promise<JtiRuntimeSettingsResponse> {
+  const normalizedLanguage = language.toLowerCase().startsWith('en') ? 'en' : 'zh';
+  const query = new URLSearchParams({ language: normalizedLanguage });
+  if (promptId) {
+    query.set('prompt_id', promptId);
+  }
+  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/runtime-settings?${query.toString()}`, {
     method: 'GET',
   });
   return handleResponse<JtiRuntimeSettingsResponse>(response);
@@ -273,9 +291,11 @@ export async function getJtiRuntimeSettings(promptId?: string): Promise<JtiRunti
 export async function updateJtiRuntimeSettings(
   settings: JtiRuntimeSettings,
   promptId?: string,
+  language: string = 'zh',
 ): Promise<{ settings: JtiRuntimeSettings; message: string; prompt_id?: string }> {
+  const normalizedLanguage = language.toLowerCase().startsWith('en') ? 'en' : 'zh';
   const payload = promptId ? { ...settings, prompt_id: promptId } : settings;
-  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/runtime-settings`, {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/runtime-settings?language=${normalizedLanguage}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),

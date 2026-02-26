@@ -28,8 +28,12 @@ interface KBFile { name: string; display_name: string; size?: number; editable?:
 
 const MAX_CUSTOM = 3;
 const SYSTEM_DEFAULT_ID = 'system_default';
+const normalizeLanguage = (value?: string) => (
+  typeof value === 'string' && value.trim().toLowerCase().startsWith('en') ? 'en' : 'zh'
+);
 
 export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, language = 'zh' }: JtiSettingsModalProps) {
+  const normalizedLanguage = normalizeLanguage(language);
   const [activeTab, setActiveTab] = useState<'prompt' | 'quiz' | 'kb'>('prompt');
 
   // === Prompt state ===
@@ -46,6 +50,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   const [deleting, setDeleting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [runtimeSettings, setRuntimeSettings] = useState<api.JtiRuntimeSettings | null>(null);
+  const [runtimePromptId, setRuntimePromptId] = useState<string>(SYSTEM_DEFAULT_ID);
   const [defaultRuntimeSettings, setDefaultRuntimeSettings] = useState<api.JtiRuntimeSettings | null>(null);
   const [savingRuntimeSettings, setSavingRuntimeSettings] = useState(false);
 
@@ -74,9 +79,14 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
         await refreshRuntimeSettings(latestActivePromptId);
       };
       void init();
-      if (activeTab === 'kb') loadKbFiles();
     }
-  }, [isOpen]);
+  }, [isOpen, normalizedLanguage]);
+
+  useEffect(() => {
+    if (isOpen && activeTab === 'kb') {
+      void loadKbFiles();
+    }
+  }, [isOpen, activeTab, normalizedLanguage]);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -102,7 +112,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   const loadPrompts = async (): Promise<string | null> => {
     setLoading(true);
     try {
-      const data = await api.listJtiPrompts();
+      const data = await api.listJtiPrompts(normalizedLanguage);
       setPrompts(data.prompts || []);
       const latestActivePromptId = data.active_prompt_id || null;
       setActivePromptId(latestActivePromptId);
@@ -118,8 +128,9 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
 
   const loadRuntimeSettings = async (promptId: string) => {
     try {
-      const data = await api.getJtiRuntimeSettings(promptId);
+      const data = await api.getJtiRuntimeSettings(promptId, normalizedLanguage);
       setRuntimeSettings(data.settings || null);
+      setRuntimePromptId(promptId);
     } catch (e) {
       console.error('Failed to load JTI runtime settings:', e);
     }
@@ -127,7 +138,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
 
   const loadDefaultRuntimeSettings = async () => {
     try {
-      const data = await api.getJtiRuntimeSettings(SYSTEM_DEFAULT_ID);
+      const data = await api.getJtiRuntimeSettings(SYSTEM_DEFAULT_ID, normalizedLanguage);
       setDefaultRuntimeSettings(data.settings || null);
     } catch (e) {
       console.error('Failed to load default JTI runtime settings:', e);
@@ -135,16 +146,22 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   };
 
   const refreshRuntimeSettings = async (latestActivePromptId: string | null) => {
-    await Promise.all([
-      loadRuntimeSettings(resolveRuntimePromptId(latestActivePromptId)),
-      loadDefaultRuntimeSettings(),
-    ]);
+    const targetPromptId = resolveRuntimePromptId(latestActivePromptId);
+    await Promise.all([loadRuntimeSettings(targetPromptId), loadDefaultRuntimeSettings()]);
+  };
+
+  const handleSelectRuntimePrompt = async (promptId: string) => {
+    if (promptId === SYSTEM_DEFAULT_ID) {
+      setRuntimePromptId(SYSTEM_DEFAULT_ID);
+      return;
+    }
+    await loadRuntimeSettings(promptId);
   };
 
   const handleCreate = async (name: string, content: string) => {
     setCreating(true);
     try {
-      await api.createJtiPrompt(name, content);
+      await api.createJtiPrompt(name, content, normalizedLanguage);
       const latestActivePromptId = await loadPrompts();
       await refreshRuntimeSettings(latestActivePromptId);
     } catch (e) {
@@ -158,7 +175,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   const handleCloneDefault = async () => {
     setCloning(true);
     try {
-      await api.cloneDefaultJtiPrompt();
+      await api.cloneDefaultJtiPrompt(normalizedLanguage);
       const latestActivePromptId = await loadPrompts();
       await refreshRuntimeSettings(latestActivePromptId);
       onPromptChange();
@@ -174,7 +191,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
 
   const handleSetActive = async (promptId: string | null) => {
     try {
-      await api.setActiveJtiPrompt(promptId);
+      await api.setActiveJtiPrompt(promptId, normalizedLanguage);
       const latestActivePromptId = await loadPrompts();
       await refreshRuntimeSettings(latestActivePromptId);
       onPromptChange();
@@ -199,7 +216,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   const saveEdit = async () => {
     if (!editingId) return;
     try {
-      await api.updateJtiPrompt(editingId, editName, editContent);
+      await api.updateJtiPrompt(editingId, editName, editContent, normalizedLanguage);
       const latestActivePromptId = await loadPrompts();
       await refreshRuntimeSettings(latestActivePromptId);
       if (editingId === activePromptId) onPromptChange();
@@ -218,7 +235,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
     const promptId = confirmDeleteId;
     setDeleting(true);
     try {
-      await api.deleteJtiPrompt(promptId);
+      await api.deleteJtiPrompt(promptId, normalizedLanguage);
       setConfirmDeleteId(null);
       const latestActivePromptId = await loadPrompts();
       await refreshRuntimeSettings(latestActivePromptId);
@@ -233,18 +250,21 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
     }
   };
 
-  const handleSaveRuntimeSettings = async (settings: api.JtiRuntimeSettings) => {
-    if (!activePromptId) {
+  const handleSaveRuntimeSettings = async (
+    settings: api.JtiRuntimeSettings,
+    promptId: string,
+  ) => {
+    if (!promptId || promptId === SYSTEM_DEFAULT_ID) {
       alert('預設人物設定的回覆規則為唯讀，請先建立副本並啟用後再編輯。');
       return;
     }
 
     setSavingRuntimeSettings(true);
     try {
-      const runtimePromptId = resolveRuntimePromptId(activePromptId);
-      const result = await api.updateJtiRuntimeSettings(settings, runtimePromptId);
+      const result = await api.updateJtiRuntimeSettings(settings, promptId, normalizedLanguage);
       setRuntimeSettings(result.settings);
-      onPromptChange();
+      setRuntimePromptId(promptId);
+      if (promptId === activePromptId) onPromptChange();
       setSuccessMsg('✅ 已更新回覆規則');
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (e) {
@@ -259,7 +279,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   const loadKbFiles = async () => {
     setKbLoading(true);
     try {
-      const data = await api.listJtiKnowledgeFiles(language);
+      const data = await api.listJtiKnowledgeFiles(normalizedLanguage);
       setKbFiles(data.files || []);
     } catch (e) {
       console.error('Failed to load KB files:', e);
@@ -272,7 +292,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
     setUploading(true);
     try {
       for (const file of Array.from(files)) {
-        await api.uploadJtiKnowledgeFile(language, file);
+        await api.uploadJtiKnowledgeFile(normalizedLanguage, file);
       }
       await loadKbFiles();
       setSuccessMsg(`✅ 已上傳 ${files.length} 個檔案`);
@@ -290,7 +310,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
     setFileLoading(true);
     setIsEditing(false);
     try {
-      const data = await api.getJtiKnowledgeFileContent(filename, language);
+      const data = await api.getJtiKnowledgeFileContent(filename, normalizedLanguage);
       setFileContent(data.content || '');
       setFileEditable(data.editable || false);
     } catch {
@@ -303,7 +323,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
 
   const handleDownloadFile = async (filename: string) => {
     try {
-      await api.downloadJtiKnowledgeFile(filename, language);
+      await api.downloadJtiKnowledgeFile(filename, normalizedLanguage);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       alert('下載失敗: ' + msg);
@@ -317,7 +337,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
     if (!viewingFile) return;
     setSaving(true);
     try {
-      await api.updateJtiKnowledgeFileContent(viewingFile, fileEditContent, language);
+      await api.updateJtiKnowledgeFileContent(viewingFile, fileEditContent, normalizedLanguage);
       setFileContent(fileEditContent);
       setIsEditing(false);
       setSuccessMsg('✅ 已儲存變更');
@@ -339,7 +359,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
     if (!confirmDeleteFile) return;
     setDeletingFile(true);
     try {
-      await api.deleteJtiKnowledgeFile(confirmDeleteFile, language);
+      await api.deleteJtiKnowledgeFile(confirmDeleteFile, normalizedLanguage);
       setConfirmDeleteFile(null);
       await loadKbFiles();
       setSuccessMsg('✅ 已刪除檔案');
@@ -381,11 +401,10 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
           {activeTab === 'prompt' && (
             <JtiPersonaTab
               prompts={prompts}
-              activePromptId={activePromptId}
               maxCustom={maxCustom}
               loading={loading}
               successMsg={successMsg}
-              language={language}
+              language={normalizedLanguage}
               onSetActive={handleSetActive}
               onCloneDefault={handleCloneDefault}
               cloning={cloning}
@@ -405,8 +424,10 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
               onDeleteConfirm={handleDeleteConfirm}
               onDeleteCancel={handleDeleteCancel}
               runtimeSettings={runtimeSettings}
+              runtimePromptId={runtimePromptId}
               defaultRuntimeSettings={defaultRuntimeSettings}
               savingRuntimeSettings={savingRuntimeSettings}
+              onSelectRuntimePrompt={handleSelectRuntimePrompt}
               onSaveRuntimeSettings={handleSaveRuntimeSettings}
             />
           )}
@@ -419,7 +440,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
 
           {activeTab === 'kb' && (
             <JtiKnowledgeTab
-              language={language}
+              language={normalizedLanguage}
               kbFiles={kbFiles}
               kbLoading={kbLoading}
               uploading={uploading}
