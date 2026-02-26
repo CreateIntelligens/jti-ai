@@ -419,33 +419,23 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         start_keywords = [
             '測驗', '心理測驗', '色彩測驗', '配色測驗', '開始測驗', '玩測驗', '試試測驗',
             '再測', '重測', '重新測', '再來一次', '再測一次', '重新開始',
+            '來測', '測一下', '測看看', '想測', '做測',
+            '繼續測驗', '回到測驗',
             'quiz', 'start quiz', 'again', 'retry', 'redo',
         ]
         negative_keywords = ['不想', '不要', '不用', '不玩', '跳過', '算了', '不了', "don't", "dont", "no ", "not ", "skip", "pass", "never"]
-        resume_keywords = ['繼續測驗', '繼續', '接著', '接續', '回到測驗', 'continue', 'resume']
         msg_lower = request.message.lower()
 
-        # 檢查是否有開始意圖
         has_start_intent = any(kw in msg_lower for kw in start_keywords)
-        wants_resume = any(kw in msg_lower for kw in resume_keywords)
-        # 檢查是否有拒絕意圖
-        has_rejection = any(kw in msg_lower for kw in negative_keywords) or any(kw in request.message for kw in negative_keywords)
-
-        # 只有在有開始意圖且沒有拒絕時才開始測驗
+        has_rejection = any(kw in msg_lower for kw in negative_keywords)
         should_start_quiz = has_start_intent and not has_rejection
 
         logger.info(f"[DEBUG] 測驗判斷: has_start={has_start_intent}, has_rejection={has_rejection}, should_start={should_start_quiz}")
 
-        # 暫停或繼續都視為重新開始（也納入 resume keywords 判斷）
-        if (wants_resume or should_start_quiz) and session.step.value in ("DONE", "WELCOME"):
-            # 不論之前狀態，一律重置讓下方 start_quiz 處理
-            should_start_quiz = True
-
-        if should_start_quiz and session.step.value == "DONE":
-            session.step = SessionStep.WELCOME
-            session_manager.update_session(session)
-
-        if should_start_quiz and session.step.value == "WELCOME":
+        if should_start_quiz and session.step.value in ("DONE", "WELCOME"):
+            if session.step.value == "DONE":
+                session.step = SessionStep.WELCOME
+                session_manager.update_session(session)
             # 直接呼叫 start_quiz，不依賴 LLM
             tool_result = await tool_executor.execute("start_quiz", {
                 "session_id": request.session_id
