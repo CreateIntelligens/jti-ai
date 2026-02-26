@@ -133,31 +133,15 @@ def get_default_response_rule_sections() -> Dict[str, Dict[str, str]]:
 def build_system_instruction(
     persona: str,
     language: str,
-    response_rules: Optional[str] = None,
     response_rule_sections: Optional[Dict[str, str]] = None,
     max_response_chars: int = DEFAULT_MAX_RESPONSE_CHARS,
 ) -> str:
     """組合完整 system instruction: persona + 規則。"""
-    if response_rules:
-        rules = response_rules
-    else:
-        defaults = get_default_response_rule_sections()
-        sections = response_rule_sections or defaults.get(language, defaults["zh"])
-        rules = _compose_response_rules(language, sections, max_response_chars)
-
+    defaults = get_default_response_rule_sections()
+    sections = response_rule_sections or defaults.get(language, defaults["zh"])
+    rules = _compose_response_rules(language, sections, max_response_chars)
     return f"{persona}\n\n{rules}"
 
-
-def build_welcome_text(language: str) -> Dict[str, str]:
-    """取得歡迎文案（title/description）。"""
-    return deepcopy(WELCOME_TEXT.get(language, WELCOME_TEXT["zh"]))
-
-
-# 向後相容：組合完整的預設 prompt（供 fallback 用）
-SYSTEM_INSTRUCTIONS = {
-    lang: build_system_instruction(PERSONA[lang], lang)
-    for lang in PERSONA
-}
 
 # 動態狀態模板（每次對話會變）
 SESSION_STATE_TEMPLATES = {
