@@ -169,10 +169,103 @@ def get_question_from_selected(selected_questions: List[Dict], question_index: i
         return None
 
 
+def complete_selected_questions(
+    selected_questions: List[Dict],
+    quiz_id: str = "color_taste",
+    language: str = "zh",
+) -> List[Dict]:
+    """Deterministically fill missing quiz questions when selected list is incomplete."""
+    if not selected_questions:
+        return selected_questions
+
+    try:
+        quiz_bank = load_quiz_bank(language)
+        all_questions = quiz_bank.get("questions", [])
+        selection_rules = quiz_bank.get("selection_rules", {})
+        required = selection_rules.get("required", {})
+        total_questions = selection_rules.get("total", 5)
+
+        completed: List[Dict] = []
+        used_ids = set()
+        for question in selected_questions:
+            qid = question.get("id") if isinstance(question, dict) else None
+            if qid and qid not in used_ids:
+                completed.append(question)
+                used_ids.add(qid)
+
+        if len(completed) >= total_questions:
+            return completed[:total_questions]
+
+        preferred_categories = [
+            c for c in required.get("random_from", []) if isinstance(c, str)
+        ]
+        used_categories = {
+            q.get("category")
+            for q in completed
+            if isinstance(q, dict) and q.get("category") in preferred_categories
+        }
+
+        def first_question_in_category(category: str) -> Optional[Dict]:
+            pool = sorted(
+                (
+                    q for q in all_questions
+                    if q.get("category") == category and q.get("id") not in used_ids
+                ),
+                key=lambda q: q.get("id", ""),
+            )
+            return pool[0] if pool else None
+
+        while len(completed) < total_questions:
+            picked = None
+
+            # 優先補上尚未出現的 required 分類（固定順序，確保可重現）
+            for category in preferred_categories:
+                if category in used_categories:
+                    continue
+                picked = first_question_in_category(category)
+                if picked:
+                    break
+
+            # 若 required 分類已用完，仍可從 required 分類中補題
+            if not picked:
+                for category in preferred_categories:
+                    picked = first_question_in_category(category)
+                    if picked:
+                        break
+
+            # 最後 fallback：從所有未使用題目中取第一題
+            if not picked:
+                remaining = sorted(
+                    (q for q in all_questions if q.get("id") not in used_ids),
+                    key=lambda q: q.get("id", ""),
+                )
+                picked = remaining[0] if remaining else None
+
+            if not picked:
+                break
+
+            completed.append(picked)
+            used_ids.add(picked["id"])
+            category = picked.get("category")
+            if category in preferred_categories:
+                used_categories.add(category)
+
+        logger.warning(
+            "Recovered incomplete selected_questions: %s -> %s (%s)",
+            len(selected_questions),
+            len(completed),
+            language,
+        )
+        return completed
+
+    except Exception as e:
+        logger.error(f"Failed to complete selected questions: {e}")
+        return selected_questions
 
 
-def get_total_questions(quiz_id: str = "color_taste") -> int:
+
+def get_total_questions(quiz_id: str = "color_taste", language: str = "zh") -> int:
     """取得題庫總題數（依 selection_rules 決定）"""
-    quiz_bank = load_quiz_bank()
+    quiz_bank = load_quiz_bank(language)
     selection_rules = quiz_bank.get("selection_rules", {})
     return selection_rules.get("total", 5)

@@ -2,6 +2,7 @@
 JTI 測驗系統 API Endpoints
 """
 
+from copy import deepcopy
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Depends
@@ -229,6 +230,11 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
+        # rollback 時保留原始抽題序列，避免重建 session 後題目順序漂移。
+        preserved_selected_questions = (
+            deepcopy(session.selected_questions) if session.selected_questions else None
+        )
+
         # 記錄用戶訊息
         logger.info(f"[用戶訊息] Session: {request.session_id[:8]}... | 狀態: {session.step.value} | 訊息: '{request.message}'")
 
@@ -239,13 +245,32 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             if deleted_count > 0:
                 # 2. 重新讀取剩餘 logs 並重建 session
                 logs = conversation_logger.get_session_logs(request.session_id)
-                # 若 logs 全空（例如刪除的是第一句話），session 可能回退到初始狀態
-                session = session_manager.rebuild_session_from_logs(request.session_id, logs)
-                if not session:
-                    # 重建失敗（例如 logs 為空）→ 直接用現有 session（rollback 前的）
-                    session = _get_or_rebuild_session(request.session_id)
+                if logs:
+                    session = session_manager.rebuild_session_from_logs(request.session_id, logs)
                     if not session:
-                        raise HTTPException(status_code=404, detail="Session not found after rollback")
+                        raise HTTPException(status_code=500, detail="Failed to rebuild session from logs")
+                else:
+                    # logs 全空（例如刪除第一輪）→ 強制重置 session，避免沿用刪除前的舊進度
+                    session.step = SessionStep.WELCOME
+                    session.answers = {}
+                    session.current_question = None
+                    session.current_q_index = 0
+                    session.selected_questions = None
+                    session.color_scores = {}
+                    session.color_result_id = None
+                    session.color_result = None
+                    session.chat_history = []
+                    session = session_manager.update_session(session)
+                    logger.info(f"Session {request.session_id[:8]}... reset to initial state (no remaining logs)")
+
+                if logs and session and preserved_selected_questions:
+                    session.selected_questions = preserved_selected_questions
+                    if session.step == SessionStep.QUIZ:
+                        if session.current_q_index < len(preserved_selected_questions):
+                            session.current_question = preserved_selected_questions[session.current_q_index]
+                        else:
+                            session.current_question = None
+                    session = session_manager.update_session(session)
 
                 # 3. 清除 LLM 記憶體快取，確保下次建構時不會混入已刪除的歷史
                 main_agent.remove_session(request.session_id)
@@ -298,6 +323,49 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     "user_choice": user_choice
                 })
 
+                # 記錄工具呼叫
+                tool_calls = [{"tool": "submit_answer", "args": {"user_choice": user_choice}, "result": tool_result}]
+
+                # submit_answer 失敗時，避免交由 LLM 自由發揮造成題目飄移
+                if tool_result.get("error") or tool_result.get("success") is False:
+                    updated_session = session_manager.get_session(request.session_id) or session
+                    response_message = tool_result.get("message")
+                    if not response_message:
+                        response_message = (
+                            "Quiz data is incomplete. Please restart the quiz."
+                            if updated_session.language == "en"
+                            else "測驗題目資料不完整，請輸入「開始測驗」重新開始。"
+                        )
+
+                    log_result = conversation_logger.log_conversation(
+                        session_id=request.session_id,
+                        user_message=request.message,
+                        agent_response=response_message,
+                        tool_calls=tool_calls,
+                        session_state={
+                            "step": updated_session.step.value,
+                            "answers_count": len(updated_session.answers),
+                            "color_result_id": updated_session.color_result_id,
+                            "current_question_id": updated_session.current_question.get("id") if updated_session.current_question else None,
+                            "language": updated_session.language,
+                            "selected_questions": updated_session.selected_questions,
+                        },
+                        mode="jti"
+                    )
+                    final_turn_number = log_result[1] if log_result else None
+
+                    logger.warning(
+                        "submit_answer failed for session %s: %s",
+                        request.session_id[:8],
+                        tool_result.get("error"),
+                    )
+                    return ChatResponse(
+                        message=response_message,
+                        session=updated_session.model_dump(),
+                        tool_calls=[{"tool": "submit_answer", "args": {"user_choice": user_choice}}],
+                        turn_number=final_turn_number,
+                    )
+
                 updated_session = session_manager.get_session(request.session_id)
 
                 # 記錄答題結果和當前分數
@@ -305,9 +373,6 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 if updated_session.color_scores:
                     scores_str = " | ".join([f"{k}:{v}" for k, v in sorted(updated_session.color_scores.items(), key=lambda x: -x[1])])
                     logger.info(f"[當前分數] {scores_str}")
-
-                # 記錄工具呼叫
-                tool_calls = [{"tool": "submit_answer", "args": {"user_choice": user_choice}, "result": tool_result}]
 
                 # 交給 main_agent 的 LLM 處理回應（生成評論 + 下一題）
                 result = await main_agent.chat_with_tool_result(
@@ -325,7 +390,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 logger.info(f"[AI回應] {response_message[:100]}{'...' if len(response_message) > 100 else ''}")
 
                 # 記錄到對話日誌
-                conversation_logger.log_conversation(
+                log_result = conversation_logger.log_conversation(
                     session_id=request.session_id,
                     user_message=request.message,
                     agent_response=response_message,
@@ -336,9 +401,11 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                         "color_result_id": updated_session.color_result_id,
                         "current_question_id": updated_session.current_question.get("id") if updated_session.current_question else None,
                         "language": updated_session.language,
+                        "selected_questions": updated_session.selected_questions,
                     },
                     mode="jti"
                 )
+                final_turn_number = log_result[1] if log_result else None
 
                 logger.info(f"✅ QUIZ 作答成功: {request.message} → {user_choice}")
 
@@ -350,7 +417,8 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 return ChatResponse(
                     message=response_message,
                     session=updated_session.model_dump(),
-                    tool_calls=response_tool_calls
+                    tool_calls=response_tool_calls,
+                    turn_number=final_turn_number,
                 )
             else:
                 # ❌ 無法判斷選項：AI 打哈哈引導回測驗
@@ -397,6 +465,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                         "color_result_id": session.color_result_id,
                         "current_question_id": session.current_question.get("id") if session.current_question else None,
                         "language": session.language,
+                        "selected_questions": session.selected_questions,
                     },
                     mode="jti"
                 )
@@ -472,6 +541,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                         "color_result_id": updated_session.color_result_id,
                         "current_question_id": updated_session.current_question.get("id") if updated_session.current_question else None,
                         "language": updated_session.language,
+                        "selected_questions": updated_session.selected_questions,
                     },
                     mode="jti"
                 )
@@ -510,6 +580,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 "color_result_id": session.color_result_id,
                 "current_question_id": session.current_question.get("id") if session.current_question else None,
                 "language": session.language,
+                "selected_questions": session.selected_questions,
             },
             mode="jti"
         )
@@ -554,6 +625,7 @@ async def quiz_start(request: QuizActionRequest, auth: dict = Depends(verify_aut
                     "color_result_id": session.color_result_id,
                     "current_question_id": None,
                     "language": session.language,
+                    "selected_questions": session.selected_questions,
                 },
                 mode="jti"
             )
@@ -602,6 +674,7 @@ async def quiz_start(request: QuizActionRequest, auth: dict = Depends(verify_aut
                 "color_result_id": updated_session.color_result_id if updated_session else session.color_result_id,
                 "current_question_id": q.get("id") if isinstance(q, dict) else None,
                 "language": updated_session.language if updated_session else session.language,
+                "selected_questions": updated_session.selected_questions if updated_session else session.selected_questions,
             },
             mode="jti",
         )

@@ -12,6 +12,7 @@ from datetime import datetime
 
 from app.models.session import Session, SessionStep
 from app.services.mongo_client import get_mongo_db
+from app.tools.quiz import complete_selected_questions, get_total_questions
 from .session_state_mixin import SessionStateMixin
 import logging
 
@@ -119,6 +120,17 @@ class MongoSessionManager(SessionStateMixin):
             return None
 
         try:
+            # 先嘗試從現有 session 取完整 selected_questions（重建時優先保留）
+            existing_selected_questions = None
+            existing_language = "zh"
+            try:
+                existing_doc = self.sessions_collection.find_one({"session_id": session_id})
+                if existing_doc:
+                    existing_selected_questions = existing_doc.get("selected_questions")
+                    existing_language = existing_doc.get("language", "zh")
+            except Exception:
+                pass
+
             # === 從 logs 提取資料 ===
             answers = {}            # {question_id: option_id}
             selected_questions = [] # 按順序收集的題目
@@ -168,8 +180,35 @@ class MongoSessionManager(SessionStateMixin):
             step = snapshot.get("step", "WELCOME")
             color_result_id = snapshot.get("color_result_id") or color_result_id
 
-            # === 推斷語言（預設 zh） ===
-            language = "zh"
+            # === 推斷語言（優先使用最後一筆 snapshot） ===
+            language = snapshot.get("language", existing_language)
+            if not isinstance(language, str):
+                language = existing_language if isinstance(existing_language, str) else "zh"
+
+            # 若 snapshot 已帶完整 selected_questions，也優先使用
+            snapshot_selected_questions = snapshot.get("selected_questions")
+            if (
+                isinstance(snapshot_selected_questions, list)
+                and len(snapshot_selected_questions) > len(selected_questions)
+            ):
+                selected_questions = snapshot_selected_questions
+
+            # 保留舊 session 的完整抽題序列（避免 rollback 後遺失未揭露題目）
+            if (
+                isinstance(existing_selected_questions, list)
+                and len(existing_selected_questions) > len(selected_questions)
+            ):
+                selected_questions = existing_selected_questions
+
+            # 若仍不足，做 deterministic 補齊，避免後續 submit_answer 缺題炸掉
+            if selected_questions:
+                total_questions = get_total_questions("color_taste", language)
+                if len(selected_questions) < total_questions:
+                    selected_questions = complete_selected_questions(
+                        selected_questions,
+                        quiz_id="color_taste",
+                        language=language,
+                    )
 
             # === 計算 current_q_index 和 current_question ===
             current_q_index = len(answers)
