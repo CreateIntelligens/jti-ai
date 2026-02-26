@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Lock, Copy } from 'lucide-react';
 import ConfirmDialog from '../ConfirmDialog';
 
@@ -13,12 +13,37 @@ interface Prompt {
   is_active?: boolean;
 }
 
+interface RuntimeWelcome {
+  title: string;
+  description: string;
+}
+
+interface RuntimeRuleSections {
+  role_scope: string;
+  scope_limits: string;
+  response_style: string;
+  knowledge_rules: string;
+}
+
+interface RuntimeSettings {
+  response_rule_sections: {
+    zh: RuntimeRuleSections;
+    en: RuntimeRuleSections;
+  };
+  welcome: {
+    zh: RuntimeWelcome;
+    en: RuntimeWelcome;
+  };
+  max_response_chars: number;
+}
+
 export interface JtiPersonaTabProps {
   prompts: Prompt[];
   activePromptId: string | null;
   maxCustom: number;
   loading: boolean;
   successMsg: string | null;
+  language?: string;
   onSetActive: (promptId: string | null) => Promise<void>;
   onCloneDefault: () => Promise<void>;
   cloning: boolean;
@@ -37,16 +62,21 @@ export interface JtiPersonaTabProps {
   deleting: boolean;
   onDeleteConfirm: () => Promise<void>;
   onDeleteCancel: () => void;
+  runtimeSettings: RuntimeSettings | null;
+  defaultRuntimeSettings: RuntimeSettings | null;
+  savingRuntimeSettings: boolean;
+  onSaveRuntimeSettings: (settings: RuntimeSettings) => Promise<void>;
 }
 
 const SYSTEM_DEFAULT_ID = 'system_default';
 
 export default function JtiPersonaTab({
   prompts,
-  activePromptId: _activePromptId,
+  activePromptId,
   maxCustom,
   loading,
   successMsg,
+  language = 'zh',
   onSetActive,
   onCloneDefault,
   cloning,
@@ -65,13 +95,26 @@ export default function JtiPersonaTab({
   deleting,
   onDeleteConfirm,
   onDeleteCancel,
+  runtimeSettings,
+  defaultRuntimeSettings,
+  savingRuntimeSettings,
+  onSaveRuntimeSettings,
 }: JtiPersonaTabProps) {
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [newName, setNewName] = useState('');
   const [newContent, setNewContent] = useState('');
+  const [runtimeDraft, setRuntimeDraft] = useState<RuntimeSettings | null>(runtimeSettings);
 
+  const currentLang = language === 'en' ? 'en' : 'zh';
   const customPrompts = prompts.filter(p => p.id !== SYSTEM_DEFAULT_ID);
   const defaultPrompt = prompts.find(p => p.id === SYSTEM_DEFAULT_ID);
+  const activeRuntimePromptId = activePromptId || SYSTEM_DEFAULT_ID;
+  const isRuntimeReadonly = activeRuntimePromptId === SYSTEM_DEFAULT_ID;
+  const showRoleScopeField = currentLang !== 'zh';
+
+  useEffect(() => {
+    setRuntimeDraft(runtimeSettings);
+  }, [runtimeSettings]);
 
   const toggleExpand = (id: string) => {
     setExpandedIds(prev => {
@@ -88,12 +131,185 @@ export default function JtiPersonaTab({
     return lines.slice(0, maxLines).join('\n') + '...';
   };
 
+  const shouldShowExpandButton = (content: string, isActive?: boolean) => (
+    content.split('\n').length > 3 || !!isActive
+  );
+
+  const getExpandButtonText = (expanded: boolean, _isActive?: boolean) => {
+    return expanded ? '收起完整內容' : '展開完整內容';
+  };
+
   const handleCreate = async () => {
     if (!newContent.trim()) return;
     const name = newName.trim() || `自訂人物設定 ${customPrompts.length + 1}`;
     await onCreate(name, newContent.trim());
     setNewName('');
     setNewContent('');
+  };
+
+  const updateResponseRule = (value: string) => {
+    setRuntimeDraft(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        response_rule_sections: {
+          ...prev.response_rule_sections,
+          [currentLang]: {
+            ...prev.response_rule_sections[currentLang],
+            response_style: value,
+          },
+        },
+      };
+    });
+  };
+
+  const updateRuleSection = (field: keyof RuntimeRuleSections, value: string) => {
+    setRuntimeDraft(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        response_rule_sections: {
+          ...prev.response_rule_sections,
+          [currentLang]: {
+            ...prev.response_rule_sections[currentLang],
+            [field]: value,
+          },
+        },
+      };
+    });
+  };
+
+  const updateLengthLimit = (value: string) => {
+    const parsed = parseInt(value, 10);
+    if (Number.isNaN(parsed)) return;
+    setRuntimeDraft(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        max_response_chars: parsed,
+      };
+    });
+  };
+
+  const renderReadonlyRuntimeSettings = (settings: RuntimeSettings | null) => {
+    if (!settings) return null;
+
+    return (
+      <div className="jti-runtime-settings">
+        <div className="jti-prompt-name-row">
+          <span className="jti-prompt-name">回覆規則</span>
+        </div>
+
+        <div className="jti-runtime-readonly-item">
+          <div className="jti-runtime-label">回覆字數上限（字元）</div>
+          <div className="jti-runtime-readonly-value">{settings.max_response_chars}</div>
+        </div>
+
+        {showRoleScopeField && (
+          <div className="jti-runtime-readonly-item">
+            <div className="jti-runtime-label">角色與可做事項（{currentLang.toUpperCase()}）</div>
+            <pre className="jti-prompt-content">
+              {settings.response_rule_sections[currentLang].role_scope}
+            </pre>
+          </div>
+        )}
+
+        <div className="jti-runtime-readonly-item">
+          <div className="jti-runtime-label">範圍限制（{currentLang.toUpperCase()}）</div>
+          <pre className="jti-prompt-content">
+            {settings.response_rule_sections[currentLang].scope_limits}
+          </pre>
+        </div>
+
+        <div className="jti-runtime-readonly-item">
+          <div className="jti-runtime-label">回覆格式規則（{currentLang.toUpperCase()}）</div>
+          <pre className="jti-prompt-content">
+            {settings.response_rule_sections[currentLang].response_style}
+          </pre>
+        </div>
+
+        <div className="jti-runtime-readonly-item">
+          <div className="jti-runtime-label">知識庫規則（{currentLang.toUpperCase()}）</div>
+          <pre className="jti-prompt-content">
+            {settings.response_rule_sections[currentLang].knowledge_rules}
+          </pre>
+        </div>
+      </div>
+    );
+  };
+
+  const renderRuntimeSettings = () => {
+    if (!runtimeDraft) return null;
+
+    if (isRuntimeReadonly) {
+      return renderReadonlyRuntimeSettings(defaultRuntimeSettings);
+    }
+
+    return (
+      <div className="jti-runtime-settings">
+        <div className="jti-prompt-name-row">
+          <span className="jti-prompt-name">回覆規則</span>
+        </div>
+
+        <label className="jti-runtime-label">回覆字數上限（字元）</label>
+        <input
+          type="number"
+          min={30}
+          max={600}
+          className="jti-prompt-input"
+          value={runtimeDraft.max_response_chars}
+          onChange={e => updateLengthLimit(e.target.value)}
+        />
+
+        {showRoleScopeField && (
+          <>
+            <label className="jti-runtime-label">角色與可做事項（{currentLang.toUpperCase()}）</label>
+            <textarea
+              className="jti-prompt-textarea"
+              rows={6}
+              value={runtimeDraft.response_rule_sections[currentLang].role_scope}
+              onChange={e => updateRuleSection('role_scope', e.target.value)}
+              placeholder="可做事項..."
+            />
+          </>
+        )}
+
+        <label className="jti-runtime-label">範圍限制（{currentLang.toUpperCase()}）</label>
+        <textarea
+          className="jti-prompt-textarea"
+          rows={6}
+          value={runtimeDraft.response_rule_sections[currentLang].scope_limits}
+          onChange={e => updateRuleSection('scope_limits', e.target.value)}
+          placeholder="限制條件..."
+        />
+
+        <label className="jti-runtime-label">回覆格式規則（{currentLang.toUpperCase()}）</label>
+        <textarea
+          className="jti-prompt-textarea"
+          rows={6}
+          value={runtimeDraft.response_rule_sections[currentLang].response_style}
+          onChange={e => updateResponseRule(e.target.value)}
+          placeholder="回覆格式規則..."
+        />
+
+        <label className="jti-runtime-label">知識庫規則（{currentLang.toUpperCase()}）</label>
+        <textarea
+          className="jti-prompt-textarea"
+          rows={6}
+          value={runtimeDraft.response_rule_sections[currentLang].knowledge_rules}
+          onChange={e => updateRuleSection('knowledge_rules', e.target.value)}
+          placeholder="知識庫使用規則..."
+        />
+
+        <button
+          className="jti-btn primary full-width"
+          onClick={() => onSaveRuntimeSettings(runtimeDraft)}
+          disabled={savingRuntimeSettings}
+        >
+          {savingRuntimeSettings ? '儲存中...' : '儲存回覆規則'}
+        </button>
+      </div>
+    );
   };
 
   if (loading) {
@@ -140,21 +356,23 @@ export default function JtiPersonaTab({
                     {cloning ? '複製中...' : '以此為基礎建立副本'}
                   </button>
                 )}
+                {shouldShowExpandButton(defaultPrompt.content, defaultPrompt.is_active) && (
+                  <button
+                    className="jti-btn small secondary jti-prompt-expand"
+                    onClick={() => toggleExpand(defaultPrompt.id)}
+                  >
+                    {getExpandButtonText(expandedIds.has(defaultPrompt.id), defaultPrompt.is_active)}
+                  </button>
+                )}
               </div>
             </div>
             <div className="jti-prompt-preview">
               <pre className="jti-prompt-content">
                 {expandedIds.has(defaultPrompt.id) ? defaultPrompt.content : getPreview(defaultPrompt.content)}
               </pre>
-              {defaultPrompt.content.split('\n').length > 3 && (
-                <button
-                  className="jti-btn small secondary jti-prompt-expand"
-                  onClick={() => toggleExpand(defaultPrompt.id)}
-                >
-                  {expandedIds.has(defaultPrompt.id) ? '收起' : '展開完整內容'}
-                </button>
-              )}
             </div>
+            {expandedIds.has(defaultPrompt.id) &&
+              renderReadonlyRuntimeSettings(defaultRuntimeSettings)}
           </div>
         )}
 
@@ -227,23 +445,24 @@ export default function JtiPersonaTab({
                     >
                       刪除
                     </button>
+                    {shouldShowExpandButton(prompt.content, prompt.is_active) && (
+                      <button
+                        className="jti-btn small secondary jti-prompt-expand"
+                        onClick={() => toggleExpand(prompt.id)}
+                      >
+                        {getExpandButtonText(expandedIds.has(prompt.id), prompt.is_active)}
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="jti-prompt-preview">
                   <pre className="jti-prompt-content">
                     {expandedIds.has(prompt.id) ? prompt.content : getPreview(prompt.content)}
                   </pre>
-                  {prompt.content.split('\n').length > 3 && (
-                    <button
-                      className="jti-btn small secondary jti-prompt-expand"
-                      onClick={() => toggleExpand(prompt.id)}
-                    >
-                      {expandedIds.has(prompt.id) ? '收起' : '展開完整內容'}
-                    </button>
-                  )}
                 </div>
               </>
             )}
+            {prompt.is_active && expandedIds.has(prompt.id) && renderRuntimeSettings()}
           </div>
         ))}
       </div>

@@ -6,7 +6,7 @@ Prompt 管理模組 (MongoDB 版本)
 import os
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 
 from pydantic import BaseModel, Field
 from pymongo import MongoClient
@@ -29,6 +29,10 @@ class StorePrompts(BaseModel):
     store_name: str
     prompts: List[Prompt] = Field(default_factory=list)
     active_prompt_id: Optional[str] = None
+    # JTI 舊版全域 runtime 設定（相容用）
+    jti_runtime_settings: Optional[Dict[str, Any]] = None
+    # JTI 新版：每個人物設定各自綁定 runtime 設定（key = prompt_id / system_default）
+    jti_runtime_settings_by_prompt: Optional[Dict[str, Dict[str, Any]]] = None
 
 
 class PromptManager:

@@ -182,6 +182,39 @@ export async function deleteServerApiKey(keyId: string): Promise<void> {
 
 // ========== JTI Prompt Management ==========
 
+export interface JtiRuntimeSettings {
+  response_rule_sections: {
+    zh: {
+      role_scope: string;
+      scope_limits: string;
+      response_style: string;
+      knowledge_rules: string;
+    };
+    en: {
+      role_scope: string;
+      scope_limits: string;
+      response_style: string;
+      knowledge_rules: string;
+    };
+  };
+  welcome: {
+    zh: {
+      title: string;
+      description: string;
+    };
+    en: {
+      title: string;
+      description: string;
+    };
+  };
+  max_response_chars: number;
+}
+
+export interface JtiRuntimeSettingsResponse {
+  prompt_id?: string;
+  settings: JtiRuntimeSettings;
+}
+
 export async function listJtiPrompts(): Promise<any> {
   const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/`);
   return handleResponse<any>(response);
@@ -227,6 +260,27 @@ export async function cloneDefaultJtiPrompt(): Promise<any> {
     headers: { 'Content-Type': 'application/json' },
   });
   return handleResponse<any>(response);
+}
+
+export async function getJtiRuntimeSettings(promptId?: string): Promise<JtiRuntimeSettingsResponse> {
+  const query = promptId ? `?prompt_id=${encodeURIComponent(promptId)}` : '';
+  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/runtime-settings${query}`, {
+    method: 'GET',
+  });
+  return handleResponse<JtiRuntimeSettingsResponse>(response);
+}
+
+export async function updateJtiRuntimeSettings(
+  settings: JtiRuntimeSettings,
+  promptId?: string,
+): Promise<{ settings: JtiRuntimeSettings; message: string; prompt_id?: string }> {
+  const payload = promptId ? { ...settings, prompt_id: promptId } : settings;
+  const response = await fetchWithApiKey(`${API_BASE}/jti/prompts/runtime-settings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return handleResponse<{ settings: JtiRuntimeSettings; message: string; prompt_id?: string }>(response);
 }
 // ========== JTI 知識庫管理 ==========
 

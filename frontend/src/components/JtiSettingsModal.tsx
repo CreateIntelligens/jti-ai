@@ -27,6 +27,7 @@ interface JtiSettingsModalProps {
 interface KBFile { name: string; display_name: string; size?: number; editable?: boolean; }
 
 const MAX_CUSTOM = 3;
+const SYSTEM_DEFAULT_ID = 'system_default';
 
 export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, language = 'zh' }: JtiSettingsModalProps) {
   const [activeTab, setActiveTab] = useState<'prompt' | 'quiz' | 'kb'>('prompt');
@@ -44,6 +45,9 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [runtimeSettings, setRuntimeSettings] = useState<api.JtiRuntimeSettings | null>(null);
+  const [defaultRuntimeSettings, setDefaultRuntimeSettings] = useState<api.JtiRuntimeSettings | null>(null);
+  const [savingRuntimeSettings, setSavingRuntimeSettings] = useState(false);
 
   // === KB state ===
   const [kbFiles, setKbFiles] = useState<KBFile[]>([]);
@@ -61,9 +65,15 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   const [saving, setSaving] = useState(false);
   const [fileLoading, setFileLoading] = useState(false);
 
+  const resolveRuntimePromptId = (promptId?: string | null) => promptId || SYSTEM_DEFAULT_ID;
+
   useEffect(() => {
     if (isOpen) {
-      loadPrompts();
+      const init = async () => {
+        const latestActivePromptId = await loadPrompts();
+        await refreshRuntimeSettings(latestActivePromptId);
+      };
+      void init();
       if (activeTab === 'kb') loadKbFiles();
     }
   }, [isOpen]);
@@ -89,25 +99,54 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   }, [isOpen, onClose, editingId, confirmDeleteId, confirmDeleteFile, viewingFile, isEditing]);
 
   // === Prompt handlers ===
-  const loadPrompts = async () => {
+  const loadPrompts = async (): Promise<string | null> => {
     setLoading(true);
     try {
       const data = await api.listJtiPrompts();
       setPrompts(data.prompts || []);
-      setActivePromptId(data.active_prompt_id);
+      const latestActivePromptId = data.active_prompt_id || null;
+      setActivePromptId(latestActivePromptId);
       setMaxCustom(data.max_custom_prompts || MAX_CUSTOM);
+      return latestActivePromptId;
     } catch (e) {
       console.error('Failed to load JTI prompts:', e);
+      return null;
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadRuntimeSettings = async (promptId: string) => {
+    try {
+      const data = await api.getJtiRuntimeSettings(promptId);
+      setRuntimeSettings(data.settings || null);
+    } catch (e) {
+      console.error('Failed to load JTI runtime settings:', e);
+    }
+  };
+
+  const loadDefaultRuntimeSettings = async () => {
+    try {
+      const data = await api.getJtiRuntimeSettings(SYSTEM_DEFAULT_ID);
+      setDefaultRuntimeSettings(data.settings || null);
+    } catch (e) {
+      console.error('Failed to load default JTI runtime settings:', e);
+    }
+  };
+
+  const refreshRuntimeSettings = async (latestActivePromptId: string | null) => {
+    await Promise.all([
+      loadRuntimeSettings(resolveRuntimePromptId(latestActivePromptId)),
+      loadDefaultRuntimeSettings(),
+    ]);
   };
 
   const handleCreate = async (name: string, content: string) => {
     setCreating(true);
     try {
       await api.createJtiPrompt(name, content);
-      await loadPrompts();
+      const latestActivePromptId = await loadPrompts();
+      await refreshRuntimeSettings(latestActivePromptId);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       alert('建立失敗: ' + msg);
@@ -120,7 +159,8 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
     setCloning(true);
     try {
       await api.cloneDefaultJtiPrompt();
-      await loadPrompts();
+      const latestActivePromptId = await loadPrompts();
+      await refreshRuntimeSettings(latestActivePromptId);
       onPromptChange();
       setSuccessMsg('✅ 已複製預設人物設定並啟用');
       setTimeout(() => setSuccessMsg(null), 3000);
@@ -135,7 +175,8 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   const handleSetActive = async (promptId: string | null) => {
     try {
       await api.setActiveJtiPrompt(promptId);
-      await loadPrompts();
+      const latestActivePromptId = await loadPrompts();
+      await refreshRuntimeSettings(latestActivePromptId);
       onPromptChange();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -159,7 +200,8 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
     if (!editingId) return;
     try {
       await api.updateJtiPrompt(editingId, editName, editContent);
-      await loadPrompts();
+      const latestActivePromptId = await loadPrompts();
+      await refreshRuntimeSettings(latestActivePromptId);
       if (editingId === activePromptId) onPromptChange();
       cancelEdit();
     } catch (e) {
@@ -178,7 +220,8 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
     try {
       await api.deleteJtiPrompt(promptId);
       setConfirmDeleteId(null);
-      await loadPrompts();
+      const latestActivePromptId = await loadPrompts();
+      await refreshRuntimeSettings(latestActivePromptId);
       if (promptId === activePromptId) onPromptChange();
       setSuccessMsg('✅ 已刪除人物設定');
       setTimeout(() => setSuccessMsg(null), 3000);
@@ -187,6 +230,28 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
       alert('刪除失敗: ' + msg);
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleSaveRuntimeSettings = async (settings: api.JtiRuntimeSettings) => {
+    if (!activePromptId) {
+      alert('預設人物設定的回覆規則為唯讀，請先建立副本並啟用後再編輯。');
+      return;
+    }
+
+    setSavingRuntimeSettings(true);
+    try {
+      const runtimePromptId = resolveRuntimePromptId(activePromptId);
+      const result = await api.updateJtiRuntimeSettings(settings, runtimePromptId);
+      setRuntimeSettings(result.settings);
+      onPromptChange();
+      setSuccessMsg('✅ 已更新回覆規則');
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      alert('儲存設定失敗: ' + msg);
+    } finally {
+      setSavingRuntimeSettings(false);
     }
   };
 
@@ -320,6 +385,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
               maxCustom={maxCustom}
               loading={loading}
               successMsg={successMsg}
+              language={language}
               onSetActive={handleSetActive}
               onCloneDefault={handleCloneDefault}
               cloning={cloning}
@@ -338,6 +404,10 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
               deleting={deleting}
               onDeleteConfirm={handleDeleteConfirm}
               onDeleteCancel={handleDeleteCancel}
+              runtimeSettings={runtimeSettings}
+              defaultRuntimeSettings={defaultRuntimeSettings}
+              savingRuntimeSettings={savingRuntimeSettings}
+              onSaveRuntimeSettings={handleSaveRuntimeSettings}
             />
           )}
 

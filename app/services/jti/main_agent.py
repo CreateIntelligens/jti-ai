@@ -21,9 +21,12 @@ from app.services.gemini_service import client as gemini_client
 from app.tools.tool_executor import tool_executor, ToolExecutor
 from app.services.jti.agent_prompts import (
     PERSONA,
-    SYSTEM_INSTRUCTIONS,
     SESSION_STATE_TEMPLATES,
     build_system_instruction,
+)
+from app.services.jti.runtime_settings import (
+    load_runtime_settings_from_prompt_manager,
+    SYSTEM_DEFAULT_PROMPT_ID,
 )
 
 # 使用工廠函數取得適當的實作（MongoDB 或記憶體）
@@ -107,20 +110,69 @@ class MainAgent:
     # 重用 ToolExecutor 的 _format_options（避免重複定義）
     _format_options_text = staticmethod(ToolExecutor._format_options)
 
-    def _get_system_instruction(self, session: Session) -> str:
-        """取得靜態 System Instruction（persona from DB + system rules from code）"""
+    @staticmethod
+    def _get_active_prompt_context():
+        """取得目前啟用的人物設定資訊（prompt_manager / prompt_id / persona）。"""
+        prompt_manager = None
+        prompt_id = SYSTEM_DEFAULT_PROMPT_ID
         persona = None
         try:
             from app import deps
-            if deps.prompt_manager:
-                active = deps.prompt_manager.get_active_prompt("__jti__")
+            prompt_manager = getattr(deps, "prompt_manager", None)
+            if prompt_manager:
+                active = prompt_manager.get_active_prompt("__jti__")
                 if active:
+                    prompt_id = active.id
                     persona = active.content
         except Exception:
-            pass
+            prompt_manager = None
+        return prompt_manager, prompt_id, persona
+
+    def _get_system_instruction(self, session: Session) -> str:
+        """取得靜態 System Instruction（persona from DB + system rules from code）"""
+        try:
+            prompt_manager, runtime_prompt_id, persona = self._get_active_prompt_context()
+            runtime_settings = load_runtime_settings_from_prompt_manager(prompt_manager, runtime_prompt_id)
+        except Exception:
+            runtime_settings = load_runtime_settings_from_prompt_manager(None)
+            persona = None
+
         if not persona:
             persona = PERSONA.get(session.language, PERSONA["zh"])
-        return build_system_instruction(persona, session.language)
+
+        response_rule_sections = runtime_settings.response_rule_sections.get(
+            session.language, runtime_settings.response_rule_sections.get("zh")
+        )
+        sections_payload = (
+            response_rule_sections.model_dump()
+            if hasattr(response_rule_sections, "model_dump")
+            else response_rule_sections
+        )
+        return build_system_instruction(
+            persona=persona,
+            language=session.language,
+            response_rule_sections=sections_payload,
+            max_response_chars=runtime_settings.max_response_chars,
+        )
+
+    @staticmethod
+    def _apply_response_length_limit(message: str, session: Session) -> str:
+        """套用一般回覆字數上限（測驗流程不截斷，避免題目被切掉）。"""
+        if session.step == SessionStep.QUIZ:
+            return message
+
+        max_chars = None
+        try:
+            prompt_manager, runtime_prompt_id, _ = MainAgent._get_active_prompt_context()
+            runtime_settings = load_runtime_settings_from_prompt_manager(prompt_manager, runtime_prompt_id)
+            max_chars = runtime_settings.max_response_chars
+        except Exception:
+            max_chars = None
+
+        if not max_chars or len(message) <= max_chars:
+            return message
+
+        return message[:max_chars].rstrip()
 
     def _get_session_state(self, session: Session) -> str:
         """取得動態 Session 狀態（會變化的資訊）"""
@@ -270,6 +322,7 @@ class MainAgent:
                 logger.warning(f"LLM 未生成任何文本回應，使用者輸入：{user_message[:50]}")
 
             final_message = re.sub(r'\s*\[cite:\s*[^\]]*\]', '', final_message).strip()
+            final_message = self._apply_response_length_limit(final_message, session)
 
             # 4. 同步 DB（背景）
             self._sync_history_to_db_background(session_id, user_message, final_message)
@@ -394,6 +447,8 @@ class MainAgent:
 
             if not final_message:
                 final_message = "收到！"
+
+            final_message = self._apply_response_length_limit(final_message, session)
 
             self._append_to_chat_history(chat_session, user_message, final_message)
             self._sync_history_to_db_background(session_id, user_message, final_message)

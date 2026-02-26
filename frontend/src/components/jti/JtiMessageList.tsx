@@ -32,6 +32,8 @@ interface JtiMessageListProps {
   setEditText: (text: string) => void;
   handleEditKeyDown: (e: React.KeyboardEvent, turnNumber: number) => void;
   quickActions: QuickAction[];
+  welcomeTitle?: string;
+  welcomeDescription?: string;
   t: TFunction;
 }
 
@@ -51,6 +53,8 @@ export default function JtiMessageList({
   setEditText,
   handleEditKeyDown,
   quickActions,
+  welcomeTitle,
+  welcomeDescription,
   t,
 }: JtiMessageListProps) {
   return (
@@ -62,9 +66,9 @@ export default function JtiMessageList({
               <span className="hero-icon">🚬</span>
               <div className="icon-glow"></div>
             </div>
-            <h2 className="hero-title">{t('welcome_title')}</h2>
+            <h2 className="hero-title">{welcomeTitle || t('welcome_title')}</h2>
             <p className="hero-description">
-              {t('welcome_description')}
+              {welcomeDescription || t('welcome_description')}
             </p>
           </div>
 

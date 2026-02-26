@@ -277,7 +277,7 @@
 }
 
 .jti-prompt-expand {
-  margin-top: 0.4rem;
+  margin-top: 0;
 }
 
 /* Edit form */
@@ -352,6 +352,68 @@
   font-size: 0.85rem;
   padding: 1rem 0;
   border-top: 1px solid rgba(224, 192, 104, 0.08);
+}
+
+/* Runtime settings section */
+.jti-runtime-settings {
+  border-top: 1px solid rgba(224, 192, 104, 0.08);
+  margin-top: 1.25rem;
+  padding-top: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.jti-runtime-readonly-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.jti-runtime-readonly-value {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(224, 192, 104, 0.2);
+  border-radius: 6px;
+  padding: 0.55rem 0.8rem;
+  color: var(--text-muted);
+  font-size: 0.86rem;
+}
+
+.jti-runtime-help {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.jti-runtime-label {
+  margin-top: 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--gold);
+}
+
+.jti-runtime-variable-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.jti-runtime-variable-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.jti-runtime-variable-key {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  .jti-runtime-variable-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Scrollbar */

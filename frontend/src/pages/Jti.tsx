@@ -5,7 +5,7 @@ import ConversationHistoryModal from '../components/ConversationHistoryModal';
 import JtiSettingsModal from '../components/JtiSettingsModal';
 import JtiMessageList from '../components/jti/JtiMessageList';
 import JtiInputArea from '../components/jti/JtiInputArea';
-import { fetchWithApiKey } from '../services/api';
+import { fetchWithApiKey, getJtiRuntimeSettings } from '../services/api';
 import { useTheme } from '../hooks/useTheme';
 import { useAutoResize } from '../hooks/useAutoResize';
 import { useScrollToBottom } from '../hooks/useScrollToBottom';
@@ -33,6 +33,11 @@ interface SessionData {
   color_result?: { color_name?: string; title?: string };
 }
 
+interface WelcomeContent {
+  title: string;
+  description: string;
+}
+
 export default function Jti() {
   const { t, i18n } = useTranslation();
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -45,6 +50,7 @@ export default function Jti() {
   const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [welcomeContent, setWelcomeContent] = useState<WelcomeContent | null>(null);
   const { theme, toggleTheme } = useTheme();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -148,6 +154,24 @@ export default function Jti() {
     }
   }, [currentLanguage, sessionId, i18n, messages.length, t]);
 
+  const refreshWelcomeContent = useCallback(async (lang?: string) => {
+    const targetLang = (lang || currentLanguage) === 'en' ? 'en' : 'zh';
+    try {
+      const data = await getJtiRuntimeSettings();
+      const welcome = data.settings?.welcome?.[targetLang];
+      if (welcome?.title && welcome?.description) {
+        setWelcomeContent({
+          title: welcome.title,
+          description: welcome.description,
+        });
+      } else {
+        setWelcomeContent(null);
+      }
+    } catch {
+      setWelcomeContent(null);
+    }
+  }, [currentLanguage]);
+
   // 初始化 session
   useEffect(() => {
     const lang = localStorage.getItem('language') || 'zh';
@@ -165,6 +189,10 @@ export default function Jti() {
       })
       .catch(() => setStatusText(t('status_failed')));
   }, [t]);
+
+  useEffect(() => {
+    void refreshWelcomeContent();
+  }, [refreshWelcomeContent]);
 
   useScrollToBottom(messagesEndRef, [messages]);
   useAutoResize(inputRef, userInput);
@@ -466,6 +494,8 @@ export default function Jti() {
           setEditText={setEditText}
           handleEditKeyDown={handleEditKeyDown}
           quickActions={quickActions}
+          welcomeTitle={welcomeContent?.title}
+          welcomeDescription={welcomeContent?.description}
           t={t}
         />
         <JtiInputArea
@@ -486,7 +516,10 @@ export default function Jti() {
       <JtiSettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
-        onPromptChange={silentRestart}
+        onPromptChange={() => {
+          void silentRestart();
+          void refreshWelcomeContent();
+        }}
         language={currentLanguage}
       />
 
