@@ -308,6 +308,14 @@ class MainAgent:
             t3 = time.time()
             logger.info(f"[計時] 主 Agent: {(t3-t2)*1000:.0f}ms | 總計: {(t3-t0)*1000:.0f}ms")
 
+            # 3. 清理 chat session 歷史：把 enriched_message 替換回乾淨的 user_message
+            #    避免 KB 結果累積在歷史中淹沒後續的短追問
+            if kb_result and hasattr(chat_session, '_curated_history') and chat_session._curated_history:
+                last_user = chat_session._curated_history[-2]  # send_message 後倒數第二筆是 user
+                if last_user.role == "user":
+                    last_user.parts = [types.Part.from_text(text=user_message)]
+                    logger.info(f"[歷史清理] 已將 enriched_message 替換回乾淨的 user_message")
+
             tool_calls_log = []
 
             # 3. 取得回應
