@@ -33,6 +33,8 @@ class StorePrompts(BaseModel):
     jti_runtime_settings: Optional[Dict[str, Any]] = None
     # JTI 新版：每個人物設定各自綁定 runtime 設定（key = prompt_id / system_default）
     jti_runtime_settings_by_prompt: Optional[Dict[str, Dict[str, Any]]] = None
+    # JTI 人物設定多語版本（key = prompt_id, value = {"zh": "...", "en": "..."}）
+    jti_persona_by_prompt: Optional[Dict[str, Dict[str, str]]] = None
 
 
 class PromptManager:

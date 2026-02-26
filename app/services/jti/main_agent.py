@@ -12,7 +12,7 @@ import os
 import logging
 import re
 import time
-from typing import Dict, List
+from typing import Dict, List, Optional
 import google.genai as genai
 from google.genai import types
 from app.models.session import Session, SessionStep
@@ -45,6 +45,8 @@ class MainAgent:
         self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
         # 持久 chat session：session_id → Gemini ChatSession
         self._chat_sessions: Dict[str, any] = {}
+        # 快取最近一次查詢的 max_response_chars，避免重複查詢 MongoDB
+        self._last_max_response_chars: Optional[int] = None
 
     def _get_or_create_chat_session(self, session: Session):
         """取得或建立持久 Gemini chat session（不帶任何 tool）"""
@@ -111,34 +113,63 @@ class MainAgent:
     _format_options_text = staticmethod(ToolExecutor._format_options)
 
     @staticmethod
-    def _get_active_prompt_context():
-        """取得目前啟用的人物設定資訊（prompt_manager / prompt_id / persona）。"""
+    def _get_store_name_for_language(language: str) -> str:
+        normalized_language = (
+            "en"
+            if isinstance(language, str) and language.strip().lower().startswith("en")
+            else "zh"
+        )
+        return "__jti__en" if normalized_language == "en" else "__jti__"
+
+    @staticmethod
+    def _get_active_prompt_context(language: str = "zh"):
+        """取得目前啟用的人物設定資訊（prompt_manager / store_name / prompt_id / persona）。"""
         prompt_manager = None
+        store_name = MainAgent._get_store_name_for_language(language)
         prompt_id = SYSTEM_DEFAULT_PROMPT_ID
         persona = None
+        normalized_language = (
+            "en"
+            if isinstance(language, str) and language.strip().lower().startswith("en")
+            else "zh"
+        )
         try:
             from app import deps
             prompt_manager = getattr(deps, "prompt_manager", None)
             if prompt_manager:
-                active = prompt_manager.get_active_prompt("__jti__")
+                active = prompt_manager.get_active_prompt(store_name)
                 if active:
                     prompt_id = active.id
                     persona = active.content
+                    store_prompts = prompt_manager._load_store_prompts(store_name)
+                    persona_map = getattr(store_prompts, "jti_persona_by_prompt", None)
+                    if isinstance(persona_map, dict):
+                        persona_pair = persona_map.get(active.id)
+                        if isinstance(persona_pair, dict):
+                            persona_by_lang = persona_pair.get(normalized_language)
+                            if isinstance(persona_by_lang, str) and persona_by_lang.strip():
+                                persona = persona_by_lang
         except Exception:
             prompt_manager = None
-        return prompt_manager, prompt_id, persona
+        return prompt_manager, store_name, prompt_id, persona
 
     def _get_system_instruction(self, session: Session) -> str:
         """取得靜態 System Instruction（persona from DB + system rules from code）"""
         try:
-            prompt_manager, runtime_prompt_id, persona = self._get_active_prompt_context()
-            runtime_settings = load_runtime_settings_from_prompt_manager(prompt_manager, runtime_prompt_id)
+            prompt_manager, store_name, runtime_prompt_id, persona = self._get_active_prompt_context(session.language)
+            runtime_settings = load_runtime_settings_from_prompt_manager(
+                prompt_manager,
+                runtime_prompt_id,
+                store_name=store_name,
+            )
         except Exception:
             runtime_settings = load_runtime_settings_from_prompt_manager(None)
             persona = None
 
         if not persona:
             persona = PERSONA.get(session.language, PERSONA["zh"])
+
+        self._last_max_response_chars = runtime_settings.max_response_chars
 
         response_rule_sections = runtime_settings.response_rule_sections.get(
             session.language, runtime_settings.response_rule_sections.get("zh")
@@ -155,20 +186,12 @@ class MainAgent:
             max_response_chars=runtime_settings.max_response_chars,
         )
 
-    @staticmethod
-    def _apply_response_length_limit(message: str, session: Session) -> str:
+    def _apply_response_length_limit(self, message: str, session: Session) -> str:
         """套用一般回覆字數上限（測驗流程不截斷，避免題目被切掉）。"""
         if session.step == SessionStep.QUIZ:
             return message
 
-        max_chars = None
-        try:
-            prompt_manager, runtime_prompt_id, _ = MainAgent._get_active_prompt_context()
-            runtime_settings = load_runtime_settings_from_prompt_manager(prompt_manager, runtime_prompt_id)
-            max_chars = runtime_settings.max_response_chars
-        except Exception:
-            max_chars = None
-
+        max_chars = self._last_max_response_chars
         if not max_chars or len(message) <= max_chars:
             return message
 
@@ -455,6 +478,29 @@ class MainAgent:
 
             if not final_message:
                 final_message = "收到！"
+
+            # 測驗防呆：submit_answer 後若 LLM 回覆漏掉下一題，補上題目與選項避免跳題。
+            if (
+                tool_name == "submit_answer"
+                and isinstance(tool_result, dict)
+                and isinstance(tool_result.get("next_question"), dict)
+                and not tool_result.get("is_complete")
+            ):
+                next_question = tool_result["next_question"]
+                next_question_text = str(next_question.get("text", "")).strip()
+                if next_question_text and next_question_text not in final_message:
+                    next_q_index = int(tool_result.get("current_index", 0)) + 1
+                    question_prefix = (
+                        f"Question {next_q_index}:"
+                        if session.language == "en"
+                        else f"第{next_q_index}題："
+                    )
+                    options_text = self._format_options_text(next_question.get("options", []))
+                    final_message = (
+                        f"{final_message.strip()}\n\n"
+                        f"{question_prefix} {next_question_text}\n"
+                        f"{options_text}"
+                    ).strip()
 
             final_message = self._apply_response_length_limit(final_message, session)
 

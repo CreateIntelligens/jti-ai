@@ -157,7 +157,7 @@ export default function Jti() {
   const refreshWelcomeContent = useCallback(async (lang?: string) => {
     const targetLang = (lang || currentLanguage) === 'en' ? 'en' : 'zh';
     try {
-      const data = await getJtiRuntimeSettings();
+      const data = await getJtiRuntimeSettings(undefined, targetLang);
       const welcome = data.settings?.welcome?.[targetLang];
       if (welcome?.title && welcome?.description) {
         setWelcomeContent({
