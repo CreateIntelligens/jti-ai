@@ -239,13 +239,23 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             if deleted_count > 0:
                 # 2. 重新讀取剩餘 logs 並重建 session
                 logs = conversation_logger.get_session_logs(request.session_id)
-                # 若 logs 全空（例如刪除的是第一句話），session 可能回退到初始狀態
-                session = session_manager.rebuild_session_from_logs(request.session_id, logs)
-                if not session:
-                    # 重建失敗（例如 logs 為空）→ 直接用現有 session（rollback 前的）
-                    session = _get_or_rebuild_session(request.session_id)
+                if logs:
+                    session = session_manager.rebuild_session_from_logs(request.session_id, logs)
                     if not session:
-                        raise HTTPException(status_code=404, detail="Session not found after rollback")
+                        raise HTTPException(status_code=500, detail="Failed to rebuild session from logs")
+                else:
+                    # logs 全空（刪除的是第一筆）→ 重置 session 回初始狀態
+                    session.step = SessionStep.WELCOME
+                    session.answers = {}
+                    session.current_question = None
+                    session.current_q_index = 0
+                    session.selected_questions = None
+                    session.color_scores = {}
+                    session.color_result_id = None
+                    session.color_result = None
+                    session.chat_history = []
+                    session_manager.update_session(session)
+                    logger.info(f"Session {request.session_id[:8]}... reset to initial state (no remaining logs)")
 
                 # 3. 清除 LLM 記憶體快取，確保下次建構時不會混入已刪除的歷史
                 main_agent.remove_session(request.session_id)
@@ -325,7 +335,10 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 logger.info(f"[AI回應] {response_message[:100]}{'...' if len(response_message) > 100 else ''}")
 
                 # 記錄到對話日誌
-                conversation_logger.log_conversation(
+                if request.turn_number:
+                    conversation_logger.delete_turns_from(request.session_id, request.turn_number)
+
+                log_result = conversation_logger.log_conversation(
                     session_id=request.session_id,
                     user_message=request.message,
                     agent_response=response_message,
@@ -340,6 +353,8 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     mode="jti"
                 )
 
+                final_turn_number = log_result[1] if log_result else None
+
                 logger.info(f"✅ QUIZ 作答成功: {request.message} → {user_choice}")
 
                 response_tool_calls = [
@@ -350,7 +365,8 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 return ChatResponse(
                     message=response_message,
                     session=updated_session.model_dump(),
-                    tool_calls=response_tool_calls
+                    tool_calls=response_tool_calls,
+                    turn_number=final_turn_number
                 )
             else:
                 # ❌ 無法判斷選項：AI 打哈哈引導回測驗

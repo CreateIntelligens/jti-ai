@@ -119,6 +119,17 @@ class MongoSessionManager(SessionStateMixin):
             return None
 
         try:
+            # === 先從 MongoDB 取現有 session 的完整題目列表 ===
+            existing_selected_questions = None
+            existing_language = "zh"
+            try:
+                doc = self.sessions_collection.find_one({"session_id": session_id})
+                if doc:
+                    existing_selected_questions = doc.get("selected_questions")
+                    existing_language = doc.get("language", "zh")
+            except Exception:
+                pass
+
             # === 從 logs 提取資料 ===
             answers = {}            # {question_id: option_id}
             selected_questions = [] # 按順序收集的題目
@@ -168,8 +179,12 @@ class MongoSessionManager(SessionStateMixin):
             step = snapshot.get("step", "WELCOME")
             color_result_id = snapshot.get("color_result_id") or color_result_id
 
-            # === 推斷語言（預設 zh） ===
-            language = "zh"
+            # === 優先使用 MongoDB 中完整的題目列表 ===
+            if existing_selected_questions and len(existing_selected_questions) > len(selected_questions):
+                selected_questions = existing_selected_questions
+
+            # === 推斷語言 ===
+            language = existing_language
 
             # === 計算 current_q_index 和 current_question ===
             current_q_index = len(answers)
