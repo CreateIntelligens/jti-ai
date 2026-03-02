@@ -364,25 +364,20 @@ export default function ConversationHistoryModal({
         }
       }
 
-      const response = await fetchWithApiKey(url);
-      if (!response.ok) {
-        throw new Error('Failed to export conversations');
+      const apiKey = localStorage.getItem('activeGeminiApiKey') || 'system';
+      if (apiKey && apiKey !== 'system') {
+        try {
+          const keys = JSON.parse(localStorage.getItem('userGeminiApiKeys') || '[]');
+          const found = keys.find((k: any) => k.name === apiKey);
+          if (found && found.key) {
+            url += `${url.includes('?') ? '&' : '?'}token=${found.key}`;
+          }
+        } catch {
+          // ignore parsing error
+        }
       }
 
-      const blob = await response.blob();
-      const downloadUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = downloadUrl;
-
-      const filename = sessionIds && sessionIds.length === 1
-        ? `conversation-${sessionIds[0].substring(0, 8)}-${Date.now()}.json`
-        : `conversations-${mode}-${Date.now()}.json`;
-
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(downloadUrl);
+      window.open(url, '_blank');
     } catch (error) {
       console.error('[ConversationHistory] Export error:', error);
       alert('匯出失敗，請稍後再試');

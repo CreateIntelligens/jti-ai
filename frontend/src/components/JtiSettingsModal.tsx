@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import * as api from '../services/api';
 import JtiPersonaTab from './jti/JtiPersonaTab';
 import JtiKnowledgeTab from './jti/JtiKnowledgeTab';
+import JtiQuizTab from './jti/JtiQuizTab';
 import Tabs from './Tabs';
 import type { Tab } from './Tabs';
 
@@ -389,7 +390,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
         <Tabs
           tabs={[
             { key: 'prompt', label: '人物設定' },
-            { key: 'quiz', label: '題庫', disabled: true, title: '即將推出' },
+            { key: 'quiz', label: '題庫' },
             { key: 'kb', label: '知識庫', onClick: loadKbFiles },
           ] as Tab[]}
           activeKey={activeTab}
@@ -433,9 +434,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
           )}
 
           {activeTab === 'quiz' && (
-            <div className="jti-settings-coming-soon">
-              即將推出
-            </div>
+            <JtiQuizTab language={normalizedLanguage} />
           )}
 
           {activeTab === 'kb' && (

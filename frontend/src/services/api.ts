@@ -315,21 +315,10 @@ export async function getJtiKnowledgeFileContent(filename: string, language: str
 }
 
 export async function downloadJtiKnowledgeFile(filename: string, language: string = 'zh'): Promise<void> {
-  const url = `${API_BASE}/jti/knowledge/files/${encodeURIComponent(filename)}/download?language=${language}`;
-  const response = await fetchWithApiKey(url);
-  if (!response.ok) {
-    const error = await response.text();
-    throw new Error(error || response.statusText);
-  }
-  const blob = await response.blob();
-  const objectUrl = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = objectUrl;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  window.URL.revokeObjectURL(objectUrl);
+  const apiKey = getUserApiKey();
+  const params = new URLSearchParams({ language });
+  if (apiKey) params.set('token', apiKey);
+  window.open(`${API_BASE}/jti/knowledge/files/${encodeURIComponent(filename)}/download?${params}`, '_blank');
 }
 
 export async function updateJtiKnowledgeFileContent(filename: string, content: string, language: string = 'zh'): Promise<any> {
@@ -356,6 +345,233 @@ export async function deleteJtiKnowledgeFile(fileName: string, language: string 
     method: 'DELETE',
   });
   return handleResponse<any>(response);
+}
+
+// ========== JTI 題庫管理 ==========
+
+export interface QuizQuestionOption {
+  id: string;
+  text: string;
+  score: Record<string, number>;
+}
+
+export interface QuizQuestion {
+  id: string;
+  text: string;
+  category: string;
+  weight: number;
+  options: QuizQuestionOption[];
+}
+
+export interface QuizBank {
+  bank_id: string;
+  name: string;
+  language: string;
+  is_active: boolean;
+  is_default: boolean;
+  question_count: number;
+  quiz_id?: string;
+  title?: string;
+  description?: string;
+}
+
+export interface QuizBankMetadata {
+  bank_id: string;
+  name: string;
+  quiz_id: string;
+  title: string;
+  description: string;
+  total_questions: number;
+  dimensions: string[];
+  tie_breaker_priority: string[];
+  selection_rules: {
+    total: number;
+    required: { personality: number; random_from: string[] };
+  };
+  is_active: boolean;
+  is_default: boolean;
+}
+
+export interface ColorResult {
+  color_id: string;
+  title: string;
+  color_name: string;
+  recommended_colors: string[];
+  description: string;
+}
+
+export interface QuizBankStats {
+  total_questions: number;
+  categories: Record<string, number>;
+  dimensions: string[];
+  selection_rules: Record<string, unknown>;
+}
+
+// --- Bank Management ---
+
+export async function listQuizBanks(language: string = 'zh'): Promise<{ banks: QuizBank[]; total: number; max: number }> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/banks/?language=${language}`);
+  return handleResponse(response);
+}
+
+export async function createQuizBank(language: string, name: string): Promise<QuizBank> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/banks/?language=${language}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  return handleResponse(response);
+}
+
+export async function deleteQuizBank(language: string, bankId: string): Promise<void> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/banks/${encodeURIComponent(bankId)}?language=${language}`, {
+    method: 'DELETE',
+  });
+  await handleResponse(response);
+}
+
+export async function activateQuizBank(language: string, bankId: string): Promise<void> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/banks/${encodeURIComponent(bankId)}/activate?language=${language}`, {
+    method: 'POST',
+  });
+  await handleResponse(response);
+}
+
+// --- Quiz Questions ---
+
+export async function listQuizQuestions(language: string = 'zh', category?: string, bankId?: string): Promise<{ questions: QuizQuestion[]; total: number }> {
+  const params = new URLSearchParams({ language });
+  if (bankId) params.set('bank_id', bankId);
+  if (category) params.set('category', category);
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/questions/?${params}`);
+  return handleResponse(response);
+}
+
+export async function getQuizQuestion(language: string, id: string, bankId?: string): Promise<QuizQuestion> {
+  const params = new URLSearchParams({ language });
+  if (bankId) params.set('bank_id', bankId);
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/questions/${encodeURIComponent(id)}?${params}`);
+  return handleResponse(response);
+}
+
+export async function createQuizQuestion(language: string, question: QuizQuestion, bankId?: string): Promise<QuizQuestion> {
+  const params = new URLSearchParams({ language });
+  if (bankId) params.set('bank_id', bankId);
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/questions/?${params}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(question),
+  });
+  return handleResponse(response);
+}
+
+export async function updateQuizQuestion(language: string, id: string, data: Partial<QuizQuestion>, bankId?: string): Promise<QuizQuestion> {
+  const params = new URLSearchParams({ language });
+  if (bankId) params.set('bank_id', bankId);
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/questions/${encodeURIComponent(id)}?${params}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse(response);
+}
+
+export async function deleteQuizQuestion(language: string, id: string, bankId?: string): Promise<void> {
+  const params = new URLSearchParams({ language });
+  if (bankId) params.set('bank_id', bankId);
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/questions/${encodeURIComponent(id)}?${params}`, {
+    method: 'DELETE',
+  });
+  await handleResponse(response);
+}
+
+// --- Quiz Metadata ---
+
+export async function getQuizBankMetadata(language: string = 'zh', bankId?: string): Promise<QuizBankMetadata> {
+  const params = new URLSearchParams({ language });
+  if (bankId) params.set('bank_id', bankId);
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/metadata/?${params}`);
+  return handleResponse(response);
+}
+
+export async function updateQuizBankMetadata(language: string, data: Partial<QuizBankMetadata>, bankId?: string): Promise<QuizBankMetadata> {
+  const params = new URLSearchParams({ language });
+  if (bankId) params.set('bank_id', bankId);
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/metadata/?${params}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse(response);
+}
+
+// --- Color Results ---
+
+export async function listColorResults(language: string = 'zh'): Promise<{ results: ColorResult[]; total: number }> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/color-results/?language=${language}`);
+  return handleResponse(response);
+}
+
+export async function updateColorResult(language: string, colorId: string, data: Partial<ColorResult>): Promise<ColorResult> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/color-results/${encodeURIComponent(colorId)}?language=${language}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  return handleResponse(response);
+}
+
+export async function exportColorResultsCsv(language: string): Promise<void> {
+  const params = new URLSearchParams({ language });
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/color-results/export/?${params}`);
+  if (!response.ok) throw new Error('Export failed');
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `color_results_${language}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+// --- Quiz Stats ---
+
+export async function getQuizBankStats(language: string = 'zh', bankId?: string): Promise<QuizBankStats> {
+  const params = new URLSearchParams({ language });
+  if (bankId) params.set('bank_id', bankId);
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/stats/?${params}`);
+  return handleResponse(response);
+}
+
+// --- Import / Export ---
+
+export async function importQuizBank(language: string, bankId: string, file: File, replace = false): Promise<{ count: number; message: string }> {
+  const params = new URLSearchParams({ language, bank_id: bankId });
+  if (replace) params.set('replace', 'true');
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/import/?${params}`, {
+    method: 'POST',
+    body: formData,
+  });
+  return handleResponse(response);
+}
+
+export async function exportQuizBankCsv(language: string, bankId: string): Promise<void> {
+  const params = new URLSearchParams({ language, bank_id: bankId });
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/export/?${params}`);
+  if (!response.ok) throw new Error('Export failed');
+  const blob = await response.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `quiz_bank_${bankId}_${language}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
 }
 
 // ========== 使用者 Gemini API Key 管理（多組）==========
