@@ -64,7 +64,6 @@ class QuizBankStore:
             "language": language,
             "bank_id": bank_id,
             "name": name,
-            "quiz_id": "color_taste",
             "title": name,
             "description": "",
             "total_questions": 5,
@@ -257,7 +256,6 @@ class QuizBankStore:
             clean_questions.append(clean_q)
 
         return {
-            "quiz_id": meta.get("quiz_id", ""),
             "title": meta.get("title", ""),
             "description": meta.get("description", ""),
             "total_questions": meta.get("total_questions", 5),

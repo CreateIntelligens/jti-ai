@@ -291,7 +291,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         # ========== QUIZ 狀態：後端完全接管 ==========
         if session.step.value == "QUIZ" and session.current_question:
             q = session.current_question
-            total_questions = get_total_questions(session.quiz_id)
+            total_questions = get_total_questions(session.language)
             remaining = total_questions - len(session.answers)
             current_q_num = len(session.answers) + 1
 

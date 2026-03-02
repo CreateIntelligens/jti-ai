@@ -202,11 +202,10 @@ class MongoSessionManager(SessionStateMixin):
 
             # 若仍不足，做 deterministic 補齊，避免後續 submit_answer 缺題炸掉
             if selected_questions:
-                total_questions = get_total_questions("color_taste", language)
+                total_questions = get_total_questions(language)
                 if len(selected_questions) < total_questions:
                     selected_questions = complete_selected_questions(
                         selected_questions,
-                        quiz_id="color_taste",
                         language=language,
                     )
 
@@ -239,7 +238,6 @@ class MongoSessionManager(SessionStateMixin):
                 session_id=session_id,
                 step=step,
                 language=language,
-                quiz_id="color_taste",
                 current_q_index=current_q_index,
                 answers=answers,
                 selected_questions=selected_questions if selected_questions else None,

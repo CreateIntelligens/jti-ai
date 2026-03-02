@@ -159,11 +159,10 @@ class ToolExecutor:
         session = session_manager.get_session(session_id)
         language = session.language if session else "zh"
 
-        quiz_id = session.quiz_id if session else "color_taste"
-        total_questions = get_total_questions(quiz_id, language)
+        total_questions = get_total_questions(language)
 
         # 隨機抽選題目（依 selection_rules）
-        selected_questions = generate_random_quiz(quiz_id, language)
+        selected_questions = generate_random_quiz(language)
 
         # 重置測驗狀態並保存選中的題目
         session = session_manager.start_quiz(session_id, selected_questions)
@@ -206,7 +205,7 @@ class ToolExecutor:
         else:
             question = None
 
-        total = get_total_questions(session.quiz_id, session.language)
+        total = get_total_questions(session.language)
 
         if question is None:
             # 已經完成所有題目
@@ -261,7 +260,7 @@ class ToolExecutor:
             return {"error": "Session not found or invalid state"}
 
         # 檢查是否完成測驗
-        total_questions = get_total_questions(session.quiz_id, session.language)
+        total_questions = get_total_questions(session.language)
         is_complete = session.is_quiz_complete(total_questions)
 
         logger.info(f"Answer submitted: Q{question_id}={option_id}, answered={len(session.answers)}/{total_questions}, complete={is_complete}")
@@ -293,7 +292,6 @@ class ToolExecutor:
             if not next_question and session.selected_questions:
                 completed_questions = complete_selected_questions(
                     session.selected_questions,
-                    quiz_id=session.quiz_id,
                     language=session.language,
                 )
                 if len(completed_questions) > len(session.selected_questions):

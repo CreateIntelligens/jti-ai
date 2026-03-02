@@ -28,7 +28,6 @@ class Session(BaseModel):
     language: str = "zh"  # 語言設定 (zh/en)
 
     # 測驗相關
-    quiz_id: str = "color_taste"  # 使用的題庫 ID
     current_q_index: int = 0      # 目前題目索引
     answers: Dict[str, str] = Field(default_factory=dict)  # {question_id: option_id}
     selected_questions: Optional[List[Dict[str, Any]]] = None  # 本次測驗隨機選中的題目列表

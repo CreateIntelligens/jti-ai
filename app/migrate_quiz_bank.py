@@ -104,7 +104,6 @@ def migrate_quiz_bank() -> None:
 
         # Upsert metadata with multi-set fields
         store.upsert_metadata(lang, DEFAULT_BANK_ID, {
-            "quiz_id": data.get("quiz_id", ""),
             "name": "預設題庫",
             "title": data.get("title", ""),
             "description": data.get("description", ""),

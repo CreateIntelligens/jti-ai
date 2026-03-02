@@ -50,19 +50,13 @@ def invalidate_quiz_cache(language: str = "zh"):
     quiz_data_cache.pop(language, None)
 
 
-def generate_random_quiz(quiz_id: str = "color_taste", language: str = "zh") -> List[Dict]:
+def generate_random_quiz(language: str = "zh") -> List[Dict]:
     """
     產生隨機測驗題目
 
     策略：
     - 依 selection_rules 的 required 規則抽題
     - 總題數由 selection_rules.total 決定（預設 5 題）
-
-    Args:
-        quiz_id: 題庫 ID
-
-    Returns:
-        List of 5 selected questions
     """
     try:
         quiz_bank = load_quiz_bank(language)
@@ -118,8 +112,7 @@ def generate_random_quiz(quiz_id: str = "color_taste", language: str = "zh") -> 
                 used_ids.update(q["id"] for q in fill)
 
         logger.info(
-            "Generated random quiz: %s (%s), selected %s questions: %s",
-            quiz_id,
+            "Generated random quiz (%s), selected %s questions: %s",
             language,
             len(selected),
             [q.get("id") for q in selected],
@@ -131,36 +124,19 @@ def generate_random_quiz(quiz_id: str = "color_taste", language: str = "zh") -> 
         raise
 
 
-def generate_quiz(quiz_id: str = "color_taste", language: str = "zh") -> Dict:
-    """
-    產生測驗題目（向後相容的 wrapper）
-
-    Returns:
-        {
-            "quiz_id": str,
-            "name": str,
-            "description": str,
-            "total_questions": int,
-            "questions": list (5 randomly selected questions)
-        }
-    """
+def generate_quiz(language: str = "zh") -> Dict:
+    """產生測驗題目"""
     try:
         quiz_bank = load_quiz_bank(language)
-
-        # 隨機抽題
-        questions = generate_random_quiz(quiz_id, language)
-
+        questions = generate_random_quiz(language)
         result = {
-            "quiz_id": quiz_bank.get("quiz_id", quiz_id),
-            "name": quiz_bank.get("title", quiz_id),
+            "name": quiz_bank.get("title", ""),
             "description": quiz_bank.get("description", ""),
             "total_questions": len(questions),
             "questions": questions,
         }
-
-        logger.info(f"Generated quiz: {quiz_id}, {len(questions)} questions")
+        logger.info(f"Generated quiz ({language}), {len(questions)} questions")
         return result
-
     except Exception as e:
         logger.error(f"Failed to generate quiz: {e}")
         raise
@@ -188,7 +164,6 @@ def get_question_from_selected(selected_questions: List[Dict], question_index: i
 
 def complete_selected_questions(
     selected_questions: List[Dict],
-    quiz_id: str = "color_taste",
     language: str = "zh",
 ) -> List[Dict]:
     """Deterministically fill missing quiz questions when selected list is incomplete."""
@@ -281,7 +256,7 @@ def complete_selected_questions(
 
 
 
-def get_total_questions(quiz_id: str = "color_taste", language: str = "zh") -> int:
+def get_total_questions(language: str = "zh") -> int:
     """取得題庫總題數（依 selection_rules 決定）"""
     quiz_bank = load_quiz_bank(language)
     selection_rules = quiz_bank.get("selection_rules", {})
