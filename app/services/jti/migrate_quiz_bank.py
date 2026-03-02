@@ -13,6 +13,7 @@ import logging
 from pathlib import Path
 
 from app.services.quiz_bank_store import DEFAULT_BANK_ID
+from app.services.color_results_store import DEFAULT_SET_ID
 
 logger = logging.getLogger(__name__)
 
@@ -121,14 +122,66 @@ def migrate_quiz_bank() -> None:
         print(f"[Startup] ✅ Seeded quiz bank ({lang}): {count} questions")
 
 
+def _upgrade_legacy_color_results() -> None:
+    """
+    Upgrade legacy color_results documents that lack set_id.
+
+    Strategy:
+    - If a doc with set_id="default" already exists for this color_id, delete the legacy duplicate.
+    - Otherwise, update the legacy doc in-place to add set_id="default".
+    Also ensure default set metadata exists.
+    """
+    from app.services.mongo_client import get_mongo_db
+
+    db = get_mongo_db()
+    if db is None:
+        return
+
+    col = db["color_results"]
+    legacy_docs = list(col.find({"set_id": {"$exists": False}}))
+    for doc in legacy_docs:
+        lang = doc.get("language")
+        color_id = doc.get("color_id")
+        existing = col.find_one({"language": lang, "set_id": DEFAULT_SET_ID, "color_id": color_id})
+        if existing:
+            col.delete_one({"_id": doc["_id"]})
+        else:
+            col.update_one(
+                {"_id": doc["_id"]},
+                {"$set": {"set_id": DEFAULT_SET_ID}},
+            )
+    if legacy_docs:
+        logger.info("[Startup] Processed %d legacy color result docs", len(legacy_docs))
+
+    # Ensure default set metadata exists
+    meta_col = db["color_results_metadata"]
+    for lang in ["zh"]:
+        existing_meta = meta_col.find_one({"language": lang, "set_id": DEFAULT_SET_ID})
+        if not existing_meta:
+            now = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
+            meta_col.insert_one({
+                "language": lang,
+                "set_id": DEFAULT_SET_ID,
+                "name": "預設色彩結果",
+                "is_active": True,
+                "is_default": True,
+                "created_at": now,
+                "updated_at": now,
+            })
+            logger.info("[Startup] Created default color results metadata for %s", lang)
+
+
 def migrate_color_results() -> None:
     """Seed color results from JSON → MongoDB (skip if already populated)."""
     from app.services.color_results_store import get_color_results_store
 
+    # First, upgrade any legacy data
+    _upgrade_legacy_color_results()
+
     store = get_color_results_store()
 
     for lang in ["zh"]:  # 先中文，未來加 en
-        existing = store.list_results(lang)
+        existing = store.list_results(lang, set_id=DEFAULT_SET_ID)
         if existing:
             logger.info("[Startup] Color results (%s) already in MongoDB, skipping seed", lang)
             continue
@@ -140,5 +193,5 @@ def migrate_color_results() -> None:
         with open(COLOR_RESULTS_PATH, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        count = store.bulk_upsert_results(lang, data)
+        count = store.bulk_upsert_results(lang, data, set_id=DEFAULT_SET_ID)
         print(f"[Startup] ✅ Seeded color results ({lang}): {count} entries")

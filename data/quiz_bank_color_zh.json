@@ -1,1217 +1,160 @@
 {
-  "quiz_id": "color_taste",
-  "title": "生活品味色彩探索",
-  "description": "透過 5 個簡單的問題，找出最適合你的 Ploom X 保護殼顏色",
-  "total_questions": 5,
+  "title": "生活品味人格探索",
+  "description": "透過幾個簡單的問題，找出最適合你的人格類型",
+  "total_questions": 4,
   "questions": [
     {
-      "id": "c1",
-      "text": "選擇一個最能代表你個性的詞彙？",
+      "id": "q1",
+      "text": "週末突然多出一整天，你會怎麼安排？",
       "category": "personality",
-      "weight": 2,
+      "weight": 1,
       "options": [
-        {"id": "a", "text": "優雅精緻", "score": {"metal": 2}},
-        {"id": "b", "text": "清新自然", "score": {"cool": 2}}
+        {"id": "a", "text": "先列清單：交通、時間、備案，效率最大化", "score": {"analyst": 1}},
+        {"id": "b", "text": "揪朋友一起：吃喝聊走拍照，重點是一起玩", "score": {"diplomat": 1}},
+        {"id": "c", "text": "選一個熟悉且品質穩的地方：舒服、安心、剛剛好", "score": {"guardian": 1}},
+        {"id": "d", "text": "當天才決定：看到哪裡有趣就去哪裡，越未知越好", "score": {"explorer": 1}}
       ]
     },
     {
-      "id": "c2",
-      "text": "朋友會用哪個詞形容你？",
+      "id": "q2",
+      "text": "你挑選一趟旅行的「第一優先」是？",
       "category": "personality",
-      "weight": 2,
+      "weight": 1,
       "options": [
-        {"id": "a", "text": "超有活力", "score": {"warm": 2}},
-        {"id": "b", "text": "很可靠", "score": {"dark": 2}}
+        {"id": "a", "text": "行程密度與路線最佳化：每段都恰到好處", "score": {"analyst": 1}},
+        {"id": "b", "text": "一起出發的人：好不好玩取決於同伴與互動", "score": {"diplomat": 1}},
+        {"id": "c", "text": "住宿與整體質感：經典、舒適、值得信賴", "score": {"guardian": 1}},
+        {"id": "d", "text": "新鮮感：沒做過的事、沒去過的點、越特別越好", "score": {"explorer": 1}}
       ]
     },
     {
-      "id": "c3",
-      "text": "如果你是一種天氣，你會是？",
+      "id": "q3",
+      "text": "朋友臨時改計畫（時間/地點都變了），你第一反應？",
       "category": "personality",
-      "weight": 2,
+      "weight": 1,
       "options": [
-        {"id": "a", "text": "雨後彩虹，繽紛絢麗", "score": {"colorful": 2}},
-        {"id": "b", "text": "晴朗的黃昏，金色陽光灑落", "score": {"metal": 2}}
+        {"id": "a", "text": "快速重排：把可行方案列出來、選最優解", "score": {"analyst": 1}},
+        {"id": "b", "text": "先確認大家心情：別掃興，我來讓氣氛回來", "score": {"diplomat": 1}},
+        {"id": "c", "text": "穩住大局：選風險最小、大家最安心的方案", "score": {"guardian": 1}},
+        {"id": "d", "text": "太好了！順勢開新副本：改去更刺激的地方", "score": {"explorer": 1}}
       ]
     },
     {
-      "id": "c4",
-      "text": "選一個最吸引你的元素？",
+      "id": "q4",
+      "text": "你在團體出遊時最常扮演的角色是？",
       "category": "personality",
-      "weight": 2,
+      "weight": 1,
       "options": [
-        {"id": "a", "text": "水，清澈流動", "score": {"cool": 2}},
-        {"id": "b", "text": "火，熱烈奔放", "score": {"warm": 2}}
+        {"id": "a", "text": "行程規劃師：時間控、路線控、預算控", "score": {"analyst": 1}},
+        {"id": "b", "text": "氣氛王：拍照、帶話題、把大家湊在一起", "score": {"diplomat": 1}},
+        {"id": "c", "text": "定海神針：照顧細節、確保每個人都舒服", "score": {"guardian": 1}},
+        {"id": "d", "text": "開路先鋒：找新點、試新店、帶大家衝第一", "score": {"explorer": 1}}
       ]
     },
     {
-      "id": "c5",
-      "text": "如果你是一種動物，你覺得自己最像？",
+      "id": "q5",
+      "text": "面對陌生城市，你會怎麼走？",
       "category": "personality",
-      "weight": 2,
+      "weight": 1,
       "options": [
-        {"id": "a", "text": "貓頭鷹，沉穩智慧", "score": {"dark": 2}},
-        {"id": "b", "text": "蝴蝶，多彩多姿", "score": {"colorful": 2}}
+        {"id": "a", "text": "先做功課：地圖、評價、動線、替代路線都看過", "score": {"analyst": 1}},
+        {"id": "b", "text": "先找當地人/朋友推薦：順便聊天認識新朋友", "score": {"diplomat": 1}},
+        {"id": "c", "text": "優先走「口碑經典」路線：安全、不踩雷、品質穩", "score": {"guardian": 1}},
+        {"id": "d", "text": "隨機探索：小巷、未知景點、走到哪算哪", "score": {"explorer": 1}}
       ]
     },
     {
-      "id": "c6",
-      "text": "形容自己的第一印象？",
+      "id": "q6",
+      "text": "你最在意的「生活儀式感」長什麼樣？",
       "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "有氣質", "score": {"metal": 2}},
-        {"id": "b", "text": "很熱情", "score": {"warm": 2}}
-      ]
-    },
-    {
-      "id": "c7",
-      "text": "吃飽飯後想要吃點甜食，你會選擇？",
-      "category": "food",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "甜甜的蛋糕或巧克力，越甜越滿足", "score": {"warm": 1}},
-        {"id": "b", "text": "沁涼的冰淇淋或薄荷糖，清爽舒暢", "score": {"cool": 1}}
+        {"id": "a", "text": "生活有系統：收納、習慣、節奏都能被優化", "score": {"analyst": 1}},
+        {"id": "b", "text": "有人一起：再平常也能變成值得分享的時刻", "score": {"diplomat": 1}},
+        {"id": "c", "text": "經典質感：耐看、耐用、越用越有味道", "score": {"guardian": 1}},
+        {"id": "d", "text": "有驚喜：偶爾打破規則，讓日常突然很好玩", "score": {"explorer": 1}}
       ]
     },
     {
-      "id": "c8",
-      "text": "週末早午餐，你比較想吃？",
-      "category": "food",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "清爽的沙拉配果汁", "score": {"cool": 1}},
-        {"id": "b", "text": "簡單的吐司配黑咖啡", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c9",
-      "text": "下午茶時間，你會選？",
-      "category": "food",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "香濃的拿鐵或卡布奇諾", "score": {"warm": 1}},
-        {"id": "b", "text": "清香的綠茶或花茶", "score": {"cool": 1}}
-      ]
-    },
-    {
-      "id": "c10",
-      "text": "宵夜時間，你最想吃？",
-      "category": "food",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "熱騰騰的泡麵或鹹酥雞", "score": {"warm": 1}},
-        {"id": "b", "text": "清淡的水果或優格", "score": {"cool": 1}}
-      ]
-    },
-    {
-      "id": "c11",
-      "text": "去咖啡廳你通常會點？",
-      "category": "food",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "焦 caramel 瑪奇朵或摩卡", "score": {"warm": 1}},
-        {"id": "b", "text": "季節限定特調", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c12",
-      "text": "選購配件時，你最重視的是？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "質感與品味，要有高級感", "score": {"metal": 1}},
-        {"id": "b", "text": "實用與耐看，經典不退流行", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c13",
-      "text": "買衣服時，你通常會選？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "有設計感的款式，展現品味", "score": {"metal": 1}},
-        {"id": "b", "text": "亮眼搶眼的顏色", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c14",
-      "text": "挑選手機殼時，你會選？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "透明或淺色系", "score": {"cool": 1}},
-        {"id": "b", "text": "黑色或深色系", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c15",
-      "text": "選太陽眼鏡時，你會選？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "紅色或橘色框", "score": {"warm": 1}},
-        {"id": "b", "text": "特殊造型或花紋", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c16",
-      "text": "買包包時，你最在意？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "品牌質感，要有精品感", "score": {"metal": 1}},
-        {"id": "b", "text": "容量實用，好背好裝", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c17",
-      "text": "你理想中的度假地點是？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "熱帶海島，享受陽光沙灘", "score": {"cool": 1}},
-        {"id": "b", "text": "森林山區，親近大自然", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c18",
-      "text": "週末最想做的事是？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "去高級餐廳吃頓好的", "score": {"metal": 1}},
-        {"id": "b", "text": "找朋友出去玩", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c19",
-      "text": "參加派對時，你通常會？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "成為全場焦點，帶動氣氛", "score": {"warm": 1}},
-        {"id": "b", "text": "找幾個好友安靜聊天", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c20",
-      "text": "運動的話，你比較喜歡？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "瑜伽或皮拉提斯", "score": {"cool": 1}},
-        {"id": "b", "text": "跑步或健身房", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c21",
-      "text": "旅行時，你更喜歡？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "入住精品飯店享受服務", "score": {"metal": 1}},
-        {"id": "b", "text": "住民宿體驗在地生活", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c22",
-      "text": "逛街時，你會先走進？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "快時尚或平價品牌", "score": {"cool": 1}},
-        {"id": "b", "text": "書店或文具店", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c23",
-      "text": "你喜歡的居家風格是？",
-      "category": "home",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "簡約現代，黑白灰為主", "score": {"dark": 1}},
-        {"id": "b", "text": "繽紛多彩，展現個性", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c24",
-      "text": "佈置房間時，你會加入？",
-      "category": "home",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "暖色調的燈光或地毯", "score": {"warm": 1}},
-        {"id": "b", "text": "各種顏色的植物盆栽", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c25",
-      "text": "理想的臥室燈光是？",
-      "category": "home",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "溫暖的黃光，很有氣氛", "score": {"warm": 1}},
-        {"id": "b", "text": "明亮的白光，乾淨清爽", "score": {"cool": 1}}
-      ]
-    },
-    {
-      "id": "c26",
-      "text": "選床單時，你會選？",
-      "category": "home",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "素色高質感的材質", "score": {"metal": 1}},
-        {"id": "b", "text": "暖橘或暖黃色系", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c27",
-      "text": "你家客廳最想有？",
-      "category": "home",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "大片落地窗採光", "score": {"cool": 1}},
-        {"id": "b", "text": "滿滿的書架", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c28",
-      "text": "聽音樂時，你比較喜歡？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "節奏感強的流行樂或電音", "score": {"warm": 1}},
-        {"id": "b", "text": "各種風格都聽，看心情", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c29",
-      "text": "壓力大的時候，你會？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "大吃大喝犒賞自己", "score": {"warm": 1}},
-        {"id": "b", "text": "安靜獨處沉澱心情", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c30",
-      "text": "拍照時，你喜歡的濾鏡風格是？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "質感復古，帶點金色調", "score": {"metal": 1}},
-        {"id": "b", "text": "明亮鮮豔，暖色調", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c31",
-      "text": "心情好的時候，你會？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "去海邊或公園走走", "score": {"cool": 1}},
-        {"id": "b", "text": "享受一個人的時光", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c32",
-      "text": "看電影時，你最常選？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "熱血動作片", "score": {"warm": 1}},
-        {"id": "b", "text": "奇幻冒險片", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c33",
-      "text": "睡前你通常會？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "滑手機看社群", "score": {"warm": 1}},
-        {"id": "b", "text": "看書或聽音樂放鬆", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c34",
-      "text": "選香水時，你喜歡什麼調？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "木質調或皮革調，成熟穩重", "score": {"metal": 1}},
-        {"id": "b", "text": "海洋調或清新調，乾淨舒服", "score": {"cool": 1}}
-      ]
-    },
-    {
-      "id": "c35",
-      "text": "如果可以學一項才藝，你會選？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "舞蹈或健身", "score": {"warm": 1}},
-        {"id": "b", "text": "攝影或寫作", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c36",
-      "text": "社群軟體上，你的頭貼風格是？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "搞怪有趣的創意照", "score": {"colorful": 1}},
-        {"id": "b", "text": "精心修圖的質感照", "score": {"metal": 1}}
-      ]
-    },
-    {
-      "id": "c37",
-      "text": "收到禮物時，你更開心收到？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "實用貼心的生活小物", "score": {"cool": 1}},
-        {"id": "b", "text": "手作溫暖的心意禮物", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c38",
-      "text": "如果養寵物，你會選？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "安靜的烏龜或兔子", "score": {"dark": 1}},
-        {"id": "b", "text": "特別的爬蟲或鳥類", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c39",
-      "text": "選車的話，你最在意？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "外型時尚有質感", "score": {"metal": 1}},
-        {"id": "b", "text": "馬力強動力足", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c40",
-      "text": "工作累了，你會想？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "到海邊或山上透透氣", "score": {"cool": 1}},
-        {"id": "b", "text": "回家一個人安靜休息", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c41",
-      "text": "約會時，你比較想去？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "遊樂園玩設施", "score": {"warm": 1}},
-        {"id": "b", "text": "展覽或市集探索新奇", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c42",
-      "text": "如果開一家店，你會開？",
+      "id": "q7",
+      "text": "你選餐廳最像哪一種？",
       "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "精品選物店", "score": {"metal": 2}},
-        {"id": "b", "text": "熱鬧的餐酒館", "score": {"warm": 2}}
-      ]
-    },
-    {
-      "id": "c43",
-      "text": "你的手機桌布通常是？",
-      "category": "style",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "海景或天空風景", "score": {"cool": 1}},
-        {"id": "b", "text": "純黑或深色系", "score": {"dark": 1}}
+        {"id": "a", "text": "看評分＋菜單＋距離＋排隊時間，算出最划算", "score": {"analyst": 1}},
+        {"id": "b", "text": "先看氛圍：適合聊天、拍照、大家坐得開心", "score": {"diplomat": 1}},
+        {"id": "c", "text": "先看品牌與口碑：穩、好、值得反覆回訪", "score": {"guardian": 1}},
+        {"id": "d", "text": "選沒吃過的：新菜系、怪有趣、越特別越好", "score": {"explorer": 1}}
       ]
     },
     {
-      "id": "c44",
-      "text": "選飲料杯的話，你會選？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "可愛造型杯，看了就開心", "score": {"warm": 1}},
-        {"id": "b", "text": "彩繪圖案杯，獨一無二", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c45",
-      "text": "選筆電的話，你最在意？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "輕薄有質感的外型", "score": {"metal": 1}},
-        {"id": "b", "text": "螢幕大、規格高", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c46",
-      "text": "去 KTV，你通常會點？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "抒情慢歌，放鬆心情", "score": {"cool": 1}},
-        {"id": "b", "text": "冷門好歌，展現品味", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c47",
-      "text": "選一個夢想中的超能力？",
+      "id": "q8",
+      "text": "你買東西的「決策模式」是？",
       "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "控制火焰", "score": {"warm": 2}},
-        {"id": "b", "text": "變形術", "score": {"colorful": 2}}
-      ]
-    },
-    {
-      "id": "c48",
-      "text": "週末早上起床，你第一件事是？",
-      "category": "lifestyle",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "泡杯好咖啡慢慢享用", "score": {"metal": 1}},
-        {"id": "b", "text": "查看朋友訊息", "score": {"warm": 1}}
+        {"id": "a", "text": "比規格、比評價、比CP值，買一次就要買對", "score": {"analyst": 1}},
+        {"id": "b", "text": "看會不會讓生活更有趣、能跟朋友一起分享", "score": {"diplomat": 1}},
+        {"id": "c", "text": "看材質、工藝、耐用度：經典就是不用多說", "score": {"guardian": 1}},
+        {"id": "d", "text": "看能不能帶來新體驗：好玩比完美更重要", "score": {"explorer": 1}}
       ]
     },
     {
-      "id": "c49",
-      "text": "你比較喜歡哪種聚會？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "咖啡廳的輕鬆下午茶", "score": {"cool": 1}},
-        {"id": "b", "text": "安靜的品酒或品茶會", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c50",
-      "text": "選一個最想去的城市？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "紐約，熱鬧繁華", "score": {"warm": 1}},
-        {"id": "b", "text": "曼谷，繽紛有趣", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c51",
-      "text": "如果你是一種花，你覺得自己是？",
+      "id": "q9",
+      "text": "一場聚會，你最享受的瞬間是？",
       "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "玫瑰，高貴優雅", "score": {"metal": 2}},
-        {"id": "b", "text": "向日葵，陽光燦爛", "score": {"warm": 2}}
-      ]
-    },
-    {
-      "id": "c52",
-      "text": "挑傢俱時，你偏好的材質是？",
-      "category": "home",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "淺色木頭，自然清爽", "score": {"cool": 1}},
-        {"id": "b", "text": "深色木頭，穩重大方", "score": {"dark": 1}}
+        {"id": "a", "text": "一切都順：流程順、節奏順、每個人都玩到重點", "score": {"analyst": 1}},
+        {"id": "b", "text": "大家笑成一團：聊到停不下來，情緒被點亮", "score": {"diplomat": 1}},
+        {"id": "c", "text": "被信任與依靠：有人需要你、你讓局面更穩", "score": {"guardian": 1}},
+        {"id": "d", "text": "出現意外驚喜：臨時加碼、突發任務、越來越嗨", "score": {"explorer": 1}}
       ]
     },
     {
-      "id": "c53",
-      "text": "選一種藝術風格？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "野獸派，色彩強烈", "score": {"warm": 1}},
-        {"id": "b", "text": "普普藝術，大膽繽紛", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c54",
-      "text": "在團體中，你通常扮演什麼角色？",
+      "id": "q10",
+      "text": "如果要挑戰一件新事，你比較像哪種？",
       "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "品味擔當，提供建議", "score": {"metal": 2}},
-        {"id": "b", "text": "氣氛製造者，帶動歡樂", "score": {"warm": 2}}
-      ]
-    },
-    {
-      "id": "c55",
-      "text": "選一種甜點？",
-      "category": "food",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "日式抹茶蛋糕", "score": {"cool": 1}},
-        {"id": "b", "text": "提拉米蘇", "score": {"dark": 1}}
+        {"id": "a", "text": "先學原理＋拆步驟，做出可複製的方法", "score": {"analyst": 1}},
+        {"id": "b", "text": "找人一起學：互相鼓勵、過程更好玩", "score": {"diplomat": 1}},
+        {"id": "c", "text": "選穩健路線：從基礎打底，慢慢練到很扎實", "score": {"guardian": 1}},
+        {"id": "d", "text": "直接跳進去：先做再說，邊玩邊學最快", "score": {"explorer": 1}}
       ]
     },
     {
-      "id": "c56",
-      "text": "遇到困難時，你通常會？",
+      "id": "q11",
+      "text": "你整理行李的方式最像？",
       "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "找朋友討論，集思廣益", "score": {"warm": 2}},
-        {"id": "b", "text": "嘗試各種不同的方法", "score": {"colorful": 2}}
-      ]
-    },
-    {
-      "id": "c57",
-      "text": "你的衣櫃裡最多的顏色是？",
-      "category": "style",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "米色、卡其色等大地色", "score": {"metal": 1}},
-        {"id": "b", "text": "紅色、橘色等亮色系", "score": {"warm": 1}}
+        {"id": "a", "text": "分類＋清單＋備用方案：缺什麼一眼就知道", "score": {"analyst": 1}},
+        {"id": "b", "text": "行李要留空間：路上遇到喜歡的就一起帶回來分享", "score": {"diplomat": 1}},
+        {"id": "c", "text": "必帶「品質穩」的經典品：用得安心、拍起來也好看", "score": {"guardian": 1}},
+        {"id": "d", "text": "輕裝上陣：帶最少、路上補給，行動自由最重要", "score": {"explorer": 1}}
       ]
     },
     {
-      "id": "c58",
-      "text": "選一種天空的樣子？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "晴朗的藍天白雲", "score": {"cool": 1}},
-        {"id": "b", "text": "深邃的滿天星空", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c59",
-      "text": "如果要學做菜，你想學？",
-      "category": "food",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "中式熱炒，大火快炒", "score": {"warm": 1}},
-        {"id": "b", "text": "各國料理都想嘗試", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c60",
-      "text": "你覺得自己的生活節奏像？",
+      "id": "q12",
+      "text": "你心目中的「理想一天」比較接近？",
       "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "優雅的華爾滋", "score": {"metal": 2}},
-        {"id": "b", "text": "熱情的拉丁舞曲", "score": {"warm": 2}}
-      ]
-    },
-    {
-      "id": "c61",
-      "text": "選一種寶石？",
-      "category": "style",
       "weight": 1,
       "options": [
-        {"id": "a", "text": "藍寶石，沉靜優雅", "score": {"cool": 1}},
-        {"id": "b", "text": "黑曜石，神秘深邃", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c62",
-      "text": "你喜歡的攝影主題是？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "人物或生活記錄", "score": {"warm": 1}},
-        {"id": "b", "text": "花卉或大自然", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c63",
-      "text": "選一種季節代表你？",
-      "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "秋天，成熟優雅", "score": {"metal": 2}},
-        {"id": "b", "text": "夏天，熱情奔放", "score": {"warm": 2}}
-      ]
-    },
-    {
-      "id": "c64",
-      "text": "你的閱讀習慣是？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "療癒散文或旅遊書", "score": {"cool": 1}},
-        {"id": "b", "text": "推理小說或哲學書", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c65",
-      "text": "選一種冰品？",
-      "category": "food",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "芒果冰，甜蜜滿足", "score": {"warm": 1}},
-        {"id": "b", "text": "彩虹雪花冰，繽紛可愛", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c66",
-      "text": "如果變成一種食物，你會是？",
-      "category": "food",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "松露，珍貴獨特", "score": {"metal": 1}},
-        {"id": "b", "text": "麻辣火鍋，熱情四溢", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c67",
-      "text": "你最喜歡的時段是？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "清晨時分，空氣清新", "score": {"cool": 1}},
-        {"id": "b", "text": "深夜時分，安靜沉思", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c68",
-      "text": "你理想的住所位置是？",
-      "category": "home",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "熱鬧商圈附近", "score": {"warm": 1}},
-        {"id": "b", "text": "森林或山區的特色民宿", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c69",
-      "text": "選一種運動？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "高爾夫球或網球", "score": {"metal": 1}},
-        {"id": "b", "text": "籃球或足球", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c70",
-      "text": "你的社交風格是？",
-      "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "輕鬆自在，和誰都能聊", "score": {"cool": 2}},
-        {"id": "b", "text": "慢熱內斂，但朋友都很深交", "score": {"dark": 2}}
-      ]
-    },
-    {
-      "id": "c71",
-      "text": "挑枕頭時，你會選？",
-      "category": "home",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "羽絨枕，柔軟溫暖", "score": {"warm": 1}},
-        {"id": "b", "text": "抱枕要多買幾個裝飾", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c72",
-      "text": "如果你是一種材質，你會是？",
-      "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "金屬，堅硬閃亮", "score": {"metal": 2}},
-        {"id": "b", "text": "陽光，溫暖明亮", "score": {"warm": 2}}
-      ]
-    },
-    {
-      "id": "c73",
-      "text": "選一種交通工具代表你？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "帆船，自在悠閒", "score": {"cool": 1}},
-        {"id": "b", "text": "火車，穩定可靠", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c74",
-      "text": "你會怎麼形容自己的笑容？",
-      "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "爽朗的大笑", "score": {"warm": 2}},
-        {"id": "b", "text": "傻呼呼的笑", "score": {"colorful": 2}}
-      ]
-    },
-    {
-      "id": "c75",
-      "text": "你喝水的習慣是？",
-      "category": "food",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "溫熱水或礦泉水", "score": {"metal": 1}},
-        {"id": "b", "text": "隨時帶著水壺", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c76",
-      "text": "選一種蛋糕裝飾風格？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "鮮奶油霜，簡約清爽", "score": {"cool": 1}},
-        {"id": "b", "text": "翻糖造型，創意十足", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c77",
-      "text": "你覺得最療癒的聲音是？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "輕柔的鋼琴聲", "score": {"metal": 1}},
-        {"id": "b", "text": "朋友的笑聲", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c78",
-      "text": "你習慣的工作環境是？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "明亮通風的空間", "score": {"cool": 1}},
-        {"id": "b", "text": "安靜不被打擾的角落", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c79",
-      "text": "你喜歡的鞋子風格是？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "運動鞋，好動好走", "score": {"warm": 1}},
-        {"id": "b", "text": "特殊設計款，獨特有趣", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c80",
-      "text": "如果要參加才藝表演，你會選？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "演奏樂器", "score": {"metal": 1}},
-        {"id": "b", "text": "唱歌跳舞", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c81",
-      "text": "你偏好的燈光顏色是？",
-      "category": "home",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "白色，明亮清爽", "score": {"cool": 1}},
-        {"id": "b", "text": "間接照明，柔和不刺眼", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c82",
-      "text": "你通常怎麼選擇餐廳？",
-      "category": "food",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "朋友推薦或網路熱門", "score": {"warm": 1}},
-        {"id": "b", "text": "想嘗試沒吃過的新餐廳", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c83",
-      "text": "如果你是一杯調酒，你會是？",
-      "category": "food",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "香檳，優雅高貴", "score": {"metal": 1}},
-        {"id": "b", "text": "威士忌，深沉醇厚", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c84",
-      "text": "你對新事物的態度是？",
-      "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "觀望一下再決定", "score": {"cool": 2}},
-        {"id": "b", "text": "超愛嘗鮮，什麼都想試", "score": {"colorful": 2}}
-      ]
-    },
-    {
-      "id": "c85",
-      "text": "選一種香味？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "玫瑰或茉莉，甜美浪漫", "score": {"warm": 1}},
-        {"id": "b", "text": "雪松或皮革，沉穩神秘", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c86",
-      "text": "你理想的生日派對是？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "高級餐廳的精緻晚宴", "score": {"metal": 1}},
-        {"id": "b", "text": "朋友齊聚的熱鬧派對", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c87",
-      "text": "你的錢包/皮夾風格是？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "簡約實用款", "score": {"cool": 1}},
-        {"id": "b", "text": "經典深色款", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c88",
-      "text": "你處理壓力的方式是？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "找朋友訴苦聊天", "score": {"warm": 1}},
-        {"id": "b", "text": "做點新鮮事轉移注意力", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c89",
-      "text": "你喜歡的窗簾風格是？",
-      "category": "home",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "絲絨或緞面，高級感", "score": {"metal": 1}},
-        {"id": "b", "text": "暖色棉布，溫馨可愛", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c90",
-      "text": "如果要養植物，你會選？",
-      "category": "home",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "綠蘿或龜背芋，好照顧", "score": {"cool": 1}},
-        {"id": "b", "text": "仙人掌，不用常澆水", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c91",
-      "text": "你的行李箱風格是？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "亮色系，好認又好看", "score": {"warm": 1}},
-        {"id": "b", "text": "貼滿貼紙，展現個性", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c92",
-      "text": "你會怎麼形容自己的穿搭？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "質感優先，精品單品", "score": {"metal": 1}},
-        {"id": "b", "text": "舒適自然，清新簡約", "score": {"cool": 1}}
-      ]
-    },
-    {
-      "id": "c93",
-      "text": "你喜歡的遊戲類型是？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "多人競技類", "score": {"warm": 1}},
-        {"id": "b", "text": "解謎推理類", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c94",
-      "text": "你覺得最能代表你的詞是？",
-      "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "自在", "score": {"cool": 2}},
-        {"id": "b", "text": "創意", "score": {"colorful": 2}}
-      ]
-    },
-    {
-      "id": "c95",
-      "text": "選一種早餐組合？",
-      "category": "food",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "酪梨吐司配燕麥奶", "score": {"metal": 1}},
-        {"id": "b", "text": "蛋餅配奶茶", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c96",
-      "text": "你覺得最浪漫的事是？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "一起看海看星星", "score": {"cool": 1}},
-        {"id": "b", "text": "靜靜待在彼此身邊", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c97",
-      "text": "你的手錶風格是？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "彩色錶帶，活潑亮眼", "score": {"warm": 1}},
-        {"id": "b", "text": "智慧手錶，功能多樣", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c98",
-      "text": "如果你是一種糖果，你會是？",
-      "category": "food",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "金莎巧克力，精緻高級", "score": {"metal": 1}},
-        {"id": "b", "text": "薄荷糖，清涼舒服", "score": {"cool": 1}}
-      ]
-    },
-    {
-      "id": "c99",
-      "text": "你最欣賞別人哪種特質？",
-      "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "可靠值得信賴", "score": {"dark": 2}},
-        {"id": "b", "text": "有想法有創意", "score": {"colorful": 2}}
-      ]
-    },
-    {
-      "id": "c100",
-      "text": "選一種海鮮？",
-      "category": "food",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "龍蝦，高級美味", "score": {"metal": 1}},
-        {"id": "b", "text": "烤蝦，香氣四溢", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c101",
-      "text": "你覺得自己的能量像？",
-      "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "流動的清泉", "score": {"cool": 2}},
-        {"id": "b", "text": "沉靜的大地", "score": {"dark": 2}}
-      ]
-    },
-    {
-      "id": "c102",
-      "text": "選一種麵食？",
-      "category": "food",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "麻辣乾拌麵", "score": {"warm": 1}},
-        {"id": "b", "text": "什錦炒麵", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c103",
-      "text": "你的睡眠習慣是？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "使用高級寢具，講究睡眠品質", "score": {"metal": 1}},
-        {"id": "b", "text": "睡前喜歡滑手機", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c104",
-      "text": "你喜歡的聊天方式是？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "文字訊息，想好再說", "score": {"cool": 1}},
-        {"id": "b", "text": "看心情，不一定要常聯絡", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c105",
-      "text": "你的廚房會有？",
-      "category": "home",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "可愛的廚房小物", "score": {"warm": 1}},
-        {"id": "b", "text": "各種新奇的料理工具", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c106",
-      "text": "你的浴室風格是？",
-      "category": "home",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "飯店級的高級感", "score": {"metal": 1}},
-        {"id": "b", "text": "簡約清爽，乾淨明亮", "score": {"cool": 1}}
-      ]
-    },
-    {
-      "id": "c107",
-      "text": "如果你是一種咖啡，你會是？",
-      "category": "food",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "焦糖瑪奇朵，甜蜜幸福", "score": {"warm": 1}},
-        {"id": "b", "text": "濃縮咖啡，濃郁強烈", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c108",
-      "text": "選一種動漫角色類型？",
-      "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "治癒型，溫柔療癒", "score": {"cool": 2}},
-        {"id": "b", "text": "搞笑型，總是帶來歡樂", "score": {"colorful": 2}}
-      ]
-    },
-    {
-      "id": "c109",
-      "text": "你的桌布/壁紙偏好是？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "極簡設計或名畫", "score": {"metal": 1}},
-        {"id": "b", "text": "寵物或親友照片", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c110",
-      "text": "你最想擁有的技能是？",
-      "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "冥想放鬆，內心平靜", "score": {"cool": 2}},
-        {"id": "b", "text": "深度思考，洞察事理", "score": {"dark": 2}}
-      ]
-    },
-    {
-      "id": "c111",
-      "text": "選一種蔬菜？",
-      "category": "food",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "番茄，酸甜可口", "score": {"warm": 1}},
-        {"id": "b", "text": "彩椒，色彩繽紛", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c112",
-      "text": "你的社群發文風格是？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "精心修圖，展現品味", "score": {"metal": 1}},
-        {"id": "b", "text": "自然隨性，記錄生活", "score": {"cool": 1}}
-      ]
-    },
-    {
-      "id": "c113",
-      "text": "你理想的退休生活是？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "和親友在一起享天倫", "score": {"warm": 1}},
-        {"id": "b", "text": "靜靜地看書種花", "score": {"dark": 1}}
-      ]
-    },
-    {
-      "id": "c114",
-      "text": "選一種飲料杯的材質？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "不鏽鋼，質感耐用", "score": {"metal": 1}},
-        {"id": "b", "text": "環保材質，有設計感", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c115",
-      "text": "你會怎麼慶祝成功？",
-      "category": "mood",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "放個假好好休息", "score": {"cool": 1}},
-        {"id": "b", "text": "和親友一起慶祝", "score": {"warm": 1}}
-      ]
-    },
-    {
-      "id": "c116",
-      "text": "你喜歡的節日是？",
-      "category": "lifestyle",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "清明節，慎終追遠", "score": {"dark": 1}},
-        {"id": "b", "text": "萬聖節，搞怪有趣", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c117",
-      "text": "如果你是一種建築風格？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "巴洛克式，華麗精緻", "score": {"metal": 1}},
-        {"id": "b", "text": "北歐風，簡約自然", "score": {"cool": 1}}
-      ]
-    },
-    {
-      "id": "c118",
-      "text": "你最討厭的事情是？",
-      "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "冷漠沒溫度", "score": {"warm": 2}},
-        {"id": "b", "text": "虛偽不真誠", "score": {"dark": 2}}
-      ]
-    },
-    {
-      "id": "c119",
-      "text": "你的筆記本/手帳風格是？",
-      "category": "style",
-      "weight": 1,
-      "options": [
-        {"id": "a", "text": "素雅簡約，乾淨俐落", "score": {"cool": 1}},
-        {"id": "b", "text": "貼滿貼紙，充滿創意", "score": {"colorful": 1}}
-      ]
-    },
-    {
-      "id": "c120",
-      "text": "你對時間的態度是？",
-      "category": "personality",
-      "weight": 2,
-      "options": [
-        {"id": "a", "text": "時間就是金錢，不浪費", "score": {"metal": 2}},
-        {"id": "b", "text": "把握當下，活在現在", "score": {"warm": 2}}
+        {"id": "a", "text": "做完該做的＋還多完成一點：高效又有掌控感", "score": {"analyst": 1}},
+        {"id": "b", "text": "跟喜歡的人一起：吃好、聊好、心情好", "score": {"diplomat": 1}},
+        {"id": "c", "text": "簡單但有質感：穩穩的、優雅的、舒服的", "score": {"guardian": 1}},
+        {"id": "d", "text": "充滿新鮮刺激：嘗試、探索、最後還有驚喜收尾", "score": {"explorer": 1}}
       ]
     }
   ],
-  "dimensions": ["metal", "cool", "warm", "dark", "colorful"],
-  "tie_breaker_priority": ["metal", "cool", "warm", "dark", "colorful"],
+  "dimensions": ["analyst", "diplomat", "guardian", "explorer"],
+  "tie_breaker_priority": ["analyst", "diplomat", "guardian", "explorer"],
   "selection_rules": {
-    "total": 5,
+    "total": 4,
     "required": {
-      "personality": 1,
-      "random_from": ["food", "style", "lifestyle", "home", "mood"]
+      "personality": 4,
+      "random_from": ["personality"]
     }
   }
 }

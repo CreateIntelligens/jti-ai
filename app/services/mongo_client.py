@@ -159,8 +159,13 @@ class MongoDBClient:
         # ===== color_results 集合 =====
         color_results_col = db["color_results"]
         try:
+            # Drop legacy index without set_id if it exists
+            try:
+                color_results_col.drop_index("language_1_color_id_1")
+            except Exception:
+                pass
             color_results_col.create_index(
-                [("language", 1), ("color_id", 1)], unique=True
+                [("language", 1), ("set_id", 1), ("color_id", 1)], unique=True
             )
             color_results_col.create_index("language")
             logger.info("Created indexes for 'color_results' collection")

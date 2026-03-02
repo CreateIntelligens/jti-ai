@@ -199,6 +199,15 @@ export interface ColorResult {
   description: string;
 }
 
+export interface ColorSet {
+  set_id: string;
+  name: string;
+  language: string;
+  is_active: boolean;
+  is_default: boolean;
+  color_count: number;
+}
+
 export interface QuizBankStats {
   total_questions: number;
   categories: Record<string, number>;
@@ -294,13 +303,45 @@ export async function updateQuizBankMetadata(language: string, data: Partial<Qui
   return handleResponse(response);
 }
 
-export async function listColorResults(language: string = 'zh'): Promise<{ results: ColorResult[]; total: number }> {
-  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/color-results/?language=${language}`);
+export async function listColorSets(language: string = 'zh'): Promise<{ sets: ColorSet[]; total: number; max: number }> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/color-results/sets/?language=${language}`);
   return handleResponse(response);
 }
 
-export async function updateColorResult(language: string, colorId: string, data: Partial<ColorResult>): Promise<ColorResult> {
-  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/color-results/${encodeURIComponent(colorId)}?language=${language}`, {
+export async function createColorSet(language: string, name: string): Promise<ColorSet> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/color-results/sets/?language=${language}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name }),
+  });
+  return handleResponse(response);
+}
+
+export async function deleteColorSet(language: string, setId: string): Promise<void> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/color-results/sets/${encodeURIComponent(setId)}?language=${language}`, {
+    method: 'DELETE',
+  });
+  await handleResponse(response);
+}
+
+export async function activateColorSet(language: string, setId: string): Promise<void> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/color-results/sets/${encodeURIComponent(setId)}/activate?language=${language}`, {
+    method: 'POST',
+  });
+  await handleResponse(response);
+}
+
+export async function listColorResults(language: string = 'zh', setId?: string): Promise<{ results: ColorResult[]; total: number }> {
+  const params = new URLSearchParams({ language });
+  if (setId) params.set('set_id', setId);
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/color-results/?${params}`);
+  return handleResponse(response);
+}
+
+export async function updateColorResult(language: string, colorId: string, data: Partial<ColorResult>, setId?: string): Promise<ColorResult> {
+  const params = new URLSearchParams({ language });
+  if (setId) params.set('set_id', setId);
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/color-results/${encodeURIComponent(colorId)}?${params}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),

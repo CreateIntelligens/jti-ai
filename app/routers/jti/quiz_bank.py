@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from app.auth import verify_auth
 from app.services.quiz_bank_store import get_quiz_bank_store, DEFAULT_BANK_ID
-from app.services.color_results_store import get_color_results_store
+from app.services.color_results_store import get_color_results_store, DEFAULT_SET_ID
 from app.tools.quiz import invalidate_quiz_cache
 from app.tools.color_results import invalidate_color_results_cache
 
@@ -71,6 +71,10 @@ class UpdateColorResultRequest(BaseModel):
 
 
 class CreateBankRequest(BaseModel):
+    name: str
+
+
+class CreateColorSetRequest(BaseModel):
     name: str
 
 
@@ -261,17 +265,82 @@ def delete_question(
     return {"message": f"Question '{question_id}' deleted"}
 
 
+# ========== Color Set Endpoints ==========
+
+
+@router.get("/color-results/sets/")
+def list_color_sets(
+    language: str = Query("zh"),
+    auth: dict = Depends(verify_auth),
+):
+    """List all color sets for a language."""
+    store = get_color_results_store()
+    sets = store.list_sets(language)
+    return {"sets": sets, "total": len(sets), "max": 3}
+
+
+@router.post("/color-results/sets/", status_code=201)
+def create_color_set(
+    request: CreateColorSetRequest,
+    language: str = Query("zh"),
+    auth: dict = Depends(verify_auth),
+):
+    """Create a new color set (copied from default)."""
+    store = get_color_results_store()
+    try:
+        color_set = store.create_set(language, request.name)
+        return color_set
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.delete("/color-results/sets/{set_id}")
+def delete_color_set(
+    set_id: str,
+    language: str = Query("zh"),
+    auth: dict = Depends(verify_auth),
+):
+    """Delete a color set."""
+    if set_id == DEFAULT_SET_ID:
+        raise HTTPException(status_code=403, detail="Cannot delete default set")
+    store = get_color_results_store()
+    try:
+        deleted = store.delete_set(language, set_id)
+        if not deleted:
+            raise HTTPException(status_code=404, detail=f"Set '{set_id}' not found")
+        invalidate_color_results_cache(language)
+        return {"message": f"Set '{set_id}' deleted"}
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.post("/color-results/sets/{set_id}/activate")
+def activate_color_set(
+    set_id: str,
+    language: str = Query("zh"),
+    auth: dict = Depends(verify_auth),
+):
+    """Set a color set as active."""
+    store = get_color_results_store()
+    success = store.set_active(language, set_id)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Set '{set_id}' not found")
+    invalidate_color_results_cache(language)
+    return {"message": f"Set '{set_id}' is now active"}
+
+
 # ========== Color Results Endpoints ==========
 
 
 @router.get("/color-results/")
 def list_color_results(
     language: str = Query("zh"),
+    set_id: Optional[str] = Query(None),
     auth: dict = Depends(verify_auth),
 ):
-    """List all color results."""
+    """List all color results for a set (defaults to active set)."""
     store = get_color_results_store()
-    results = store.list_results(language)
+    results = store.list_results(language, set_id)
     return {"results": results, "total": len(results)}
 
 
@@ -280,14 +349,19 @@ def update_color_result(
     color_id: str,
     request: UpdateColorResultRequest,
     language: str = Query("zh"),
+    set_id: Optional[str] = Query(None),
     auth: dict = Depends(verify_auth),
 ):
     """Update a color result."""
     store = get_color_results_store()
+    # Resolve set_id
+    resolved_set_id = set_id if set_id else store.get_active_set_id(language)
+    if resolved_set_id == DEFAULT_SET_ID:
+        raise HTTPException(status_code=400, detail="Cannot modify default set")
     update_data = request.model_dump(exclude_none=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
-    result = store.upsert_result(language, color_id, update_data)
+    result = store.upsert_result(language, color_id, update_data, set_id=resolved_set_id)
     invalidate_color_results_cache(language)
     return result
 
@@ -495,7 +569,7 @@ def export_data(
 
     else:  # colors
         color_store = get_color_results_store()
-        results = color_store.list_results(language)
+        results = color_store.list_results(language)  # uses active set
         headers_list = ["color_id", "color_name", "title", "recommended_colors", "description"]
         writer = csv.DictWriter(output, fieldnames=headers_list)
         writer.writeheader()

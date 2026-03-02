@@ -47,6 +47,13 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
        // Expanded
        const [expandedId, setExpandedId] = useState<string | null>(null);
 
+       // --- Color set state ---
+       const [colorSets, setColorSets] = useState<api.ColorSet[]>([]);
+       const [selectedColorSetId, setSelectedColorSetId] = useState<string>('default');
+       const [creatingColorSet, setCreatingColorSet] = useState(false);
+       const [newColorSetName, setNewColorSetName] = useState('');
+       const [confirmDeleteColorSet, setConfirmDeleteColorSet] = useState<string | null>(null);
+
        // --- Color state ---
        const [colorResults, setColorResults] = useState<api.ColorResult[]>([]);
        const [colorLoading, setColorLoading] = useState(false);
@@ -88,19 +95,33 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
               }
        }, [language, category, selectedBankId]);
 
+       const loadColorSets = useCallback(async () => {
+              try {
+                     const data = await api.listColorSets(language);
+                     setColorSets(data.sets || []);
+                     if (data.sets.length > 0 && !data.sets.find(s => s.set_id === selectedColorSetId)) {
+                            const active = data.sets.find(s => s.is_active);
+                            setSelectedColorSetId(active ? active.set_id : data.sets[0].set_id);
+                     }
+              } catch (e) {
+                     console.error('Failed to load color sets:', e);
+              }
+       }, [language]); // eslint-disable-line react-hooks/exhaustive-deps
+
        const loadColors = useCallback(async () => {
               setColorLoading(true);
               try {
-                     const data = await api.listColorResults(language);
+                     const data = await api.listColorResults(language, selectedColorSetId);
                      setColorResults(data.results || []);
               } catch (e) {
                      console.error('Failed to load color results:', e);
               } finally {
                      setColorLoading(false);
               }
-       }, [language]);
+       }, [language, selectedColorSetId]);
 
        useEffect(() => { void loadBanks(); }, [loadBanks]);
+       useEffect(() => { void loadColorSets(); }, [loadColorSets]);
 
        useEffect(() => {
               if (subTab === 'questions') void loadQuestions();
@@ -248,6 +269,46 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
               }
        };
 
+       // --- Color Set actions ---
+       const handleCreateColorSet = async () => {
+              if (!newColorSetName.trim()) return;
+              try {
+                     const set = await api.createColorSet(language, newColorSetName.trim());
+                     setCreatingColorSet(false);
+                     setNewColorSetName('');
+                     setSelectedColorSetId(set.set_id);
+                     await loadColorSets();
+                     showSuccess('✅ 已建立新色彩結果集');
+              } catch (e) {
+                     const msg = e instanceof Error ? e.message : String(e);
+                     alert('建立失敗: ' + msg);
+              }
+       };
+
+       const handleDeleteColorSet = async (setId: string) => {
+              try {
+                     await api.deleteColorSet(language, setId);
+                     setConfirmDeleteColorSet(null);
+                     if (selectedColorSetId === setId) setSelectedColorSetId('default');
+                     await loadColorSets();
+                     showSuccess('✅ 已刪除色彩結果集');
+              } catch (e) {
+                     const msg = e instanceof Error ? e.message : String(e);
+                     alert('刪除失敗: ' + msg);
+              }
+       };
+
+       const handleActivateColorSet = async (setId: string) => {
+              try {
+                     await api.activateColorSet(language, setId);
+                     await loadColorSets();
+                     showSuccess('✅ 已切換使用中的色彩結果集');
+              } catch (e) {
+                     const msg = e instanceof Error ? e.message : String(e);
+                     alert('切換失敗: ' + msg);
+              }
+       };
+
        // --- Color CRUD ---
        const handleStartColorEdit = (cr: api.ColorResult) => {
               setEditColorId(cr.color_id);
@@ -261,7 +322,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
               if (!editColorId) return;
               setSavingColor(true);
               try {
-                     await api.updateColorResult(language, editColorId, editColorData);
+                     await api.updateColorResult(language, editColorId, editColorData, selectedColorSetId);
                      setEditColorId(null);
                      setEditColorData({});
                      await loadColors();
@@ -598,6 +659,82 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                      {/* ========== Colors Sub-tab ========== */}
                      {subTab === 'colors' && (
                             <div className="jti-quiz-colors">
+
+                                   {/* Color Set Selector Bar */}
+                                   <div className="jti-bank-bar">
+                                          <div className="jti-bank-list">
+                                                 {colorSets.map(set => (
+                                                        <div
+                                                               key={set.set_id}
+                                                               className={`jti-bank-card ${selectedColorSetId === set.set_id ? 'selected' : ''}`}
+                                                               onClick={() => setSelectedColorSetId(set.set_id)}
+                                                        >
+                                                               <div className="jti-bank-card-top">
+                                                                      <span className="jti-bank-name">{set.name || set.set_id}</span>
+                                                                      {set.is_active && (
+                                                                             <span className="jti-bank-active-badge" title="使用中">
+                                                                                    <Star size={10} /> 使用中
+                                                                             </span>
+                                                                      )}
+                                                               </div>
+                                                               <div className="jti-bank-card-bottom">
+                                                                      <span className="jti-bank-count">{set.color_count} 色</span>
+                                                                      {!set.is_active && (
+                                                                             <button
+                                                                                    className="jti-bank-activate-btn"
+                                                                                    onClick={(e) => { e.stopPropagation(); handleActivateColorSet(set.set_id); }}
+                                                                                    title="設為使用中"
+                                                                             >
+                                                                                    啟用
+                                                                             </button>
+                                                                      )}
+                                                                      {!set.is_default && (
+                                                                             <button
+                                                                                    className="jti-bank-delete-btn"
+                                                                                    onClick={(e) => { e.stopPropagation(); setConfirmDeleteColorSet(set.set_id); }}
+                                                                                    title="刪除"
+                                                                             >
+                                                                                    <Trash2 size={11} />
+                                                                             </button>
+                                                                      )}
+                                                               </div>
+
+                                                               {confirmDeleteColorSet === set.set_id && (
+                                                                      <div className="jti-bank-delete-confirm" onClick={e => e.stopPropagation()}>
+                                                                             <span>確定刪除？</span>
+                                                                             <button onClick={() => handleDeleteColorSet(set.set_id)}>刪除</button>
+                                                                             <button className="cancel" onClick={() => setConfirmDeleteColorSet(null)}>取消</button>
+                                                                      </div>
+                                                               )}
+                                                        </div>
+                                                 ))}
+
+                                                 {colorSets.length < 3 && (
+                                                        creatingColorSet ? (
+                                                               <div className="jti-bank-card creating">
+                                                                      <input
+                                                                             placeholder="結果集名稱"
+                                                                             value={newColorSetName}
+                                                                             onChange={e => setNewColorSetName(e.target.value)}
+                                                                             onKeyDown={e => e.key === 'Enter' && handleCreateColorSet()}
+                                                                             autoFocus
+                                                                      />
+                                                                      <div className="jti-bank-create-actions">
+                                                                             <button onClick={handleCreateColorSet}>建立</button>
+                                                                             <button className="cancel" onClick={() => { setCreatingColorSet(false); setNewColorSetName(''); }}>
+                                                                                    <X size={12} />
+                                                                             </button>
+                                                                      </div>
+                                                               </div>
+                                                        ) : (
+                                                               <button className="jti-bank-add" onClick={() => setCreatingColorSet(true)}>
+                                                                      <Plus size={14} /> 新增結果集
+                                                               </button>
+                                                        )
+                                                 )}
+                                          </div>
+                                   </div>
+
                                    <div className="jti-quiz-toolbar" style={{ justifyContent: 'flex-end', marginBottom: '10px' }}>
                                           <button
                                                  className="jti-quiz-export-btn"
@@ -617,9 +754,11 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                                                                <div className="jti-color-card-header">
                                                                       <span className={`jti-color-badge jti-color-${cr.color_id}`}>{cr.color_name}</span>
                                                                       <span className="jti-color-title">{cr.title}</span>
-                                                                      <button className="icon-btn" onClick={() => editColorId === cr.color_id ? setEditColorId(null) : handleStartColorEdit(cr)}>
-                                                                             {editColorId === cr.color_id ? <X size={14} /> : <Pencil size={14} />}
-                                                                      </button>
+                                                                      {selectedColorSetId !== 'default' && (
+                                                                             <button className="icon-btn" onClick={() => editColorId === cr.color_id ? setEditColorId(null) : handleStartColorEdit(cr)}>
+                                                                                    {editColorId === cr.color_id ? <X size={14} /> : <Pencil size={14} />}
+                                                                             </button>
+                                                                      )}
                                                                </div>
 
                                                                {editColorId === cr.color_id ? (
@@ -629,9 +768,9 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                                                                                     <input placeholder="色系名稱" value={editColorData.color_name || ''} onChange={e => setEditColorData({ ...editColorData, color_name: e.target.value })} />
                                                                              </div>
                                                                              <input
-                                                                                    placeholder="推薦色（逗號分隔）"
+                                                                                    placeholder="推薦色（逗號、頓號或空白分隔）"
                                                                                     value={(editColorData.recommended_colors || []).join(', ')}
-                                                                                    onChange={e => setEditColorData({ ...editColorData, recommended_colors: e.target.value.split(',').map(s => s.trim()).filter(Boolean) })}
+                                                                                    onChange={e => setEditColorData({ ...editColorData, recommended_colors: e.target.value.split(/[,、\s]+/).filter(Boolean) })}
                                                                              />
                                                                              <textarea placeholder="描述" value={editColorData.description || ''} onChange={e => setEditColorData({ ...editColorData, description: e.target.value })} rows={4} />
                                                                              <div className="jti-quiz-form-actions">
