@@ -61,8 +61,8 @@
   "language": "zh|en",
   "step": "initial|quiz|scoring|done",
   "answers": {"q1": "a", "q2": "b"},
-  "color_result_id": "metal|cool|warm|dark|colorful",
-  "color_scores": {"metal": 2, "cool": 1},
+  "color_result_id": "analyst|diplomat|guardian|explorer",
+  "color_scores": {"analyst": 2, "guardian": 1},
   "expires_at": ISODate(),
   ...
 }

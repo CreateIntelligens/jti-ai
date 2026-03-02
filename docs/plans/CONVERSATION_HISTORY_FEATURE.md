@@ -1,5 +1,7 @@
 # 對話歷史查看功能
 
+> Historical note: this feature is still present, but the current page/component/route names have changed. Use the current runtime/admin routes and `frontend/src/components/ConversationHistoryModal.tsx` as the source of truth.
+
 ## 概述
 
 用戶現在可以在 JTI 測驗頁面查看完整的對話歷史記錄，包括所有對話轉次、AI 回應、工具呼叫和 session 狀態。

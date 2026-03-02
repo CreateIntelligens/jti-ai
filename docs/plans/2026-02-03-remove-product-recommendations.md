@@ -1,5 +1,7 @@
 # Remove Product Recommendations Implementation Plan
 
+> Historical note: this document describes an earlier MBTI-era plan. The current JTI flow now uses the 4-question / 4-result personality quiz under `/api/jti/*` and `/api/jti-admin/*`.
+
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Remove the product recommendation feature entirely while keeping KB chat and the MBTI quiz flow intact.

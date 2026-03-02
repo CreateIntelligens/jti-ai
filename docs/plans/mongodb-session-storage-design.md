@@ -61,9 +61,9 @@
   // 色彩測驗結果
   "color_result_id": String,
   "color_scores": {                 // {"dimension": score}
-    "metal": 2,
-    "cool": 2,
-    "warm": 1
+    "analyst": 2,
+    "guardian": 2,
+    "explorer": 1
   },
   "color_result": Object,
 
@@ -101,7 +101,7 @@
   // Session 快照（便於分析）
   "session_snapshot": {
     "step": String,
-    "quiz_progress": String,        // "2/5 已完成"
+    "quiz_progress": String,        // "2/4 已完成"
     "color_scores": Object
   },
 

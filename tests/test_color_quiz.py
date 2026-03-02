@@ -18,8 +18,7 @@ class TestColorQuizSession(unittest.TestCase):
         random.seed(7)
         questions = generate_random_quiz(language="zh")
         self.assertEqual(len(questions), 4)
-        categories = [q.get("category") for q in questions]
-        self.assertTrue(all(category == "personality" for category in categories))
+        self.assertTrue(all("category" not in question for question in questions))
         rules = load_quiz_bank(language="zh").get("selection_rules", {})
         self.assertEqual(rules.get("total"), 4)
         self.assertEqual(len({q["id"] for q in questions}), 4)

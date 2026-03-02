@@ -161,20 +161,20 @@ class TestRebuildSessionFromLogs(unittest.TestCase):
                               "selected": "q1_a",
                               "is_complete": True,
                               "color_result": {
-                                  "color_scores": {"warm": 3, "cool": 2},
-                                  "result": {"name": "暖色系", "description": "..."},
+                                  "color_scores": {"analyst": 3, "guardian": 2},
+                                  "result": {"name": "分析家", "description": "..."},
                               },
                           },
                       }],
-                      snapshot_step="DONE", answers_count=1, color_result_id="warm"),
+                      snapshot_step="DONE", answers_count=1, color_result_id="analyst"),
         ]
 
         session = self.manager.rebuild_session_from_logs(sid, logs)
 
         self.assertIsNotNone(session)
         self.assertEqual(session.step, SessionStep.DONE)
-        self.assertEqual(session.color_result_id, "warm")
-        self.assertEqual(session.color_scores, {"warm": 3, "cool": 2})
+        self.assertEqual(session.color_result_id, "analyst")
+        self.assertEqual(session.color_scores, {"analyst": 3, "guardian": 2})
         self.assertIsNotNone(session.color_result)
         self.assertIsNone(session.current_question)
 
