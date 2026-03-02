@@ -1192,34 +1192,28 @@
   border: 1px solid transparent;
 }
 
-.jti-color-badge.jti-color-metal {
-  background: rgba(200, 169, 110, 0.15);
-  color: #d4af37;
-  border-color: rgba(200, 169, 110, 0.3);
+.jti-color-badge.jti-color-analyst {
+  background: rgba(92, 133, 255, 0.15);
+  color: #8cabff;
+  border-color: rgba(92, 133, 255, 0.3);
 }
 
-.jti-color-badge.jti-color-cool {
-  background: rgba(100, 181, 246, 0.15);
-  color: #64b5f6;
-  border-color: rgba(100, 181, 246, 0.3);
+.jti-color-badge.jti-color-diplomat {
+  background: rgba(255, 143, 163, 0.15);
+  color: #ff9db1;
+  border-color: rgba(255, 143, 163, 0.3);
 }
 
-.jti-color-badge.jti-color-warm {
-  background: rgba(255, 138, 101, 0.15);
-  color: #ff8a65;
-  border-color: rgba(255, 138, 101, 0.3);
+.jti-color-badge.jti-color-guardian {
+  background: rgba(127, 199, 132, 0.15);
+  color: #8fd395;
+  border-color: rgba(127, 199, 132, 0.3);
 }
 
-.jti-color-badge.jti-color-dark {
-  background: rgba(158, 158, 158, 0.15);
-  color: #bdbdbd;
-  border-color: rgba(158, 158, 158, 0.3);
-}
-
-.jti-color-badge.jti-color-colorful {
-  background: rgba(186, 104, 200, 0.15);
-  color: #ce93d8;
-  border-color: rgba(186, 104, 200, 0.3);
+.jti-color-badge.jti-color-explorer {
+  background: rgba(255, 183, 77, 0.15);
+  color: #ffc86a;
+  border-color: rgba(255, 183, 77, 0.3);
 }
 
 

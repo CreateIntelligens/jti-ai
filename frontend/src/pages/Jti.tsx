@@ -28,6 +28,7 @@ interface SessionData {
   session_id: string;
   step: string;
   answers?: Record<string, string>;
+  selected_questions?: Array<unknown>;
   color_scores?: Record<string, number>;
   color_result_id?: string;
   color_result?: { color_name?: string; title?: string };
@@ -36,6 +37,10 @@ interface SessionData {
 interface WelcomeContent {
   title: string;
   description: string;
+}
+
+function getQuizTotalQuestions(session: SessionData): number {
+  return session.selected_questions?.length || 4;
 }
 
 export default function Jti() {
@@ -234,8 +239,9 @@ export default function Jti() {
       if (data.session) {
         const s = data.session as SessionData;
         const count = Object.keys(s.answers || {}).length;
+        const totalQuestions = getQuizTotalQuestions(s);
         if (s.step === 'QUIZ') {
-          console.log(`[測驗進度] ${count}/5 題`);
+          console.log(`[測驗進度] ${count}/${totalQuestions} 題`);
         }
         if (s.color_scores && Object.keys(s.color_scores).length > 0) {
           const sorted = Object.entries(s.color_scores).sort(([, a], [, b]) => (b as number) - (a as number));
@@ -318,8 +324,9 @@ export default function Jti() {
       if (data.session) {
         const s = data.session as SessionData;
         const count = Object.keys(s.answers || {}).length;
+        const totalQuestions = getQuizTotalQuestions(s);
         const colorName = s.color_result?.color_name || s.color_result_id || '';
-        const status = s.step === 'QUIZ' ? `${t('status_quiz')} · ${count}/5`
+        const status = s.step === 'QUIZ' ? `${t('status_quiz')} · ${count}/${totalQuestions}`
           : colorName || t('status_chatting');
         setStatusText(status);
       }

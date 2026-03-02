@@ -157,7 +157,6 @@ export interface QuizQuestionOption {
 export interface QuizQuestion {
   id: string;
   text: string;
-  category: string;
   weight: number;
   options: QuizQuestionOption[];
 }
@@ -185,7 +184,6 @@ export interface QuizBankMetadata {
   tie_breaker_priority: string[];
   selection_rules: {
     total: number;
-    required: { personality: number; random_from: string[] };
   };
   is_active: boolean;
   is_default: boolean;
@@ -243,10 +241,9 @@ export async function activateQuizBank(language: string, bankId: string): Promis
   await handleResponse(response);
 }
 
-export async function listQuizQuestions(language: string = 'zh', category?: string, bankId?: string): Promise<{ questions: QuizQuestion[]; total: number }> {
+export async function listQuizQuestions(language: string = 'zh', bankId?: string): Promise<{ questions: QuizQuestion[]; total: number }> {
   const params = new URLSearchParams({ language });
   if (bankId) params.set('bank_id', bankId);
-  if (category) params.set('category', category);
   const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/questions/?${params}`);
   return handleResponse(response);
 }

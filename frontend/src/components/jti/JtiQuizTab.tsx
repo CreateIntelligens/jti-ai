@@ -23,7 +23,6 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
        // --- Question state ---
        const [questions, setQuestions] = useState<api.QuizQuestion[]>([]);
        const [stats, setStats] = useState<api.QuizBankStats | null>(null);
-       const [category, setCategory] = useState<string>('');
        const [loading, setLoading] = useState(false);
        const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
@@ -32,7 +31,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
        const [editData, setEditData] = useState<Partial<api.QuizQuestion>>({});
        const [creating, setCreating] = useState(false);
        const [newQuestion, setNewQuestion] = useState<api.QuizQuestion>({
-              id: '', text: '', category: 'personality', weight: 1, options: [
+              id: '', text: '', weight: 1, options: [
                      { ...EMPTY_OPTION, id: 'a' }, { ...EMPTY_OPTION, id: 'b' },
               ],
        });
@@ -80,7 +79,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
               setLoading(true);
               try {
                      const [qData, sData] = await Promise.all([
-                            api.listQuizQuestions(language, category || undefined, selectedBankId),
+                            api.listQuizQuestions(language, selectedBankId),
                             api.getQuizBankStats(language, selectedBankId),
                      ]);
                      const sortedQuestions = (qData.questions || []).sort((a: api.QuizQuestion, b: api.QuizQuestion) =>
@@ -93,7 +92,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
               } finally {
                      setLoading(false);
               }
-       }, [language, category, selectedBankId]);
+       }, [language, selectedBankId]);
 
        const loadColorSets = useCallback(async () => {
               try {
@@ -215,7 +214,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                      await api.createQuizQuestion(language, newQuestion, selectedBankId);
                      setCreating(false);
                      setNewQuestion({
-                            id: '', text: '', category: 'personality', weight: 1,
+                            id: '', text: '', weight: 1,
                             options: [{ ...EMPTY_OPTION, id: 'a' }, { ...EMPTY_OPTION, id: 'b' }],
                      });
                      await loadQuestions();
@@ -231,7 +230,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
 
        const handleStartEdit = (q: api.QuizQuestion) => {
               setEditingId(q.id);
-              setEditData({ text: q.text, category: q.category, weight: q.weight, options: [...q.options] });
+              setEditData({ text: q.text, weight: q.weight, options: [...q.options] });
               setExpandedId(q.id);
        };
 
@@ -356,7 +355,6 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
               setNewQuestion({ ...newQuestion, options: opts });
        };
 
-       const allCategories = stats ? Object.keys(stats.categories) : [];
        const selectedBank = banks.find(b => b.bank_id === selectedBankId);
 
        return (
@@ -462,17 +460,6 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
 
                                    {/* Import / Export row */}
                                    <div className="jti-quiz-toolbar">
-                                          <select
-                                                 className="jti-quiz-filter"
-                                                 value={category}
-                                                 onChange={e => setCategory(e.target.value)}
-                                          >
-                                                 <option value="">全部分類</option>
-                                                 {allCategories.map(c => (
-                                                        <option key={c} value={c}>{c}</option>
-                                                 ))}
-                                          </select>
-
                                           {selectedBankId !== 'default' && (
                                                  <>
                                                         <input
@@ -520,31 +507,18 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                                                  <span className="jti-quiz-stat-total">
                                                         {selectedBank?.name || selectedBankId}: <strong>{stats.total_questions}</strong> 題
                                                  </span>
-                                                 {Object.entries(stats.categories).map(([cat, count]) => (
-                                                        <span key={cat} className="jti-quiz-stat-cat">
-                                                               {cat}: {count}
-                                                        </span>
-                                                 ))}
                                           </div>
                                    )}
 
                                    {/* Create form */}
                                    {creating && (
-                                          <div className="jti-quiz-form">
+                                                 <div className="jti-quiz-form">
                                                  <div className="jti-quiz-form-row">
                                                         <input
                                                                placeholder="題目 ID（如 c121）"
                                                                value={newQuestion.id}
                                                                onChange={e => setNewQuestion({ ...newQuestion, id: e.target.value })}
                                                         />
-                                                        <select
-                                                               value={newQuestion.category}
-                                                               onChange={e => setNewQuestion({ ...newQuestion, category: e.target.value })}
-                                                        >
-                                                               {['personality', 'food', 'style', 'lifestyle', 'home', 'mood'].map(c => (
-                                                                      <option key={c} value={c}>{c}</option>
-                                                               ))}
-                                                        </select>
                                                         <input
                                                                type="number"
                                                                placeholder="權重"
@@ -564,7 +538,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                                                         <div key={idx} className="jti-quiz-option-row">
                                                                <input placeholder="ID" value={opt.id} onChange={e => updateNewOption(idx, 'id', e.target.value)} style={{ width: 50 }} />
                                                                <input placeholder="選項文字" value={opt.text} onChange={e => updateNewOption(idx, 'text', e.target.value)} />
-                                                               <input placeholder='分數 {"metal":1}' value={JSON.stringify(opt.score)} onChange={e => updateNewOption(idx, 'score', e.target.value)} style={{ width: 140 }} />
+                                                               <input placeholder='分數 {"analyst":1}' value={JSON.stringify(opt.score)} onChange={e => updateNewOption(idx, 'score', e.target.value)} style={{ width: 140 }} />
                                                         </div>
                                                  ))}
                                                  <div className="jti-quiz-form-actions">
@@ -584,7 +558,6 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                                                                <div className="jti-quiz-card-header" onClick={() => setExpandedId(expandedId === q.id ? null : q.id)}>
                                                                       <div className="jti-quiz-card-info">
                                                                              <span className="jti-quiz-card-id">{q.id}</span>
-                                                                             <span className="jti-quiz-card-cat">{q.category}</span>
                                                                              <span className="jti-quiz-card-weight">×{q.weight}</span>
                                                                       </div>
                                                                       <div className="jti-quiz-card-text">{q.text}</div>
@@ -605,11 +578,6 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                                                                                     <div className="jti-quiz-edit-form">
                                                                                            <textarea value={editData.text || ''} onChange={e => setEditData({ ...editData, text: e.target.value })} rows={2} />
                                                                                            <div className="jti-quiz-form-row">
-                                                                                                  <select value={editData.category || q.category} onChange={e => setEditData({ ...editData, category: e.target.value })}>
-                                                                                                         {['personality', 'food', 'style', 'lifestyle', 'home', 'mood'].map(c => (
-                                                                                                                <option key={c} value={c}>{c}</option>
-                                                                                                         ))}
-                                                                                                  </select>
                                                                                                   <input type="number" value={editData.weight ?? q.weight} onChange={e => setEditData({ ...editData, weight: Number(e.target.value) })} style={{ width: 70 }} />
                                                                                            </div>
                                                                                            <div className="jti-quiz-options-header">選項：</div>
