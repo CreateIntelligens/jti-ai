@@ -180,6 +180,12 @@ class ExportGeneralConversationsResponse(BaseModel):
     total_sessions: int
 
 
+QUIZ_OPENING = {
+    "zh": "簡單四個問題，幫你找到命定手機殼，如果中途想離開，請輸入「中斷」，即可回到問答模式，讓我們開始測驗吧！",
+    "en": "Just four questions to find your perfect phone case! If you want to leave midway, type pause to return to chat. Let's begin!",
+}
+
+
 def _make_quiz_tts_text(q: dict, q_num: int, language: str) -> str:
     """組出題庫模式的 TTS 文字（只有題目，不含選項）"""
     text = q.get("text", "")
@@ -554,17 +560,18 @@ async def _execute_quiz_start(session_id: str, user_message: str = "[API] quiz_s
             error=tool_result.get("error"),
         )
 
+    lang = updated_session.language if updated_session else session.language
     q = tool_result.get("current_question") or (updated_session.current_question if updated_session else None)
     options = q.get("options", []) if isinstance(q, dict) else []
     options_text = _format_options_text(options)
+    opening = QUIZ_OPENING.get(lang, QUIZ_OPENING["zh"])
 
-    if updated_session and updated_session.language == "en":
-        response_message = f"Let's start.\n\nQuestion 1: {q.get('text', '')}\n{options_text}"
+    if lang == "en":
+        response_message = f"{opening}\n\nQuestion 1: {q.get('text', '')}\n{options_text}"
     else:
-        response_message = (
-            "簡單四個問題，幫你找到命定手機殼，如果中途想離開，請輸入「中斷」，即可回到問答模式，讓我們開始測驗吧！\n\n"
-            f"第1題：{q.get('text', '')}\n{options_text}"
-        )
+        response_message = f"{opening}\n\n第1題：{q.get('text', '')}\n{options_text}"
+
+    tts_text = f"{opening} {_make_quiz_tts_text(q, 1, lang)}" if isinstance(q, dict) else None
 
     log_result = conversation_logger.log_conversation(
         session_id=session_id,
@@ -576,7 +583,7 @@ async def _execute_quiz_start(session_id: str, user_message: str = "[API] quiz_s
             "answers_count": len(updated_session.answers) if updated_session else len(session.answers),
             "color_result_id": updated_session.color_result_id if updated_session else session.color_result_id,
             "current_question_id": q.get("id") if isinstance(q, dict) else None,
-            "language": updated_session.language if updated_session else session.language,
+            "language": lang,
             "selected_questions": updated_session.selected_questions if updated_session else session.selected_questions,
         },
         mode="jti",
@@ -585,11 +592,7 @@ async def _execute_quiz_start(session_id: str, user_message: str = "[API] quiz_s
 
     return ChatResponse(
         message=response_message,
-        tts_text=_make_quiz_tts_text(
-            q,
-            1,
-            updated_session.language if updated_session else session.language,
-        ) if isinstance(q, dict) else None,
+        tts_text=tts_text,
         session=updated_session.model_dump() if updated_session else session.model_dump(),
         tool_calls=[{"tool": "start_quiz", "args": {"session_id": session_id}}],
         turn_number=final_turn_number
