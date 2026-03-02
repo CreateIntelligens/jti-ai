@@ -56,6 +56,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     """對話回應"""
     message: str
+    tts_text: Optional[str] = None
     session: Optional[Dict[str, Any]] = None
     tool_calls: Optional[list] = None
     turn_number: Optional[int] = None
@@ -177,6 +178,14 @@ class ExportGeneralConversationsResponse(BaseModel):
     sessions: List[ConversationSessionGroup]
     total_conversations: int
     total_sessions: int
+
+
+def _make_quiz_tts_text(q: dict, q_num: int, language: str) -> str:
+    """組出題庫模式的 TTS 文字（只有題目，不含選項）"""
+    text = q.get("text", "")
+    if language == "en":
+        return f"Question {q_num}: {text}"
+    return f"第{q_num}題：{text}"
 
 
 # === Endpoints ===
@@ -374,20 +383,28 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     scores_str = " | ".join([f"{k}:{v}" for k, v in sorted(updated_session.color_scores.items(), key=lambda x: -x[1])])
                     logger.info(f"[當前分數] {scores_str}")
 
-                # 交給 main_agent 的 LLM 處理回應（生成評論 + 下一題）
-                result = await main_agent.chat_with_tool_result(
-                    session_id=request.session_id,
-                    user_message=request.message,
-                    tool_name="submit_answer",
-                    tool_args={"user_choice": user_choice},
-                    tool_result=tool_result
-                )
-
-                response_message = result["message"]
-                updated_session = session_manager.get_session(request.session_id)
-
-                # 記錄 AI 回應
-                logger.info(f"[AI回應] {response_message[:100]}{'...' if len(response_message) > 100 else ''}")
+                if tool_result.get("is_complete"):
+                    # 測驗完成，LLM 宣布色系結果
+                    result = await main_agent.chat_with_tool_result(
+                        session_id=request.session_id,
+                        user_message=request.message,
+                        tool_name="submit_answer",
+                        tool_args={"user_choice": user_choice},
+                        tool_result=tool_result
+                    )
+                    response_message = result["message"]
+                    updated_session = session_manager.get_session(request.session_id)
+                    tts_text = None
+                else:
+                    # 還有下一題，直接拼題目，不經 LLM
+                    next_q = tool_result["next_question"]
+                    q_num = len(updated_session.answers) + 1
+                    options_text = _format_options_text(next_q.get("options", []))
+                    if updated_session.language == "en":
+                        response_message = f"Question {q_num}: {next_q.get('text', '')}\n{options_text}"
+                    else:
+                        response_message = f"第{q_num}題：{next_q.get('text', '')}\n{options_text}"
+                    tts_text = _make_quiz_tts_text(next_q, q_num, updated_session.language)
 
                 # 記錄到對話日誌
                 log_result = conversation_logger.log_conversation(
@@ -416,6 +433,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
 
                 return ChatResponse(
                     message=response_message,
+                    tts_text=tts_text,
                     session=updated_session.model_dump(),
                     tool_calls=response_tool_calls,
                     turn_number=final_turn_number,
@@ -476,6 +494,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
 
                 return ChatResponse(
                     message=response_message,
+                    tts_text=_make_quiz_tts_text(q, current_q_num, session.language),
                     session=session.model_dump(),
                     tool_calls=[],
                     turn_number=final_turn_number
@@ -505,55 +524,9 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             if session.step.value == "DONE":
                 session.step = SessionStep.WELCOME
                 session_manager.update_session(session)
-            # 直接呼叫 start_quiz，不依賴 LLM
-            tool_result = await tool_executor.execute("start_quiz", {
-                "session_id": request.session_id
-            })
-
-            if tool_result.get("success"):
-                # 讓 LLM 生成自然的開場白
-                result = await main_agent.chat_with_tool_result(
-                    session_id=request.session_id,
-                    user_message=request.message,
-                    tool_name="start_quiz",
-                    tool_args={"session_id": request.session_id},
-                    tool_result=tool_result
-                )
-
-                updated_session = session_manager.get_session(request.session_id)
-
-                # 記錄 AI 回應
-                logger.info(f"[AI回應] 測驗開始 | {result['message'][:80]}...")
-
-                # 記錄對話
-                # 如果 request.turn_number 存在，我們先執行刪除
-                if request.turn_number:
-                     conversation_logger.delete_turns_from(request.session_id, request.turn_number)
-
-                log_result = conversation_logger.log_conversation(
-                    session_id=request.session_id,
-                    user_message=request.message,
-                    agent_response=result["message"],
-                    tool_calls=[{"tool": "start_quiz", "args": {"session_id": request.session_id}, "result": tool_result}],
-                    session_state={
-                        "step": updated_session.step.value,
-                        "answers_count": len(updated_session.answers),
-                        "color_result_id": updated_session.color_result_id,
-                        "current_question_id": updated_session.current_question.get("id") if updated_session.current_question else None,
-                        "language": updated_session.language,
-                        "selected_questions": updated_session.selected_questions,
-                    },
-                    mode="jti"
-                )
-                
-                final_turn_number = log_result[1] if log_result else None
-
-                return ChatResponse(
-                    message=result["message"],
-                    session=updated_session.model_dump(),
-                    tool_calls=[{"tool": "start_quiz", "args": {"session_id": request.session_id}}],
-                    turn_number=final_turn_number
-                )
+            if request.turn_number:
+                conversation_logger.delete_turns_from(request.session_id, request.turn_number)
+            return await _execute_quiz_start(request.session_id, user_message=request.message)
 
         # 一般對話：走 LLM
         result = await main_agent.chat(
@@ -594,6 +567,94 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+async def _execute_quiz_start(session_id: str, user_message: str = "[API] quiz_start") -> ChatResponse:
+    """開始測驗的核心邏輯，供 /quiz/start 和 /chat/message keyword detection 共用。"""
+    session = session_manager.get_session(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    if session.step.value == "DONE":
+        if session.language == "en":
+            response_message = "You've already completed the quiz! Please refresh the page to start a new session."
+        else:
+            response_message = "你已經完成過測驗囉！這次對話只能測驗一次。如果想重新測驗，請重新整理頁面開始新的對話。"
+
+        log_result = conversation_logger.log_conversation(
+            session_id=session_id,
+            user_message=user_message,
+            agent_response=response_message,
+            tool_calls=[],
+            session_state={
+                "step": session.step.value,
+                "answers_count": len(session.answers),
+                "color_result_id": session.color_result_id,
+                "current_question_id": None,
+                "language": session.language,
+                "selected_questions": session.selected_questions,
+            },
+            mode="jti"
+        )
+        final_turn_number = log_result[1] if log_result else None
+        return ChatResponse(
+            message=response_message,
+            session=session.model_dump(),
+            tool_calls=[],
+            turn_number=final_turn_number
+        )
+
+    tool_result = await tool_executor.execute("start_quiz", {"session_id": session_id})
+    updated_session = session_manager.get_session(session_id)
+
+    if not tool_result.get("success"):
+        return ChatResponse(
+            message=tool_result.get("error", "start_quiz failed"),
+            session=updated_session.model_dump() if updated_session else session.model_dump(),
+            tool_calls=[],
+            error=tool_result.get("error"),
+        )
+
+    q = tool_result.get("current_question") or (updated_session.current_question if updated_session else None)
+    options = q.get("options", []) if isinstance(q, dict) else []
+    options_text = _format_options_text(options)
+
+    if updated_session and updated_session.language == "en":
+        response_message = f"Let's start.\n\nQuestion 1: {q.get('text', '')}\n{options_text}"
+    else:
+        response_message = (
+            "簡單四個問題，幫你找到命定手機殼，如果中途想離開，請輸入「中斷」，即可回到問答模式，讓我們開始測驗吧！\n\n"
+            f"第1題：{q.get('text', '')}\n{options_text}"
+        )
+
+    log_result = conversation_logger.log_conversation(
+        session_id=session_id,
+        user_message=user_message,
+        agent_response=response_message,
+        tool_calls=[{"tool": "start_quiz", "args": {"session_id": session_id}, "result": tool_result}],
+        session_state={
+            "step": updated_session.step.value if updated_session else session.step.value,
+            "answers_count": len(updated_session.answers) if updated_session else len(session.answers),
+            "color_result_id": updated_session.color_result_id if updated_session else session.color_result_id,
+            "current_question_id": q.get("id") if isinstance(q, dict) else None,
+            "language": updated_session.language if updated_session else session.language,
+            "selected_questions": updated_session.selected_questions if updated_session else session.selected_questions,
+        },
+        mode="jti",
+    )
+    final_turn_number = log_result[1] if log_result else None
+
+    return ChatResponse(
+        message=response_message,
+        tts_text=_make_quiz_tts_text(
+            q,
+            1,
+            updated_session.language if updated_session else session.language,
+        ) if isinstance(q, dict) else None,
+        session=updated_session.model_dump() if updated_session else session.model_dump(),
+        tool_calls=[{"tool": "start_quiz", "args": {"session_id": session_id}}],
+        turn_number=final_turn_number
+    )
+
+
 @router.post("/quiz/start", response_model=ChatResponse)
 async def quiz_start(request: QuizActionRequest, auth: dict = Depends(verify_auth)):
     """
@@ -604,90 +665,11 @@ async def quiz_start(request: QuizActionRequest, auth: dict = Depends(verify_aut
     - curl / 自動化測試
     """
     try:
-        session = session_manager.get_session(request.session_id)
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
-
-        if session.step.value == "DONE":
-            if session.language == "en":
-                response_message = "You've already completed the quiz! Please refresh the page to start a new session."
-            else:
-                response_message = "你已經完成過測驗囉！這次對話只能測驗一次。如果想重新測驗，請重新整理頁面開始新的對話。"
-            
-            log_result = conversation_logger.log_conversation(
-                session_id=request.session_id,
-                user_message="[API] quiz_start",
-                agent_response=response_message,
-                tool_calls=[],
-                session_state={
-                    "step": session.step.value,
-                    "answers_count": len(session.answers),
-                    "color_result_id": session.color_result_id,
-                    "current_question_id": None,
-                    "language": session.language,
-                    "selected_questions": session.selected_questions,
-                },
-                mode="jti"
-            )
-            
-            final_turn_number = log_result[1] if log_result else None
-            
-            return ChatResponse(
-                message=response_message,
-                session=session.model_dump(),
-                tool_calls=[],
-                turn_number=final_turn_number
-            )
-
-        tool_result = await tool_executor.execute("start_quiz", {"session_id": request.session_id})
-        updated_session = session_manager.get_session(request.session_id)
-
-        if not tool_result.get("success"):
-            return ChatResponse(
-                message=tool_result.get("error", "start_quiz failed"),
-                session=updated_session.model_dump() if updated_session else session.model_dump(),
-                tool_calls=[],
-                error=tool_result.get("error"),
-            )
-
-        q = tool_result.get("current_question") or (updated_session.current_question if updated_session else None)
-        options = q.get("options", []) if isinstance(q, dict) else []
-        options_text = _format_options_text(options)
-
-        if updated_session and updated_session.language == "en":
-            response_message = f"Let's start.\n\nQuestion 1: {q.get('text', '')}\n{options_text}"
-        else:
-            response_message = (
-                "想來做個生活品味色彩探索測驗嗎？ 簡單五個測驗，尋找你的命定手機殼，"
-                "如果中途想離開，請輸入中斷，即可繼續問答，那我們開始測驗吧！\n\n"
-                f"第1題：{q.get('text', '')}\n{options_text}"
-            )
-
-        log_result = conversation_logger.log_conversation(
-            session_id=request.session_id,
-            user_message="[API] quiz_start",
-            agent_response=response_message,
-            tool_calls=[{"tool": "start_quiz", "args": {"session_id": request.session_id}, "result": tool_result}],
-            session_state={
-                "step": updated_session.step.value if updated_session else session.step.value,
-                "answers_count": len(updated_session.answers) if updated_session else len(session.answers),
-                "color_result_id": updated_session.color_result_id if updated_session else session.color_result_id,
-                "current_question_id": q.get("id") if isinstance(q, dict) else None,
-                "language": updated_session.language if updated_session else session.language,
-                "selected_questions": updated_session.selected_questions if updated_session else session.selected_questions,
-            },
-            mode="jti",
-        )
-        
-        final_turn_number = log_result[1] if log_result else None
-
-        return ChatResponse(
-            message=response_message,
-            session=updated_session.model_dump() if updated_session else session.model_dump(),
-            tool_calls=[{"tool": "start_quiz", "args": {"session_id": request.session_id}}],
-            turn_number=final_turn_number
-        )
-
+        s = session_manager.get_session(request.session_id)
+        if s and s.step.value == "DONE":
+            s.step = SessionStep.WELCOME
+            session_manager.update_session(s)
+        return await _execute_quiz_start(request.session_id)
     except HTTPException:
         raise
     except Exception as e:

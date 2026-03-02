@@ -372,53 +372,9 @@ class MainAgent:
             if not session:
                 return {"error": "Session not found", "message": "找不到 session"}
 
-            # start_quiz 開場白：用固定文案
-            if tool_name == "start_quiz" and tool_result.get("current_question"):
-                q = tool_result["current_question"]
-                options = q.get("options", [])
-                options_text = self._format_options_text(options)
-
-                if session.language == "en":
-                    opening = (
-                        "Would you like to take a lifestyle color exploration quiz? "
-                        "Just five questions to find your perfect phone case. "
-                        "If you want to leave midway, just type 'pause' to return to chat. Let's begin!"
-                    )
-                    question_prefix = "Question 1:"
-                else:
-                    opening = (
-                        "想來做個生活品味色彩探索測驗嗎？ 簡單五個測驗，尋找你的命定手機殼，"
-                        "如果中途想離開，請輸入中斷，即可繼續問答，那我們開始測驗吧！"
-                    )
-                    question_prefix = "第1題："
-
-                message = f"{opening}\n\n{question_prefix} {q.get('text', '')}\n{options_text}"
-
-                chat_session = self._get_or_create_chat_session(session)
-                self._append_to_chat_history(chat_session, user_message, message)
-                self._sync_history_to_db_background(session_id, user_message, message)
-
-                return {
-                    "message": message,
-                    "session": session.model_dump(),
-                }
-
             # 根據工具結果生成指示
             if "instruction_for_llm" in tool_result:
                 instruction = tool_result["instruction_for_llm"]
-            elif tool_name == "start_quiz" and tool_result.get("current_question"):
-                q = tool_result["current_question"]
-                options = q.get("options", [])
-                options_text = self._format_options_text(options)
-                instruction = f"""測驗已開始。
-
-	開場白請固定使用以下文字，回覆必須從這行開頭（前面不要加任何字），請逐字輸出不要改寫：
-	想來做個生活品味色彩探索測驗嗎？ 簡單五個測驗，尋找你的命定手機殼，如果中途想離開，請輸入中斷，即可繼續問答，那我們開始測驗吧！
-
-	接著請完整顯示第1題與所有選項：
-
-	第1題：{q['text']}
-	{options_text}"""
             elif "color_result" in tool_result and tool_result.get("message"):
                 instruction = f"""使用者剛完成色彩測驗。
 
