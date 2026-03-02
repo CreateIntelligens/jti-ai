@@ -147,14 +147,14 @@ def build_system_instruction(
 SESSION_STATE_TEMPLATES = {
     "zh": """<內部狀態資訊 - 不要在回應中提及>
 目前階段: {step_value}
-測驗進度: {answers_count}/5 題
+測驗進度: {answers_count}/4 題
 色系結果: {color_result}
 
 ⚠️ 重要：必須使用繁體中文回應所有內容，即使使用者用英文提問
 </內部狀態資訊>""",
     "en": """<Internal State Info - Do not mention in response>
 Current Stage: {step_value}
-Quiz Progress: {answers_count}/5 questions
+Quiz Progress: {answers_count}/4 questions
 Color Result: {color_result}
 
 ⚠️ CRITICAL: You MUST respond in English only, even if user writes in Chinese

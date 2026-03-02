@@ -29,7 +29,7 @@ conversation_logger = get_conversation_logger()
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/jti", tags=["JTI Quiz"])
+router = APIRouter(prefix="/api/jti", tags=["JTI Chat"])
 
 # === Request/Response Models ===
 

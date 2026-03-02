@@ -24,7 +24,7 @@ from app.services.jti.runtime_settings import (
 )
 import app.deps as deps
 
-router = APIRouter(prefix="/api/jti/prompts", tags=["JTI Persona Management"])
+router = APIRouter(prefix="/api/jti/prompts", tags=["JTI Prompts"])
 
 JTI_STORE_NAME_ZH = "__jti__"
 JTI_STORE_NAME_EN = "__jti__en"
