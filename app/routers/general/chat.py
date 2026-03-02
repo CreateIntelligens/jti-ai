@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from app.auth import verify_auth
 from app.core import FileSearchManager
-from app.routers import jti  # for response models
+from app.routers.jti import chat as jti  # for response models
 from app.utils import group_conversations_by_session, group_conversations_as_summary
 import app.deps as deps
 

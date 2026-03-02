@@ -1,19 +1,19 @@
 """
-JTI 測驗系統 API Endpoints
+JTI Chat API — session management, chat messages, and conversation history.
 """
 
 from copy import deepcopy
 from datetime import datetime
+from typing import Optional, Dict, Any, List, Union
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, Dict, Any, List, Union
 import logging
-from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
-from app.services.jti.main_agent import main_agent
+
+from app.auth import verify_auth
 from app.models.session import SessionStep
-from app.auth import verify_auth, require_admin
-from app.tools.tool_executor import tool_executor
+from app.services.jti.main_agent import main_agent
+from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 from app.tools.quiz import get_total_questions
 from app.utils import group_conversations_by_session
 from app.services.jti.quiz_helpers import (
@@ -22,39 +22,35 @@ from app.services.jti.quiz_helpers import (
     _pause_quiz_and_respond,
     _judge_user_choice,
 )
+from app.routers.jti.quiz import _execute_quiz_start, _make_quiz_tts_text
 
-# 使用工廠函數取得適當的實作（MongoDB 或記憶體）
 session_manager = get_session_manager()
 conversation_logger = get_conversation_logger()
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/jti", tags=["JTI Chat"])
 
+
 # === Request/Response Models ===
 
 class CreateSessionRequest(BaseModel):
-    """建立 session 請求"""
-    language: str = "zh"  # 語言 (zh/en)
-    previous_session_id: Optional[str] = None  # 舊 session ID，用於清理記憶體
+    language: str = "zh"
+    previous_session_id: Optional[str] = None
 
 
 class CreateSessionResponse(BaseModel):
-    """建立 session 回應"""
     ok: bool = True
     session_id: str
     message: str = "Session created"
 
 
 class ChatRequest(BaseModel):
-    """對話請求"""
     session_id: str = Field(..., description="Session ID")
     message: str = Field(..., description="使用者訊息")
     turn_number: Optional[int] = Field(None, description="若是重新生成，則指定該訊息的 turn_number（之後的記錄會被刪除）")
 
 
 class ChatResponse(BaseModel):
-    """對話回應"""
     message: str
     tts_text: Optional[str] = None
     session: Optional[Dict[str, Any]] = None
@@ -63,25 +59,16 @@ class ChatResponse(BaseModel):
     error: Optional[str] = None
 
 
-class QuizActionRequest(BaseModel):
-    """測驗控制請求（不透過自然語言判斷）"""
-    session_id: str = Field(..., description="Session ID")
-
-
-
 class ConversationToolCall(BaseModel):
-    """工具呼叫記錄"""
     tool: Optional[str] = None
     tool_name: Optional[str] = None
     args: Dict[str, Any] = Field(default_factory=dict)
     result: Dict[str, Any] = Field(default_factory=dict)
     execution_time_ms: Optional[float] = None
-
     model_config = ConfigDict(extra="allow")
 
 
 class ConversationItem(BaseModel):
-    """單筆對話記錄"""
     mongo_id: Optional[str] = Field(default=None, alias="_id", description="MongoDB document ID")
     session_id: str
     mode: str
@@ -94,12 +81,10 @@ class ConversationItem(BaseModel):
     session_snapshot: Optional[Dict[str, Any]] = None
     session_state: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
-
     model_config = ConfigDict(populate_by_name=True, extra="allow")
 
 
 class ConversationSessionGroup(BaseModel):
-    """按 session 分組的對話"""
     session_id: str
     conversations: List[ConversationItem]
     first_message_time: Optional[str] = None
@@ -107,7 +92,6 @@ class ConversationSessionGroup(BaseModel):
 
 
 class ConversationSessionSummary(BaseModel):
-    """Session 摘要（不含完整對話）"""
     session_id: str
     first_message_time: Optional[str] = None
     last_message_time: Optional[str] = None
@@ -116,7 +100,6 @@ class ConversationSessionSummary(BaseModel):
 
 
 class ConversationsBySessionResponse(BaseModel):
-    """查詢單一 session 對話回應"""
     session_id: str
     mode: str
     conversations: List[ConversationItem]
@@ -124,7 +107,6 @@ class ConversationsBySessionResponse(BaseModel):
 
 
 class ConversationsGroupedResponse(BaseModel):
-    """查詢多個 sessions 對話回應"""
     mode: str
     sessions: List[ConversationSessionGroup]
     total_conversations: int
@@ -132,19 +114,16 @@ class ConversationsGroupedResponse(BaseModel):
 
 
 class DeleteConversationRequest(BaseModel):
-    """刪除對話請求"""
     session_ids: List[str]
 
 
 class DeleteConversationResponse(BaseModel):
-    """刪除對話回應"""
     ok: bool
     deleted_count: int
     deleted_logs: int
 
 
 class ExportConversationsResponse(BaseModel):
-    """匯出對話回應"""
     exported_at: str
     mode: str
     sessions: List[ConversationSessionGroup]
@@ -153,7 +132,6 @@ class ExportConversationsResponse(BaseModel):
 
 
 class GeneralConversationsBySessionResponse(BaseModel):
-    """General chat 單一 session 對話查詢回應"""
     session_id: str
     store_name: str
     mode: str
@@ -162,7 +140,6 @@ class GeneralConversationsBySessionResponse(BaseModel):
 
 
 class GeneralConversationsResponse(BaseModel):
-    """General chat 對話查詢回應（摘要列表）"""
     store_name: str
     mode: str
     sessions: List[ConversationSessionSummary]
@@ -171,7 +148,6 @@ class GeneralConversationsResponse(BaseModel):
 
 
 class ExportGeneralConversationsResponse(BaseModel):
-    """General chat 對話匯出回應"""
     exported_at: str
     store_name: str
     mode: str
@@ -180,43 +156,20 @@ class ExportGeneralConversationsResponse(BaseModel):
     total_sessions: int
 
 
-QUIZ_OPENING = {
-    "zh": "簡單四個問題，幫你找到命定手機殼，如果中途想離開，請輸入「中斷」，即可回到問答模式，讓我們開始測驗吧！",
-    "en": "Just four questions to find your perfect phone case! If you want to leave midway, type pause to return to chat. Let's begin!",
-}
-
-
-def _make_quiz_tts_text(q: dict, q_num: int, language: str) -> str:
-    """組出題庫模式的 TTS 文字（只有題目，不含選項）"""
-    text = q.get("text", "")
-    if language == "en":
-        return f"Question {q_num}: {text}"
-    return f"第{q_num}題：{text}"
-
-
 # === Endpoints ===
 
 @router.post("/chat/start", response_model=CreateSessionResponse)
 async def create_session(request: CreateSessionRequest, auth: dict = Depends(verify_auth)):
-    """
-    建立新的 JTI 對話 Session
-
-    回傳 session_id 供後續 /api/jti/chat/message 使用
-    """
+    """建立新的 JTI 對話 Session"""
     try:
-        # 清理舊 session 的記憶體 chat session
         if request.previous_session_id:
             main_agent.remove_session(request.previous_session_id)
             logger.info(f"Cleaned up previous chat session: {request.previous_session_id[:8]}...")
 
         session = session_manager.create_session(language=request.language)
-
         logger.info(f"Created new session: {session.session_id} (language={request.language})")
 
-        return CreateSessionResponse(
-            session_id=session.session_id,
-            message="Session created"
-        )
+        return CreateSessionResponse(session_id=session.session_id)
 
     except Exception as e:
         logger.error(f"Failed to create session: {e}")
@@ -237,7 +190,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
        - 先用規則判斷使用者選 A 還是 B（明確 A/B/1/2 或選項文字）
        - 規則無法判斷時，再用 LLM 判斷
        - 判斷成功 → 呼叫 submit_answer，回覆下一題
-       - 判斷失敗 → AI 打哈哈 + 重問當前題
+       - 判斷失敗 → hardcode 提示 + 重問當前題
        - **不走知識庫，鎖定作答**
     """
     try:
@@ -245,27 +198,22 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
-        # rollback 時保留原始抽題序列，避免重建 session 後題目順序漂移。
         preserved_selected_questions = (
             deepcopy(session.selected_questions) if session.selected_questions else None
         )
 
-        # 記錄用戶訊息
         logger.info(f"[用戶訊息] Session: {request.session_id[:8]}... | 狀態: {session.step.value} | 訊息: '{request.message}'")
 
         # ========== 重新生成 / 回滾邏輯 ==========
         if request.turn_number is not None:
-            # 1. 刪除該 turn 及之後的 logs
             deleted_count = conversation_logger.delete_turns_from(request.session_id, request.turn_number)
             if deleted_count > 0:
-                # 2. 重新讀取剩餘 logs 並重建 session
                 logs = conversation_logger.get_session_logs(request.session_id)
                 if logs:
                     session = session_manager.rebuild_session_from_logs(request.session_id, logs)
                     if not session:
                         raise HTTPException(status_code=500, detail="Failed to rebuild session from logs")
                 else:
-                    # logs 全空（例如刪除第一輪）→ 強制重置 session，避免沿用刪除前的舊進度
                     session.step = SessionStep.WELCOME
                     session.answers = {}
                     session.current_question = None
@@ -287,9 +235,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                             session.current_question = None
                     session = session_manager.update_session(session)
 
-                # 3. 清除 LLM 記憶體快取，確保下次建構時不會混入已刪除的歷史
                 main_agent.remove_session(request.session_id)
-
                 logger.info(f"Session {request.session_id[:8]}... rolled back to before turn {request.turn_number}")
             else:
                 logger.warning(f"Failed to delete logs from turn {request.turn_number}")
@@ -298,30 +244,19 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         if session.step.value == "QUIZ" and session.current_question:
             q = session.current_question
             total_questions = get_total_questions(session.language)
-            remaining = total_questions - len(session.answers)
             current_q_num = len(session.answers) + 1
 
-            msg = request.message.strip()
-            # 使用者想中斷/暫停測驗：回到一般問答（保留進度）
-            # 只對明確的「中斷」做規則判斷，其餘意圖交由 _judge_user_choice 的 LLM 輔助判斷，
-            # 避免像「我不想太華麗，所以選B」這種作答理由被誤判為想退出測驗。
-            if msg == "中斷":
+            if request.message.strip() == "中斷":
                 return ChatResponse(**(await _pause_quiz_and_respond(
                     session_id=request.session_id,
                     log_user_message=request.message,
                     session=session,
                 )))
 
-            # 格式化當前題目
             options_text = _format_options_text(q.get("options", []))
-            current_q_text = f"第{current_q_num}題：{q['text']}\n{options_text}"
-
-            # 記錄當前測驗進度
             logger.info(f"[測驗進度] 第 {current_q_num}/{total_questions} 題 | 題目: {q.get('text', '')[:30]}...")
 
-            # 用規則/LLM 判斷選項
             user_choice = await _judge_user_choice(request.message, q)
-
             logger.info(f"[答題判斷] 使用者回答: '{request.message}' -> 判定選項: {user_choice}")
 
             if user_choice == "PAUSE":
@@ -332,41 +267,33 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 )))
 
             if user_choice:
-                # ✅ 判斷成功，呼叫 submit_answer
+                from app.tools.tool_executor import tool_executor
                 tool_result = await tool_executor.execute("submit_answer", {
                     "session_id": request.session_id,
                     "user_choice": user_choice
                 })
-
-                # 記錄工具呼叫
                 tool_calls = [{"tool": "submit_answer", "args": {"user_choice": user_choice}, "result": tool_result}]
 
-
                 updated_session = session_manager.get_session(request.session_id)
-
-                # 記錄答題結果和當前分數
                 logger.info(f"[答題結果] 選項: {user_choice} | 已答: {len(updated_session.answers)}/{total_questions} 題")
                 if updated_session.color_scores:
                     scores_str = " | ".join([f"{k}:{v}" for k, v in sorted(updated_session.color_scores.items(), key=lambda x: -x[1])])
                     logger.info(f"[當前分數] {scores_str}")
 
                 if tool_result.get("is_complete"):
-                    # 測驗完成，直接用 tool_result 的訊息，不走 LLM
                     response_message = tool_result.get("message", "")
                     updated_session = session_manager.get_session(request.session_id)
                     tts_text = response_message
                 else:
-                    # 還有下一題，直接拼題目，不經 LLM
                     next_q = tool_result["next_question"]
                     q_num = len(updated_session.answers) + 1
-                    options_text = _format_options_text(next_q.get("options", []))
+                    next_options_text = _format_options_text(next_q.get("options", []))
                     if updated_session.language == "en":
-                        response_message = f"Question {q_num}: {next_q.get('text', '')}\n{options_text}"
+                        response_message = f"Question {q_num}: {next_q.get('text', '')}\n{next_options_text}"
                     else:
-                        response_message = f"第{q_num}題：{next_q.get('text', '')}\n{options_text}"
+                        response_message = f"第{q_num}題：{next_q.get('text', '')}\n{next_options_text}"
                     tts_text = _make_quiz_tts_text(next_q, q_num, updated_session.language)
 
-                # 記錄到對話日誌
                 log_result = conversation_logger.log_conversation(
                     session_id=request.session_id,
                     user_message=request.message,
@@ -383,24 +310,17 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     mode="jti"
                 )
                 final_turn_number = log_result[1] if log_result else None
-
                 logger.info(f"✅ QUIZ 作答成功: {request.message} → {user_choice}")
-
-                response_tool_calls = [
-                    {k: v for k, v in call.items() if k != "result"}
-                    for call in tool_calls
-                ]
 
                 return ChatResponse(
                     message=response_message,
                     tts_text=tts_text,
                     session=updated_session.model_dump(),
-                    tool_calls=response_tool_calls,
+                    tool_calls=[{k: v for k, v in call.items() if k != "result"} for call in tool_calls],
                     turn_number=final_turn_number,
                 )
             else:
-                # ❌ 無法判斷選項：hardcode 提示，不走 AI
-                options_text = _format_options_text(q.get("options", []))
+                # ❌ 無法判斷選項：hardcode 提示
                 if session.language == "en":
                     hint = "Please choose one of the options!"
                     response_message = f"{hint}\n\nQuestion {current_q_num}: {q.get('text', '')}\n{options_text}"
@@ -410,14 +330,8 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
 
                 logger.info(f"⚠️ QUIZ 無法判斷選項，hardcode 提示: {request.message}")
 
-                # 記錄到對話日誌
-                # 對於 QUIZ 錯誤處理回應，我們也需要記錄，並且需要與其他 log_turn 保持一致
-                # 但這裡原本是用 log_conversation，它會自動計算 turn_number
-                # 為了避免 rollback 後 turn_number 錯亂，我們明確傳入 turn_number
-                
-                # 如果 request.turn_number 存在，我們先執行刪除
                 if request.turn_number:
-                     conversation_logger.delete_turns_from(request.session_id, request.turn_number)
+                    conversation_logger.delete_turns_from(request.session_id, request.turn_number)
 
                 log_result = conversation_logger.log_conversation(
                     session_id=request.session_id,
@@ -434,10 +348,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     },
                     mode="jti"
                 )
-                
                 final_turn_number = log_result[1] if log_result else None
-
-                logger.info(f"⚠️ QUIZ 無法判斷選項: {request.message}")
 
                 return ChatResponse(
                     message=response_message,
@@ -448,9 +359,6 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 )
 
         # ========== 非 QUIZ 狀態 ==========
-
-        # 先用關鍵字判斷是否要開始測驗（不依賴 LLM 呼叫工具）
-        # 移除單獨的「色彩」「顏色」避免誤判產品諮詢（如「有什麼顏色」）
         start_keywords = [
             '測驗', '心理測驗', '色彩測驗', '配色測驗', '開始測驗', '玩測驗', '試試測驗',
             '再測', '重測', '重新測', '再來一次', '再測一次', '重新開始',
@@ -480,12 +388,8 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             session_id=request.session_id,
             user_message=request.message,
         )
-        
-        # 記錄 AI 回應
         logger.info(f"[AI回應] 一般對話 | {result['message'][:80]}...")
 
-        # 記錄對話
-        # 如果 request.turn_number 存在，我們先執行刪除
         if request.turn_number:
             conversation_logger.delete_turns_from(request.session_id, request.turn_number)
 
@@ -504,7 +408,6 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             },
             mode="jti"
         )
-        
         final_turn_number = log_result[1] if log_result else None
 
         return ChatResponse(**result, turn_number=final_turn_number)
@@ -512,137 +415,6 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
     except Exception as e:
         logger.error(f"Chat failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
-
-
-async def _execute_quiz_start(session_id: str, user_message: str = "[API] quiz_start") -> ChatResponse:
-    """開始測驗的核心邏輯，供 /quiz/start 和 /chat/message keyword detection 共用。"""
-    session = session_manager.get_session(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    if session.step.value == "DONE":
-        if session.language == "en":
-            response_message = "You've already completed the quiz! Please refresh the page to start a new session."
-        else:
-            response_message = "你已經完成過測驗囉！這次對話只能測驗一次。如果想重新測驗，請重新整理頁面開始新的對話。"
-
-        log_result = conversation_logger.log_conversation(
-            session_id=session_id,
-            user_message=user_message,
-            agent_response=response_message,
-            tool_calls=[],
-            session_state={
-                "step": session.step.value,
-                "answers_count": len(session.answers),
-                "color_result_id": session.color_result_id,
-                "current_question_id": None,
-                "language": session.language,
-                "selected_questions": session.selected_questions,
-            },
-            mode="jti"
-        )
-        final_turn_number = log_result[1] if log_result else None
-        return ChatResponse(
-            message=response_message,
-            session=session.model_dump(),
-            tool_calls=[],
-            turn_number=final_turn_number
-        )
-
-    tool_result = await tool_executor.execute("start_quiz", {"session_id": session_id})
-    updated_session = session_manager.get_session(session_id)
-
-    if not tool_result.get("success"):
-        return ChatResponse(
-            message=tool_result.get("error", "start_quiz failed"),
-            session=updated_session.model_dump() if updated_session else session.model_dump(),
-            tool_calls=[],
-            error=tool_result.get("error"),
-        )
-
-    lang = updated_session.language if updated_session else session.language
-    q = tool_result.get("current_question") or (updated_session.current_question if updated_session else None)
-    options = q.get("options", []) if isinstance(q, dict) else []
-    options_text = _format_options_text(options)
-    opening = QUIZ_OPENING.get(lang, QUIZ_OPENING["zh"])
-
-    if lang == "en":
-        response_message = f"{opening}\n\nQuestion 1: {q.get('text', '')}\n{options_text}"
-    else:
-        response_message = f"{opening}\n\n第1題：{q.get('text', '')}\n{options_text}"
-
-    tts_text = f"{opening} {_make_quiz_tts_text(q, 1, lang)}" if isinstance(q, dict) else None
-
-    log_result = conversation_logger.log_conversation(
-        session_id=session_id,
-        user_message=user_message,
-        agent_response=response_message,
-        tool_calls=[{"tool": "start_quiz", "args": {"session_id": session_id}, "result": tool_result}],
-        session_state={
-            "step": updated_session.step.value if updated_session else session.step.value,
-            "answers_count": len(updated_session.answers) if updated_session else len(session.answers),
-            "color_result_id": updated_session.color_result_id if updated_session else session.color_result_id,
-            "current_question_id": q.get("id") if isinstance(q, dict) else None,
-            "language": lang,
-            "selected_questions": updated_session.selected_questions if updated_session else session.selected_questions,
-        },
-        mode="jti",
-    )
-    final_turn_number = log_result[1] if log_result else None
-
-    return ChatResponse(
-        message=response_message,
-        tts_text=tts_text,
-        session=updated_session.model_dump() if updated_session else session.model_dump(),
-        tool_calls=[{"tool": "start_quiz", "args": {"session_id": session_id}}],
-        turn_number=final_turn_number
-    )
-
-
-@router.post("/quiz/start", response_model=ChatResponse)
-async def quiz_start(request: QuizActionRequest, auth: dict = Depends(verify_auth)):
-    """
-    直接開始測驗（不依賴自然語言判斷）
-
-    用途：
-    - 前端按鈕/流程控制
-    - curl / 自動化測試
-    """
-    try:
-        s = session_manager.get_session(request.session_id)
-        if s and s.step.value == "DONE":
-            s.step = SessionStep.WELCOME
-            session_manager.update_session(s)
-        return await _execute_quiz_start(request.session_id)
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"quiz_start failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/quiz/pause", response_model=ChatResponse)
-async def quiz_pause(request: QuizActionRequest, auth: dict = Depends(verify_auth)):
-    """
-    直接暫停測驗（不依賴自然語言判斷）
-    """
-    try:
-        session = _get_or_rebuild_session(request.session_id)
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
-
-        return ChatResponse(**(await _pause_quiz_and_respond(
-            session_id=request.session_id,
-            log_user_message="[API] quiz_pause",
-            session=session,
-        )))
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"quiz_pause failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
 
 
 @router.get(
@@ -656,33 +428,15 @@ async def get_conversations(
     date_to: Optional[str] = None,
     auth: dict = Depends(verify_auth)
 ):
-    """
-    取得對話歷史
-
-    Query Parameters:
-    - session_id: (可選) 指定 Session ID 則只回傳該 session 的對話
-    - date_from: (可選) 起始日期 YYYY-MM-DD
-    - date_to: (可選) 結束日期 YYYY-MM-DD
-
-    回傳所有 JTI 模式的對話（按 session 分組），分頁由前端處理
-    """
+    """取得對話歷史"""
     mode = "jti"
     try:
         if session_id:
-            # 查詢特定 session
             conversations = conversation_logger.get_session_logs(session_id)
             conversations = [c for c in conversations if c.get("mode") == mode]
-
             logger.info(f"Retrieved {len(conversations)} conversations for session {session_id}")
-
-            return {
-                "session_id": session_id,
-                "mode": mode,
-                "conversations": conversations,
-                "total": len(conversations)
-            }
+            return {"session_id": session_id, "mode": mode, "conversations": conversations, "total": len(conversations)}
         else:
-            # 查詢所有 JTI 對話
             query: dict = {"mode": mode}
             if date_from or date_to:
                 ts_filter: dict = {}
@@ -693,22 +447,12 @@ async def get_conversations(
                 query["timestamp"] = ts_filter
 
             session_ids, total_sessions = conversation_logger.get_paginated_session_ids(
-                query=query,
-                page=1,
-                page_size=100000
+                query=query, page=1, page_size=100000
             )
-
             all_conversations = conversation_logger.get_logs_for_sessions(session_ids)
             session_list = group_conversations_by_session(all_conversations)
-
             logger.info(f"Retrieved {len(all_conversations)} conversations across {len(session_list)} sessions (total {total_sessions})")
-
-            return {
-                "mode": mode,
-                "sessions": session_list,
-                "total_conversations": len(all_conversations),
-                "total_sessions": total_sessions
-            }
+            return {"mode": mode, "sessions": session_list, "total_conversations": len(all_conversations), "total_sessions": total_sessions}
 
     except Exception as e:
         logger.error(f"Failed to get conversations: {e}")
@@ -717,30 +461,16 @@ async def get_conversations(
 
 @router.delete("/history", response_model=DeleteConversationResponse)
 async def delete_conversations(request: DeleteConversationRequest, auth: dict = Depends(verify_auth)):
-    """批量刪除對話紀錄
-
-    Body:
-    - session_ids: 要刪除的 session ID 列表
-
-    同時刪除每個 session 的：
-    - 對話日誌 (conversation logs)
-    - JTI session
-    - 記憶體中的 chat session
-    """
+    """批量刪除對話紀錄"""
     total_logs = 0
     deleted_count = 0
     for sid in request.session_ids:
-        logs = conversation_logger.delete_session_logs(sid)
-        total_logs += logs
+        total_logs += conversation_logger.delete_session_logs(sid)
         if session_manager.delete_session(sid):
             deleted_count += 1
         main_agent.remove_session(sid)
 
-    return {
-        "ok": True,
-        "deleted_count": deleted_count,
-        "deleted_logs": total_logs,
-    }
+    return {"ok": True, "deleted_count": deleted_count, "deleted_logs": total_logs}
 
 
 @router.get(
@@ -749,65 +479,30 @@ async def delete_conversations(request: DeleteConversationRequest, auth: dict = 
     response_model_exclude_none=True,
 )
 async def export_conversations(session_ids: Optional[str] = None, auth: dict = Depends(verify_auth)):
-    """
-    匯出對話歷史為 JSON 格式
-
-    Query Parameters:
-    - session_ids: (可選) 指定一個或多個 Session ID（用逗號分隔），只匯出指定的 sessions
-
-    範例:
-    - 單個 session: ?session_ids=abc123
-    - 多個 sessions: ?session_ids=abc123,def456,ghi789
-    - 所有 sessions: 不提供 session_ids 參數
-
-    如果不提供 session_ids，則匯出所有 JTI 模式的對話（按 session 分組）
-    """
+    """匯出對話歷史為 JSON 格式"""
     mode = "jti"
     try:
         if session_ids:
-            # 解析 session_ids（支援逗號分隔）
             session_id_list = [sid.strip() for sid in session_ids.split(',') if sid.strip()]
-
-            # 收集指定 sessions 的對話
             sessions = []
             total_conversations = 0
-
             for session_id in session_id_list:
                 conversations = conversation_logger.get_session_logs(session_id)
                 conversations = [c for c in conversations if c.get("mode") == mode]
-
                 if conversations:
                     sessions.append({
                         "session_id": session_id,
                         "conversations": conversations,
-                        "first_message_time": conversations[0].get("timestamp") if conversations else None,
+                        "first_message_time": conversations[0].get("timestamp"),
                         "total": len(conversations)
                     })
                     total_conversations += len(conversations)
-
-            # 按時間排序
             sessions.sort(key=lambda x: x["first_message_time"] or "", reverse=True)
-
-            return {
-                "exported_at": datetime.utcnow().isoformat(),
-                "mode": mode,
-                "sessions": sessions,
-                "total_conversations": total_conversations,
-                "total_sessions": len(sessions)
-            }
+            return {"exported_at": datetime.utcnow().isoformat(), "mode": mode, "sessions": sessions, "total_conversations": total_conversations, "total_sessions": len(sessions)}
         else:
-            # 匯出所有 JTI 對話
             all_conversations = conversation_logger.get_session_logs_by_mode(mode)
-
             session_list = group_conversations_by_session(all_conversations)
-
-            return {
-                "exported_at": datetime.utcnow().isoformat(),
-                "mode": mode,
-                "sessions": session_list,
-                "total_conversations": len(all_conversations),
-                "total_sessions": len(session_list)
-            }
+            return {"exported_at": datetime.utcnow().isoformat(), "mode": mode, "sessions": session_list, "total_conversations": len(all_conversations), "total_sessions": len(session_list)}
 
     except Exception as e:
         logger.error(f"Failed to export conversations: {e}")

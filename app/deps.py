@@ -43,7 +43,7 @@ def init_managers():
         _init_jti_default_prompt()
 
         # Seed quiz bank & color results from JSON → MongoDB
-        from .migrate_quiz_bank import migrate_quiz_bank, migrate_color_results
+        from .services.jti.migrate_quiz_bank import migrate_quiz_bank, migrate_color_results
         migrate_quiz_bank()
         migrate_color_results()
     except ValueError as e:
