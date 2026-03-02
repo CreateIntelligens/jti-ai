@@ -485,20 +485,16 @@ export async function deleteQuizQuestion(language: string, id: string, bankId?: 
   await handleResponse(response);
 }
 
-// --- Quiz Metadata ---
+// --- Quiz Bank Metadata (via /banks/{bank_id}) ---
 
-export async function getQuizBankMetadata(language: string = 'zh', bankId?: string): Promise<QuizBankMetadata> {
-  const params = new URLSearchParams({ language });
-  if (bankId) params.set('bank_id', bankId);
-  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/metadata/?${params}`);
+export async function getQuizBankMetadata(language: string = 'zh', bankId: string = 'default'): Promise<QuizBankMetadata> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/banks/${encodeURIComponent(bankId)}?language=${language}`);
   return handleResponse(response);
 }
 
-export async function updateQuizBankMetadata(language: string, data: Partial<QuizBankMetadata>, bankId?: string): Promise<QuizBankMetadata> {
-  const params = new URLSearchParams({ language });
-  if (bankId) params.set('bank_id', bankId);
-  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/metadata/?${params}`, {
-    method: 'PUT',
+export async function updateQuizBankMetadata(language: string, data: Partial<QuizBankMetadata>, bankId: string = 'default'): Promise<QuizBankMetadata> {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/banks/${encodeURIComponent(bankId)}?language=${language}`, {
+    method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
@@ -522,8 +518,8 @@ export async function updateColorResult(language: string, colorId: string, data:
 }
 
 export async function exportColorResultsCsv(language: string): Promise<void> {
-  const params = new URLSearchParams({ language });
-  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/color-results/export/?${params}`);
+  const params = new URLSearchParams({ language, type: 'colors' });
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/transfer/export?${params}`);
   if (!response.ok) throw new Error('Export failed');
   const blob = await response.blob();
   const url = window.URL.createObjectURL(blob);
@@ -548,11 +544,11 @@ export async function getQuizBankStats(language: string = 'zh', bankId?: string)
 // --- Import / Export ---
 
 export async function importQuizBank(language: string, bankId: string, file: File, replace = false): Promise<{ count: number; message: string }> {
-  const params = new URLSearchParams({ language, bank_id: bankId });
+  const params = new URLSearchParams({ language, bank_id: bankId, type: 'questions' });
   if (replace) params.set('replace', 'true');
   const formData = new FormData();
   formData.append('file', file);
-  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/import/?${params}`, {
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/transfer/import?${params}`, {
     method: 'POST',
     body: formData,
   });
@@ -560,8 +556,8 @@ export async function importQuizBank(language: string, bankId: string, file: Fil
 }
 
 export async function exportQuizBankCsv(language: string, bankId: string): Promise<void> {
-  const params = new URLSearchParams({ language, bank_id: bankId });
-  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/export/?${params}`);
+  const params = new URLSearchParams({ language, bank_id: bankId, type: 'questions' });
+  const response = await fetchWithApiKey(`${API_BASE}/jti/quiz-bank/transfer/export?${params}`);
   if (!response.ok) throw new Error('Export failed');
   const blob = await response.blob();
   const url = window.URL.createObjectURL(blob);

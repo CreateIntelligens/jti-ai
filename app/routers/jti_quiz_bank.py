@@ -25,7 +25,7 @@ from app.tools.color_results import invalidate_color_results_cache
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/jti/quiz-bank", tags=["jti-quiz-bank"])
+router = APIRouter(prefix="/api/jti/quiz-bank", tags=["JTI Quiz Bank"])
 
 
 # ========== Request Models ==========
@@ -52,7 +52,8 @@ class UpdateQuestionRequest(BaseModel):
     options: Optional[list[QuestionOption]] = None
 
 
-class UpdateMetadataRequest(BaseModel):
+class UpdateBankRequest(BaseModel):
+    """Update bank metadata fields."""
     name: Optional[str] = None
     title: Optional[str] = None
     description: Optional[str] = None
@@ -73,7 +74,7 @@ class CreateBankRequest(BaseModel):
     name: str
 
 
-# ========== Bank Management ==========
+# ========== Bank Endpoints ==========
 
 
 @router.get("/banks/")
@@ -100,6 +101,39 @@ def create_bank(
         return bank
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+
+
+@router.get("/banks/{bank_id}")
+def get_bank(
+    bank_id: str,
+    language: str = Query("zh"),
+    auth: dict = Depends(verify_auth),
+):
+    """Get a bank's metadata."""
+    store = get_quiz_bank_store()
+    meta = store.get_metadata(language, bank_id)
+    if not meta:
+        raise HTTPException(status_code=404, detail=f"Bank '{bank_id}' not found")
+    return meta
+
+
+@router.patch("/banks/{bank_id}")
+def update_bank(
+    bank_id: str,
+    request: UpdateBankRequest,
+    language: str = Query("zh"),
+    auth: dict = Depends(verify_auth),
+):
+    """Update a bank's metadata."""
+    if bank_id == DEFAULT_BANK_ID:
+        raise HTTPException(status_code=403, detail="Cannot modify default bank")
+    store = get_quiz_bank_store()
+    update_data = request.model_dump(exclude_none=True)
+    if not update_data:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    result = store.upsert_metadata(language, bank_id, update_data)
+    invalidate_quiz_cache(language)
+    return result
 
 
 @router.delete("/banks/{bank_id}")
@@ -182,7 +216,6 @@ def create_question(
     existing = store.get_question(language, bank_id, request.id)
     if existing:
         raise HTTPException(status_code=409, detail=f"Question '{request.id}' already exists")
-
     result = store.create_question(language, bank_id, request.model_dump())
     invalidate_quiz_cache(language)
     return result
@@ -203,7 +236,6 @@ def update_question(
     update_data = request.model_dump(exclude_none=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
-
     result = store.update_question(language, bank_id, question_id, update_data)
     if not result:
         raise HTTPException(status_code=404, detail=f"Question '{question_id}' not found")
@@ -227,43 +259,6 @@ def delete_question(
         raise HTTPException(status_code=404, detail=f"Question '{question_id}' not found")
     invalidate_quiz_cache(language)
     return {"message": f"Question '{question_id}' deleted"}
-
-
-# ========== Metadata Endpoints ==========
-
-
-@router.get("/metadata/")
-def get_metadata(
-    language: str = Query("zh"),
-    bank_id: str = Query(DEFAULT_BANK_ID),
-    auth: dict = Depends(verify_auth),
-):
-    """Get quiz bank metadata."""
-    store = get_quiz_bank_store()
-    meta = store.get_metadata(language, bank_id)
-    if not meta:
-        raise HTTPException(status_code=404, detail="Metadata not found")
-    return meta
-
-
-@router.put("/metadata/")
-def update_metadata(
-    request: UpdateMetadataRequest,
-    language: str = Query("zh"),
-    bank_id: str = Query(DEFAULT_BANK_ID),
-    auth: dict = Depends(verify_auth),
-):
-    """Update quiz bank metadata."""
-    if bank_id == DEFAULT_BANK_ID:
-        raise HTTPException(status_code=403, detail="Cannot modify default bank")
-    store = get_quiz_bank_store()
-    update_data = request.model_dump(exclude_none=True)
-    if not update_data:
-        raise HTTPException(status_code=400, detail="No fields to update")
-
-    result = store.upsert_metadata(language, bank_id, update_data)
-    invalidate_quiz_cache(language)
-    return result
 
 
 # ========== Color Results Endpoints ==========
@@ -292,50 +287,9 @@ def update_color_result(
     update_data = request.model_dump(exclude_none=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
-
     result = store.upsert_result(language, color_id, update_data)
     invalidate_color_results_cache(language)
     return result
-
-
-@router.get("/color-results/export/")
-def export_color_results(
-    language: str = Query("zh"),
-    auth: dict = Depends(verify_auth),
-):
-    """Export color results as CSV download."""
-    store = get_color_results_store()
-    results = store.list_results(language)
-
-    output = io.StringIO()
-    output.write('\ufeff')  # Write UTF-8 BOM for Excel compatibility
-    headers = ["color_id", "color_name", "title", "recommended_colors", "description"]
-    
-    writer = csv.DictWriter(output, fieldnames=headers)
-    writer.writeheader()
-
-    for cr in results:
-        row: dict[str, str] = {
-            "color_id": cr.get("color_id", ""),
-            "color_name": cr.get("color_name", ""),
-            "title": cr.get("title", ""),
-            "recommended_colors": ", ".join(cr.get("recommended_colors", [])),
-            "description": cr.get("description", ""),
-        }
-        writer.writerow(row)
-
-    output.seek(0)
-
-    filename = f"color_results_{language}.csv"
-    encoded_filename = urllib.parse.quote(filename)
-
-    return StreamingResponse(
-        iter([output.getvalue()]),
-        media_type="text/csv; charset=utf-8",
-        headers={
-            "Content-Disposition": f"attachment; filename*=utf-8''{encoded_filename}",
-        },
-    )
 
 
 # ========== Stats Endpoint ==========
@@ -365,7 +319,7 @@ def get_stats(
     }
 
 
-# ========== CSV/XLSX Import ==========
+# ========== Import/Export (unified) ==========
 
 
 def _parse_scores(s: str) -> dict[str, float]:
@@ -391,7 +345,6 @@ def _parse_csv_rows(reader) -> list[dict]:
             continue
 
         options = []
-        # Support up to 5 options (a through e)
         for letter in "abcde":
             opt_id = row.get(f"option_{letter}_id", "").strip()
             opt_text = row.get(f"option_{letter}_text", "").strip()
@@ -406,131 +359,160 @@ def _parse_csv_rows(reader) -> list[dict]:
         if len(options) < 2:
             continue
 
-        question: dict[str, Any] = {
+        questions.append({
             "id": row["id"].strip(),
             "text": row["text"].strip(),
             "category": row.get("category", "personality").strip(),
             "weight": float(row.get("weight", "1") or "1"),
             "options": options,
-        }
-        questions.append(question)
+        })
     return questions
 
 
-@router.post("/import/")
-async def import_questions(
+@router.post("/transfer/import")
+async def import_data(
     file: UploadFile = File(...),
+    type: str = Query("questions", description="'questions' or 'colors'"),
     language: str = Query("zh"),
     bank_id: str = Query(DEFAULT_BANK_ID),
-    replace: bool = Query(False, description="Replace all existing questions"),
+    replace: bool = Query(False, description="Replace all existing data"),
     auth: dict = Depends(verify_auth),
 ):
-    """Import questions from CSV or XLSX file."""
-    if bank_id == DEFAULT_BANK_ID:
-        raise HTTPException(status_code=403, detail="Cannot modify default bank")
-    store = get_quiz_bank_store()
-
-    # Check bank exists
-    meta = store.get_metadata(language, bank_id)
-    if not meta:
-        raise HTTPException(status_code=404, detail=f"Bank '{bank_id}' not found")
+    """Import questions or color results from CSV/XLSX file."""
+    if type not in ("questions", "colors"):
+        raise HTTPException(status_code=400, detail="type must be 'questions' or 'colors'")
 
     data = await file.read()
     filename = (file.filename or "").lower()
 
-    questions: list[dict] = []
+    if type == "questions":
+        if bank_id == DEFAULT_BANK_ID:
+            raise HTTPException(status_code=403, detail="Cannot modify default bank")
+        store = get_quiz_bank_store()
+        meta = store.get_metadata(language, bank_id)
+        if not meta:
+            raise HTTPException(status_code=404, detail=f"Bank '{bank_id}' not found")
 
-    if filename.endswith(".csv"):
-        text = data.decode("utf-8-sig")  # Handle BOM
+        if filename.endswith(".csv"):
+            text = data.decode("utf-8-sig")
+            reader = csv.DictReader(io.StringIO(text))
+            questions = _parse_csv_rows(reader)
+        elif filename.endswith((".xlsx", ".xls")):
+            try:
+                import openpyxl
+            except ImportError:
+                raise HTTPException(status_code=500, detail="openpyxl not installed")
+            wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True)
+            ws = wb.active
+            if ws is None:
+                raise HTTPException(status_code=400, detail="Empty workbook")
+            rows = list(ws.iter_rows(values_only=True))
+            if len(rows) < 2:
+                raise HTTPException(status_code=400, detail="No data rows")
+            headers = [str(h or "").strip().lower() for h in rows[0]]
+            dict_rows = [dict(zip(headers, [str(c or "").strip() for c in row])) for row in rows[1:]]
+            questions = _parse_csv_rows(iter(dict_rows))
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type. Use .csv or .xlsx")
+
+        if not questions:
+            raise HTTPException(status_code=400, detail="No valid questions found in file")
+
+        count = store.replace_all_questions(language, bank_id, questions) if replace else store.bulk_upsert_questions(language, bank_id, questions)
+        invalidate_quiz_cache(language)
+        return {"message": f"Imported {count} questions", "count": count}
+
+    else:  # colors
+        if not filename.endswith(".csv"):
+            raise HTTPException(status_code=400, detail="Color results import only supports .csv")
+        text = data.decode("utf-8-sig")
         reader = csv.DictReader(io.StringIO(text))
-        questions = _parse_csv_rows(reader)
-
-    elif filename.endswith((".xlsx", ".xls")):
-        try:
-            import openpyxl
-        except ImportError:
-            raise HTTPException(status_code=500, detail="openpyxl not installed, XLSX not supported")
-
-        wb = openpyxl.load_workbook(io.BytesIO(data), read_only=True)
-        ws = wb.active
-        if ws is None:
-            raise HTTPException(status_code=400, detail="Empty workbook")
-
-        rows = list(ws.iter_rows(values_only=True))
-        if len(rows) < 2:
-            raise HTTPException(status_code=400, detail="No data rows")
-
-        headers = [str(h or "").strip().lower() for h in rows[0]]
-        dict_rows = [dict(zip(headers, [str(c or "").strip() for c in row])) for row in rows[1:]]
-        questions = _parse_csv_rows(iter(dict_rows))
-    else:
-        raise HTTPException(status_code=400, detail="Unsupported file type. Use .csv or .xlsx")
-
-    if not questions:
-        raise HTTPException(status_code=400, detail="No valid questions found in file")
-
-    if replace:
-        count = store.replace_all_questions(language, bank_id, questions)
-    else:
-        count = store.bulk_upsert_questions(language, bank_id, questions)
-
-    invalidate_quiz_cache(language)
-    return {"message": f"Imported {count} questions", "count": count}
+        color_store = get_color_results_store()
+        count = 0
+        for row in reader:
+            color_id = row.get("color_id", "").strip()
+            if not color_id:
+                continue
+            update_data: dict[str, Any] = {}
+            if row.get("color_name"):
+                update_data["color_name"] = row["color_name"].strip()
+            if row.get("title"):
+                update_data["title"] = row["title"].strip()
+            if row.get("recommended_colors"):
+                update_data["recommended_colors"] = [c.strip() for c in row["recommended_colors"].split(",") if c.strip()]
+            if row.get("description"):
+                update_data["description"] = row["description"].strip()
+            if update_data:
+                color_store.upsert_result(language, color_id, update_data)
+                count += 1
+        invalidate_color_results_cache(language)
+        return {"message": f"Imported {count} color results", "count": count}
 
 
-# ========== CSV Export ==========
-
-
-@router.get("/export/")
-def export_questions(
+@router.get("/transfer/export")
+def export_data(
+    type: str = Query("questions", description="'questions' or 'colors'"),
     language: str = Query("zh"),
     bank_id: str = Query(DEFAULT_BANK_ID),
     auth: dict = Depends(verify_auth),
 ):
-    """Export questions as CSV download."""
-    store = get_quiz_bank_store()
-    questions = store.list_questions(language, bank_id)
+    """Export questions or color results as CSV."""
+    if type not in ("questions", "colors"):
+        raise HTTPException(status_code=400, detail="type must be 'questions' or 'colors'")
 
     output = io.StringIO()
-    output.write('\ufeff')  # Write UTF-8 BOM for Excel compatibility
-    # Build headers dynamically based on max options
-    max_opts = max((len(q.get("options", [])) for q in questions), default=2)
-    max_opts = max(max_opts, 2)
+    output.write('\ufeff')  # UTF-8 BOM for Excel
 
-    headers = ["id", "text", "category", "weight"]
-    for i, letter in enumerate("abcde"[:max_opts]):
-        headers.extend([f"option_{letter}_id", f"option_{letter}_text", f"option_{letter}_scores"])
+    if type == "questions":
+        store = get_quiz_bank_store()
+        questions = store.list_questions(language, bank_id)
+        max_opts = max((len(q.get("options", [])) for q in questions), default=2)
+        max_opts = max(max_opts, 2)
+        headers = ["id", "text", "category", "weight"]
+        for letter in "abcde"[:max_opts]:
+            headers.extend([f"option_{letter}_id", f"option_{letter}_text", f"option_{letter}_scores"])
 
-    writer = csv.DictWriter(output, fieldnames=headers)
-    writer.writeheader()
+        writer = csv.DictWriter(output, fieldnames=headers)
+        writer.writeheader()
+        for q in questions:
+            row: dict[str, str] = {
+                "id": q.get("id", ""),
+                "text": q.get("text", ""),
+                "category": q.get("category", ""),
+                "weight": str(q.get("weight", 1)),
+            }
+            for i, opt in enumerate(q.get("options", [])):
+                letter = "abcde"[i]
+                row[f"option_{letter}_id"] = opt.get("id", "")
+                row[f"option_{letter}_text"] = opt.get("text", "")
+                scores = opt.get("score", {})
+                row[f"option_{letter}_scores"] = ",".join(f"{k}:{v}" for k, v in scores.items())
+            writer.writerow(row)
 
-    for q in questions:
-        row: dict[str, str] = {
-            "id": q.get("id", ""),
-            "text": q.get("text", ""),
-            "category": q.get("category", ""),
-            "weight": str(q.get("weight", 1)),
-        }
-        for i, opt in enumerate(q.get("options", [])):
-            letter = "abcde"[i]
-            row[f"option_{letter}_id"] = opt.get("id", "")
-            row[f"option_{letter}_text"] = opt.get("text", "")
-            scores = opt.get("score", {})
-            row[f"option_{letter}_scores"] = ",".join(f"{k}:{v}" for k, v in scores.items())
-        writer.writerow(row)
+        meta = store.get_metadata(language, bank_id)
+        bank_name = meta.get("name", bank_id) if meta else bank_id
+        filename = f"quiz_bank_{bank_name}_{language}.csv"
+
+    else:  # colors
+        color_store = get_color_results_store()
+        results = color_store.list_results(language)
+        headers_list = ["color_id", "color_name", "title", "recommended_colors", "description"]
+        writer = csv.DictWriter(output, fieldnames=headers_list)
+        writer.writeheader()
+        for cr in results:
+            writer.writerow({
+                "color_id": cr.get("color_id", ""),
+                "color_name": cr.get("color_name", ""),
+                "title": cr.get("title", ""),
+                "recommended_colors": ", ".join(cr.get("recommended_colors", [])),
+                "description": cr.get("description", ""),
+            })
+        filename = f"color_results_{language}.csv"
 
     output.seek(0)
-    meta = store.get_metadata(language, bank_id)
-    bank_name = meta.get("name", bank_id) if meta else bank_id
-
-    # URL-encode the filename to support non-ASCII characters (e.g., Chinese)
-    filename = f"quiz_bank_{bank_name}_{language}.csv"
     encoded_filename = urllib.parse.quote(filename)
-
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type="text/csv; charset=utf-8",
-        headers={
-            "Content-Disposition": f"attachment; filename*=utf-8''{encoded_filename}",
-        },
+        headers={"Content-Disposition": f"attachment; filename*=utf-8''{encoded_filename}"},
     )
