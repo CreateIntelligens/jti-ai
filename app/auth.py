@@ -104,3 +104,10 @@ def require_admin(auth_info: dict) -> None:
     """檢查是否為 admin 權限"""
     if auth_info.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
+
+
+def verify_admin(request: Request) -> dict:
+    """驗證請求並要求 admin 權限。"""
+    auth_info = verify_auth(request)
+    require_admin(auth_info)
+    return auth_info

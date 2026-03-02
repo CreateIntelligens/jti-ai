@@ -1,5 +1,5 @@
 import type { Store, FileItem, ChatResponse, StartChatResponse } from '../../types';
-import { API_BASE, fetchWithApiKey, handleResponse } from './base';
+import { API_BASE, fetchAsAdmin, fetchWithApiKey, handleResponse } from './base';
 
 // ========== Stores & Files ==========
 
@@ -191,8 +191,9 @@ export async function getGeneralConversationDetail(sessionId: string): Promise<a
 }
 
 export async function deleteConversations(mode: 'jti' | 'general', sessionIds: string[]): Promise<void> {
-  const url = mode === 'jti' ? `${API_BASE}/jti/history` : `${API_BASE}/chat/history`;
-  const response = await fetchWithApiKey(url, {
+  const url = mode === 'jti' ? `${API_BASE}/jti-admin/conversations` : `${API_BASE}/chat/history`;
+  const doFetch = mode === 'jti' ? fetchAsAdmin : fetchWithApiKey;
+  const response = await doFetch(url, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ session_ids: sessionIds }),

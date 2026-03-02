@@ -15,7 +15,13 @@ from pydantic import BaseModel
 
 from app.auth import verify_auth
 from app.core import FileSearchManager
-from app.routers.jti import chat as jti  # for response models
+from app.schemas.jti import (
+    DeleteConversationRequest,
+    DeleteConversationResponse,
+    ExportGeneralConversationsResponse,
+    GeneralConversationsBySessionResponse,
+    GeneralConversationsResponse,
+)
 from app.utils import group_conversations_by_session, group_conversations_as_summary
 import app.deps as deps
 
@@ -236,8 +242,8 @@ def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/history", response_model=jti.DeleteConversationResponse)
-def delete_general_conversations(request: jti.DeleteConversationRequest, auth: dict = Depends(verify_auth)):
+@router.delete("/history", response_model=DeleteConversationResponse)
+def delete_general_conversations(request: DeleteConversationRequest, auth: dict = Depends(verify_auth)):
     """批量刪除對話紀錄
 
     Body:
@@ -265,7 +271,7 @@ def delete_general_conversations(request: jti.DeleteConversationRequest, auth: d
 
 @router.get(
     "/history",
-    response_model=jti.GeneralConversationsResponse,
+    response_model=GeneralConversationsResponse,
     response_model_exclude_none=True,
 )
 def get_general_conversations(
@@ -327,7 +333,7 @@ def get_general_conversations(
 
 @router.get(
     "/history/export",
-    response_model=jti.ExportGeneralConversationsResponse,
+    response_model=ExportGeneralConversationsResponse,
     response_model_exclude_none=True,
 )
 def export_general_conversations(
@@ -422,7 +428,7 @@ def export_general_conversations(
 
 @router.get(
     "/history/{session_id}",
-    response_model=jti.GeneralConversationsBySessionResponse,
+    response_model=GeneralConversationsBySessionResponse,
     response_model_exclude_none=True,
 )
 def get_general_conversation_detail(

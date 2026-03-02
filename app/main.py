@@ -297,11 +297,16 @@ def index():
 
 
 # ========== Include Routers ==========
-app.include_router(jti_chat.router)
-app.include_router(jti_quiz.router)
-app.include_router(jti_prompts.router)
-app.include_router(jti_knowledge.router)
-app.include_router(jti_quiz_bank.router)
+app.include_router(jti_chat.runtime_router)
+app.include_router(jti_chat.compat_history_router)
+app.include_router(jti_chat.admin_history_router)
+app.include_router(jti_quiz.router, prefix="/api/jti")
+app.include_router(jti_prompts.router, prefix="/api/jti-admin/prompts")
+app.include_router(jti_prompts.router, prefix="/api/jti/prompts", include_in_schema=False)
+app.include_router(jti_knowledge.router, prefix="/api/jti-admin/knowledge")
+app.include_router(jti_knowledge.router, prefix="/api/jti/knowledge", include_in_schema=False)
+app.include_router(jti_quiz_bank.router, prefix="/api/jti-admin/quiz-bank")
+app.include_router(jti_quiz_bank.router, prefix="/api/jti/quiz-bank", include_in_schema=False)
 app.include_router(chat.router)
 app.include_router(prompts.router)  # before stores (more specific path patterns)
 app.include_router(stores.router)

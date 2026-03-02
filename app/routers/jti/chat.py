@@ -4,15 +4,29 @@ JTI Chat API — session management, chat messages, and conversation history.
 
 from copy import deepcopy
 from datetime import datetime
-from typing import Optional, Dict, Any, List, Union
+from typing import Optional, Union
 
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, Field, ConfigDict
 import logging
 
-from app.auth import verify_auth
+from app.auth import verify_admin, verify_auth
 from app.models.session import SessionStep
+from app.schemas.jti import (
+    ChatRequest,
+    ChatResponse,
+    ConversationsBySessionResponse,
+    ConversationsGroupedResponse,
+    CreateSessionRequest,
+    CreateSessionResponse,
+    DeleteConversationRequest,
+    DeleteConversationResponse,
+    ExportConversationsResponse,
+)
 from app.services.jti.main_agent import main_agent
+from app.services.jti.runtime_quiz_flow import (
+    execute_quiz_start,
+    make_quiz_tts_text,
+)
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 from app.tools.quiz import get_total_questions
 from app.utils import group_conversations_by_session
@@ -22,143 +36,27 @@ from app.services.jti.quiz_helpers import (
     _pause_quiz_and_respond,
     _judge_user_choice,
 )
-from app.routers.jti.quiz import _execute_quiz_start, _make_quiz_tts_text
 
 session_manager = get_session_manager()
 conversation_logger = get_conversation_logger()
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/jti", tags=["JTI Chat"])
-
-
-# === Request/Response Models ===
-
-class CreateSessionRequest(BaseModel):
-    language: str = "zh"
-    previous_session_id: Optional[str] = None
-
-
-class CreateSessionResponse(BaseModel):
-    ok: bool = True
-    session_id: str
-    message: str = "Session created"
-
-
-class ChatRequest(BaseModel):
-    session_id: str = Field(..., description="Session ID")
-    message: str = Field(..., description="使用者訊息")
-    turn_number: Optional[int] = Field(None, description="若是重新生成，則指定該訊息的 turn_number（之後的記錄會被刪除）")
-
-
-class ChatResponse(BaseModel):
-    message: str
-    tts_text: Optional[str] = None
-    session: Optional[Dict[str, Any]] = None
-    tool_calls: Optional[list] = None
-    turn_number: Optional[int] = None
-    error: Optional[str] = None
-
-
-class ConversationToolCall(BaseModel):
-    tool: Optional[str] = None
-    tool_name: Optional[str] = None
-    args: Dict[str, Any] = Field(default_factory=dict)
-    result: Dict[str, Any] = Field(default_factory=dict)
-    execution_time_ms: Optional[float] = None
-    model_config = ConfigDict(extra="allow")
-
-
-class ConversationItem(BaseModel):
-    mongo_id: Optional[str] = Field(default=None, alias="_id", description="MongoDB document ID")
-    session_id: str
-    mode: str
-    turn_number: Optional[int] = None
-    timestamp: str
-    responded_at: Optional[str] = None
-    user_message: str
-    agent_response: str
-    tool_calls: List[ConversationToolCall] = Field(default_factory=list)
-    session_snapshot: Optional[Dict[str, Any]] = None
-    session_state: Optional[Dict[str, Any]] = None
-    error: Optional[str] = None
-    model_config = ConfigDict(populate_by_name=True, extra="allow")
-
-
-class ConversationSessionGroup(BaseModel):
-    session_id: str
-    conversations: List[ConversationItem]
-    first_message_time: Optional[str] = None
-    total: int
-
-
-class ConversationSessionSummary(BaseModel):
-    session_id: str
-    first_message_time: Optional[str] = None
-    last_message_time: Optional[str] = None
-    message_count: int
-    preview: Optional[str] = None
-
-
-class ConversationsBySessionResponse(BaseModel):
-    session_id: str
-    mode: str
-    conversations: List[ConversationItem]
-    total: int
-
-
-class ConversationsGroupedResponse(BaseModel):
-    mode: str
-    sessions: List[ConversationSessionGroup]
-    total_conversations: int
-    total_sessions: int
-
-
-class DeleteConversationRequest(BaseModel):
-    session_ids: List[str]
-
-
-class DeleteConversationResponse(BaseModel):
-    ok: bool
-    deleted_count: int
-    deleted_logs: int
-
-
-class ExportConversationsResponse(BaseModel):
-    exported_at: str
-    mode: str
-    sessions: List[ConversationSessionGroup]
-    total_conversations: int
-    total_sessions: int
-
-
-class GeneralConversationsBySessionResponse(BaseModel):
-    session_id: str
-    store_name: str
-    mode: str
-    conversations: List[ConversationItem]
-    total: int
-
-
-class GeneralConversationsResponse(BaseModel):
-    store_name: str
-    mode: str
-    sessions: List[ConversationSessionSummary]
-    total_conversations: int
-    total_sessions: int
-
-
-class ExportGeneralConversationsResponse(BaseModel):
-    exported_at: str
-    store_name: str
-    mode: str
-    sessions: List[ConversationSessionGroup]
-    total_conversations: int
-    total_sessions: int
+runtime_router = APIRouter(prefix="/api/jti", tags=["JTI Chat"])
+compat_history_router = APIRouter(
+    prefix="/api/jti",
+    tags=["JTI Conversations"],
+    include_in_schema=False,
+)
+admin_history_router = APIRouter(
+    prefix="/api/jti-admin/conversations",
+    tags=["JTI Conversations"],
+)
+router = runtime_router
 
 
 # === Endpoints ===
 
-@router.post("/chat/start", response_model=CreateSessionResponse)
+@runtime_router.post("/chat/start", response_model=CreateSessionResponse)
 async def create_session(request: CreateSessionRequest, auth: dict = Depends(verify_auth)):
     """建立新的 JTI 對話 Session"""
     try:
@@ -176,7 +74,7 @@ async def create_session(request: CreateSessionRequest, auth: dict = Depends(ver
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/chat/message", response_model=ChatResponse)
+@runtime_router.post("/chat/message", response_model=ChatResponse)
 async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
     """
     主要對話端點
@@ -297,7 +195,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                         response_message = f"Question {q_num}: {next_q.get('text', '')}\n{next_options_text}"
                     else:
                         response_message = f"第{q_num}題：{next_q.get('text', '')}\n{next_options_text}"
-                    tts_text = _make_quiz_tts_text(next_q, q_num, updated_session.language)
+                    tts_text = make_quiz_tts_text(next_q, q_num, updated_session.language)
 
                 log_result = conversation_logger.log_conversation(
                     session_id=request.session_id,
@@ -357,7 +255,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
 
                 return ChatResponse(
                     message=response_message,
-                    tts_text=f"{hint} {_make_quiz_tts_text(q, current_q_num, session.language)}",
+                    tts_text=f"{hint} {make_quiz_tts_text(q, current_q_num, session.language)}",
                     session=session.model_dump(),
                     tool_calls=[],
                     turn_number=final_turn_number
@@ -386,7 +284,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 session_manager.update_session(session)
             if request.turn_number:
                 conversation_logger.delete_turns_from(request.session_id, request.turn_number)
-            return await _execute_quiz_start(request.session_id, user_message=request.message)
+            return await execute_quiz_start(request.session_id, user_message=request.message)
 
         # 一般對話：走 LLM
         result = await main_agent.chat(
@@ -422,8 +320,13 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get(
+@compat_history_router.get(
     "/history",
+    response_model=Union[ConversationsBySessionResponse, ConversationsGroupedResponse],
+    response_model_exclude_none=True,
+)
+@admin_history_router.get(
+    "",
     response_model=Union[ConversationsBySessionResponse, ConversationsGroupedResponse],
     response_model_exclude_none=True,
 )
@@ -431,7 +334,7 @@ async def get_conversations(
     session_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    auth: dict = Depends(verify_auth)
+    auth: dict = Depends(verify_admin),
 ):
     """取得對話歷史"""
     mode = "jti"
@@ -464,8 +367,9 @@ async def get_conversations(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/history", response_model=DeleteConversationResponse)
-async def delete_conversations(request: DeleteConversationRequest, auth: dict = Depends(verify_auth)):
+@compat_history_router.delete("/history", response_model=DeleteConversationResponse)
+@admin_history_router.delete("", response_model=DeleteConversationResponse)
+async def delete_conversations(request: DeleteConversationRequest, auth: dict = Depends(verify_admin)):
     """批量刪除對話紀錄"""
     total_logs = 0
     deleted_count = 0
@@ -478,12 +382,17 @@ async def delete_conversations(request: DeleteConversationRequest, auth: dict = 
     return {"ok": True, "deleted_count": deleted_count, "deleted_logs": total_logs}
 
 
-@router.get(
+@compat_history_router.get(
     "/history/export",
     response_model=ExportConversationsResponse,
     response_model_exclude_none=True,
 )
-async def export_conversations(session_ids: Optional[str] = None, auth: dict = Depends(verify_auth)):
+@admin_history_router.get(
+    "/export",
+    response_model=ExportConversationsResponse,
+    response_model_exclude_none=True,
+)
+async def export_conversations(session_ids: Optional[str] = None, auth: dict = Depends(verify_admin)):
     """匯出對話歷史為 JSON 格式"""
     mode = "jti"
     try:

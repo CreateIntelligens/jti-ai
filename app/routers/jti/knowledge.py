@@ -18,11 +18,11 @@ from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from app.auth import verify_auth
+from app.auth import verify_admin, verify_auth
 from app.deps import _get_or_create_manager
 from app.services.knowledge_store import get_knowledge_store
 
-router = APIRouter(prefix="/api/jti/knowledge", tags=["JTI Knowledge"])
+router = APIRouter(tags=["JTI Knowledge"], dependencies=[Depends(verify_admin)])
 
 EDITABLE_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".yaml", ".yml", ".docx"}
 TEXT_PREVIEW_EXTENSIONS = EDITABLE_EXTENSIONS | {".log", ".py", ".js", ".html"}

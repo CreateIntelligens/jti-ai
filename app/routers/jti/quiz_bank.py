@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.auth import verify_auth
+from app.auth import verify_admin, verify_auth
 from app.services.quiz_bank_store import get_quiz_bank_store, DEFAULT_BANK_ID
 from app.services.color_results_store import get_color_results_store, DEFAULT_SET_ID
 from app.tools.quiz import invalidate_quiz_cache
@@ -25,7 +25,7 @@ from app.tools.color_results import invalidate_color_results_cache
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/jti/quiz-bank", tags=["JTI Quiz Bank"])
+router = APIRouter(tags=["JTI Quiz Bank"], dependencies=[Depends(verify_admin)])
 
 
 # ========== Request Models ==========

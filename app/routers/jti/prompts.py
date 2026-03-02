@@ -12,7 +12,7 @@ from typing import Optional, Dict
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
-from app.auth import verify_auth
+from app.auth import verify_admin, verify_auth
 from app.services.jti.main_agent import main_agent
 from app.services.jti.agent_prompts import PERSONA
 from app.services.jti.runtime_settings import (
@@ -24,7 +24,7 @@ from app.services.jti.runtime_settings import (
 )
 import app.deps as deps
 
-router = APIRouter(prefix="/api/jti/prompts", tags=["JTI Prompts"])
+router = APIRouter(tags=["JTI Prompts"], dependencies=[Depends(verify_admin)])
 
 JTI_STORE_NAME_ZH = "__jti__"
 JTI_STORE_NAME_EN = "__jti__en"

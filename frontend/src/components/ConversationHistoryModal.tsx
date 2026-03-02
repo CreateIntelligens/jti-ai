@@ -16,7 +16,7 @@ import {
   Calendar,
   X,
 } from 'lucide-react';
-import { deleteConversations, fetchWithApiKey, getGeneralConversationDetail } from '../services/api';
+import { deleteConversations, fetchAsAdmin, fetchWithApiKey, getGeneralConversationDetail } from '../services/api';
 import MiniCalendar from './MiniCalendar';
 
 interface ConversationEntry {
@@ -187,7 +187,7 @@ export default function ConversationHistoryModal({
 
         let url = '';
         if (mode === 'jti') {
-          url = `/api/jti/history`;
+          url = `/api/jti-admin/conversations`;
         } else {
           url = `/api/chat/history${storeName ? `?store_name=${encodeURIComponent(storeName)}` : ''}`;
         }
@@ -202,7 +202,7 @@ export default function ConversationHistoryModal({
 
         console.log('[ConversationHistory] Fetching:', url);
 
-        const response = await fetchWithApiKey(url);
+        const response = await (mode === 'jti' ? fetchAsAdmin(url) : fetchWithApiKey(url));
         if (!response.ok) {
           console.error('[ConversationHistory] API Error:', response.status, response.statusText);
           throw new Error('Failed to fetch conversations');
@@ -350,7 +350,7 @@ export default function ConversationHistoryModal({
     try {
       let url = '';
       if (mode === 'jti') {
-        url = `/api/jti/history/export`;
+        url = `/api/jti-admin/conversations/export`;
         if (sessionIds && sessionIds.length > 0) {
           url += `?session_ids=${sessionIds.join(',')}`;
         }
@@ -365,7 +365,7 @@ export default function ConversationHistoryModal({
       }
 
       const apiKey = localStorage.getItem('activeGeminiApiKey') || 'system';
-      if (apiKey && apiKey !== 'system') {
+      if (mode !== 'jti' && apiKey && apiKey !== 'system') {
         try {
           const keys = JSON.parse(localStorage.getItem('userGeminiApiKeys') || '[]');
           const found = keys.find((k: any) => k.name === apiKey);

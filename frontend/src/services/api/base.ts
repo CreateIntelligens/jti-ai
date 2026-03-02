@@ -31,3 +31,7 @@ export async function fetchWithApiKey(url: string, options: RequestInit = {}): P
   }
   return fetch(url, { ...options, headers });
 }
+
+export async function fetchAsAdmin(url: string, options: RequestInit = {}): Promise<Response> {
+  return fetch(url, options);
+}
