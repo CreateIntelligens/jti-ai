@@ -335,45 +335,6 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 # 記錄工具呼叫
                 tool_calls = [{"tool": "submit_answer", "args": {"user_choice": user_choice}, "result": tool_result}]
 
-                # submit_answer 失敗時，避免交由 LLM 自由發揮造成題目飄移
-                if tool_result.get("error") or tool_result.get("success") is False:
-                    updated_session = session_manager.get_session(request.session_id) or session
-                    response_message = tool_result.get("message")
-                    if not response_message:
-                        response_message = (
-                            "Quiz data is incomplete. Please restart the quiz."
-                            if updated_session.language == "en"
-                            else "測驗題目資料不完整，請輸入「開始測驗」重新開始。"
-                        )
-
-                    log_result = conversation_logger.log_conversation(
-                        session_id=request.session_id,
-                        user_message=request.message,
-                        agent_response=response_message,
-                        tool_calls=tool_calls,
-                        session_state={
-                            "step": updated_session.step.value,
-                            "answers_count": len(updated_session.answers),
-                            "color_result_id": updated_session.color_result_id,
-                            "current_question_id": updated_session.current_question.get("id") if updated_session.current_question else None,
-                            "language": updated_session.language,
-                            "selected_questions": updated_session.selected_questions,
-                        },
-                        mode="jti"
-                    )
-                    final_turn_number = log_result[1] if log_result else None
-
-                    logger.warning(
-                        "submit_answer failed for session %s: %s",
-                        request.session_id[:8],
-                        tool_result.get("error"),
-                    )
-                    return ChatResponse(
-                        message=response_message,
-                        session=updated_session.model_dump(),
-                        tool_calls=[{"tool": "submit_answer", "args": {"user_choice": user_choice}}],
-                        turn_number=final_turn_number,
-                    )
 
                 updated_session = session_manager.get_session(request.session_id)
 
@@ -384,17 +345,10 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     logger.info(f"[當前分數] {scores_str}")
 
                 if tool_result.get("is_complete"):
-                    # 測驗完成，LLM 宣布色系結果
-                    result = await main_agent.chat_with_tool_result(
-                        session_id=request.session_id,
-                        user_message=request.message,
-                        tool_name="submit_answer",
-                        tool_args={"user_choice": user_choice},
-                        tool_result=tool_result
-                    )
-                    response_message = result["message"]
+                    # 測驗完成，直接用 tool_result 的訊息，不走 LLM
+                    response_message = tool_result.get("message", "")
                     updated_session = session_manager.get_session(request.session_id)
-                    tts_text = None
+                    tts_text = response_message
                 else:
                     # 還有下一題，直接拼題目，不經 LLM
                     next_q = tool_result["next_question"]
@@ -439,29 +393,16 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     turn_number=final_turn_number,
                 )
             else:
-                # ❌ 無法判斷選項：AI 打哈哈引導回測驗
-                # 不傳原始 user_message，避免 AI 回答使用者的問題
-                nudge_result = await main_agent.chat_with_tool_result(
-                    session_id=request.session_id,
-                    user_message="（使用者回覆了非選項內容）",
-                    tool_name="quiz_nudge",
-                    tool_args={},
-                    tool_result={"instruction_for_llm":
-                        "使用者在測驗中回覆了不是選項的內容。"
-                        "不要回答任何問題，不要提供任何資訊。"
-                        "用一句話（20字以內）輕鬆帶過，引導回測驗。"
-                    }
-                )
-
-                nudge_text = nudge_result["message"].strip()
-                q_text_key = q.get("text", "")
-                if q_text_key and q_text_key in nudge_text:
-                    response_message = nudge_text
+                # ❌ 無法判斷選項：hardcode 提示，不走 AI
+                options_text = _format_options_text(q.get("options", []))
+                if session.language == "en":
+                    hint = "Please choose one of the options!"
+                    response_message = f"{hint}\n\nQuestion {current_q_num}: {q.get('text', '')}\n{options_text}"
                 else:
-                    response_message = f"{nudge_text}\n\n{current_q_text}"
+                    hint = "請從選項中選一個喜歡的答案喔！"
+                    response_message = f"{hint}\n\n第{current_q_num}題：{q.get('text', '')}\n{options_text}"
 
-                # 記錄 AI 回應
-                logger.info(f"[AI回應] 無法判斷選項，重問 | {response_message[:80]}...")
+                logger.info(f"⚠️ QUIZ 無法判斷選項，hardcode 提示: {request.message}")
 
                 # 記錄到對話日誌
                 # 對於 QUIZ 錯誤處理回應，我們也需要記錄，並且需要與其他 log_turn 保持一致
@@ -494,7 +435,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
 
                 return ChatResponse(
                     message=response_message,
-                    tts_text=_make_quiz_tts_text(q, current_q_num, session.language),
+                    tts_text=f"{hint} {_make_quiz_tts_text(q, current_q_num, session.language)}",
                     session=session.model_dump(),
                     tool_calls=[],
                     turn_number=final_turn_number
