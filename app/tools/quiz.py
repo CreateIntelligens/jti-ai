@@ -55,61 +55,18 @@ def generate_random_quiz(language: str = "zh") -> List[Dict]:
     產生隨機測驗題目
 
     策略：
-    - 依 selection_rules 的 required 規則抽題
-    - 總題數由 selection_rules.total 決定（預設 5 題）
+    - 依 selection_rules.total 從題庫中隨機抽題
+    - 總題數由 selection_rules.total 決定（預設 4 題）
     """
     try:
         quiz_bank = load_quiz_bank(language)
         all_questions = quiz_bank.get("questions", [])
         selection_rules = quiz_bank.get("selection_rules", {})
-        required = selection_rules.get("required", {})
-        total_questions = selection_rules.get("total", 5)
+        total_questions = selection_rules.get("total", 4)
+        if not all_questions:
+            return []
 
-        # 按分類分組
-        categories: Dict[str, List[Dict]] = {}
-        for q in all_questions:
-            category = q.get("category", "unknown")
-            categories.setdefault(category, []).append(q)
-
-        selected: List[Dict] = []
-        used_ids = set()
-
-        # 1) 必選類別（目前：personality 1 題）
-        personality_count = required.get("personality", 0)
-        if personality_count > 0:
-            pool = categories.get("personality", [])
-            if pool:
-                picked = random.sample(pool, k=min(personality_count, len(pool)))
-                selected.extend(picked)
-                used_ids.update(q["id"] for q in picked)
-
-        # 2) 從指定分類清單中抽題（不重複）
-        remaining = total_questions - len(selected)
-        random_from = required.get("random_from", [])
-        available_categories = [c for c in random_from if c in categories]
-
-        if remaining > 0 and available_categories:
-            chosen_categories = random.sample(
-                available_categories,
-                k=min(remaining, len(available_categories))
-            )
-            for category in chosen_categories:
-                pool = [q for q in categories.get(category, []) if q["id"] not in used_ids]
-                if pool:
-                    question = random.choice(pool)
-                    selected.append(question)
-                    used_ids.add(question["id"])
-
-        # 3) 若仍不足，從剩餘題目補足
-        if len(selected) < total_questions:
-            remaining_pool = [q for q in all_questions if q["id"] not in used_ids]
-            if remaining_pool:
-                fill = random.sample(
-                    remaining_pool,
-                    k=min(total_questions - len(selected), len(remaining_pool))
-                )
-                selected.extend(fill)
-                used_ids.update(q["id"] for q in fill)
+        selected = random.sample(all_questions, k=min(total_questions, len(all_questions)))
 
         logger.info(
             "Generated random quiz (%s), selected %s questions: %s",
@@ -174,8 +131,7 @@ def complete_selected_questions(
         quiz_bank = load_quiz_bank(language)
         all_questions = quiz_bank.get("questions", [])
         selection_rules = quiz_bank.get("selection_rules", {})
-        required = selection_rules.get("required", {})
-        total_questions = selection_rules.get("total", 5)
+        total_questions = selection_rules.get("total", 4)
 
         completed: List[Dict] = []
         used_ids = set()
@@ -188,59 +144,15 @@ def complete_selected_questions(
         if len(completed) >= total_questions:
             return completed[:total_questions]
 
-        preferred_categories = [
-            c for c in required.get("random_from", []) if isinstance(c, str)
-        ]
-        used_categories = {
-            q.get("category")
-            for q in completed
-            if isinstance(q, dict) and q.get("category") in preferred_categories
-        }
+        remaining = sorted(
+            (q for q in all_questions if q.get("id") not in used_ids),
+            key=lambda q: q.get("id", ""),
+        )
 
-        def first_question_in_category(category: str) -> Optional[Dict]:
-            pool = sorted(
-                (
-                    q for q in all_questions
-                    if q.get("category") == category and q.get("id") not in used_ids
-                ),
-                key=lambda q: q.get("id", ""),
-            )
-            return pool[0] if pool else None
-
-        while len(completed) < total_questions:
-            picked = None
-
-            # 優先補上尚未出現的 required 分類（固定順序，確保可重現）
-            for category in preferred_categories:
-                if category in used_categories:
-                    continue
-                picked = first_question_in_category(category)
-                if picked:
-                    break
-
-            # 若 required 分類已用完，仍可從 required 分類中補題
-            if not picked:
-                for category in preferred_categories:
-                    picked = first_question_in_category(category)
-                    if picked:
-                        break
-
-            # 最後 fallback：從所有未使用題目中取第一題
-            if not picked:
-                remaining = sorted(
-                    (q for q in all_questions if q.get("id") not in used_ids),
-                    key=lambda q: q.get("id", ""),
-                )
-                picked = remaining[0] if remaining else None
-
-            if not picked:
-                break
-
+        while len(completed) < total_questions and remaining:
+            picked = remaining.pop(0)
             completed.append(picked)
             used_ids.add(picked["id"])
-            category = picked.get("category")
-            if category in preferred_categories:
-                used_categories.add(category)
 
         logger.warning(
             "Recovered incomplete selected_questions: %s -> %s (%s)",
@@ -260,4 +172,4 @@ def get_total_questions(language: str = "zh") -> int:
     """取得題庫總題數（依 selection_rules 決定）"""
     quiz_bank = load_quiz_bank(language)
     selection_rules = quiz_bank.get("selection_rules", {})
-    return selection_rules.get("total", 5)
+    return selection_rules.get("total", 4)

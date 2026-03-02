@@ -1,0 +1,26 @@
+{
+  "analyst": {
+    "title": "Maximize Every Moment",
+    "color_name": "Analyst",
+    "recommended_colors": ["Silver Gray", "Black"],
+    "description": "You thrive on plans, clarity, and smart choices. You know how to turn every step into a better experience, and your sense of structure helps life run at its best."
+  },
+  "diplomat": {
+    "title": "Live Well, Enjoy More",
+    "color_name": "Diplomat",
+    "recommended_colors": ["Champagne Gold", "Rose Gold"],
+    "description": "You are warm, social, and naturally tuned in to people. For you, the best moments in life are the ones shared, and your presence turns everyday scenes into joyful memories."
+  },
+  "guardian": {
+    "title": "Classic Taste, Distinct Presence",
+    "color_name": "Guardian",
+    "recommended_colors": ["Dark Gray", "Aqua Blue"],
+    "description": "You are dependable, thoughtful, and grounded in timeless taste. With your steady judgment and eye for lasting quality, you create a life that feels composed, refined, and trustworthy."
+  },
+  "explorer": {
+    "title": "Chase Adventure, Find Every Surprise",
+    "color_name": "Explorer",
+    "recommended_colors": ["Jungle Green", "Coral Red"],
+    "description": "You are energized by novelty, challenge, and discovery. Your curiosity pulls you toward the unexpected, and your adventurous spirit keeps life playful, vivid, and full of possibility."
+  }
+}

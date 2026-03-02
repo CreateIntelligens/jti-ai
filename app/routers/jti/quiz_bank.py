@@ -40,14 +40,12 @@ class QuestionOption(BaseModel):
 class CreateQuestionRequest(BaseModel):
     id: str
     text: str
-    category: str
     weight: int | float = 1
     options: list[QuestionOption]
 
 
 class UpdateQuestionRequest(BaseModel):
     text: Optional[str] = None
-    category: Optional[str] = None
     weight: Optional[int | float] = None
     options: Optional[list[QuestionOption]] = None
 
@@ -182,12 +180,11 @@ def activate_bank(
 def list_questions(
     language: str = Query("zh"),
     bank_id: str = Query(DEFAULT_BANK_ID),
-    category: Optional[str] = Query(None),
     auth: dict = Depends(verify_auth),
 ):
     """List quiz questions for a bank."""
     store = get_quiz_bank_store()
-    questions = store.list_questions(language, bank_id, category)
+    questions = store.list_questions(language, bank_id)
     return {"questions": questions, "total": len(questions)}
 
 
@@ -380,14 +377,9 @@ def get_stats(
     questions = store.list_questions(language, bank_id)
     meta = store.get_metadata(language, bank_id)
 
-    category_counts: dict[str, int] = {}
-    for q in questions:
-        cat = q.get("category", "unknown")
-        category_counts[cat] = category_counts.get(cat, 0) + 1
-
     return {
         "total_questions": len(questions),
-        "categories": category_counts,
+        "categories": {},
         "dimensions": meta.get("dimensions", []) if meta else [],
         "selection_rules": meta.get("selection_rules", {}) if meta else {},
     }
@@ -397,7 +389,7 @@ def get_stats(
 
 
 def _parse_scores(s: str) -> dict[str, float]:
-    """Parse compact score string like 'metal:2,cool:1'."""
+    """Parse compact score string like 'analyst:2,guardian:1'."""
     result = {}
     for pair in s.split(","):
         pair = pair.strip()
@@ -436,7 +428,6 @@ def _parse_csv_rows(reader) -> list[dict]:
         questions.append({
             "id": row["id"].strip(),
             "text": row["text"].strip(),
-            "category": row.get("category", "personality").strip(),
             "weight": float(row.get("weight", "1") or "1"),
             "options": options,
         })
@@ -542,7 +533,7 @@ def export_data(
         questions = store.list_questions(language, bank_id)
         max_opts = max((len(q.get("options", [])) for q in questions), default=2)
         max_opts = max(max_opts, 2)
-        headers = ["id", "text", "category", "weight"]
+        headers = ["id", "text", "weight"]
         for letter in "abcde"[:max_opts]:
             headers.extend([f"option_{letter}_id", f"option_{letter}_text", f"option_{letter}_scores"])
 
@@ -552,7 +543,6 @@ def export_data(
             row: dict[str, str] = {
                 "id": q.get("id", ""),
                 "text": q.get("text", ""),
-                "category": q.get("category", ""),
                 "weight": str(q.get("weight", 1)),
             }
             for i, opt in enumerate(q.get("options", [])):

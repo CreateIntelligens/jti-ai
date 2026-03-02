@@ -409,7 +409,7 @@ Format:
         session_manager.start_scoring(session_id)
 
         # 計算色系
-        result = calc_color_result(session.answers)
+        result = calc_color_result(session.answers, language=session.language)
         color_id = result.get("color_id")
         color_scores = result.get("color_scores", {})
         color_info = result.get("result")
@@ -428,9 +428,15 @@ Format:
             title = color_info.get("title", "")
             color_name = color_info.get("color_name", color_id or "")
             description = color_info.get("description", "")
-            message = f"你是{color_name}，{title}。{description}".strip()
+            if session.language == "en":
+                message = f"You are {color_name}, {title}. {description}".strip()
+            else:
+                message = f"你是{color_name}，{title}。{description}".strip()
         else:
-            message = "測驗完成，但找不到對應的色系結果。"
+            if session.language == "en":
+                message = "The quiz is complete, but no matching result was found."
+            else:
+                message = "測驗完成，但找不到對應的色系結果。"
 
         if len(message) > 200:
             message = message[:200]

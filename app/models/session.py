@@ -33,7 +33,7 @@ class Session(BaseModel):
     selected_questions: Optional[List[Dict[str, Any]]] = None  # 本次測驗隨機選中的題目列表
 
     # 結果相關
-    color_result_id: Optional[str] = None  # 色系結果，例如 "metal"
+    color_result_id: Optional[str] = None  # 測驗結果，例如 "analyst"
     color_scores: Dict[str, int] = Field(default_factory=dict)  # 各色系得分
     color_result: Optional[Dict[str, Any]] = None  # 色系結果內容（文案與推薦色）
 

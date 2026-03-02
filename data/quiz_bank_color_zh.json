@@ -6,7 +6,6 @@
     {
       "id": "q1",
       "text": "週末突然多出一整天，你會怎麼安排？",
-      "category": "personality",
       "weight": 1,
       "options": [
         {"id": "a", "text": "先列清單：交通、時間、備案，效率最大化", "score": {"analyst": 1}},
@@ -18,7 +17,6 @@
     {
       "id": "q2",
       "text": "你挑選一趟旅行的「第一優先」是？",
-      "category": "personality",
       "weight": 1,
       "options": [
         {"id": "a", "text": "行程密度與路線最佳化：每段都恰到好處", "score": {"analyst": 1}},
@@ -30,7 +28,6 @@
     {
       "id": "q3",
       "text": "朋友臨時改計畫（時間/地點都變了），你第一反應？",
-      "category": "personality",
       "weight": 1,
       "options": [
         {"id": "a", "text": "快速重排：把可行方案列出來、選最優解", "score": {"analyst": 1}},
@@ -42,7 +39,6 @@
     {
       "id": "q4",
       "text": "你在團體出遊時最常扮演的角色是？",
-      "category": "personality",
       "weight": 1,
       "options": [
         {"id": "a", "text": "行程規劃師：時間控、路線控、預算控", "score": {"analyst": 1}},
@@ -54,7 +50,6 @@
     {
       "id": "q5",
       "text": "面對陌生城市，你會怎麼走？",
-      "category": "personality",
       "weight": 1,
       "options": [
         {"id": "a", "text": "先做功課：地圖、評價、動線、替代路線都看過", "score": {"analyst": 1}},
@@ -66,7 +61,6 @@
     {
       "id": "q6",
       "text": "你最在意的「生活儀式感」長什麼樣？",
-      "category": "personality",
       "weight": 1,
       "options": [
         {"id": "a", "text": "生活有系統：收納、習慣、節奏都能被優化", "score": {"analyst": 1}},
@@ -78,7 +72,6 @@
     {
       "id": "q7",
       "text": "你選餐廳最像哪一種？",
-      "category": "personality",
       "weight": 1,
       "options": [
         {"id": "a", "text": "看評分＋菜單＋距離＋排隊時間，算出最划算", "score": {"analyst": 1}},
@@ -90,7 +83,6 @@
     {
       "id": "q8",
       "text": "你買東西的「決策模式」是？",
-      "category": "personality",
       "weight": 1,
       "options": [
         {"id": "a", "text": "比規格、比評價、比CP值，買一次就要買對", "score": {"analyst": 1}},
@@ -102,7 +94,6 @@
     {
       "id": "q9",
       "text": "一場聚會，你最享受的瞬間是？",
-      "category": "personality",
       "weight": 1,
       "options": [
         {"id": "a", "text": "一切都順：流程順、節奏順、每個人都玩到重點", "score": {"analyst": 1}},
@@ -114,7 +105,6 @@
     {
       "id": "q10",
       "text": "如果要挑戰一件新事，你比較像哪種？",
-      "category": "personality",
       "weight": 1,
       "options": [
         {"id": "a", "text": "先學原理＋拆步驟，做出可複製的方法", "score": {"analyst": 1}},
@@ -126,7 +116,6 @@
     {
       "id": "q11",
       "text": "你整理行李的方式最像？",
-      "category": "personality",
       "weight": 1,
       "options": [
         {"id": "a", "text": "分類＋清單＋備用方案：缺什麼一眼就知道", "score": {"analyst": 1}},
@@ -138,7 +127,6 @@
     {
       "id": "q12",
       "text": "你心目中的「理想一天」比較接近？",
-      "category": "personality",
       "weight": 1,
       "options": [
         {"id": "a", "text": "做完該做的＋還多完成一點：高效又有掌控感", "score": {"analyst": 1}},
@@ -151,10 +139,6 @@
   "dimensions": ["analyst", "diplomat", "guardian", "explorer"],
   "tie_breaker_priority": ["analyst", "diplomat", "guardian", "explorer"],
   "selection_rules": {
-    "total": 4,
-    "required": {
-      "personality": 4,
-      "random_from": ["personality"]
-    }
+    "total": 4
   }
 }

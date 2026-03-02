@@ -134,6 +134,24 @@ class ColorResultsStore:
         )
         return doc
 
+    def upsert_set_metadata(self, language: str, set_id: str, data: dict) -> dict:
+        """Upsert set metadata."""
+        now = datetime.now(timezone.utc)
+        update_data = {
+            k: v for k, v in data.items() if k not in ("_id", "language", "set_id")
+        }
+        update_data["language"] = language
+        update_data["set_id"] = set_id
+        update_data["updated_at"] = now
+        doc = self.metadata.find_one_and_update(
+            {"language": language, "set_id": set_id},
+            {"$set": update_data, "$setOnInsert": {"created_at": now}},
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
+        doc.pop("_id", None)
+        return doc
+
     # ===================== Color Results CRUD =====================
 
     def list_results(self, language: str, set_id: str | None = None) -> list[dict]:
@@ -213,6 +231,13 @@ class ColorResultsStore:
             )
             count += 1
         return count
+
+    def replace_all_results(self, language: str, results: dict[str, dict], set_id: str | None = None) -> int:
+        """Replace all results in a set (delete then insert)."""
+        if set_id is None:
+            set_id = DEFAULT_SET_ID
+        self.collection.delete_many({"language": language, "set_id": set_id})
+        return self.bulk_upsert_results(language, results, set_id)
 
     def get_all_results(self, language: str, set_id: str | None = None) -> dict[str, dict]:
         """Return {color_id: {title, color_name, ...}} matching JSON format."""

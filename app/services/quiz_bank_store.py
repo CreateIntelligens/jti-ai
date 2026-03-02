@@ -66,13 +66,10 @@ class QuizBankStore:
             "name": name,
             "title": name,
             "description": "",
-            "total_questions": 5,
+            "total_questions": 4,
             "dimensions": ["analyst", "diplomat", "guardian", "explorer"],
             "tie_breaker_priority": ["analyst", "diplomat", "guardian", "explorer"],
-            "selection_rules": {
-                "total": 4,
-                "required": {"personality": 4, "random_from": ["personality"]},
-            },
+            "selection_rules": {"total": 4},
             "is_active": False,
             "is_default": False,
             "created_at": now,
@@ -149,17 +146,13 @@ class QuizBankStore:
 
     # ===================== Question CRUD =====================
 
-    def list_questions(
-        self, language: str, bank_id: str | None = None, category: str | None = None
-    ) -> list[dict]:
+    def list_questions(self, language: str, bank_id: str | None = None) -> list[dict]:
         """List questions for a bank. If bank_id is None, uses active bank."""
         if not bank_id:
             meta = self.get_metadata(language)
             bank_id = meta["bank_id"] if meta else DEFAULT_BANK_ID
 
         query: dict[str, Any] = {"language": language, "bank_id": bank_id}
-        if category:
-            query["category"] = category
         cursor = self.questions.find(
             query, {"_id": 0, "language": 0, "bank_id": 0}
         ).sort("id", 1)
@@ -258,7 +251,7 @@ class QuizBankStore:
         return {
             "title": meta.get("title", ""),
             "description": meta.get("description", ""),
-            "total_questions": meta.get("total_questions", 5),
+            "total_questions": meta.get("total_questions", 4),
             "questions": clean_questions,
             "dimensions": meta.get("dimensions", []),
             "tie_breaker_priority": meta.get("tie_breaker_priority", []),

@@ -2,7 +2,7 @@
 Seed quiz bank and color results from JSON into MongoDB.
 
 Called during startup from deps.init_managers().
-Skips if data already exists in MongoDB.
+Synchronizes the default quiz bank when JSON and MongoDB drift apart.
 Handles upgrade from legacy (no bank_id) → multi-set (bank_id).
 """
 
@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import Any
 
 from app.services.quiz_bank_store import DEFAULT_BANK_ID
 from app.services.color_results_store import DEFAULT_SET_ID
@@ -22,7 +23,10 @@ QUIZ_BANK_PATHS = {
     "en": Path("data/quiz_bank_color_en.json"),
 }
 
-COLOR_RESULTS_PATH = Path("data/color_results.json")
+COLOR_RESULTS_PATHS = {
+    "zh": Path("data/color_results.json"),
+    "en": Path("data/color_results_en.json"),
+}
 
 
 def _upgrade_legacy_data() -> None:
@@ -80,8 +84,72 @@ def _upgrade_legacy_data() -> None:
     if legacy_questions:
         logger.info("[Startup] Processed %d legacy questions", len(legacy_questions))
 
+
+def _default_bank_seed_payload(data: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "name": "預設題庫",
+        "title": data.get("title", ""),
+        "description": data.get("description", ""),
+        "total_questions": data.get("total_questions", 4),
+        "dimensions": data.get("dimensions", []),
+        "tie_breaker_priority": data.get("tie_breaker_priority", []),
+        "selection_rules": data.get("selection_rules", {}),
+        "is_active": True,
+        "is_default": True,
+    }
+
+
+def _default_bank_is_outdated(
+    existing_meta: dict[str, Any] | None,
+    existing_questions: list[dict[str, Any]],
+    seed_data: dict[str, Any],
+) -> bool:
+    if not existing_meta:
+        return True
+
+    expected_meta = _default_bank_seed_payload(seed_data)
+    for key in (
+        "title",
+        "description",
+        "total_questions",
+        "dimensions",
+        "tie_breaker_priority",
+        "selection_rules",
+    ):
+        if existing_meta.get(key) != expected_meta.get(key):
+            return True
+
+    expected_questions = seed_data.get("questions", [])
+    return existing_questions != expected_questions
+
+
+def _default_color_results_set_payload(language: str) -> dict[str, Any]:
+    name = "預設色彩結果" if language == "zh" else "Default Personality Results"
+    return {
+        "name": name,
+        "is_active": True,
+        "is_default": True,
+    }
+
+
+def _default_color_results_are_outdated(
+    existing_meta: dict[str, Any] | None,
+    existing_results: dict[str, dict[str, Any]],
+    seed_data: dict[str, dict[str, Any]],
+    language: str,
+) -> bool:
+    if not existing_meta:
+        return True
+
+    expected_meta = _default_color_results_set_payload(language)
+    for key in ("name", "is_active", "is_default"):
+        if existing_meta.get(key) != expected_meta.get(key):
+            return True
+
+    return existing_results != seed_data
+
 def migrate_quiz_bank() -> None:
-    """Seed quiz bank from JSON → MongoDB (skip if already populated)."""
+    """Seed quiz bank from JSON → MongoDB and sync stale default banks."""
     from app.services.quiz_bank_store import get_quiz_bank_store
 
     # First, upgrade any legacy data
@@ -94,32 +162,22 @@ def migrate_quiz_bank() -> None:
             logger.info("[Startup] Quiz bank JSON not found for %s: %s", lang, path)
             continue
 
-        # Check if default bank already exists (either fresh or upgraded)
-        existing = store.get_metadata(lang, bank_id=DEFAULT_BANK_ID)
-        if existing:
-            logger.info("[Startup] Quiz bank (%s) already in MongoDB, skipping seed", lang)
-            continue
-
         with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        # Upsert metadata with multi-set fields
-        store.upsert_metadata(lang, DEFAULT_BANK_ID, {
-            "name": "預設題庫",
-            "title": data.get("title", ""),
-            "description": data.get("description", ""),
-            "total_questions": data.get("total_questions", 5),
-            "dimensions": data.get("dimensions", []),
-            "tie_breaker_priority": data.get("tie_breaker_priority", []),
-            "selection_rules": data.get("selection_rules", {}),
-            "is_active": True,
-            "is_default": True,
-        })
+        existing_meta = store.get_metadata(lang, bank_id=DEFAULT_BANK_ID)
+        existing_questions = store.list_questions(lang, DEFAULT_BANK_ID)
+        if not _default_bank_is_outdated(existing_meta, existing_questions, data):
+            logger.info("[Startup] Quiz bank (%s) already matches seed JSON, skipping sync", lang)
+            continue
 
-        # Bulk insert questions
+        # Upsert metadata with multi-set fields
+        store.upsert_metadata(lang, DEFAULT_BANK_ID, _default_bank_seed_payload(data))
+
+        # Replace all questions so stale extras are removed during sync.
         questions = data.get("questions", [])
-        count = store.bulk_upsert_questions(lang, DEFAULT_BANK_ID, questions)
-        print(f"[Startup] ✅ Seeded quiz bank ({lang}): {count} questions")
+        count = store.replace_all_questions(lang, DEFAULT_BANK_ID, questions)
+        print(f"[Startup] ✅ Synced quiz bank ({lang}): {count} questions")
 
 
 def _upgrade_legacy_color_results() -> None:
@@ -155,14 +213,14 @@ def _upgrade_legacy_color_results() -> None:
 
     # Ensure default set metadata exists
     meta_col = db["color_results_metadata"]
-    for lang in ["zh"]:
+    for lang in ["zh", "en"]:
         existing_meta = meta_col.find_one({"language": lang, "set_id": DEFAULT_SET_ID})
         if not existing_meta:
             now = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
             meta_col.insert_one({
                 "language": lang,
                 "set_id": DEFAULT_SET_ID,
-                "name": "預設色彩結果",
+                "name": _default_color_results_set_payload(lang)["name"],
                 "is_active": True,
                 "is_default": True,
                 "created_at": now,
@@ -172,7 +230,7 @@ def _upgrade_legacy_color_results() -> None:
 
 
 def migrate_color_results() -> None:
-    """Seed color results from JSON → MongoDB (skip if already populated)."""
+    """Seed color results from JSON → MongoDB and sync stale default sets."""
     from app.services.color_results_store import get_color_results_store
 
     # First, upgrade any legacy data
@@ -180,18 +238,20 @@ def migrate_color_results() -> None:
 
     store = get_color_results_store()
 
-    for lang in ["zh"]:  # 先中文，未來加 en
-        existing = store.list_results(lang, set_id=DEFAULT_SET_ID)
-        if existing:
-            logger.info("[Startup] Color results (%s) already in MongoDB, skipping seed", lang)
+    for lang, path in COLOR_RESULTS_PATHS.items():
+        if not path.exists():
+            logger.info("[Startup] Color results JSON not found for %s: %s", lang, path)
             continue
 
-        if not COLOR_RESULTS_PATH.exists():
-            logger.info("[Startup] Color results JSON not found: %s", COLOR_RESULTS_PATH)
-            continue
-
-        with open(COLOR_RESULTS_PATH, "r", encoding="utf-8") as f:
+        with open(path, "r", encoding="utf-8") as f:
             data = json.load(f)
 
-        count = store.bulk_upsert_results(lang, data, set_id=DEFAULT_SET_ID)
-        print(f"[Startup] ✅ Seeded color results ({lang}): {count} entries")
+        existing_meta = store.get_set_metadata(lang, DEFAULT_SET_ID)
+        existing_results = store.get_all_results(lang, set_id=DEFAULT_SET_ID)
+        if not _default_color_results_are_outdated(existing_meta, existing_results, data, lang):
+            logger.info("[Startup] Color results (%s) already match seed JSON, skipping sync", lang)
+            continue
+
+        store.upsert_set_metadata(lang, DEFAULT_SET_ID, _default_color_results_set_payload(lang))
+        count = store.replace_all_results(lang, data, set_id=DEFAULT_SET_ID)
+        print(f"[Startup] ✅ Synced color results ({lang}): {count} entries")

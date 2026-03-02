@@ -16,7 +16,10 @@ from app.tools.quiz import load_quiz_bank
 
 logger = logging.getLogger(__name__)
 
-COLOR_RESULTS_PATH = Path("data/color_results.json")
+COLOR_RESULTS_PATHS = {
+    "zh": Path("data/color_results.json"),
+    "en": Path("data/color_results_en.json"),
+}
 _color_results_cache: Dict[str, Dict[str, Any]] = {}
 
 
@@ -36,7 +39,8 @@ def load_color_results(language: str = "zh") -> Dict[str, Any]:
             logger.warning("MongoDB color results load failed, falling back to JSON: %s", e)
 
         # JSON fallback
-        with open(COLOR_RESULTS_PATH, "r", encoding="utf-8") as f:
+        path = COLOR_RESULTS_PATHS.get(language, COLOR_RESULTS_PATHS["zh"])
+        with open(path, "r", encoding="utf-8") as f:
             _color_results_cache[language] = json.load(f)
     return _color_results_cache[language]
 

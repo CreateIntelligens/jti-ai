@@ -133,7 +133,6 @@ class MongoDBClient:
                 [("language", 1), ("bank_id", 1), ("id", 1)], unique=True
             )
             quiz_bank_questions.create_index([("language", 1), ("bank_id", 1)])
-            quiz_bank_questions.create_index([("language", 1), ("bank_id", 1), ("category", 1)])
             logger.info("Created indexes for 'quiz_bank_questions' collection")
         except Exception as e:
             logger.warning(f"Index creation for 'quiz_bank_questions': {e}")
