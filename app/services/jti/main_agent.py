@@ -45,8 +45,6 @@ class MainAgent:
         self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
         # 持久 chat session：session_id → Gemini ChatSession
         self._chat_sessions: Dict[str, any] = {}
-        # 快取最近一次查詢的 max_response_chars，避免重複查詢 MongoDB
-        self._last_max_response_chars: Optional[int] = None
 
     def _get_or_create_chat_session(self, session: Session):
         """取得或建立持久 Gemini chat session（不帶任何 tool）"""
@@ -169,8 +167,6 @@ class MainAgent:
         if not persona:
             persona = PERSONA.get(session.language, PERSONA["zh"])
 
-        self._last_max_response_chars = runtime_settings.max_response_chars
-
         response_rule_sections = runtime_settings.response_rule_sections.get(
             session.language, runtime_settings.response_rule_sections.get("zh")
         )
@@ -185,17 +181,6 @@ class MainAgent:
             response_rule_sections=sections_payload,
             max_response_chars=runtime_settings.max_response_chars,
         )
-
-    def _apply_response_length_limit(self, message: str, session: Session) -> str:
-        """套用一般回覆字數上限（測驗流程不截斷，避免題目被切掉）。"""
-        if session.step == SessionStep.QUIZ:
-            return message
-
-        max_chars = self._last_max_response_chars
-        if not max_chars or len(message) <= max_chars:
-            return message
-
-        return message[:max_chars].rstrip()
 
     def _get_session_state(self, session: Session) -> str:
         """取得動態 Session 狀態（會變化的資訊）"""
@@ -353,7 +338,6 @@ class MainAgent:
                 logger.warning(f"LLM 未生成任何文本回應，使用者輸入：{user_message[:50]}")
 
             final_message = re.sub(r'\s*\[cite:\s*[^\]]*\]', '', final_message).strip()
-            final_message = self._apply_response_length_limit(final_message, session)
 
             # 4. 同步 DB（背景）
             self._sync_history_to_db_background(session_id, user_message, final_message)
@@ -501,8 +485,6 @@ class MainAgent:
                         f"{question_prefix} {next_question_text}\n"
                         f"{options_text}"
                     ).strip()
-
-            final_message = self._apply_response_length_limit(final_message, session)
 
             self._append_to_chat_history(chat_session, user_message, final_message)
             self._sync_history_to_db_background(session_id, user_message, final_message)
