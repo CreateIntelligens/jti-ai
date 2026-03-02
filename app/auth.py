@@ -26,9 +26,12 @@ def _extract_bearer_token(request: Request) -> str | None:
 
 
 def _extract_api_token(request: Request) -> str | None:
-    """從 API-Token header 提取 token（與 Authorization: Bearer 互補）"""
+    """從 API-Token header 或 query parameter (token) 提取 token"""
     # Backward compatibility: API-Key
-    return request.headers.get("api-token") or request.headers.get("api-key")
+    token = request.headers.get("api-token") or request.headers.get("api-key")
+    if not token:
+        token = request.query_params.get("token")
+    return token
 
 
 def _is_same_origin(request: Request) -> bool:

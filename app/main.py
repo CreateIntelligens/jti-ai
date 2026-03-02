@@ -65,7 +65,7 @@ from pydantic import BaseModel
 from google.genai.errors import ClientError
 
 from .auth import verify_auth, _extract_bearer_token
-from .routers import jti, jti_prompts, jti_knowledge
+from .routers import jti, jti_prompts, jti_knowledge, jti_quiz_bank
 from .routers import chat, stores, prompts, api_keys
 from .services.mongo_client import get_mongo_client
 import app.deps as deps
@@ -300,6 +300,7 @@ def index():
 app.include_router(jti.router)
 app.include_router(jti_prompts.router)
 app.include_router(jti_knowledge.router)
+app.include_router(jti_quiz_bank.router)
 app.include_router(chat.router)
 app.include_router(prompts.router)  # before stores (more specific path patterns)
 app.include_router(stores.router)

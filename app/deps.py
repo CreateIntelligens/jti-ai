@@ -41,6 +41,11 @@ def init_managers():
 
         # 初始化 JTI 預設 prompt
         _init_jti_default_prompt()
+
+        # Seed quiz bank & color results from JSON → MongoDB
+        from .migrate_quiz_bank import migrate_quiz_bank, migrate_color_results
+        migrate_quiz_bank()
+        migrate_color_results()
     except ValueError as e:
         print(f"警告: {e}")
 

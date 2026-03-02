@@ -119,6 +119,54 @@ class MongoDBClient:
         except Exception as e:
             logger.warning(f"Index creation for 'knowledge_files': {e}")
 
+        # ===== quiz_bank_questions 集合 =====
+        quiz_bank_questions = db["quiz_bank_questions"]
+        try:
+            # Drop legacy single-bank indexes if they exist
+            for idx_name in list(quiz_bank_questions.index_information().keys()):
+                if idx_name != "_id_" and "bank_id" not in idx_name:
+                    try:
+                        quiz_bank_questions.drop_index(idx_name)
+                    except Exception:
+                        pass
+            quiz_bank_questions.create_index(
+                [("language", 1), ("bank_id", 1), ("id", 1)], unique=True
+            )
+            quiz_bank_questions.create_index([("language", 1), ("bank_id", 1)])
+            quiz_bank_questions.create_index([("language", 1), ("bank_id", 1), ("category", 1)])
+            logger.info("Created indexes for 'quiz_bank_questions' collection")
+        except Exception as e:
+            logger.warning(f"Index creation for 'quiz_bank_questions': {e}")
+
+        # ===== quiz_bank_metadata 集合 =====
+        quiz_bank_metadata = db["quiz_bank_metadata"]
+        try:
+            # Drop legacy single-bank indexes if they exist
+            for idx_name in list(quiz_bank_metadata.index_information().keys()):
+                if idx_name != "_id_" and "bank_id" not in idx_name:
+                    try:
+                        quiz_bank_metadata.drop_index(idx_name)
+                    except Exception:
+                        pass
+            quiz_bank_metadata.create_index(
+                [("language", 1), ("bank_id", 1)], unique=True
+            )
+            quiz_bank_metadata.create_index("language")
+            logger.info("Created indexes for 'quiz_bank_metadata' collection")
+        except Exception as e:
+            logger.warning(f"Index creation for 'quiz_bank_metadata': {e}")
+
+        # ===== color_results 集合 =====
+        color_results_col = db["color_results"]
+        try:
+            color_results_col.create_index(
+                [("language", 1), ("color_id", 1)], unique=True
+            )
+            color_results_col.create_index("language")
+            logger.info("Created indexes for 'color_results' collection")
+        except Exception as e:
+            logger.warning(f"Index creation for 'color_results': {e}")
+
     def get_client(self) -> MongoClient:
         """取得 MongoDB 客戶端"""
         if self._client is None:

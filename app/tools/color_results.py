@@ -17,24 +17,42 @@ from app.tools.quiz import load_quiz_bank
 logger = logging.getLogger(__name__)
 
 COLOR_RESULTS_PATH = Path("data/color_results.json")
-_color_results_cache: Optional[Dict[str, Any]] = None
+_color_results_cache: Dict[str, Dict[str, Any]] = {}
 
 
-def load_color_results() -> Dict[str, Any]:
-    """載入色彩結果對照表"""
+def load_color_results(language: str = "zh") -> Dict[str, Any]:
+    """載入色彩結果對照表（MongoDB-first, JSON fallback）"""
     global _color_results_cache
-    if _color_results_cache is None:
+    if language not in _color_results_cache:
+        # MongoDB first
+        try:
+            from app.services.color_results_store import get_color_results_store
+            store = get_color_results_store()
+            results = store.get_all_results(language)
+            if results:
+                _color_results_cache[language] = results
+                return _color_results_cache[language]
+        except Exception as e:
+            logger.warning("MongoDB color results load failed, falling back to JSON: %s", e)
+
+        # JSON fallback
         with open(COLOR_RESULTS_PATH, "r", encoding="utf-8") as f:
-            _color_results_cache = json.load(f)
-    return _color_results_cache
+            _color_results_cache[language] = json.load(f)
+    return _color_results_cache[language]
 
 
-def calculate_color_result(answers: Dict[str, str]) -> Dict[str, Any]:
+def invalidate_color_results_cache(language: str = "zh"):
+    """Clear color results cache for a language (call after CRUD operations)."""
+    _color_results_cache.pop(language, None)
+
+
+def calculate_color_result(answers: Dict[str, str], language: str = "zh") -> Dict[str, Any]:
     """
     計算色系結果
 
     Args:
         answers: {question_id: option_id}
+        language: language code
 
     Returns:
         {
@@ -44,7 +62,7 @@ def calculate_color_result(answers: Dict[str, str]) -> Dict[str, Any]:
             "tie_breaker_priority": list
         }
     """
-    quiz_bank = load_quiz_bank()
+    quiz_bank = load_quiz_bank(language)
     questions = quiz_bank.get("questions", [])
     dimensions = quiz_bank.get("dimensions", [])
     tie_breaker = quiz_bank.get("tie_breaker_priority", list(dimensions))
@@ -86,7 +104,7 @@ def calculate_color_result(answers: Dict[str, str]) -> Dict[str, Any]:
     if color_id is None and tied:
         color_id = tied[0]
 
-    results = load_color_results()
+    results = load_color_results(language)
     result = results.get(color_id)
 
     logger.info("Calculated color result: %s", color_id)

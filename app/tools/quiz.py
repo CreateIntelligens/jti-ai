@@ -24,13 +24,30 @@ quiz_data_cache = {}
 
 
 def load_quiz_bank(language: str = "zh"):
-    """載入題庫"""
+    """載入題庫（MongoDB-first, JSON fallback）"""
     global quiz_data_cache
     if language not in quiz_data_cache:
+        # MongoDB first
+        try:
+            from app.services.quiz_bank_store import get_quiz_bank_store
+            store = get_quiz_bank_store()
+            bank = store.get_full_bank(language)
+            if bank and bank.get("questions"):
+                quiz_data_cache[language] = bank
+                return quiz_data_cache[language]
+        except Exception as e:
+            logger.warning("MongoDB quiz bank load failed, falling back to JSON: %s", e)
+
+        # JSON fallback
         path = QUIZ_BANK_PATHS.get(language, QUIZ_BANK_PATHS["zh"])
         with open(path, "r", encoding="utf-8") as f:
             quiz_data_cache[language] = json.load(f)
     return quiz_data_cache[language]
+
+
+def invalidate_quiz_cache(language: str = "zh"):
+    """Clear quiz data cache for a language (call after CRUD operations)."""
+    quiz_data_cache.pop(language, None)
 
 
 def generate_random_quiz(quiz_id: str = "color_taste", language: str = "zh") -> List[Dict]:
