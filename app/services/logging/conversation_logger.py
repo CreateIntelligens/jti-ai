@@ -103,7 +103,7 @@ class ConversationLogger:
                 if session_state:
                     f.write(f"\n📊 Session 狀態:\n")
                     f.write(f"  - 階段: {session_state.get('step')}\n")
-                    f.write(f"  - 已回答: {session_state.get('answers_count', 0)}/5\n")
+                    f.write(f"  - 已回答: {session_state.get('answers_count', 0)}/4\n")
                     if session_state.get('color_result_id'):
                         f.write(f"  - 色系: {session_state.get('color_result_id')}\n")
 

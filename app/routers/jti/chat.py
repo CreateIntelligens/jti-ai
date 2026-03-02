@@ -284,6 +284,11 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     response_message = tool_result.get("message", "")
                     updated_session = session_manager.get_session(request.session_id)
                     tts_text = response_message
+
+                    # 把測驗結果注入 chat_history，讓後續 LLM 對話能看到
+                    main_agent.remove_session(request.session_id)
+                    updated_session.chat_history.append({"role": "assistant", "content": response_message})
+                    session_manager.update_session(updated_session)
                 else:
                     next_q = tool_result["next_question"]
                     q_num = len(updated_session.answers) + 1

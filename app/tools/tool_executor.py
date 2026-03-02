@@ -161,8 +161,16 @@ class ToolExecutor:
 
         total_questions = get_total_questions(language)
 
-        # 隨機抽選題目（依 selection_rules）
-        selected_questions = generate_random_quiz(language)
+        # rollback 重新生成時沿用既有抽題序列；全新開始測驗則重新抽題
+        if (
+            session
+            and session.step.value == "QUIZ"
+            and session.selected_questions
+            and len(session.selected_questions) >= total_questions
+        ):
+            selected_questions = session.selected_questions
+        else:
+            selected_questions = generate_random_quiz(language)
 
         # 重置測驗狀態並保存選中的題目
         session = session_manager.start_quiz(session_id, selected_questions)
@@ -420,7 +428,7 @@ Format:
             title = color_info.get("title", "")
             color_name = color_info.get("color_name", color_id or "")
             description = color_info.get("description", "")
-            message = f"你的色系是{color_name}，{title}。{description}".strip()
+            message = f"你是{color_name}，{title}。{description}".strip()
         else:
             message = "測驗完成，但找不到對應的色系結果。"
 
