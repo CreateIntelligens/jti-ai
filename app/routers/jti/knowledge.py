@@ -30,8 +30,8 @@ TEXT_PREVIEW_EXTENSIONS = EDITABLE_EXTENSIONS | {".log", ".py", ".js", ".html"}
 
 def _get_store_name(language: str) -> str | None:
     """取得對應語言的 File Search Store 資源名稱（可選）"""
-    env_key = f"GEMINI_FILE_SEARCH_STORE_ID_{language.upper()}"
-    store_id = os.getenv(env_key) or os.getenv("GEMINI_FILE_SEARCH_STORE_ID")
+    env_key = f"JTI_STORE_ID_{language.upper()}"
+    store_id = os.getenv(env_key) or os.getenv("JTI_STORE_ID_ZH")
     if not store_id:
         return None
     return f"fileSearchStores/{store_id}"

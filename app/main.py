@@ -67,6 +67,7 @@ from google.genai.errors import ClientError
 from .auth import verify_auth, _extract_bearer_token
 from .routers.jti import chat as jti_chat, quiz as jti_quiz, prompts as jti_prompts, knowledge as jti_knowledge, quiz_bank as jti_quiz_bank
 from .routers.general import chat, stores, prompts, api_keys
+from .routers.hciot import chat as hciot_chat, prompts as hciot_prompts, knowledge as hciot_knowledge
 from .services.mongo_client import get_mongo_client
 import app.deps as deps
 
@@ -185,9 +186,9 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
     api_key_info = None
     if auth["role"] == "admin":
         # Admin 使用預設中文知識庫（或可從 system message 解析）
-        store_name = os.getenv("GEMINI_FILE_SEARCH_STORE_ID_ZH") or os.getenv("GEMINI_FILE_SEARCH_STORE_ID", "")
+        store_name = os.getenv("JTI_STORE_ID_ZH", "")
         if not store_name:
-            raise HTTPException(status_code=400, detail="未設定知識庫，請配置 GEMINI_FILE_SEARCH_STORE_ID_ZH")
+            raise HTTPException(status_code=400, detail="未設定知識庫，請配置 JTI_STORE_ID_ZH")
     else:
         # 一般 key → 從 auth 取得綁定的 store
         if not deps.api_key_manager:
@@ -307,6 +308,13 @@ app.include_router(jti_knowledge.router, prefix="/api/jti-admin/knowledge")
 app.include_router(jti_knowledge.router, prefix="/api/jti/knowledge", include_in_schema=False)
 app.include_router(jti_quiz_bank.router, prefix="/api/jti-admin/quiz-bank")
 app.include_router(jti_quiz_bank.router, prefix="/api/jti/quiz-bank", include_in_schema=False)
+app.include_router(hciot_chat.runtime_router)
+app.include_router(hciot_chat.compat_history_router)
+app.include_router(hciot_chat.admin_history_router)
+app.include_router(hciot_prompts.router, prefix="/api/hciot-admin/prompts")
+app.include_router(hciot_prompts.router, prefix="/api/hciot/prompts", include_in_schema=False)
+app.include_router(hciot_knowledge.router, prefix="/api/hciot-admin/knowledge")
+app.include_router(hciot_knowledge.router, prefix="/api/hciot/knowledge", include_in_schema=False)
 app.include_router(chat.router)
 app.include_router(prompts.router)  # before stores (more specific path patterns)
 app.include_router(stores.router)

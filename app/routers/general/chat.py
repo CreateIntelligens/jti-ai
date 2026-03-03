@@ -155,7 +155,7 @@ def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
         if remaining_logs:
             store_name = remaining_logs[0].get("session_snapshot", {}).get("store")
         if not store_name:
-            store_name = os.getenv("GEMINI_FILE_SEARCH_STORE_ID_ZH", "")
+            store_name = os.getenv("JTI_STORE_ID_ZH", "")
 
         history = []
         for log in remaining_logs:

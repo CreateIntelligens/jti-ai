@@ -193,8 +193,8 @@ class MainAgent:
 
     def _file_search(self, query: str, language: str) -> str | None:
         """用 flash 跑 File Search 查知識庫"""
-        store_env_key = f"GEMINI_FILE_SEARCH_STORE_ID_{language.upper()}"
-        store_id = os.getenv(store_env_key) or os.getenv("GEMINI_FILE_SEARCH_STORE_ID")
+        store_env_key = f"JTI_STORE_ID_{language.upper()}"
+        store_id = os.getenv(store_env_key) or os.getenv("JTI_STORE_ID_ZH")
         if not store_id:
             logger.warning("未設定知識庫，跳過 File Search")
             return None
