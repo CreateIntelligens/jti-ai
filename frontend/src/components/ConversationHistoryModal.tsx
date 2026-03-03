@@ -16,13 +16,13 @@ import {
   Calendar,
   X,
 } from 'lucide-react';
-import { deleteConversations, fetchAsAdmin, fetchWithApiKey, getGeneralConversationDetail } from '../services/api';
+import { deleteConversations, fetchAsAdmin, fetchWithApiKey, getGeneralConversationDetail, getHciotConversationDetail } from '../services/api';
 import MiniCalendar from './MiniCalendar';
 
 interface ConversationEntry {
   _id: string;
   session_id: string;
-  mode: 'jti' | 'general';
+  mode: 'jti' | 'hciot' | 'general';
   turn_number?: number;
   timestamp: string;
   user_message: string;
@@ -64,7 +64,7 @@ interface ConversationHistoryModalProps {
   onClose: () => void;
   sessionId?: string;
   storeName?: string;
-  mode?: 'jti' | 'general';
+  mode?: 'jti' | 'hciot' | 'general';
   onResumeSession?: (sessionId: string, messages: Array<{ role: 'user' | 'assistant'; text: string; turnNumber?: number }>, language?: string) => void;
 }
 
@@ -77,6 +77,7 @@ export default function ConversationHistoryModal({
   onResumeSession,
 }: ConversationHistoryModalProps) {
   const { t } = useTranslation();
+  const isAdminMode = mode === 'jti' || mode === 'hciot';
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -188,6 +189,8 @@ export default function ConversationHistoryModal({
         let url = '';
         if (mode === 'jti') {
           url = `/api/jti-admin/conversations`;
+        } else if (mode === 'hciot') {
+          url = `/api/hciot-admin/conversations`;
         } else {
           url = `/api/chat/history${storeName ? `?store_name=${encodeURIComponent(storeName)}` : ''}`;
         }
@@ -202,7 +205,7 @@ export default function ConversationHistoryModal({
 
         console.log('[ConversationHistory] Fetching:', url);
 
-        const response = await (mode === 'jti' ? fetchAsAdmin(url) : fetchWithApiKey(url));
+        const response = await (isAdminMode ? fetchAsAdmin(url) : fetchWithApiKey(url));
         if (!response.ok) {
           console.error('[ConversationHistory] API Error:', response.status, response.statusText);
           throw new Error('Failed to fetch conversations');
@@ -338,6 +341,17 @@ export default function ConversationHistoryModal({
         setDetailLoading(null);
       }
     }
+    if (mode === 'hciot' && !detailCache[sid]) {
+      setDetailLoading(sid);
+      try {
+        const data = await getHciotConversationDetail(sid);
+        setDetailCache((prev) => ({ ...prev, [sid]: data.conversations || [] }));
+      } catch (error) {
+        console.error('[ConversationHistory] Failed to load detail:', error);
+      } finally {
+        setDetailLoading(null);
+      }
+    }
   };
 
   const copyToClipboard = (text: string, id: string) => {
@@ -354,6 +368,11 @@ export default function ConversationHistoryModal({
         if (sessionIds && sessionIds.length > 0) {
           url += `?session_ids=${sessionIds.join(',')}`;
         }
+      } else if (mode === 'hciot') {
+        url = `/api/hciot-admin/conversations/export`;
+        if (sessionIds && sessionIds.length > 0) {
+          url += `?session_ids=${sessionIds.join(',')}`;
+        }
       } else {
         url = `/api/chat/history/export`;
         if (storeName) {
@@ -365,7 +384,7 @@ export default function ConversationHistoryModal({
       }
 
       const apiKey = localStorage.getItem('activeGeminiApiKey') || 'system';
-      if (mode !== 'jti' && apiKey && apiKey !== 'system') {
+      if (!isAdminMode && apiKey && apiKey !== 'system') {
         try {
           const keys = JSON.parse(localStorage.getItem('userGeminiApiKeys') || '[]');
           const found = keys.find((k: any) => k.name === apiKey);
@@ -421,7 +440,9 @@ export default function ConversationHistoryModal({
     let convs = detailCache[sid];
     if (!convs) {
       try {
-        const data = await getGeneralConversationDetail(sid);
+        const data = mode === 'hciot'
+          ? await getHciotConversationDetail(sid)
+          : await getGeneralConversationDetail(sid);
         convs = data.conversations || [];
         setDetailCache((prev) => ({ ...prev, [sid]: convs }));
       } catch (error) {
@@ -470,7 +491,11 @@ export default function ConversationHistoryModal({
             <div>
               <h2>{t('conversation_history')}</h2>
               <p className="conversation-header-subtitle">
-                {mode === 'jti' ? 'JTI Quiz Sessions' : `${t('knowledge_base') || '知識庫'}：${storeName || 'All'}`}
+                {mode === 'jti'
+                  ? 'JTI Quiz Sessions'
+                  : mode === 'hciot'
+                    ? 'HCIoT Education Sessions'
+                    : `${t('knowledge_base') || '知識庫'}：${storeName || 'All'}`}
               </p>
             </div>
           </div>
@@ -706,9 +731,11 @@ export default function ConversationHistoryModal({
                             e.stopPropagation();
                             // General 模式：確保已載入完整對話
                             let convs = conversations;
-                            if (mode === 'general' && !detailCache[session.session_id]) {
+                            if ((mode === 'general' || mode === 'hciot') && !detailCache[session.session_id]) {
                               try {
-                                const data = await getGeneralConversationDetail(session.session_id);
+                                const data = mode === 'hciot'
+                                  ? await getHciotConversationDetail(session.session_id)
+                                  : await getGeneralConversationDetail(session.session_id);
                                 convs = data.conversations || [];
                                 setDetailCache((prev) => ({ ...prev, [session.session_id]: convs }));
                               } catch (error) {

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { History, Moon, RotateCcw, Settings, Sun } from 'lucide-react';
+import { HeartPulse, History, Moon, RotateCcw, Settings, Sun } from 'lucide-react';
 
 import ConversationHistoryModal from '../components/ConversationHistoryModal';
-import PromptManagementModal from '../components/PromptManagementModal';
+import HciotSettingsModal from '../components/HciotSettingsModal';
 import HciotInputArea from '../components/hciot/HciotInputArea';
 import HciotMessageList, { type HciotMessage } from '../components/hciot/HciotMessageList';
+import HciotTopicGrid from '../components/hciot/HciotTopicGrid';
 import {
   HCIOT_DEFAULT_STORE_NAME,
   HCIOT_TOPICS,
@@ -16,7 +17,6 @@ import { useAutoResize } from '../hooks/useAutoResize';
 import { useScrollToBottom } from '../hooks/useScrollToBottom';
 import { useTheme } from '../hooks/useTheme';
 import * as api from '../services/api';
-import type { Store } from '../types';
 import '../styles/shared/index.css';
 import '../styles/hciot/layout.css';
 import '../styles/hciot/components.css';
@@ -25,7 +25,6 @@ export default function Hciot() {
   const { t, i18n } = useTranslation();
   const { theme, toggleTheme } = useTheme();
 
-  const [stores, setStores] = useState<Store[]>([]);
   const [storeName, setStoreName] = useState<string | null>(null);
   const [storeMissing, setStoreMissing] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -56,9 +55,9 @@ export default function Hciot() {
     }
   }, [editingTurn]);
 
-  const startSession = useCallback(async (targetStore: string, previousSessionId?: string | null, targetLanguage?: string) => {
+  const startSession = useCallback(async (previousSessionId?: string | null, targetLanguage?: string) => {
     const lang = normalizeHciotLanguage(targetLanguage || currentLanguage);
-    const result = await api.startChat(targetStore, previousSessionId);
+    const result = await api.hciotStartChat(lang, previousSessionId);
     setSessionId(result.session_id || null);
     setSessionInfo(result.session_id ? `#${result.session_id.substring(0, 8)}` : '');
     setStatusText(t('status_connected'));
@@ -72,28 +71,10 @@ export default function Hciot() {
 
   const bootstrapStore = useCallback(async () => {
     try {
-      const availableStores = await api.fetchStores();
-      setStores(availableStores);
-
-      const targetKey = HCIOT_DEFAULT_STORE_NAME.toLowerCase();
-      const target = availableStores.find((store) => {
-        const storeName = store.name.toLowerCase();
-        const displayName = (store.display_name || '').toLowerCase();
-        return storeName === targetKey || displayName === targetKey;
-      });
-      if (!target) {
-        setStoreName(null);
-        setStoreMissing(true);
-        setSessionId(null);
-        setSessionInfo('');
-        setStatusText(t('hciot_status_store_missing'));
-        return;
-      }
-
-      setStoreName(target.name);
-      await startSession(target.name);
+      await startSession();
+      setStoreName(HCIOT_DEFAULT_STORE_NAME);
     } catch (error) {
-      console.error('Failed to initialize HCIoT store:', error);
+      console.error('Failed to initialize HCIoT session:', error);
       setStoreMissing(true);
       setStatusText(t('status_failed'));
     }
@@ -111,8 +92,8 @@ export default function Hciot() {
     setLoading(false);
     setIsTyping(false);
     setMessages([]);
-    await startSession(storeName, sessionId);
-  }, [messages.length, sessionId, startSession, storeName, t]);
+    await startSession(sessionId);
+  }, [storeName, messages.length, sessionId, startSession, t]);
 
   const toggleLanguage = useCallback(async () => {
     if (messages.length > 0) {
@@ -131,12 +112,12 @@ export default function Hciot() {
     setMessages([]);
 
     if (storeName) {
-      await startSession(storeName, sessionId, nextLanguage);
+      await startSession(sessionId, nextLanguage);
     }
   }, [currentLanguage, i18n, messages.length, sessionId, startSession, storeName, t]);
 
   const sendMessage = useCallback(async (message: string, turnNumber?: number) => {
-    if (!message || loading || !storeName) return;
+    if (!message || loading) return;
 
     setEditingTurn(null);
     if (turnNumber === undefined) {
@@ -150,15 +131,16 @@ export default function Hciot() {
     try {
       let activeSessionId = sessionId;
       if (!activeSessionId) {
-        activeSessionId = await startSession(storeName);
+        activeSessionId = await startSession();
       }
+      if (!activeSessionId) throw new Error('Failed to create session');
 
-      const data = await api.sendMessage(message, activeSessionId || undefined, turnNumber);
+      const data = await api.hciotSendMessage(message, activeSessionId, turnNumber);
       await new Promise((resolve) => setTimeout(resolve, 240));
       setIsTyping(false);
 
       const nextMessage: HciotMessage = {
-        text: data.answer,
+        text: data.message,
         type: 'assistant',
         timestamp: Date.now(),
         turnNumber: data.turn_number,
@@ -191,7 +173,7 @@ export default function Hciot() {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [loading, sessionId, startSession, storeName, t]);
+  }, [loading, sessionId, startSession, t]);
 
   const handleRegenerate = async (turnNumber: number) => {
     if (!sessionId || loading) return;
@@ -263,7 +245,7 @@ export default function Hciot() {
 
       <header className="hciot-header">
         <div className="hciot-brand">
-          <div className="hciot-brand-mark">H</div>
+          <div className="hciot-brand-mark"><HeartPulse size={24} /></div>
           <div>
             <p className="hciot-brand-kicker">{t('hciot_brand_kicker')}</p>
             <h1 className="hciot-brand-title">{t('hciot_app_title')}</h1>
@@ -290,52 +272,60 @@ export default function Hciot() {
       </header>
 
       <main className="hciot-main">
-        <HciotMessageList
-          messages={messages}
-          loading={loading}
-          sessionId={sessionId}
-          isTyping={isTyping}
-          editingTurn={editingTurn}
-          editText={editText}
-          editTextareaRef={editTextareaRef}
-          messagesEndRef={messagesEndRef}
-          handleRegenerate={handleRegenerate}
-          handleEditAndResend={handleEditAndResend}
-          setEditingTurn={setEditingTurn}
-          setEditText={setEditText}
-          handleEditKeyDown={handleEditKeyDown}
-          topics={HCIOT_TOPICS}
-          language={currentLanguage}
-          onSelectTopic={handleSelectTopic}
-          heroEyebrow={t('hciot_hero_eyebrow')}
-          heroTitle={t('hciot_hero_title')}
-          heroDescription={t('hciot_hero_description')}
-          heroNote={t('hciot_hero_note')}
-          topicHeading={t('hciot_topic_heading')}
-          topicSubheading={t('hciot_topic_subheading')}
-          topicDisabledMessage={storeMissing ? t('hciot_store_missing_notice', { store: HCIOT_DEFAULT_STORE_NAME }) : null}
-        />
+        <aside className="hciot-sidebar">
+          <div className="hciot-topic-inline-panel">
+            <HciotTopicGrid
+              topics={HCIOT_TOPICS}
+              language={currentLanguage}
+              disabled={loading || !sessionId}
+              onSelect={handleSelectTopic}
+              heading={t('hciot_topic_heading')}
+              subheading={t('hciot_topic_subheading')}
+              disabledMessage={storeMissing ? t('hciot_store_missing_notice', { store: HCIOT_DEFAULT_STORE_NAME }) : null}
+            />
+          </div>
+        </aside>
+        
+        <div className="hciot-chat-container">
+          <HciotMessageList
+            messages={messages}
+            loading={loading}
+            isTyping={isTyping}
+            editingTurn={editingTurn}
+            editText={editText}
+            editTextareaRef={editTextareaRef}
+            messagesEndRef={messagesEndRef}
+            handleRegenerate={handleRegenerate}
+            handleEditAndResend={handleEditAndResend}
+            setEditingTurn={setEditingTurn}
+            setEditText={setEditText}
+            handleEditKeyDown={handleEditKeyDown}
+            heroEyebrow={t('hciot_hero_eyebrow')}
+            heroTitle={t('hciot_hero_title')}
+            heroDescription={t('hciot_hero_description')}
+            heroNote={t('hciot_hero_note')}
+          />
 
-        <HciotInputArea
-          userInput={userInput}
-          loading={loading}
-          sessionId={sessionId}
-          statusText={statusText}
-          sessionInfo={sessionInfo}
-          placeholder={loading ? t('loading') : t('hciot_input_placeholder')}
-          setUserInput={setUserInput}
-          handleSubmit={handleSubmit}
-          handleKeyDown={handleKeyDown}
-          inputRef={inputRef}
-        />
+          <HciotInputArea
+            userInput={userInput}
+            loading={loading}
+            sessionId={sessionId}
+            statusText={statusText}
+            sessionInfo={sessionInfo}
+            placeholder={loading ? t('loading') : t('hciot_input_placeholder')}
+            setUserInput={setUserInput}
+            handleSubmit={handleSubmit}
+            handleKeyDown={handleKeyDown}
+            inputRef={inputRef}
+          />
+        </div>
       </main>
 
-      <PromptManagementModal
+      <HciotSettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
-        currentStore={storeName}
-        onRestartChat={restartConversation}
-        stores={stores}
+        onPromptChange={restartConversation}
+        language={currentLanguage}
       />
 
       <ConversationHistoryModal
@@ -343,7 +333,7 @@ export default function Hciot() {
         onClose={() => setShowHistoryModal(false)}
         sessionId={sessionId || undefined}
         storeName={storeName || undefined}
-        mode="general"
+        mode="hciot"
         onResumeSession={(sid, resumedMessages) => {
           setSessionId(sid);
           setMessages(

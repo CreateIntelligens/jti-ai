@@ -41,5 +41,21 @@
   "resume_session": "Resume",
   "prev": "Prev",
   "next": "Next",
-  "page": "Page"
+  "page": "Page",
+  "hciot_app_title": "HCIoT Care Guide",
+  "hciot_brand_kicker": "Hospital Education Interface",
+  "hciot_settings": "Prompt Settings",
+  "hciot_toggle_language": "Toggle Language",
+  "hciot_toggle_theme": "Toggle Theme",
+  "hciot_hero_eyebrow": "Hospital Education Q&A",
+  "hciot_hero_title": "Turn hospital education files into guided patient conversations.",
+  "hciot_hero_description": "This interface is designed for hospital-side evaluation of education Q&A quality. Selecting a topic sends the first question immediately, and answers follow the current prompt rules and knowledge documents.",
+  "hciot_hero_note": "The product direction is public-facing, but this stage is mainly for hospital testing. Adjust tone, restrictions, and response format through prompt settings.",
+  "hciot_topic_heading": "Common Education Topics",
+  "hciot_topic_subheading": "Tap a topic to begin",
+  "hciot_input_placeholder": "Ask about symptoms, self-care, diet advice, medication reminders, or follow-up timing...",
+  "hciot_status_store_missing": "Knowledge store not ready",
+  "hciot_store_missing_notice": "Store {{store}} was not found. Please create the store and upload the education documents first.",
+  "hciot_language_confirm_zh": "Switching language will restart the conversation. Continue?",
+  "hciot_language_confirm_en": "Switching language will restart the conversation. Continue?"
 }

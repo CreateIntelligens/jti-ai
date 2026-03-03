@@ -27,13 +27,8 @@ export default function App() {
 
   const page = window.location.pathname.replace(/^\//, '').toLowerCase() || 'home';
 
-  const isHciotPage =
-    (page === 'hciot' && canShow('hciot')) ||
-    (!canShow('home') && !canShow('jti') && canShow('hciot'));
-
-  const isJtiPage =
-    (page === 'jti' && canShow('jti')) ||
-    (!canShow('home') && canShow('jti') && !isHciotPage);
+  const isHciotPage = page === 'hciot' && canShow('hciot');
+  const isJtiPage = page === 'jti' && canShow('jti');
 
   if (isHciotPage) {
     if (page !== 'hciot') window.history.replaceState(null, '', '/hciot');

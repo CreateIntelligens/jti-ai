@@ -190,9 +190,13 @@ export async function getGeneralConversationDetail(sessionId: string): Promise<a
   return handleResponse<any>(response);
 }
 
-export async function deleteConversations(mode: 'jti' | 'general', sessionIds: string[]): Promise<void> {
-  const url = mode === 'jti' ? `${API_BASE}/jti-admin/conversations` : `${API_BASE}/chat/history`;
-  const doFetch = mode === 'jti' ? fetchAsAdmin : fetchWithApiKey;
+export async function deleteConversations(mode: 'jti' | 'hciot' | 'general', sessionIds: string[]): Promise<void> {
+  const url = mode === 'jti'
+    ? `${API_BASE}/jti-admin/conversations`
+    : mode === 'hciot'
+      ? `${API_BASE}/hciot-admin/conversations`
+      : `${API_BASE}/chat/history`;
+  const doFetch = mode === 'general' ? fetchWithApiKey : fetchAsAdmin;
   const response = await doFetch(url, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },
