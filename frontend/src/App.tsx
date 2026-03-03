@@ -6,6 +6,7 @@ import PromptManagementModal from './components/PromptManagementModal';
 import UserApiKeyModal from './components/UserApiKeyModal';
 import ConversationHistoryModal from './components/ConversationHistoryModal';
 import Jti from './pages/Jti';
+import Hciot from './pages/Hciot';
 import { useAppChat } from './hooks/useAppChat';
 import './styles/shared/index.css';
 import './styles/app/layout.css';
@@ -26,9 +27,18 @@ export default function App() {
 
   const page = window.location.pathname.replace(/^\//, '').toLowerCase() || 'home';
 
+  const isHciotPage =
+    (page === 'hciot' && canShow('hciot')) ||
+    (!canShow('home') && !canShow('jti') && canShow('hciot'));
+
   const isJtiPage =
     (page === 'jti' && canShow('jti')) ||
-    (!canShow('home') && canShow('jti'));
+    (!canShow('home') && canShow('jti') && !isHciotPage);
+
+  if (isHciotPage) {
+    if (page !== 'hciot') window.history.replaceState(null, '', '/hciot');
+    return <Hciot />;
+  }
 
   if (isJtiPage) {
     if (page !== 'jti') window.history.replaceState(null, '', '/jti');

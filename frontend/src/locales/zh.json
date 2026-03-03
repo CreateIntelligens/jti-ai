@@ -41,5 +41,21 @@
   "resume_session": "接續對話",
   "prev": "上一頁",
   "next": "下一頁",
-  "page": "頁次"
+  "page": "頁次",
+  "hciot_app_title": "HCIoT 衛教助理",
+  "hciot_brand_kicker": "Hospital Education Interface",
+  "hciot_settings": "人物設定",
+  "hciot_toggle_language": "切換語言",
+  "hciot_toggle_theme": "切換主題",
+  "hciot_hero_eyebrow": "醫院衛教問答入口",
+  "hciot_hero_title": "把衛教資料變成可直接對話的臨床說明。",
+  "hciot_hero_description": "這個介面提供院方測試衛教問答效果。點選下方主題會直接送出第一個問題，回答內容會依目前的提示詞設定和知識庫資料整理。",
+  "hciot_hero_note": "目前版本以民眾使用情境設計，但回答品質仍以院方測試與調整為主。若要變更口吻、禁語或回答格式，請從人物設定調整。",
+  "hciot_topic_heading": "常用衛教主題",
+  "hciot_topic_subheading": "點擊主題立即開始",
+  "hciot_input_placeholder": "請輸入想詢問的症狀、照護方式、回診時機或飲食建議...",
+  "hciot_status_store_missing": "知識庫尚未就緒",
+  "hciot_store_missing_notice": "找不到知識庫 {{store}}，請先建立 store 並匯入衛教文件。",
+  "hciot_language_confirm_zh": "切換語言會重新開始對話，確定要繼續嗎？",
+  "hciot_language_confirm_en": "切換語言會重新開始對話，確定要繼續嗎？"
 }
