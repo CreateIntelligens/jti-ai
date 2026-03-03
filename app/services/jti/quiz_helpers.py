@@ -11,6 +11,7 @@ from google import genai
 
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 from app.services.jti.main_agent import main_agent
+from app.services.gemini_service import gemini_with_retry
 
 logger = logging.getLogger(__name__)
 
@@ -175,10 +176,10 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
 只回覆：A 至 E、PAUSE 或 X"""
 
         model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
-        response = client.models.generate_content(
+        response = gemini_with_retry(lambda: client.models.generate_content(
             model=model_name,
             contents=prompt
-        )
+        ))
 
         result = response.text.strip().upper()
 

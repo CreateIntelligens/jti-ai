@@ -8,11 +8,15 @@ Gemini API 整合服務（使用新版 google-genai SDK）
 """
 
 import os
+import time
+import logging
+from pathlib import Path
+from typing import Callable, Optional, Dict, List, TypeVar
+
 import google.genai as genai
 from google.genai import types
-from pathlib import Path
-from typing import Optional, Dict, List
-import logging
+
+T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +81,34 @@ class GeminiService:
         """
         # 新版 SDK 中，tools 在 generate_content 時才傳入
         return self.model_name
+
+
+def gemini_with_retry(fn: Callable[[], T], retries: int = 3, base_delay: float = 2.0) -> T:
+    """
+    呼叫 Gemini API 並在 503 UNAVAILABLE 時自動重試。
+
+    Args:
+        fn: 呼叫 Gemini 的 lambda，例如 lambda: chat.send_message(msg)
+        retries: 最多重試次數（不含第一次）
+        base_delay: 第一次重試等待秒數，之後線性增加（2s, 4s, 6s...）
+    """
+    last_exc: Exception | None = None
+    for attempt in range(retries + 1):
+        try:
+            return fn()
+        except Exception as e:
+            err_str = str(e)
+            is_503 = "503" in err_str or "UNAVAILABLE" in err_str
+            if not is_503 or attempt == retries:
+                raise
+            wait = base_delay * (attempt + 1)
+            logger.warning(
+                "[Gemini] 503 UNAVAILABLE，第 %d/%d 次重試，等待 %.0fs...",
+                attempt + 1, retries, wait,
+            )
+            time.sleep(wait)
+            last_exc = e
+    raise last_exc  # type: ignore
 
 
 # 全域實例

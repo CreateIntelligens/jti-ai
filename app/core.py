@@ -14,6 +14,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from app.services.gemini_service import gemini_with_retry
 
 load_dotenv()
 
@@ -254,10 +255,10 @@ class FileSearchManager:
             raise ValueError("請先選擇 Store 以開始對話")
 
         # 確保在發送訊息時也帶上 config
-        response = self.chat_session.send_message(
+        response = gemini_with_retry(lambda: self.chat_session.send_message(
             message=message,
             config=self.current_config
-        )
+        ))
         return response
 
     def get_history(self):
