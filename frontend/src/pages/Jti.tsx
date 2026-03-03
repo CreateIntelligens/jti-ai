@@ -436,7 +436,6 @@ export default function Jti() {
       <header className="jti-header">
         <div className="header-content">
           <div className="logo-section">
-            <span className="logo-icon">🚬</span>
             <h1 className="logo-text">{t('app_title')}</h1>
           </div>
           <div className="status-section">

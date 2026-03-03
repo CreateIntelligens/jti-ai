@@ -63,7 +63,7 @@ export default function JtiMessageList({
         <div className="welcome-screen">
           <div className="welcome-hero">
             <div className="hero-icon-wrapper">
-              <span className="hero-icon">🚬</span>
+              <span className="hero-icon"></span>
               <div className="icon-glow"></div>
             </div>
             <h2 className="hero-title">{welcomeTitle || t('welcome_title')}</h2>
