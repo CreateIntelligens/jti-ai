@@ -96,7 +96,7 @@ def create_bank(
     language: str = Query("zh"),
     auth: dict = Depends(verify_auth),
 ):
-    """Create a new empty quiz bank."""
+    """Create a new quiz bank by cloning the default bank."""
     store = get_quiz_bank_store()
     try:
         bank = store.create_bank(language, request.name)

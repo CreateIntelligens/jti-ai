@@ -53,31 +53,48 @@ class QuizBankStore:
         return banks
 
     def create_bank(self, language: str, name: str) -> dict:
-        """Create new empty bank. Raises if at max."""
+        """Create a new bank by cloning the default bank when available."""
         count = self.metadata.count_documents({"language": language})
         if count >= MAX_BANKS:
             raise ValueError(f"Maximum {MAX_BANKS} banks per language")
 
         now = datetime.now(timezone.utc)
         bank_id = str(uuid.uuid4())[:8]
+        default_meta = self.get_metadata(language, DEFAULT_BANK_ID) or {}
         doc = {
             "language": language,
             "bank_id": bank_id,
             "name": name,
             "title": name,
-            "description": "",
-            "total_questions": 4,
-            "dimensions": ["analyst", "diplomat", "guardian", "explorer"],
-            "tie_breaker_priority": ["analyst", "diplomat", "guardian", "explorer"],
-            "selection_rules": {"total": 4},
+            "description": default_meta.get("description", ""),
+            "total_questions": default_meta.get("total_questions", 4),
+            "dimensions": default_meta.get("dimensions", ["analyst", "diplomat", "guardian", "explorer"]),
+            "tie_breaker_priority": default_meta.get(
+                "tie_breaker_priority",
+                ["analyst", "diplomat", "guardian", "explorer"],
+            ),
+            "selection_rules": default_meta.get("selection_rules", {"total": 4}),
             "is_active": False,
             "is_default": False,
             "created_at": now,
             "updated_at": now,
         }
         self.metadata.insert_one(doc)
+
+        default_questions = list(
+            self.questions.find({"language": language, "bank_id": DEFAULT_BANK_ID})
+        )
+        for question in default_questions:
+            question.pop("_id", None)
+            question["language"] = language
+            question["bank_id"] = bank_id
+            question["created_at"] = now
+            question["updated_at"] = now
+        if default_questions:
+            self.questions.insert_many(default_questions)
+
         doc.pop("_id", None)
-        doc["question_count"] = 0
+        doc["question_count"] = len(default_questions)
         return doc
 
     def delete_bank(self, language: str, bank_id: str) -> bool:
