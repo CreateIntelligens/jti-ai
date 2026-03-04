@@ -266,16 +266,19 @@ class FileSearchManager:
             si = [types.Part.from_text(text=system_instruction)]
 
         # 保存 Config 供後續 send_message 使用
+        full_store_name = store_name if store_name.startswith("fileSearchStores/") else f"fileSearchStores/{store_name}"
+        is_pro = "pro" in model
+        thinking_budget = -1 if is_pro else 0
         self.current_config = types.GenerateContentConfig(
             tools=[
                 types.Tool(
                     file_search=types.FileSearch(
-                        file_search_store_names=[store_name]
+                        file_search_store_names=[full_store_name]
                     )
                 )
             ],
             system_instruction=si,
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            thinking_config=types.ThinkingConfig(thinking_budget=thinking_budget),
         )
 
         self.chat_session = self._client_for(store_name).chats.create(
@@ -342,6 +345,9 @@ class FileSearchManager:
         if system_instruction:
             si = [types.Part.from_text(text=system_instruction)]
 
+        full_store_name = store_name if store_name.startswith("fileSearchStores/") else f"fileSearchStores/{store_name}"
+        is_pro = "pro" in model
+        thinking_budget = -1 if is_pro else 0
         response = self._client_for(store_name).models.generate_content(
             model=model,
             contents=question,
@@ -349,12 +355,12 @@ class FileSearchManager:
                 tools=[
                     types.Tool(
                         file_search=types.FileSearch(
-                            file_search_store_names=[store_name]
+                            file_search_store_names=[full_store_name]
                         )
                     )
                 ],
                 system_instruction=si,
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
+                thinking_config=types.ThinkingConfig(thinking_budget=thinking_budget),
             ),
         )
         return response
