@@ -7,69 +7,100 @@ Session Manager 工廠
 
 import os
 import logging
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
-_session_manager = None
-_conversation_logger = None
+HCIOT_DB_NAME = "hciot_app"
+
+# lazy singleton cache
+_singletons: dict[str, Any] = {}
+
+
+def _get_or_create(
+    key: str,
+    mongo_factory,
+    fallback_factory=None,
+    label: str = "",
+) -> Any:
+    """通用 lazy singleton 工廠。
+
+    嘗試用 mongo_factory 建立實例（需要 MONGODB_URI），
+    失敗則用 fallback_factory（若有提供），否則回傳 None。
+    """
+    if key in _singletons:
+        return _singletons[key]
+
+    if os.getenv("MONGODB_URI"):
+        try:
+            instance = mongo_factory()
+            _singletons[key] = instance
+            logger.info("Using MongoDB %s", label)
+            return instance
+        except Exception as e:
+            fallback_desc = "falling back to in-memory" if fallback_factory else "disabled"
+            logger.warning("MongoDB %s failed, %s: %s", label, fallback_desc, e)
+
+    if fallback_factory:
+        instance = fallback_factory()
+        _singletons[key] = instance
+        logger.info("Using in-memory/file-based %s", label)
+        return instance
+
+    return None
 
 
 def get_session_manager():
-    global _session_manager
-    if _session_manager is not None:
-        return _session_manager
-
-    if os.getenv("MONGODB_URI"):
-        try:
-            from .mongo_session_manager import MongoSessionManager
-            _session_manager = MongoSessionManager()
-            logger.info("Using MongoDB SessionManager")
-            return _session_manager
-        except Exception as e:
-            logger.warning(f"MongoDB SessionManager failed, falling back to in-memory: {e}")
-
+    from .mongo_session_manager import MongoSessionManager
     from .session_manager import SessionManager
-    _session_manager = SessionManager()
-    logger.info("Using in-memory SessionManager")
-    return _session_manager
+    return _get_or_create(
+        "session_manager",
+        mongo_factory=MongoSessionManager,
+        fallback_factory=SessionManager,
+        label="SessionManager",
+    )
 
 
 def get_conversation_logger():
-    global _conversation_logger
-    if _conversation_logger is not None:
-        return _conversation_logger
-
-    if os.getenv("MONGODB_URI"):
-        try:
-            from app.services.logging.mongo_conversation_logger import MongoConversationLogger
-            _conversation_logger = MongoConversationLogger()
-            logger.info("Using MongoDB ConversationLogger")
-            return _conversation_logger
-        except Exception as e:
-            logger.warning(f"MongoDB ConversationLogger failed, falling back to file-based: {e}")
-
+    from app.services.logging.mongo_conversation_logger import MongoConversationLogger
     from app.services.logging.conversation_logger import ConversationLogger
-    _conversation_logger = ConversationLogger()
-    logger.info("Using file-based ConversationLogger")
-    return _conversation_logger
+    return _get_or_create(
+        "conversation_logger",
+        mongo_factory=MongoConversationLogger,
+        fallback_factory=ConversationLogger,
+        label="ConversationLogger",
+    )
 
 
-_general_chat_session_manager = None
+def get_hciot_session_manager():
+    """取得 HCIoT 專用 SessionManager (hciot_app database)"""
+    from .mongo_session_manager import MongoSessionManager
+    from .session_manager import SessionManager
+    return _get_or_create(
+        "hciot_session_manager",
+        mongo_factory=lambda: MongoSessionManager(db_name=HCIOT_DB_NAME),
+        fallback_factory=SessionManager,
+        label=f"SessionManager for HCIoT (db={HCIOT_DB_NAME})",
+    )
+
+
+def get_hciot_conversation_logger():
+    """取得 HCIoT 專用 ConversationLogger (hciot_app database)"""
+    from app.services.logging.mongo_conversation_logger import MongoConversationLogger
+    from app.services.logging.conversation_logger import ConversationLogger
+    return _get_or_create(
+        "hciot_conversation_logger",
+        mongo_factory=lambda: MongoConversationLogger(db_name=HCIOT_DB_NAME),
+        fallback_factory=ConversationLogger,
+        label=f"ConversationLogger for HCIoT (db={HCIOT_DB_NAME})",
+    )
 
 
 def get_general_chat_session_manager():
-    """取得一般知識庫 Chat Session Manager"""
-    global _general_chat_session_manager
-    if _general_chat_session_manager is not None:
-        return _general_chat_session_manager
-
-    if os.getenv("MONGODB_URI"):
-        try:
-            from app.services.session.general_chat_session_manager import GeneralChatSessionManager
-            _general_chat_session_manager = GeneralChatSessionManager()
-            print("[Factory] ✅ 使用 MongoDB GeneralChatSessionManager")
-            return _general_chat_session_manager
-        except Exception as e:
-            print(f"[Factory] ⚠️ MongoDB GeneralChatSessionManager 失敗: {e}，停用 session 持久化")
-
-    return None
+    """取得一般知識庫 Chat Session Manager（無 fallback，失敗回傳 None）"""
+    from app.services.session.general_chat_session_manager import GeneralChatSessionManager
+    return _get_or_create(
+        "general_chat_session_manager",
+        mongo_factory=GeneralChatSessionManager,
+        label="GeneralChatSessionManager",
+    )

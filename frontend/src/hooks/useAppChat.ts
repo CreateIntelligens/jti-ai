@@ -103,7 +103,13 @@ export function useAppChat() {
   const [status, setStatus] = useState('');
   const [stores, setStores] = useState<Store[]>([]);
   const [keyNames, setKeyNames] = useState<string[]>([]);
-  const [projectFilter, setProjectFilter] = useState('all');
+  const [projectFilter, setProjectFilter] = useState(
+    () => localStorage.getItem('projectFilter') || 'all'
+  );
+
+  useEffect(() => {
+    localStorage.setItem('projectFilter', projectFilter);
+  }, [projectFilter]);
   const [currentTargetId, setCurrentTargetId] = useState<string | null>(null);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);

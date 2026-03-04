@@ -21,11 +21,11 @@ from app.schemas.jti import (
     ExportConversationsResponse,
 )
 from app.services.hciot.main_agent import main_agent
-from app.services.session.session_manager_factory import get_conversation_logger, get_session_manager
+from app.services.session.session_manager_factory import get_hciot_conversation_logger, get_hciot_session_manager
 from app.utils import group_conversations_by_session
 
-session_manager = get_session_manager()
-conversation_logger = get_conversation_logger()
+session_manager = get_hciot_session_manager()
+conversation_logger = get_hciot_conversation_logger()
 logger = logging.getLogger(__name__)
 
 runtime_router = APIRouter(prefix="/api/hciot", tags=["HCIoT Chat"])

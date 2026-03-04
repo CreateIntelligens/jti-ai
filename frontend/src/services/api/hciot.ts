@@ -51,7 +51,8 @@ export async function hciotSendMessage(text: string, sessionId: string, turnNumb
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
   });
-  return handleResponse<ChatResponse>(response);
+  const data = await handleResponse<Record<string, unknown>>(response);
+  return { answer: (data.message ?? data.answer ?? '') as string, turn_number: data.turn_number as number | undefined };
 }
 
 export async function listHciotPrompts(language: string = 'zh'): Promise<any> {

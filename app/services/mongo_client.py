@@ -234,6 +234,34 @@ def get_mongo_client() -> MongoDBClient:
     return _mongo_client
 
 
-def get_mongo_db():
-    """便利函數：取得資料庫實例"""
-    return get_mongo_client().get_db()
+_initialized_dbs: set = set()
+
+
+def get_mongo_db(db_name: str | None = None):
+    """便利函數：取得資料庫實例。db_name 為 None 時回傳預設 jti_app。"""
+    client = get_mongo_client()
+    if db_name:
+        db = client.get_client()[db_name]
+        if db_name not in _initialized_dbs:
+            _initialized_dbs.add(db_name)
+            _ensure_base_indexes(db, db_name)
+        return db
+    return client.get_db()
+
+
+def _ensure_base_indexes(db, db_name: str) -> None:
+    """為非預設 database 建立基本的 sessions/conversations 索引"""
+    try:
+        sessions = db["sessions"]
+        sessions.create_index("session_id", unique=True)
+        sessions.create_index("language")
+        sessions.create_index([("created_at", -1)])
+
+        conversations = db["conversations"]
+        conversations.create_index([("session_id", 1), ("turn_number", 1)])
+        conversations.create_index([("mode", 1), ("timestamp", -1)])
+        conversations.create_index([("timestamp", -1)])
+
+        logger.info("Ensured base indexes for database '%s'", db_name)
+    except Exception as e:
+        logger.warning("Index creation for '%s' failed: %s", db_name, e)

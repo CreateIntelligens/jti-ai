@@ -5,14 +5,19 @@ HCIoT main agent - patient education chat flow.
 import asyncio
 import logging
 import os
-import re
 import time
 from typing import Dict
 
 from google.genai import types
 
 from app.models.session import Session
-from app.services.gemini_service import client as gemini_client
+import app.services.gemini_service as _gemini_service
+from app.services.agent_utils import (
+    build_chat_history,
+    extract_response_text,
+    normalize_language,
+    strip_citations,
+)
 from app.services.gemini_clients import get_client_for_store
 from app.services.hciot.agent_prompts import (
     PERSONA,
@@ -25,9 +30,9 @@ from app.services.hciot.runtime_settings import (
     SYSTEM_DEFAULT_PROMPT_ID,
     load_runtime_settings_from_prompt_manager,
 )
-from app.services.session.session_manager_factory import get_session_manager
+from app.services.session.session_manager_factory import get_hciot_session_manager
 
-session_manager = get_session_manager()
+session_manager = get_hciot_session_manager()
 logger = logging.getLogger(__name__)
 FILE_SEARCH_MODEL = "gemini-2.5-flash-lite-preview-09-2025"
 
@@ -42,23 +47,14 @@ class HciotMainAgent:
         if sid in self._chat_sessions:
             return self._chat_sessions[sid]
 
-        history = []
-        if session.chat_history:
-            for msg in session.chat_history:
-                role = "user" if msg["role"] == "user" else "model"
-                history.append(
-                    types.Content(
-                        role=role,
-                        parts=[types.Part.from_text(text=msg["content"])],
-                    )
-                )
+        history = build_chat_history(session.chat_history) if session.chat_history else []
 
         system_instruction = self._get_system_instruction(session)
         config = types.GenerateContentConfig(
             system_instruction=[types.Part.from_text(text=system_instruction)],
             thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
-        chat_session = gemini_client.chats.create(
+        chat_session = _gemini_service.client.chats.create(
             model=self.model_name,
             config=config,
             history=history,
@@ -89,8 +85,7 @@ class HciotMainAgent:
 
     @staticmethod
     def _get_store_name_for_language(language: str) -> str:
-        normalized_language = "en" if isinstance(language, str) and language.strip().lower().startswith("en") else "zh"
-        return "__hciot__en" if normalized_language == "en" else HCIOT_STORE_NAME
+        return "__hciot__en" if normalize_language(language) == "en" else HCIOT_STORE_NAME
 
     @staticmethod
     def _get_active_prompt_context(language: str = "zh"):
@@ -98,7 +93,7 @@ class HciotMainAgent:
         store_name = HciotMainAgent._get_store_name_for_language(language)
         prompt_id = SYSTEM_DEFAULT_PROMPT_ID
         persona = None
-        normalized_language = "en" if isinstance(language, str) and language.strip().lower().startswith("en") else "zh"
+        normalized_language = normalize_language(language)
         try:
             from app import deps
             prompt_manager = getattr(deps, "prompt_manager", None)
@@ -155,14 +150,13 @@ class HciotMainAgent:
 
     @staticmethod
     def _get_file_search_store_name(language: str) -> str | None:
-        normalized_language = "EN" if isinstance(language, str) and language.strip().lower().startswith("en") else "ZH"
-        store_id = (
-            os.getenv(f"HCIOT_STORE_ID_{normalized_language}")
-            or os.getenv("HCIOT_STORE_ID")
-        )
-        if store_id:
-            return f"fileSearchStores/{store_id}" if not store_id.startswith("fileSearchStores/") else store_id
-        return None
+        lang_upper = normalize_language(language).upper()
+        store_id = os.getenv(f"HCIOT_STORE_ID_{lang_upper}") or os.getenv("HCIOT_STORE_ID")
+        if not store_id:
+            return None
+        if store_id.startswith("fileSearchStores/"):
+            return store_id
+        return f"fileSearchStores/{store_id}"
 
     def _file_search(self, query: str, language: str) -> str | None:
         store_name = self._get_file_search_store_name(language)
@@ -195,7 +189,7 @@ class HciotMainAgent:
 
     def _check_intent_fast(self, query: str) -> str:
         try:
-            response = gemini_client.models.generate_content(
+            response = _gemini_service.client.models.generate_content(
                 model=FILE_SEARCH_MODEL,
                 contents=build_intent_prompt(query),
                 config=types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=0)),
@@ -208,7 +202,7 @@ class HciotMainAgent:
 
     async def chat(self, session_id: str, user_message: str) -> Dict:
         try:
-            if not gemini_client:
+            if not _gemini_service.client:
                 return {"error": "Gemini client not initialized", "message": "系統未正確初始化，請檢查 API Key 設定。"}
 
             session = session_manager.get_session(session_id)
@@ -243,16 +237,11 @@ class HciotMainAgent:
                 if last_user.role == "user":
                     last_user.parts = [types.Part.from_text(text=user_message)]
 
-            final_message = ""
-            if response.candidates and response.candidates[0].content.parts:
-                for part in response.candidates[0].content.parts:
-                    if hasattr(part, "text") and part.text:
-                        final_message += part.text
-
+            final_message = extract_response_text(response)
             if not final_message:
                 final_message = "目前無法回應，請稍後再試。"
 
-            final_message = re.sub(r"\s*\[cite:\s*[^\]]*\]", "", final_message).strip()
+            final_message = strip_citations(final_message)
             self._sync_history_to_db_background(session_id, user_message, final_message)
             updated_session = session_manager.get_session(session_id)
 

@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 class MongoSessionManager(SessionStateMixin):
     """MongoDB Session 管理器"""
 
-    def __init__(self):
-        self.db = get_mongo_db()
+    def __init__(self, db_name: str | None = None):
+        self.db = get_mongo_db(db_name)
         self.sessions_collection = self.db["sessions"]
 
     def create_session(self, language: str = "zh") -> Session:
