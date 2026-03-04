@@ -5,6 +5,7 @@ export interface Store {
   created_at?: string;
   managed_app?: CmsAppTarget | null;
   managed_language?: KnowledgeLanguage | null;
+  key_index?: number;
 }
 
 export type CmsAppTarget = 'jti' | 'hciot';
@@ -47,7 +48,6 @@ export interface ChatResponse {
   prompt_applied?: boolean;
   turn_number?: number;
 }
-
 
 export interface StartChatResponse {
   prompt_applied?: boolean;

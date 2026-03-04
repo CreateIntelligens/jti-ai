@@ -7,26 +7,30 @@ Gemini API 整合服務（使用新版 google-genai SDK）
 3. 提供 Main Agent 呼叫介面
 """
 
-import os
 import time
 import logging
 from pathlib import Path
-from typing import Callable, Optional, Dict, List, TypeVar
+from typing import Callable, Optional, TypeVar
 
-import google.genai as genai
 from google.genai import types
 
 T = TypeVar("T")
 
 logger = logging.getLogger(__name__)
 
-# 設定 API Key
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    logger.warning("GEMINI_API_KEY not found in environment")
+# client 由 init_gemini_client() 在 startup 時從 registry 設定
+client = None
 
-# 新版 SDK 使用 Client
-client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
+
+def init_gemini_client():
+    """從 registry 取得 default client，設定 module-level client 變數。"""
+    global client
+    from app.services.gemini_clients import get_default_client
+    try:
+        client = get_default_client()
+        logger.info("Gemini client initialized from registry")
+    except ValueError:
+        logger.warning("GEMINI_API_KEY not found - Gemini client not initialized")
 
 
 class GeminiService:
@@ -67,7 +71,7 @@ class GeminiService:
             raise
 
     def get_model_with_tools(
-        self, tools: List[Dict], store_id: Optional[str] = None
+        self, tools: list[dict], store_id: Optional[str] = None
     ) -> str:
         """
         取得 Model 名稱（供 generate_content 使用）

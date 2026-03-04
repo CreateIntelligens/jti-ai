@@ -383,19 +383,6 @@ export default function ConversationHistoryModal({
         }
       }
 
-      const apiKey = localStorage.getItem('activeGeminiApiKey') || 'system';
-      if (!isAdminMode && apiKey && apiKey !== 'system') {
-        try {
-          const keys = JSON.parse(localStorage.getItem('userGeminiApiKeys') || '[]');
-          const found = keys.find((k: any) => k.name === apiKey);
-          if (found && found.key) {
-            url += `${url.includes('?') ? '&' : '?'}token=${found.key}`;
-          }
-        } catch {
-          // ignore parsing error
-        }
-      }
-
       window.open(url, '_blank');
     } catch (error) {
       console.error('[ConversationHistory] Export error:', error);

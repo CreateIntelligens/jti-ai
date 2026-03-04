@@ -5,38 +5,44 @@ import type {
   StartChatResponse,
   CmsAppTarget,
 } from '../../types';
-import { API_BASE, fetchAsAdmin, fetchWithApiKey, handleResponse } from './base';
+import { API_BASE, fetchAsAdmin, fetchWithApiKey, fetchWithUserGeminiKey, handleResponse } from './base';
 
 // ========== Stores & Files ==========
 
 export async function fetchStores(): Promise<Store[]> {
-  const response = await fetchWithApiKey(`${API_BASE}/stores`);
+  const response = await fetchWithUserGeminiKey(`${API_BASE}/stores`);
   return handleResponse<Store[]>(response);
 }
 
-export async function createStore(name: string): Promise<Store> {
-  const response = await fetchWithApiKey(`${API_BASE}/stores`, {
+export async function createStore(name: string, keyIndex: number = 0): Promise<Store> {
+  const response = await fetchWithUserGeminiKey(`${API_BASE}/stores`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ display_name: name }),
+    body: JSON.stringify({ display_name: name, key_index: keyIndex }),
   });
   return handleResponse<Store>(response);
 }
 
+export async function getKeysCount(): Promise<number> {
+  const response = await fetchWithUserGeminiKey(`${API_BASE}/keys/count`);
+  const data = await handleResponse<{ count: number }>(response);
+  return data.count;
+}
+
 export async function deleteStore(name: string): Promise<void> {
-  const response = await fetchWithApiKey(`${API_BASE}/stores/${name}`, { method: 'DELETE' });
+  const response = await fetchWithUserGeminiKey(`${API_BASE}/stores/${name}`, { method: 'DELETE' });
   await handleResponse<void>(response);
 }
 
 export async function fetchFiles(storeName: string): Promise<FileItem[]> {
-  const response = await fetchWithApiKey(`${API_BASE}/stores/${storeName}/files`);
+  const response = await fetchWithUserGeminiKey(`${API_BASE}/stores/${storeName}/files`);
   return handleResponse<FileItem[]>(response);
 }
 
 export async function uploadFile(storeName: string, file: File): Promise<void> {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await fetchWithApiKey(`${API_BASE}/stores/${storeName}/upload`, {
+  const response = await fetchWithUserGeminiKey(`${API_BASE}/stores/${storeName}/upload`, {
     method: 'POST',
     body: formData,
   });
@@ -44,7 +50,7 @@ export async function uploadFile(storeName: string, file: File): Promise<void> {
 }
 
 export async function deleteFile(fileName: string): Promise<void> {
-  const response = await fetchWithApiKey(`${API_BASE}/files/${fileName}`, { method: 'DELETE' });
+  const response = await fetchWithUserGeminiKey(`${API_BASE}/files/${fileName}`, { method: 'DELETE' });
   await handleResponse<void>(response);
 }
 
@@ -112,7 +118,7 @@ function getSelectedModel(): string {
 }
 
 export async function startChat(storeName: string, previousSessionId?: string | null): Promise<StartChatResponse> {
-  const response = await fetchWithApiKey(`${API_BASE}/chat/start`, {
+  const response = await fetchWithUserGeminiKey(`${API_BASE}/chat/start`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ store_name: storeName, model: getSelectedModel(), previous_session_id: previousSessionId || undefined }),
@@ -124,7 +130,7 @@ export async function sendMessage(text: string, sessionId?: string, turnNumber?:
   const payload: Record<string, unknown> = { message: text };
   if (sessionId) payload.session_id = sessionId;
   if (turnNumber !== undefined) payload.turn_number = turnNumber;
-  const response = await fetchWithApiKey(`${API_BASE}/chat/message`, {
+  const response = await fetchWithUserGeminiKey(`${API_BASE}/chat/message`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
@@ -244,12 +250,12 @@ export function setActiveApiKey(name: string): void {
 
 export async function getGeneralConversations(storeName?: string): Promise<any> {
   const params = storeName ? `?store_name=${encodeURIComponent(storeName)}` : '';
-  const response = await fetchWithApiKey(`${API_BASE}/chat/history${params}`);
+  const response = await fetchWithUserGeminiKey(`${API_BASE}/chat/history${params}`);
   return handleResponse<any>(response);
 }
 
 export async function getGeneralConversationDetail(sessionId: string): Promise<any> {
-  const response = await fetchWithApiKey(`${API_BASE}/chat/history/${encodeURIComponent(sessionId)}`);
+  const response = await fetchWithUserGeminiKey(`${API_BASE}/chat/history/${encodeURIComponent(sessionId)}`);
   return handleResponse<any>(response);
 }
 
@@ -266,7 +272,7 @@ export async function deleteConversations(mode: 'jti' | 'hciot' | 'general', ses
       url = `${API_BASE}/chat/history`;
       break;
   }
-  const doFetch = mode === 'general' ? fetchWithApiKey : fetchAsAdmin;
+  const doFetch = mode === 'general' ? fetchWithUserGeminiKey : fetchAsAdmin;
   const response = await doFetch(url, {
     method: 'DELETE',
     headers: { 'Content-Type': 'application/json' },

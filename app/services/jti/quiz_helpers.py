@@ -7,11 +7,10 @@ import re
 import logging
 from typing import Optional, Any
 
-from google import genai
-
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 from app.services.jti.main_agent import main_agent
 from app.services.gemini_service import gemini_with_retry
+from app.services.gemini_clients import get_default_client
 
 logger = logging.getLogger(__name__)
 
@@ -158,7 +157,7 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
     # 用 LLM 判斷（規則判不出時）
     logger.info(f"[LLM判斷] 規則無法判定，呼叫 LLM: '{user_message}'")
     try:
-        client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+        client = get_default_client()
 
         prompt = f"""判斷使用者意圖：作答、或是想暫停/中斷測驗。
 

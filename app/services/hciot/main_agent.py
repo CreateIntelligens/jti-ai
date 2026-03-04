@@ -13,6 +13,7 @@ from google.genai import types
 
 from app.models.session import Session
 from app.services.gemini_service import client as gemini_client
+from app.services.gemini_clients import get_client_for_store
 from app.services.hciot.agent_prompts import (
     PERSONA,
     SESSION_STATE_TEMPLATES,
@@ -169,9 +170,10 @@ class HciotMainAgent:
             logger.warning("未設定 HCIoT 知識庫，跳過 File Search")
             return None
 
+        client = get_client_for_store(store_name)
         for attempt in range(3):
             try:
-                response = gemini_client.models.generate_content(
+                response = client.models.generate_content(
                     model=FILE_SEARCH_MODEL,
                     contents=query,
                     config=types.GenerateContentConfig(

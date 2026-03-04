@@ -5,7 +5,7 @@ Gemini File Search API 範例程式
 建立知識庫並進行語義查詢。
 """
 
-import mimetypes
+import logging
 import os
 import time
 from datetime import datetime
@@ -17,6 +17,8 @@ from google.genai import types
 from app.services.gemini_service import gemini_with_retry
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 
 def log(message: str) -> None:
@@ -37,14 +39,30 @@ class FileSearchManager:
         """初始化 FileSearchManager。
 
         Args:
-            api_key: Gemini API Key（若未提供則從環境變數讀取）
+            api_key: Gemini API Key（若未提供則從 registry 取得 default client）
         """
-        api_key = api_key or os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError("未設定 GEMINI_API_KEY")
-
-        self.client = genai.Client(api_key=api_key)
+        self.api_key = api_key
+        if api_key:
+            self.client = genai.Client(api_key=api_key)
+        else:
+            from app.services.gemini_clients import get_default_client
+            try:
+                self.client = get_default_client()
+            except ValueError:
+                api_key = os.getenv("GEMINI_API_KEY")
+                if not api_key:
+                    raise ValueError("未設定 GEMINI_API_KEY")
+                self.client = genai.Client(api_key=api_key)
         self.store_name: str | None = None
+
+    def _client_for(self, store_name: str | None = None):
+        """取得 store 對應的 client（多 key 支援）"""
+        if self.api_key:
+            return self.client
+        if store_name:
+            from app.services.gemini_clients import get_client_for_store
+            return get_client_for_store(store_name)
+        return self.client
 
     def create_store(self, display_name: str) -> str:
         """建立新的 File Search Store。
@@ -59,17 +77,36 @@ class FileSearchManager:
             config={"display_name": display_name}
         )
         self.store_name = store.name
+        # 將新 store 註冊到 registry，使後續操作能用正確的 client
+        from app.services.gemini_clients import register_store
+        register_store(self.store_name, self.client)
         log(f"已建立 Store: {self.store_name}")
         return self.store_name
 
     def list_stores(self) -> list:
-        """列出所有 File Search Store。
+        """列出所有 File Search Store（跨所有 key）。
 
         Returns:
             Store 列表
         """
-        stores = self.client.file_search_stores.list()
-        return list(stores)
+        if self.api_key:
+            return list(self.client.file_search_stores.list())
+
+        from app.services.gemini_clients import get_all_clients
+        clients = get_all_clients()
+        if not clients:
+            return list(self.client.file_search_stores.list())
+        all_stores = []
+        seen: set[str] = set()
+        for c in clients:
+            try:
+                for s in c.file_search_stores.list():
+                    if s.name not in seen:
+                        seen.add(s.name)
+                        all_stores.append(s)
+            except Exception as e:
+                logger.warning(f"列出 stores 失敗 (某把 key): {e}")
+        return all_stores
 
     def get_store(self, store_name: str):
         """取得指定 Store。
@@ -80,7 +117,7 @@ class FileSearchManager:
         Returns:
             Store 物件
         """
-        return self.client.file_search_stores.get(name=store_name)
+        return self._client_for(store_name).file_search_stores.get(name=store_name)
 
     def delete_store(self, store_name: str) -> None:
         """刪除指定 Store (會先清空其中的檔案)。
@@ -88,6 +125,7 @@ class FileSearchManager:
         Args:
             store_name: Store 資源名稱
         """
+        client = self._client_for(store_name)
         # 1. 先列出並刪除所有檔案
         try:
             files = self.list_files(store_name)
@@ -100,7 +138,7 @@ class FileSearchManager:
             log(f"列出檔案失敗 (可能 Store 已不存在): {e}")
 
         # 2. 刪除 Store 本身
-        self.client.file_search_stores.delete(name=store_name)
+        client.file_search_stores.delete(name=store_name)
         log(f"已刪除 Store: {store_name}")
 
     def upload_file(
@@ -154,15 +192,16 @@ class FileSearchManager:
                 mime_type = "text/plain"
 
         log(f"上傳中: {display_name} (mime={mime_type})")
+        client = self._client_for(store_name)
 
-        operation = self.client.file_search_stores.upload_to_file_search_store(
+        operation = client.file_search_stores.upload_to_file_search_store(
             file=file_path,
             file_search_store_name=store_name,
             config={"display_name": display_name, "mime_type": mime_type},
         )
         while not operation.done:
             time.sleep(poll_interval)
-            operation = self.client.operations.get(operation)
+            operation = client.operations.get(operation)
 
         log(f"已上傳: {display_name}")
         if operation.response:
@@ -175,7 +214,11 @@ class FileSearchManager:
         Args:
             file_name: 檔案資源名稱 (documents/...)
         """
-        self.client.file_search_stores.documents.delete(
+        # Extract store_name from file_name (e.g. "fileSearchStores/xxx/documents/yyy")
+        # 若格式不符則 store_name=None，_client_for(None) 會 fallback 到 self.client
+        parts = file_name.split("/")
+        store_name = "/".join(parts[:2]) if len(parts) >= 4 else None
+        self._client_for(store_name).file_search_stores.documents.delete(
             name=file_name,
             config={"force": True}
         )
@@ -190,7 +233,7 @@ class FileSearchManager:
         Returns:
             檔案列表 (包含 name, display_name)
         """
-        files = self.client.file_search_stores.documents.list(
+        files = self._client_for(store_name).file_search_stores.documents.list(
             parent=store_name
         )
         return list(files)
@@ -241,7 +284,7 @@ class FileSearchManager:
             thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
 
-        self.chat_session = self.client.chats.create(
+        self.chat_session = self._client_for(store_name).chats.create(
             model=model,
             config=self.current_config,
             history=history or []
@@ -305,7 +348,7 @@ class FileSearchManager:
         if system_instruction:
             si = [types.Part.from_text(text=system_instruction)]
 
-        response = self.client.models.generate_content(
+        response = self._client_for(store_name).models.generate_content(
             model=model,
             contents=question,
             config=types.GenerateContentConfig(

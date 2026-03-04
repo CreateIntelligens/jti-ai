@@ -206,9 +206,9 @@ export function useAppChat() {
     }
   };
 
-  const handleCreateStore = async (name: string) => {
+  const handleCreateStore = async (name: string, keyIndex: number = 0) => {
     try {
-      const newStore = await api.createStore(name);
+      const newStore = await api.createStore(name, keyIndex);
       const nextStores = await refreshStores();
       await handleStoreChange(newStore.name, nextStores);
     } catch (e) {

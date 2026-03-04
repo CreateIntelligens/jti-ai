@@ -29,6 +29,11 @@ def init_managers():
     """Called from app startup event to initialise managers."""
     global manager, prompt_manager, api_key_manager, general_session_manager
     try:
+        from .services.gemini_clients import init_registry
+        from .services.gemini_service import init_gemini_client
+        init_registry()
+        init_gemini_client()
+
         manager = FileSearchManager()
         from .prompts import PromptManager
         prompt_manager = PromptManager()
@@ -89,10 +94,13 @@ def _get_or_create_manager(user_api_key: Optional[str] = None, session_id: Optio
     # 1. 如果有 session_id，用 session_id 隔離
     if session_id:
         if session_id not in user_managers:
-            if not manager:
-                raise HTTPException(status_code=500, detail="未設定 API Key")
-            # 複製全域 manager 的 API key 建立新實例
-            new_mgr = FileSearchManager(api_key=manager.api_key if hasattr(manager, 'api_key') else None)
+            if user_api_key:
+                new_mgr = FileSearchManager(api_key=user_api_key)
+            else:
+                if not manager:
+                    raise HTTPException(status_code=500, detail="未設定 API Key")
+                # 複製全域 manager 的 API key 建立新實例
+                new_mgr = FileSearchManager(api_key=manager.api_key if hasattr(manager, 'api_key') else None)
 
             # 嘗試從 MongoDB 恢復 session
             if general_session_manager:

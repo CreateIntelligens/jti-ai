@@ -1,13 +1,14 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { Store } from '../types';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { getKeysCount } from '../services/api/general';
 
 interface StoreManagementModalProps {
   isOpen: boolean;
   onClose: () => void;
   stores: Store[];
   currentStore: string | null;
-  onCreateStore: (name: string) => Promise<void>;
+  onCreateStore: (name: string, keyIndex: number) => Promise<void>;
   onDeleteStore: (name: string) => Promise<void>;
   onRefresh: () => void;
 }
@@ -22,9 +23,17 @@ export default function StoreManagementModal({
   onRefresh,
 }: StoreManagementModalProps) {
   const [newStoreName, setNewStoreName] = useState('');
+  const [selectedKeyIndex, setSelectedKeyIndex] = useState(0);
+  const [keyCount, setKeyCount] = useState(1);
   const [creating, setCreating] = useState(false);
 
   useEscapeKey(onClose, isOpen);
+
+  useEffect(() => {
+    if (isOpen) {
+      getKeysCount().then(setKeyCount).catch(() => setKeyCount(1));
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -32,7 +41,7 @@ export default function StoreManagementModal({
     if (!newStoreName.trim()) return;
     setCreating(true);
     try {
-      await onCreateStore(newStoreName.trim());
+      await onCreateStore(newStoreName.trim(), selectedKeyIndex);
       setNewStoreName('');
       onRefresh();
     } finally {
@@ -66,6 +75,18 @@ export default function StoreManagementModal({
                 className="flex-1"
                 onKeyDown={e => e.key === 'Enter' && handleCreate()}
               />
+              {keyCount > 1 && (
+                <select
+                  value={selectedKeyIndex}
+                  onChange={e => setSelectedKeyIndex(Number(e.target.value))}
+                  style={{ minWidth: '120px' }}
+                  title="選擇使用哪個專案 key 建立"
+                >
+                  {Array.from({ length: keyCount }, (_, i) => (
+                    <option key={i} value={i}>Key #{i + 1}</option>
+                  ))}
+                </select>
+              )}
               <button onClick={handleCreate} disabled={creating || !newStoreName.trim()}>
                 {creating ? '建立中...' : '✓ 建立'}
               </button>
@@ -89,6 +110,11 @@ export default function StoreManagementModal({
                       {store.name === currentStore && (
                         <span style={{ marginLeft: '0.5rem', color: 'var(--crystal-teal)' }}>
                           ◆ 使用中
+                        </span>
+                      )}
+                      {keyCount > 1 && store.key_index !== undefined && (
+                        <span style={{ marginLeft: '0.5rem', color: '#8090b0', fontSize: '0.8em' }}>
+                          Key #{store.key_index + 1}
                         </span>
                       )}
                     </span>

@@ -77,7 +77,7 @@ export default function UserApiKeyModal({ isOpen, onClose, onApiKeySaved }: User
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal app-container" onClick={e => e.stopPropagation()} style={{ maxWidth: '680px' }}>
-        <h2>◈ API Key 設定</h2>
+        <h2>◈ Gemini Key 設定</h2>
 
         <div className="modal-content">
 
@@ -184,7 +184,7 @@ export default function UserApiKeyModal({ isOpen, onClose, onApiKeySaved }: User
               letterSpacing: '1px',
               textTransform: 'uppercase',
             }}>
-              新增 API Key
+              新增 Gemini Key
             </label>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
               <input
@@ -199,7 +199,7 @@ export default function UserApiKeyModal({ isOpen, onClose, onApiKeySaved }: User
                 value={newKey}
                 onChange={e => setNewKey(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="API Key（AIza...）"
+                placeholder="Gemini API Key（例如 AIza...）"
                 style={{ flex: 1 }}
               />
               <button
@@ -222,7 +222,7 @@ export default function UserApiKeyModal({ isOpen, onClose, onApiKeySaved }: User
             color: '#6070a0',
             lineHeight: 1.6,
           }}>
-            Key 僅存於瀏覽器，不會上傳。用於呼叫後端 API（Header：API-Token）。
+            Key 僅存於瀏覽器，不會上傳。首頁的一般知識庫與聊天會使用你選取的 Gemini key。
           </div>
         </div>
 

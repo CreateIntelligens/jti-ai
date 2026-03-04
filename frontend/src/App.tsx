@@ -8,6 +8,7 @@ import ConversationHistoryModal from './components/ConversationHistoryModal';
 import Jti from './pages/Jti';
 import Hciot from './pages/Hciot';
 import { useAppChat } from './hooks/useAppChat';
+import * as api from './services/api';
 import './styles/shared/index.css';
 import './styles/app/layout.css';
 import './styles/app/forms.css';
@@ -25,18 +26,20 @@ export default function App() {
     .split(',').map((s: string) => s.trim().toLowerCase());
   const canShow = (p: string) => !isRestricted || allowedPages.includes(p);
 
-  const page = window.location.pathname.replace(/^\//, '').toLowerCase() || 'home';
+  const pathname = window.location.pathname;
+  const page = pathname.replace(/^\/+|\/+$/g, '').toLowerCase() || 'home';
 
   const isHciotPage = page === 'hciot' && canShow('hciot');
   const isJtiPage = page === 'jti' && canShow('jti');
+  const activeGeminiKeyName = api.getActiveApiKeyName();
 
   if (isHciotPage) {
-    if (page !== 'hciot') window.history.replaceState(null, '', '/hciot');
+    if (pathname !== '/hciot') window.history.replaceState(null, '', '/hciot');
     return <Hciot />;
   }
 
   if (isJtiPage) {
-    if (page !== 'jti') window.history.replaceState(null, '', '/jti');
+    if (pathname !== '/jti') window.history.replaceState(null, '', '/jti');
     return <Jti />;
   }
 
@@ -69,8 +72,11 @@ export default function App() {
           sidebarOpen={sidebarOpen}
           onOpenStoreManagement={() => setStoreModalOpen(true)}
           onOpenUserApiKeySettings={() => setUserApiKeyModalOpen(true)}
-          onOpenConversationHistory={chatStoreName ? () => setConversationHistoryModalOpen(true) : undefined}
-          onRestartChat={chatStoreName ? handleRestartChat : undefined}
+          activeGeminiKeyName={activeGeminiKeyName === 'system' ? '系統預設' : activeGeminiKeyName}
+          onOpenConversationHistory={() => setConversationHistoryModalOpen(true)}
+          onRestartChat={handleRestartChat}
+          canOpenConversationHistory={Boolean(chatStoreName)}
+          canRestartChat={Boolean(chatStoreName)}
           theme={theme}
           onToggleTheme={toggleTheme}
         />
@@ -120,8 +126,7 @@ export default function App() {
         onClose={() => setUserApiKeyModalOpen(false)}
         onApiKeySaved={() => {
           showStatus('✅ API Key 已儲存');
-          refreshStores();
-          refreshFiles();
+          void handleRefreshKnowledge();
         }}
       />
       <ConversationHistoryModal

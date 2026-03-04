@@ -18,6 +18,7 @@ from google.genai import types
 from app.models.session import Session, SessionStep
 from app.services.session.session_manager_factory import get_session_manager
 from app.services.gemini_service import client as gemini_client, gemini_with_retry
+from app.services.gemini_clients import get_client_for_store
 from app.tools.tool_executor import tool_executor, ToolExecutor
 from app.services.jti.agent_prompts import (
     PERSONA,
@@ -201,10 +202,11 @@ class MainAgent:
 
         store_name = f"fileSearchStores/{store_id}"
         logger.info(f"[File Search] 查詢: {query[:100]}...")
+        client = get_client_for_store(store_name)
 
         for attempt in range(3):
             try:
-                response = gemini_client.models.generate_content(
+                response = client.models.generate_content(
                     model=FILE_SEARCH_MODEL,
                     contents=query,
                     config=types.GenerateContentConfig(

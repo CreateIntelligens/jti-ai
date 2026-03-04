@@ -10,10 +10,10 @@ import uuid
 from datetime import datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 
-from app.auth import verify_auth
+from app.auth import verify_auth, extract_user_gemini_api_key
 from app.core import FileSearchManager
 from app.schemas.jti import (
     DeleteConversationRequest,
@@ -41,7 +41,7 @@ class ChatMessageRequest(BaseModel):
 
 
 @router.post("/start")
-def start_chat(req: ChatStartRequest, auth: dict = Depends(verify_auth)):
+def start_chat(req: ChatStartRequest, request: Request, auth: dict = Depends(verify_auth)):
     """
     開始新的對話 Session。
 
@@ -65,12 +65,14 @@ def start_chat(req: ChatStartRequest, auth: dict = Depends(verify_auth)):
         # 一般 key → 強制用 key 綁定的 store
         store_name = auth["store_name"]
 
+    user_gemini_api_key = extract_user_gemini_api_key(request) if auth["role"] == "admin" else None
+
     # 生成 session_id
     session_key = f"{store_name}:{uuid.uuid4().hex[:8]}"
     session_id = hashlib.sha256(session_key.encode()).hexdigest()
 
     # 取得該 session 專屬的 manager
-    mgr = deps._get_or_create_manager(session_id=session_id)
+    mgr = deps._get_or_create_manager(user_api_key=user_gemini_api_key, session_id=session_id)
 
     # 取得啟用的 prompt (如果有)
     system_instruction = None
@@ -110,7 +112,7 @@ def start_chat(req: ChatStartRequest, auth: dict = Depends(verify_auth)):
 
 
 @router.post("/message")
-def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
+def send_message(req: ChatMessageRequest, request: Request, auth: dict = Depends(verify_auth)):
     """
     發送訊息到指定的對話 Session。
 
@@ -120,6 +122,8 @@ def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
     可選參數：
     - turn_number: 帶此參數時，先截斷到該輪之前再送訊息（用於重新生成 / 編輯重送）
     """
+    user_gemini_api_key = extract_user_gemini_api_key(request) if auth["role"] == "admin" else None
+
     # 取得 session_id（用於日誌記錄）
     if req.session_id:
         session_id = req.session_id
@@ -144,7 +148,10 @@ def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
             del deps.user_managers[session_id]
 
     # 取得該 session 專屬的 manager
-    mgr = deps._get_or_create_manager(session_id=req.session_id)
+    mgr = deps._get_or_create_manager(
+        user_api_key=user_gemini_api_key,
+        session_id=req.session_id or session_id,
+    )
 
     # 如果 manager 沒有 chat（general_chat_sessions 可能過期），從 conversation_logs 重建
     if req.session_id and not (hasattr(mgr, 'current_store') and mgr.current_store):

@@ -140,14 +140,20 @@ export default function Hciot() {
       setIsTyping(false);
 
       const nextMessage: HciotMessage = {
-        text: data.message,
+        text: data.answer,
         type: 'assistant',
         timestamp: Date.now(),
         turnNumber: data.turn_number,
       };
 
       setMessages((prev) => {
-        const lastUserIndex = prev.findLastIndex((m) => m.type === 'user');
+        let lastUserIndex = -1;
+        for (let index = prev.length - 1; index >= 0; index -= 1) {
+          if (prev[index].type === 'user') {
+            lastUserIndex = index;
+            break;
+          }
+        }
         return [
           ...prev.map((m, i) =>
             i === lastUserIndex ? { ...m, turnNumber: data.turn_number } : m,
