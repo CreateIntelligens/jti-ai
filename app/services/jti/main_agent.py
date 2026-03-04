@@ -17,7 +17,7 @@ import google.genai as genai
 from google.genai import types
 from app.models.session import Session, SessionStep
 from app.services.session.session_manager_factory import get_session_manager
-from app.services.gemini_service import client as gemini_client
+from app.services.gemini_service import client as gemini_client, gemini_with_retry
 from app.tools.tool_executor import tool_executor, ToolExecutor
 from app.services.jti.agent_prompts import (
     PERSONA,
@@ -239,11 +239,11 @@ class MainAgent:
 使用者訊息：「{query}」
 
 只能回覆 YES 或 NO："""
-            response = gemini_client.models.generate_content(
+            response = gemini_with_retry(lambda: gemini_client.models.generate_content(
                 model=FILE_SEARCH_MODEL,
                 contents=prompt,
                 config=types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=0)),
-            )
+            ))
             res = response.text.strip().upper() if response.text else "YES"
             logger.info(f"[Intent Check] 結果: {res} | 訊息: '{query[:30]}...'")
             return "NO" if "NO" in res else "YES"
@@ -312,7 +312,7 @@ class MainAgent:
 
             logger.info(f"使用者訊息: {user_message[:200]}...")
             t2 = time.time()
-            response = chat_session.send_message(enriched_message)
+            response = gemini_with_retry(lambda: chat_session.send_message(enriched_message))
             t3 = time.time()
             logger.info(f"[計時] 主 Agent: {(t3-t2)*1000:.0f}ms | 總計: {(t3-t0)*1000:.0f}ms")
 
@@ -404,11 +404,11 @@ class MainAgent:
                 thinking_config=types.ThinkingConfig(thinking_budget=0),
                 )
 
-            response = gemini_client.models.generate_content(
+            response = gemini_with_retry(lambda: gemini_client.models.generate_content(
                 model=self.model_name,
                 contents=conversation_parts,
-                config=config
-            )
+                config=config,
+            ))
 
             final_message = ""
             if response.candidates and response.candidates[0].content.parts:

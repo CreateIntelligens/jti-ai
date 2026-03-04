@@ -46,14 +46,14 @@ export default function App() {
     promptModalOpen, setPromptModalOpen,
     userApiKeyModalOpen, setUserApiKeyModalOpen,
     conversationHistoryModalOpen, setConversationHistoryModalOpen,
-    status, stores, currentStore,
+    status, stores, knowledgeTargets, currentTargetId, currentStore, chatStoreName, managedContext,
     files, filesLoading,
     messages, setMessages,
     loading,
     sessionId, setSessionId,
     theme, toggleTheme,
     toggleSidebar, showStatus,
-    refreshStores, refreshFiles,
+    refreshStores, refreshFiles, handleRefreshKnowledge,
     handleStoreChange, handleRestartChat,
     handleCreateStore, handleDeleteStore,
     handleUploadFile, handleDeleteFile,
@@ -69,28 +69,30 @@ export default function App() {
           sidebarOpen={sidebarOpen}
           onOpenStoreManagement={() => setStoreModalOpen(true)}
           onOpenUserApiKeySettings={() => setUserApiKeyModalOpen(true)}
-          onOpenConversationHistory={() => setConversationHistoryModalOpen(true)}
-          onRestartChat={handleRestartChat}
+          onOpenConversationHistory={chatStoreName ? () => setConversationHistoryModalOpen(true) : undefined}
+          onRestartChat={chatStoreName ? handleRestartChat : undefined}
           theme={theme}
           onToggleTheme={toggleTheme}
         />
         <div className="app-content">
           <Sidebar
             isOpen={sidebarOpen}
-            stores={stores}
-            currentStore={currentStore}
+            knowledgeTargets={knowledgeTargets}
+            currentTargetId={currentTargetId}
+            managedContext={managedContext}
             files={files}
             filesLoading={filesLoading}
-            onStoreChange={handleStoreChange}
+            onTargetChange={handleStoreChange}
             onUploadFile={handleUploadFile}
             onDeleteFile={handleDeleteFile}
-            onRefresh={refreshStores}
+            onRefresh={handleRefreshKnowledge}
             onOpenPromptManagement={() => setPromptModalOpen(true)}
+            onShowStatus={showStatus}
           />
           <ChatArea
             messages={messages}
             onSendMessage={handleSendMessage}
-            disabled={!currentStore}
+            disabled={!chatStoreName}
             loading={loading}
             onRegenerate={handleRegenerate}
             onEditAndResend={handleEditAndResend}
@@ -109,7 +111,7 @@ export default function App() {
       <PromptManagementModal
         isOpen={promptModalOpen}
         onClose={() => setPromptModalOpen(false)}
-        currentStore={currentStore}
+        currentStore={chatStoreName}
         onRestartChat={handleRestartChat}
         stores={stores}
       />
@@ -126,7 +128,7 @@ export default function App() {
         isOpen={conversationHistoryModalOpen}
         onClose={() => setConversationHistoryModalOpen(false)}
         sessionId={sessionId || undefined}
-        storeName={currentStore || undefined}
+        storeName={chatStoreName || undefined}
         mode="general"
         onResumeSession={(sid, msgs, _lang) => {
           setSessionId(sid);

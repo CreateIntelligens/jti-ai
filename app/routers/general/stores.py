@@ -2,6 +2,7 @@
 Store Management API Endpoints
 """
 
+import os
 import shutil
 import uuid
 from pathlib import Path
@@ -24,13 +25,43 @@ class QueryRequest(BaseModel):
     question: str
 
 
+def _normalize_store_name(store_name: str | None) -> str | None:
+    if not store_name:
+        return None
+    return store_name if store_name.startswith("fileSearchStores/") else f"fileSearchStores/{store_name}"
+
+
+def _resolve_managed_store_context(store_name: str) -> dict[str, str] | None:
+    normalized = _normalize_store_name(store_name)
+    mappings = [
+        ("jti", "zh", os.getenv("JTI_STORE_ID_ZH")),
+        ("jti", "en", os.getenv("JTI_STORE_ID_EN")),
+        ("hciot", "zh", os.getenv("HCIOT_STORE_ID_ZH") or os.getenv("HCIOT_STORE_ID")),
+        ("hciot", "en", os.getenv("HCIOT_STORE_ID_EN")),
+    ]
+
+    for app_name, language, configured_store in mappings:
+        if normalized and normalized == _normalize_store_name(configured_store):
+            return {"managed_app": app_name, "managed_language": language}
+    return None
+
+
 @router.get("/stores")
 def list_stores(auth: dict = Depends(verify_auth)):
     """列出所有 Store。（Admin only）"""
     require_admin(auth)
     mgr = _get_or_create_manager()
     stores = mgr.list_stores()
-    return [{"name": s.name, "display_name": s.display_name} for s in stores]
+    result = []
+    for store in stores:
+        managed_context = _resolve_managed_store_context(store.name) or {}
+        result.append({
+            "name": store.name,
+            "display_name": store.display_name,
+            "managed_app": managed_context.get("managed_app"),
+            "managed_language": managed_context.get("managed_language"),
+        })
+    return result
 
 
 @router.post("/stores")

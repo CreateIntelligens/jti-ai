@@ -66,7 +66,7 @@ from google.genai.errors import ClientError
 
 from .auth import verify_auth, _extract_bearer_token
 from .routers.jti import chat as jti_chat, quiz as jti_quiz, prompts as jti_prompts, knowledge as jti_knowledge, quiz_bank as jti_quiz_bank
-from .routers.general import chat, stores, prompts, api_keys
+from .routers.general import chat, stores, prompts, api_keys, knowledge_admin
 from .routers.hciot import chat as hciot_chat, prompts as hciot_prompts, knowledge as hciot_knowledge
 from .services.mongo_client import get_mongo_client
 import app.deps as deps
@@ -317,5 +317,6 @@ app.include_router(hciot_knowledge.router, prefix="/api/hciot-admin/knowledge")
 app.include_router(hciot_knowledge.router, prefix="/api/hciot/knowledge", include_in_schema=False)
 app.include_router(chat.router)
 app.include_router(prompts.router)  # before stores (more specific path patterns)
+app.include_router(knowledge_admin.router)
 app.include_router(stores.router)
 app.include_router(api_keys.router)

@@ -110,10 +110,34 @@ class MongoDBClient:
         knowledge_files = db["knowledge_files"]
 
         try:
+            migrated = knowledge_files.update_many(
+                {"namespace": {"$exists": False}},
+                {"$set": {"namespace": "jti"}},
+            )
+            if migrated.modified_count:
+                logger.info(
+                    "Backfilled namespace='jti' for %s legacy knowledge files",
+                    migrated.modified_count,
+                )
+        except Exception as e:
+            logger.warning(f"Legacy knowledge namespace backfill failed: {e}")
+
+        try:
+            legacy_index_keys = [("language", 1), ("filename", 1)]
+            for idx_name, meta in list(knowledge_files.index_information().items()):
+                if idx_name == "_id_":
+                    continue
+                if meta.get("key") == legacy_index_keys:
+                    try:
+                        knowledge_files.drop_index(idx_name)
+                    except Exception:
+                        pass
+
             knowledge_files.create_index(
-                [("language", 1), ("filename", 1)],
+                [("namespace", 1), ("language", 1), ("filename", 1)],
                 unique=True,
             )
+            knowledge_files.create_index([("namespace", 1), ("language", 1)])
             knowledge_files.create_index("language")
             logger.info("Created indexes for 'knowledge_files' collection")
         except Exception as e:

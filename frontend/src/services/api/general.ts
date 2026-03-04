@@ -1,4 +1,10 @@
-import type { Store, FileItem, ChatResponse, StartChatResponse } from '../../types';
+import type {
+  Store,
+  FileItem,
+  ChatResponse,
+  StartChatResponse,
+  CmsAppTarget,
+} from '../../types';
 import { API_BASE, fetchAsAdmin, fetchWithApiKey, handleResponse } from './base';
 
 // ========== Stores & Files ==========
@@ -40,6 +46,63 @@ export async function uploadFile(storeName: string, file: File): Promise<void> {
 export async function deleteFile(fileName: string): Promise<void> {
   const response = await fetchWithApiKey(`${API_BASE}/files/${fileName}`, { method: 'DELETE' });
   await handleResponse<void>(response);
+}
+
+// ========== Homepage CMS Knowledge ==========
+
+function normalizeKnowledgeLanguage(language: string): string {
+  return language.toLowerCase().startsWith('en') ? 'en' : 'zh';
+}
+
+export async function listManagedKnowledgeFiles(appTarget: CmsAppTarget, language: string = 'zh'): Promise<any> {
+  const params = new URLSearchParams({ app: appTarget, language: normalizeKnowledgeLanguage(language) });
+  const response = await fetchAsAdmin(`${API_BASE}/admin/knowledge/files/?${params}`);
+  return handleResponse<any>(response);
+}
+
+export async function getManagedKnowledgeFileContent(appTarget: CmsAppTarget, filename: string, language: string = 'zh'): Promise<any> {
+  const params = new URLSearchParams({ app: appTarget, language: normalizeKnowledgeLanguage(language) });
+  const response = await fetchAsAdmin(`${API_BASE}/admin/knowledge/files/${encodeURIComponent(filename)}/content?${params}`);
+  return handleResponse<any>(response);
+}
+
+export function downloadManagedKnowledgeFile(appTarget: CmsAppTarget, filename: string, language: string = 'zh'): void {
+  const params = new URLSearchParams({ app: appTarget, language: normalizeKnowledgeLanguage(language) });
+  window.open(`${API_BASE}/admin/knowledge/files/${encodeURIComponent(filename)}/download?${params}`, '_blank');
+}
+
+export async function updateManagedKnowledgeFileContent(
+  appTarget: CmsAppTarget,
+  filename: string,
+  content: string,
+  language: string = 'zh',
+): Promise<any> {
+  const params = new URLSearchParams({ app: appTarget, language: normalizeKnowledgeLanguage(language) });
+  const response = await fetchAsAdmin(`${API_BASE}/admin/knowledge/files/${encodeURIComponent(filename)}/content?${params}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+  return handleResponse<any>(response);
+}
+
+export async function uploadManagedKnowledgeFile(appTarget: CmsAppTarget, language: string, file: File): Promise<any> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const params = new URLSearchParams({ app: appTarget, language: normalizeKnowledgeLanguage(language) });
+  const response = await fetchAsAdmin(`${API_BASE}/admin/knowledge/upload/?${params}`, {
+    method: 'POST',
+    body: formData,
+  });
+  return handleResponse<any>(response);
+}
+
+export async function deleteManagedKnowledgeFile(appTarget: CmsAppTarget, fileName: string, language: string = 'zh'): Promise<any> {
+  const params = new URLSearchParams({ app: appTarget, language: normalizeKnowledgeLanguage(language) });
+  const response = await fetchAsAdmin(`${API_BASE}/admin/knowledge/files/${encodeURIComponent(fileName)}?${params}`, {
+    method: 'DELETE',
+  });
+  return handleResponse<any>(response);
 }
 
 // ========== Chat ==========
@@ -191,11 +254,18 @@ export async function getGeneralConversationDetail(sessionId: string): Promise<a
 }
 
 export async function deleteConversations(mode: 'jti' | 'hciot' | 'general', sessionIds: string[]): Promise<void> {
-  const url = mode === 'jti'
-    ? `${API_BASE}/jti-admin/conversations`
-    : mode === 'hciot'
-      ? `${API_BASE}/hciot-admin/conversations`
-      : `${API_BASE}/chat/history`;
+  let url: string;
+  switch (mode) {
+    case 'jti':
+      url = `${API_BASE}/jti-admin/conversations`;
+      break;
+    case 'hciot':
+      url = `${API_BASE}/hciot-admin/conversations`;
+      break;
+    default:
+      url = `${API_BASE}/chat/history`;
+      break;
+  }
   const doFetch = mode === 'general' ? fetchWithApiKey : fetchAsAdmin;
   const response = await doFetch(url, {
     method: 'DELETE',

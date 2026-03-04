@@ -19,7 +19,7 @@ conversation_logger = get_conversation_logger()
 logger = logging.getLogger(__name__)
 
 QUIZ_OPENING = {
-    "zh": "簡單四個問題，幫你找到命定手機殼，如果中途想離開，請輸入「中斷」，即可回到問答模式，讓我們開始測驗吧！",
+    "zh": "簡單四個問題，幫你找到命定保護殼，如果中途想離開，請輸入「中斷」，即可回到問答模式，讓我們開始測驗吧！",
     "en": "Just four questions to find your perfect phone case! If you want to leave midway, type pause to return to chat. Let's begin!",
 }
 

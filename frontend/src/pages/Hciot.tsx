@@ -147,18 +147,13 @@ export default function Hciot() {
       };
 
       setMessages((prev) => {
-        const next = [...prev];
-        let lastUserMessageIndex = -1;
-        for (let index = next.length - 1; index >= 0; index -= 1) {
-          if (next[index].type === 'user') {
-            lastUserMessageIndex = index;
-            break;
-          }
-        }
-        if (lastUserMessageIndex !== -1) {
-          next[lastUserMessageIndex].turnNumber = data.turn_number;
-        }
-        return [...next, nextMessage];
+        const lastUserIndex = prev.findLastIndex((m) => m.type === 'user');
+        return [
+          ...prev.map((m, i) =>
+            i === lastUserIndex ? { ...m, turnNumber: data.turn_number } : m,
+          ),
+          nextMessage,
+        ];
       });
 
       setStatusText(t('status_chatting'));

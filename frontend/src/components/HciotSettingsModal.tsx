@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import { normalizeHciotLanguage } from '../config/hciotTopics';
 import * as api from '../services/api';
 import JtiKnowledgeTab from './jti/JtiKnowledgeTab';
 import JtiPersonaTab from './jti/JtiPersonaTab';
@@ -28,12 +29,9 @@ interface KBFile { name: string; display_name: string; size?: number; editable?:
 
 const MAX_CUSTOM = 3;
 const SYSTEM_DEFAULT_ID = 'system_default';
-const normalizeLanguage = (value?: string) => (
-  typeof value === 'string' && value.trim().toLowerCase().startsWith('en') ? 'en' : 'zh'
-);
 
 export default function HciotSettingsModal({ isOpen, onClose, onPromptChange, language = 'zh' }: HciotSettingsModalProps) {
-  const normalizedLanguage = normalizeLanguage(language);
+  const normalizedLanguage = normalizeHciotLanguage(language);
   const [activeTab, setActiveTab] = useState<'prompt' | 'kb'>('prompt');
 
   const [prompts, setPrompts] = useState<Prompt[]>([]);

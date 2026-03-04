@@ -3,7 +3,29 @@ export interface Store {
   display_name?: string;
   file_count?: number;
   created_at?: string;
+  managed_app?: CmsAppTarget | null;
+  managed_language?: KnowledgeLanguage | null;
 }
+
+export type CmsAppTarget = 'jti' | 'hciot';
+export type KnowledgeLanguage = 'zh' | 'en';
+
+export type KnowledgeTarget =
+  | {
+      id: string;
+      kind: 'store';
+      label: string;
+      storeName: string;
+      managedApp?: CmsAppTarget | null;
+      managedLanguage?: KnowledgeLanguage | null;
+    }
+  | {
+      id: string;
+      kind: 'app';
+      label: string;
+      appTarget: CmsAppTarget;
+      language: KnowledgeLanguage;
+    };
 
 export interface FileItem {
   name: string;

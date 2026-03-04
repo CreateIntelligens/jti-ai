@@ -10,7 +10,7 @@ import google.genai as genai
 from google.genai import types
 
 API_KEY = os.getenv("GEMINI_API_KEY")
-STORE_ID = os.getenv("GEMINI_FILE_SEARCH_STORE_ID_ZH", os.getenv("GEMINI_FILE_SEARCH_STORE_ID"))
+STORE_ID = os.getenv("JTI_STORE_ID_ZH")
 MODEL = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 
 client = genai.Client(api_key=API_KEY)
