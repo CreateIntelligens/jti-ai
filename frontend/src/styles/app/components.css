@@ -9,17 +9,21 @@
 }
 
 .file-list li {
-  padding: 0.85rem 1rem;
+  padding: 0.6rem 0.8rem;
+  /* Reduced padding */
   background: rgba(26, 31, 58, 0.4);
   border: 1px solid rgba(61, 217, 211, 0.15);
   border-radius: 10px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  /* Slightly smaller font */
   color: #c5d4ff;
   transition: var(--transition-smooth);
   cursor: pointer;
+  gap: 0.5rem;
+  /* Add gap flex layout for safety */
 }
 
 .file-list li:hover {
@@ -30,9 +34,31 @@
 }
 
 .file-list li button {
-  padding: 0.35rem 0.75rem;
-  font-size: 0.8rem;
-  margin-left: 0.75rem;
+  padding: 0.3rem 0.5rem;
+  /* Reduced button padding */
+  font-size: 0.75rem;
+  /* Smaller icon font */
+  margin-left: 0.2rem;
+  /* Reduced margin */
+  min-width: 28px;
+  /* Ensure they don't get too squished */
+}
+
+/* Ensure the file name area can truncate instead of pushing buttons out */
+.file-list li .file-name-text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-list li .file-actions {
+  display: flex;
+  gap: 0.2rem;
+  /* Small gap between buttons */
+  flex-shrink: 0;
+  /* Prevent the buttons from shrinking */
 }
 
 /* File list animations */
@@ -232,76 +258,82 @@
   margin-top: 1.5rem;
 }
 
-/* ==================== THEME SWITCH ==================== */
+/* ==================== THEME SWITCH (MODERN) ==================== */
 
-.theme-switch {
-  display: flex;
+.header-icon-btn {
+  display: inline-flex;
   align-items: center;
-  position: relative;
-  width: 56px;
-  height: 28px;
-  background: linear-gradient(135deg, #1a1f3a, #0d1117);
-  border: 1px solid rgba(138, 180, 248, 0.15);
-  border-radius: 14px;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(42, 49, 84, 0.5);
+  border: 1px solid rgba(61, 217, 211, 0.3);
+  color: var(--crystal-cyan);
   cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   padding: 0;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
+  position: relative;
   flex-shrink: 0;
 }
 
-.theme-switch:hover {
-  border-color: rgba(138, 180, 248, 0.4);
-  box-shadow: 0 0 12px rgba(138, 180, 248, 0.15);
+.header-icon-btn:hover {
+  background: rgba(61, 217, 211, 0.15);
+  border-color: rgba(61, 217, 211, 0.6);
+  box-shadow: 0 0 12px rgba(61, 217, 211, 0.2);
+  transform: translateY(-1px);
 }
 
-.theme-switch:focus-visible {
-  outline: 2px solid var(--primary-color);
-  outline-offset: 2px;
+[data-theme="light"] .header-icon-btn {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(15, 118, 110, 0.15);
+  color: var(--crystal-teal);
 }
 
-.theme-option {
-  flex: 1;
+[data-theme="light"] .header-icon-btn:hover {
+  background: #fff;
+  border-color: var(--crystal-teal);
+  box-shadow: 0 2px 8px rgba(15, 118, 110, 0.15);
+}
+
+.theme-icon-wrapper {
+  position: relative;
+  width: 18px;
+  height: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.75rem;
-  z-index: 1;
-  opacity: 0.35;
-  transition: opacity 0.3s ease;
-  user-select: none;
 }
 
-.theme-option.active {
-  opacity: 1;
-}
-
-.theme-slider {
+.icon-sun,
+.icon-moon {
   position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 24px;
-  height: 24px;
-  background: linear-gradient(135deg, #8ab4f8, #669df6);
-  border-radius: 50%;
-  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1),
-    background 0.35s ease;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  top: 0;
+  left: 0;
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.theme-slider.light {
-  transform: translateX(28px);
-  background: linear-gradient(135deg, #f9ab00, #f29900);
-  box-shadow: 0 1px 6px rgba(249, 171, 0, 0.4);
+/* Dark mode (default) */
+.theme-toggle-btn.dark .icon-sun {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.5);
 }
 
-[data-theme="light"] .theme-switch {
-  background: linear-gradient(135deg, #e8eaed, #f1f3f4);
-  border-color: rgba(26, 115, 232, 0.15);
+.theme-toggle-btn.dark .icon-moon {
+  opacity: 1;
+  transform: rotate(0) scale(1);
 }
 
-[data-theme="light"] .theme-switch:hover {
-  border-color: rgba(26, 115, 232, 0.3);
-  box-shadow: 0 0 12px rgba(26, 115, 232, 0.1);
+/* Light mode */
+.theme-toggle-btn.light .icon-moon {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.5);
+}
+
+.theme-toggle-btn.light .icon-sun {
+  opacity: 1;
+  transform: rotate(0) scale(1);
 }
 
 @keyframes crystalShift {
@@ -314,4 +346,85 @@
   50% {
     transform: translate(5%, 5%) rotate(2deg);
   }
+}
+
+/* ==================== SETTINGS MODAL CONTENT ==================== */
+.model-card {
+  padding: 1rem;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid rgba(128, 144, 176, 0.3);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.model-card.selected {
+  border: 2px solid var(--crystal-cyan);
+  background: rgba(64, 224, 208, 0.1);
+}
+
+.prompt-preview-block,
+.api-key-code-block {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.prompt-preview-block {
+  font-size: 0.85rem;
+  color: #8090b0;
+  white-space: pre-wrap;
+  padding: 0.5rem;
+  margin: 0;
+  transition: max-height 0.3s ease;
+}
+
+.api-key-code-block {
+  display: block;
+  padding: 0.5rem;
+  word-break: break-all;
+}
+
+/* ==================== PROMPT MODAL TABS ==================== */
+.prompt-modal-tabs {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.5rem;
+  padding: 0.25rem;
+  background: rgba(26, 31, 58, 0.6);
+  border-radius: 12px;
+  border: 1px solid rgba(61, 217, 211, 0.15);
+}
+
+.prompt-modal-tab-btn {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: #8090b0;
+  font-weight: 400;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: none;
+}
+
+.prompt-modal-tab-btn.active.model {
+  background: linear-gradient(135deg, rgba(61, 217, 211, 0.25), rgba(91, 233, 255, 0.15));
+  color: #5be9ff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(61, 217, 211, 0.2);
+}
+
+.prompt-modal-tab-btn.active.prompt {
+  background: linear-gradient(135deg, rgba(255, 169, 89, 0.25), rgba(255, 205, 107, 0.15));
+  color: #ffa959;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(255, 169, 89, 0.2);
+}
+
+.prompt-modal-tab-btn.active.apikey {
+  background: linear-gradient(135deg, rgba(77, 169, 255, 0.25), rgba(91, 233, 255, 0.15));
+  color: #4da9ff;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(77, 169, 255, 0.2);
 }

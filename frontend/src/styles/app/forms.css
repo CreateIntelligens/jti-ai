@@ -245,3 +245,62 @@
     transform: translateY(0);
   }
 }
+
+/* ==================== BENTO SELECTORS ==================== */
+.bento-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1.5rem 1.5rem 1.25rem 1.5rem;
+  border-bottom: 1px solid rgba(61, 217, 211, 0.1);
+  background: linear-gradient(180deg, rgba(13, 18, 31, 0.4) 0%, transparent 100%);
+}
+
+.bento-row-inline {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.bento-select-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1;
+  background: rgba(26, 31, 58, 0.5);
+  border: 1px solid rgba(61, 217, 211, 0.2);
+  border-radius: 12px;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  min-width: 0;
+}
+
+.bento-select-wrapper:hover {
+  background: rgba(42, 49, 84, 0.7);
+  border-color: rgba(61, 217, 211, 0.4);
+  box-shadow: 0 4px 12px rgba(61, 217, 211, 0.1);
+}
+
+.bento-icon {
+  position: absolute;
+  left: 14px;
+  color: var(--crystal-teal);
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0.8;
+}
+
+/* Apply directly to the element since CustomSelect passes className down to container */
+.bento-minimal-select .custom-select-trigger {
+  background: transparent !important;
+  border: none !important;
+  padding: 0.7rem 1.2rem 0.7rem 2.8rem !important; /* Extra left padding for the icon */
+  min-height: 44px;
+  font-size: 0.95rem !important;
+  font-weight: 500;
+  box-shadow: none !important;
+}
+
+.bento-minimal-select .custom-select-dropdown {
+  /* Offset to align nicely */
+  transform: translateY(-4px);
+}
