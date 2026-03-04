@@ -29,12 +29,12 @@ from app.services.session.session_manager_factory import get_session_manager
 
 session_manager = get_session_manager()
 logger = logging.getLogger(__name__)
-FILE_SEARCH_MODEL = "gemini-2.5-flash-lite"
+FILE_SEARCH_MODEL = "gemini-2.5-flash-lite-preview-09-2025"
 
 
 class HciotMainAgent:
     def __init__(self):
-        self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
+        self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite-preview-09-2025")
         self._chat_sessions: Dict[str, any] = {}
 
     def _get_or_create_chat_session(self, session: Session):

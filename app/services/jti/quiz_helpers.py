@@ -174,7 +174,7 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
 
 只回覆：A 至 E、PAUSE 或 X"""
 
-        model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
+        model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite-preview-09-2025")
         response = gemini_with_retry(lambda: client.models.generate_content(
             model=model_name,
             contents=prompt

@@ -36,14 +36,14 @@ session_manager = get_session_manager()
 logger = logging.getLogger(__name__)
 
 # File Search 用 flash-lite（不帶 system_instruction 即可正常 grounding）
-FILE_SEARCH_MODEL = "gemini-2.5-flash-lite"
+FILE_SEARCH_MODEL = "gemini-2.5-flash-lite-preview-09-2025"
 
 
 class MainAgent:
     """主要對話 Agent"""
 
     def __init__(self):
-        self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
+        self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite-preview-09-2025")
         # 持久 chat session：session_id → Gemini ChatSession
         self._chat_sessions: Dict[str, any] = {}
 
