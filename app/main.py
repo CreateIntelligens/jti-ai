@@ -31,24 +31,25 @@ YELLOW = "\033[33m"
 RED = "\033[31m"
 RESET = "\033[0m"
 
+# 狀態碼 → 顏色 mapping
+_STATUS_COLORS: dict[str, str] = {
+    "200": GREEN, "201": GREEN,
+    "400": RED, "401": RED, "403": RED, "404": RED,
+    "429": YELLOW,
+    "500": RED, "502": RED, "503": RED,
+}
+
 class TimestampFormatter(uvicorn.logging.ColourizedFormatter):
     """在 uvicorn 原有的彩色格式前加上時間戳，並對狀態碼上色。"""
     def formatMessage(self, record):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        original = super().formatMessage(record)
+        msg = super().formatMessage(record)
 
-        # 對 HTTP 狀態碼上色
-        msg = original
-        if " 200" in msg or " 201" in msg:
-            msg = msg.replace(" 200", f" {GREEN}200{RESET}").replace(" 201", f" {GREEN}201{RESET}")
-        elif " 404" in msg or " 400" in msg or " 401" in msg or " 403" in msg:
-            msg = msg.replace(" 404", f" {RED}404{RESET}").replace(" 400", f" {RED}400{RESET}")
-            msg = msg.replace(" 401", f" {RED}401{RESET}").replace(" 403", f" {RED}403{RESET}")
-        elif " 500" in msg or " 502" in msg or " 503" in msg:
-            msg = msg.replace(" 500", f" {RED}500{RESET}").replace(" 502", f" {RED}502{RESET}")
-            msg = msg.replace(" 503", f" {RED}503{RESET}")
-        elif " 429" in msg:
-            msg = msg.replace(" 429", f" {YELLOW}429{RESET}")
+        for code, color in _STATUS_COLORS.items():
+            token = f" {code}"
+            if token in msg:
+                msg = msg.replace(token, f" {color}{code}{RESET}")
+                break
 
         return f"[{timestamp}] {msg}"
 

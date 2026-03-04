@@ -20,16 +20,30 @@ logger = logging.getLogger(__name__)
 class MongoConversationLogger:
     """MongoDB 對話日誌記錄器"""
 
-    def __init__(self, keep_file_logs: bool = True):
+    def __init__(self, keep_file_logs: bool = True, db_name: str | None = None):
         """初始化日誌記錄器
 
         Args:
             keep_file_logs: 是否同時保留檔案日誌備份
+            db_name: 指定資料庫名稱，None 表示預設 (jti_app)
         """
-        self.db = get_mongo_db()
+        self.db = get_mongo_db(db_name)
         self.conversations_collection = self.db["conversations"]
         self.keep_file_logs = keep_file_logs
         logger.info("MongoConversationLogger initialized")
+
+    @staticmethod
+    def _serialize_doc(doc: Dict) -> Dict:
+        """將 MongoDB document 轉換為可序列化格式（_id → str, datetime → ISO）。"""
+        doc["_id"] = str(doc["_id"])
+        for field in ("timestamp", "responded_at"):
+            if isinstance(doc.get(field), datetime):
+                doc[field] = doc[field].isoformat()
+        return doc
+
+    def _serialize_docs(self, docs: List[Dict]) -> List[Dict]:
+        """批次序列化 MongoDB documents。"""
+        return [self._serialize_doc(doc) for doc in docs]
 
     def log_conversation(
         self,
@@ -108,33 +122,15 @@ class MongoConversationLogger:
         try:
             query = {"session_id": session_id}
 
+            cursor = self.conversations_collection.find(query).sort("turn_number", 1)
             if limit:
-                docs = list(
-                    self.conversations_collection.find(query)
-                    .sort("turn_number", 1)
-                    .limit(limit)
-                )
-            else:
-                docs = list(
-                    self.conversations_collection.find(query)
-                    .sort("turn_number", 1)
-                )
+                cursor = cursor.limit(limit)
 
-            # 轉換 ObjectId 為字符串，datetime 為 ISO format
-            for doc in docs:
-                doc["_id"] = str(doc["_id"])
-                if isinstance(doc.get("timestamp"), datetime):
-                    doc["timestamp"] = doc["timestamp"].isoformat()
-                if isinstance(doc.get("responded_at"), datetime):
-                    doc["responded_at"] = doc["responded_at"].isoformat()
-
-            return docs
+            return self._serialize_docs(list(cursor))
 
         except Exception as e:
             logger.error(f"Failed to get session logs from MongoDB: {e}")
             return []
-
-
 
     def get_session_logs_by_mode(self, mode: str) -> List[Dict]:
         """按模式查詢所有對話紀錄
@@ -150,15 +146,7 @@ class MongoConversationLogger:
                 self.conversations_collection.find({"mode": mode})
                 .sort("timestamp", -1)
             )
-
-            for doc in docs:
-                doc["_id"] = str(doc["_id"])
-                if isinstance(doc.get("timestamp"), datetime):
-                    doc["timestamp"] = doc["timestamp"].isoformat()
-                if isinstance(doc.get("responded_at"), datetime):
-                    doc["responded_at"] = doc["responded_at"].isoformat()
-
-            return docs
+            return self._serialize_docs(docs)
 
         except Exception as e:
             logger.error(f"Failed to get logs by mode: {e}")
@@ -251,16 +239,7 @@ class MongoConversationLogger:
                     {"session_id": {"$in": session_ids}}
                 ).sort("turn_number", 1)
             )
-
-            # Formating
-            for doc in docs:
-                doc["_id"] = str(doc["_id"])
-                if isinstance(doc.get("timestamp"), datetime):
-                    doc["timestamp"] = doc["timestamp"].isoformat()
-                if isinstance(doc.get("responded_at"), datetime):
-                    doc["responded_at"] = doc["responded_at"].isoformat()
-
-            return docs
+            return self._serialize_docs(docs)
 
         except Exception as e:
             logger.error(f"Failed to get logs for sessions: {e}")
@@ -341,15 +320,7 @@ class MongoConversationLogger:
                 self.conversations_collection.find(query)
                 .sort("timestamp", -1)
             )
-
-            for doc in docs:
-                doc["_id"] = str(doc["_id"])
-                if isinstance(doc.get("timestamp"), datetime):
-                    doc["timestamp"] = doc["timestamp"].isoformat()
-                if isinstance(doc.get("responded_at"), datetime):
-                    doc["responded_at"] = doc["responded_at"].isoformat()
-
-            return docs
+            return self._serialize_docs(docs)
 
         except Exception as e:
             logger.error(f"Failed to get conversations by date range: {e}")
@@ -431,11 +402,7 @@ class MongoConversationLogger:
                 "turn_number": turn_number,
             })
             if doc:
-                doc["_id"] = str(doc["_id"])
-                if isinstance(doc.get("timestamp"), datetime):
-                    doc["timestamp"] = doc["timestamp"].isoformat()
-                if isinstance(doc.get("responded_at"), datetime):
-                    doc["responded_at"] = doc["responded_at"].isoformat()
+                self._serialize_doc(doc)
             return doc
         except Exception as e:
             logger.error(f"Failed to get turn {turn_number} for session {session_id}: {e}")

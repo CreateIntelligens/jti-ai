@@ -10,14 +10,20 @@ Main Agent - 核心對話邏輯
 import asyncio
 import os
 import logging
-import re
 import time
-from typing import Dict, List, Optional
-import google.genai as genai
+from typing import Dict
+
 from google.genai import types
-from app.models.session import Session, SessionStep
+from app.models.session import Session
 from app.services.session.session_manager_factory import get_session_manager
-from app.services.gemini_service import client as gemini_client, gemini_with_retry
+import app.services.gemini_service as _gemini_service
+from app.services.gemini_service import gemini_with_retry
+from app.services.agent_utils import (
+    build_chat_history,
+    extract_response_text,
+    normalize_language,
+    strip_citations,
+)
 from app.services.gemini_clients import get_client_for_store
 from app.tools.tool_executor import tool_executor, ToolExecutor
 from app.services.jti.agent_prompts import (
@@ -54,16 +60,8 @@ class MainAgent:
             return self._chat_sessions[sid]
 
         # 從 session.chat_history 恢復歷史
-        history = []
-        if session.chat_history:
-            for msg in session.chat_history:
-                role = "user" if msg["role"] == "user" else "model"
-                history.append(
-                    types.Content(
-                        role=role,
-                        parts=[types.Part.from_text(text=msg["content"])]
-                    )
-                )
+        history = build_chat_history(session.chat_history) if session.chat_history else []
+        if history:
             logger.info(f"從歷史恢復 chat session: {len(history)} 筆 (session={sid[:8]}...)")
 
         system_instruction = self._get_system_instruction(session)
@@ -72,7 +70,7 @@ class MainAgent:
             thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
 
-        chat_session = gemini_client.chats.create(
+        chat_session = _gemini_service.client.chats.create(
             model=self.model_name,
             config=config,
             history=history
@@ -113,12 +111,7 @@ class MainAgent:
 
     @staticmethod
     def _get_store_name_for_language(language: str) -> str:
-        normalized_language = (
-            "en"
-            if isinstance(language, str) and language.strip().lower().startswith("en")
-            else "zh"
-        )
-        return "__jti__en" if normalized_language == "en" else "__jti__"
+        return "__jti__en" if normalize_language(language) == "en" else "__jti__"
 
     @staticmethod
     def _get_active_prompt_context(language: str = "zh"):
@@ -127,11 +120,7 @@ class MainAgent:
         store_name = MainAgent._get_store_name_for_language(language)
         prompt_id = SYSTEM_DEFAULT_PROMPT_ID
         persona = None
-        normalized_language = (
-            "en"
-            if isinstance(language, str) and language.strip().lower().startswith("en")
-            else "zh"
-        )
+        normalized_language = normalize_language(language)
         try:
             from app import deps
             prompt_manager = getattr(deps, "prompt_manager", None)
@@ -241,7 +230,7 @@ class MainAgent:
 使用者訊息：「{query}」
 
 只能回覆 YES 或 NO："""
-            response = gemini_with_retry(lambda: gemini_client.models.generate_content(
+            response = gemini_with_retry(lambda: _gemini_service.client.models.generate_content(
                 model=FILE_SEARCH_MODEL,
                 contents=prompt,
                 config=types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=0)),
@@ -267,7 +256,7 @@ class MainAgent:
         3. Intent=YES → 帶知識庫結果給主 agent 回應
         """
         try:
-            if not gemini_client:
+            if not _gemini_service.client:
                 return {
                     "error": "Gemini client not initialized",
                     "message": "系統未正確初始化，請檢查 API Key 設定。"
@@ -329,17 +318,12 @@ class MainAgent:
             tool_calls_log = []
 
             # 3. 取得回應
-            final_message = ""
-            if response.candidates and response.candidates[0].content.parts:
-                for part in response.candidates[0].content.parts:
-                    if hasattr(part, 'text') and part.text:
-                        final_message += part.text
-
+            final_message = extract_response_text(response)
             if not final_message:
                 final_message = "AI目前故障 請聯絡"
                 logger.warning(f"LLM 未生成任何文本回應，使用者輸入：{user_message[:50]}")
 
-            final_message = re.sub(r'\s*\[cite:\s*[^\]]*\]', '', final_message).strip()
+            final_message = strip_citations(final_message)
 
             # 4. 同步 DB（背景）
             self._sync_history_to_db_background(session_id, user_message, final_message)
@@ -406,18 +390,13 @@ class MainAgent:
                 thinking_config=types.ThinkingConfig(thinking_budget=0),
                 )
 
-            response = gemini_with_retry(lambda: gemini_client.models.generate_content(
+            response = gemini_with_retry(lambda: _gemini_service.client.models.generate_content(
                 model=self.model_name,
                 contents=conversation_parts,
                 config=config,
             ))
 
-            final_message = ""
-            if response.candidates and response.candidates[0].content.parts:
-                for part in response.candidates[0].content.parts:
-                    if hasattr(part, 'text') and part.text:
-                        final_message += part.text
-
+            final_message = extract_response_text(response)
             if not final_message:
                 final_message = "收到！"
 

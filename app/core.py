@@ -245,6 +245,47 @@ class FileSearchManager:
             )
         return contents
 
+    @staticmethod
+    def _normalize_store_name(store_name: str) -> str:
+        """確保 store_name 帶有 fileSearchStores/ 前綴。"""
+        if store_name.startswith("fileSearchStores/"):
+            return store_name
+        return f"fileSearchStores/{store_name}"
+
+    @staticmethod
+    def _thinking_budget_for_model(model: str) -> int:
+        """Pro 模型啟用 thinking（-1 = 無限制），其餘關閉。"""
+        return -1 if "pro" in model else 0
+
+    @staticmethod
+    def _wrap_system_instruction(text: str | None) -> list | None:
+        """將 system_instruction 字串封裝為 SDK 格式。"""
+        if not text:
+            return None
+        return [types.Part.from_text(text=text)]
+
+    def _build_file_search_config(
+        self,
+        store_name: str,
+        model: str,
+        system_instruction: str | None = None,
+    ) -> types.GenerateContentConfig:
+        """建立包含 File Search 工具的 GenerateContentConfig。"""
+        full_store_name = self._normalize_store_name(store_name)
+        return types.GenerateContentConfig(
+            tools=[
+                types.Tool(
+                    file_search=types.FileSearch(
+                        file_search_store_names=[full_store_name]
+                    )
+                )
+            ],
+            system_instruction=self._wrap_system_instruction(system_instruction),
+            thinking_config=types.ThinkingConfig(
+                thinking_budget=self._thinking_budget_for_model(model)
+            ),
+        )
+
     def start_chat(self, store_name: str, model: str = "gemini-2.5-flash",
                    system_instruction: str = None, history: list = None):
         """開始一個新的 Chat Session (多輪對話)。
@@ -260,25 +301,8 @@ class FileSearchManager:
         else:
             log("[Core] 沒有 system_instruction")
 
-        # 封裝為 SDK 偏好的格式
-        si = None
-        if system_instruction:
-            si = [types.Part.from_text(text=system_instruction)]
-
-        # 保存 Config 供後續 send_message 使用
-        full_store_name = store_name if store_name.startswith("fileSearchStores/") else f"fileSearchStores/{store_name}"
-        is_pro = "pro" in model
-        thinking_budget = -1 if is_pro else 0
-        self.current_config = types.GenerateContentConfig(
-            tools=[
-                types.Tool(
-                    file_search=types.FileSearch(
-                        file_search_store_names=[full_store_name]
-                    )
-                )
-            ],
-            system_instruction=si,
-            thinking_config=types.ThinkingConfig(thinking_budget=thinking_budget),
+        self.current_config = self._build_file_search_config(
+            store_name, model, system_instruction
         )
 
         self.chat_session = self._client_for(store_name).chats.create(
@@ -340,30 +364,12 @@ class FileSearchManager:
         Returns:
             GenerateContentResponse 物件
         """
-        # 建立 config
-        si = None
-        if system_instruction:
-            si = [types.Part.from_text(text=system_instruction)]
-
-        full_store_name = store_name if store_name.startswith("fileSearchStores/") else f"fileSearchStores/{store_name}"
-        is_pro = "pro" in model
-        thinking_budget = -1 if is_pro else 0
-        response = self._client_for(store_name).models.generate_content(
+        config = self._build_file_search_config(store_name, model, system_instruction)
+        return self._client_for(store_name).models.generate_content(
             model=model,
             contents=question,
-            config=types.GenerateContentConfig(
-                tools=[
-                    types.Tool(
-                        file_search=types.FileSearch(
-                            file_search_store_names=[full_store_name]
-                        )
-                    )
-                ],
-                system_instruction=si,
-                thinking_config=types.ThinkingConfig(thinking_budget=thinking_budget),
-            ),
+            config=config,
         )
-        return response
 
 
 def main():
