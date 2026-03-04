@@ -46,13 +46,7 @@ class FileSearchManager:
             self.client = genai.Client(api_key=api_key)
         else:
             from app.services.gemini_clients import get_default_client
-            try:
-                self.client = get_default_client()
-            except ValueError:
-                api_key = os.getenv("GEMINI_API_KEY")
-                if not api_key:
-                    raise ValueError("未設定 GEMINI_API_KEY")
-                self.client = genai.Client(api_key=api_key)
+            self.client = get_default_client()
         self.store_name: str | None = None
 
     def _client_for(self, store_name: str | None = None):

@@ -188,9 +188,8 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
         if result == "PAUSE":
             logger.info(f"[LLM判斷] 暫停測驗: '{user_message}' -> PAUSE")
             return "PAUSE"
-        else:
-            logger.info(f"[LLM判斷] 失敗/無法判斷: '{user_message}' -> {result}")
-            return None
+        logger.info(f"[LLM判斷] 失敗/無法判斷: '{user_message}' -> {result}")
+        return None
 
     except Exception as e:
         logger.error(f"LLM 判斷失敗: {e}")

@@ -13,7 +13,7 @@ from pydantic import BaseModel
 from app.auth import verify_auth, require_admin, extract_user_gemini_api_key
 from app.deps import _get_or_create_manager
 from app.services.gemini_clients import (
-    get_client_by_index, get_key_count, get_store_key_index, register_store,
+    get_client_by_index, get_key_count, get_key_names, get_store_key_index, register_store,
 )
 
 router = APIRouter(prefix="/api", tags=["Store Management"])
@@ -71,9 +71,10 @@ def list_stores(request: Request, auth: dict = Depends(verify_auth)):
 
 @router.get("/keys/count")
 def get_keys_count(auth: dict = Depends(verify_auth)):
-    """回傳目前已設定的 Gemini API key 數量。（Admin only）"""
+    """回傳目前已設定的 Gemini API key 數量與名稱。（Admin only）"""
     require_admin(auth)
-    return {"count": get_key_count()}
+    names = get_key_names()
+    return {"count": get_key_count(), "names": names}
 
 
 @router.post("/stores")

@@ -21,40 +21,51 @@ _store_to_client: dict[str, genai.Client] = {}
 # 所有 clients（按 key 順序）
 _clients: list[genai.Client] = []
 
+# key index → 顯示名稱
+_key_names: list[str] = []
+
 # fallback client cache（避免每次呼叫 get_default_client 都新建）
 _fallback_client: genai.Client | None = None
 
 
+def _parse_key_token(token: str, index: int) -> tuple[str, str]:
+    """解析 'name:key' 或 'key' 格式，回傳 (name, api_key)。"""
+    if ":" in token:
+        name, api_key = token.split(":", 1)
+        return name.strip(), api_key.strip()
+    return f"Key #{index + 1}", token.strip()
+
+
 def init_registry() -> None:
     """讀取所有 API keys，建立 clients，掃描 stores 建立 mapping。"""
-    global _store_to_client, _clients, _fallback_client
+    global _store_to_client, _clients, _key_names, _fallback_client
     _store_to_client = {}
     _clients = []
+    _key_names = []
     _fallback_client = None
 
     # 優先讀 GEMINI_API_KEYS（逗號分隔），fallback 到 GEMINI_API_KEY
     keys_raw = os.getenv("GEMINI_API_KEYS", "") or os.getenv("GEMINI_API_KEY", "")
-    keys = [k.strip() for k in keys_raw.split(",") if k.strip()]
+    tokens = [t.strip() for t in keys_raw.split(",") if t.strip()]
 
-    if not keys:
+    if not tokens:
         logger.warning("未設定 GEMINI_API_KEYS 或 GEMINI_API_KEY")
         return
 
-    for i, key in enumerate(keys):
+    for i, token in enumerate(tokens):
+        name, api_key = _parse_key_token(token, i)
         try:
-            c = genai.Client(api_key=key)
+            c = genai.Client(api_key=api_key)
             _clients.append(c)
+            _key_names.append(name)
 
-            # 掃描此 key 下的所有 stores
             stores = list(c.file_search_stores.list())
-            logger.info(
-                f"[Registry] Key #{i+1} ({key[:8]}...): 發現 {len(stores)} 個 stores"
-            )
+            logger.info(f"[Registry] {name} ({api_key[:8]}...): 發現 {len(stores)} 個 stores")
             for s in stores:
                 logger.info(f"  - {s.name} ({s.display_name})")
                 _store_to_client[s.name] = c
         except Exception as e:
-            logger.error(f"[Registry] Key #{i+1} ({key[:8]}...) 初始化失敗: {e}")
+            logger.error(f"[Registry] {name} ({api_key[:8]}...) 初始化失敗: {e}")
 
     logger.info(f"[Registry] 共 {len(_clients)} 個 clients, {len(_store_to_client)} 個 store mappings")
 
@@ -80,6 +91,11 @@ def get_client_by_index(key_index: int) -> genai.Client:
 def get_key_count() -> int:
     """回傳已註冊的 key 數量。"""
     return len(_clients)
+
+
+def get_key_names() -> list[str]:
+    """回傳所有 key 的顯示名稱列表（順序對應 index）。"""
+    return list(_key_names)
 
 
 def get_client_index(client: genai.Client) -> int:

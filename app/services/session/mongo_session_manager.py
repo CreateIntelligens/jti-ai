@@ -27,26 +27,13 @@ class MongoSessionManager(SessionStateMixin):
         self.sessions_collection = self.db["sessions"]
 
     def create_session(self, language: str = "zh") -> Session:
-        """建立新 session"""
+        """建立新 session（lazy write：不立即存 MongoDB，等第一次 update 時才寫入）"""
         session = Session(language=language)
-
-        # 轉換為可序列化的字典
-        session_dict = session.model_dump(mode="json")
-
-        # 添加 MongoDB 相關字段
-        session_dict["created_at"] = datetime.now()
-        session_dict["updated_at"] = datetime.now()
-
-        try:
-            result = self.sessions_collection.insert_one(session_dict)
-            logger.info(
-                f"Created session in MongoDB: {session.session_id} "
-                f"(language={language})"
-            )
-            return session
-        except Exception as e:
-            logger.error(f"Failed to create session in MongoDB: {e}")
-            raise
+        logger.info(
+            f"Created session (in-memory only): {session.session_id} "
+            f"(language={language})"
+        )
+        return session
 
     def get_session(self, session_id: str) -> Optional[Session]:
         """取得 session"""
@@ -73,12 +60,9 @@ class MongoSessionManager(SessionStateMixin):
 
             result = self.sessions_collection.update_one(
                 {"session_id": session.session_id},
-                {"$set": session_dict}
+                {"$set": session_dict},
+                upsert=True
             )
-
-            if result.matched_count == 0:
-                logger.warning(f"Session not found for update: {session.session_id}")
-                return session
 
             logger.info(
                 f"Updated session in MongoDB: {session.session_id}, "
