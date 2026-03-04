@@ -49,14 +49,14 @@ export default function App() {
     promptModalOpen, setPromptModalOpen,
     userApiKeyModalOpen, setUserApiKeyModalOpen,
     conversationHistoryModalOpen, setConversationHistoryModalOpen,
-    status, stores, knowledgeTargets, currentTargetId, currentStore, chatStoreName, managedContext,
+    status, stores, projectFilter, projectFilterOptions, knowledgeTargets, currentTargetId, currentStore, chatStoreName, managedContext,
     files, filesLoading,
     messages, setMessages,
     loading,
     sessionId, setSessionId,
     theme, toggleTheme,
     toggleSidebar, showStatus,
-    refreshStores, refreshFiles, handleRefreshKnowledge,
+    refreshStores, refreshFiles, handleRefreshKnowledge, setProjectFilter,
     handleStoreChange, handleRestartChat,
     handleCreateStore, handleDeleteStore,
     handleUploadFile, handleDeleteFile,
@@ -83,11 +83,14 @@ export default function App() {
         <div className="app-content">
           <Sidebar
             isOpen={sidebarOpen}
+            projectFilter={projectFilter}
+            projectFilterOptions={projectFilterOptions}
             knowledgeTargets={knowledgeTargets}
             currentTargetId={currentTargetId}
             managedContext={managedContext}
             files={files}
             filesLoading={filesLoading}
+            onProjectFilterChange={setProjectFilter}
             onTargetChange={handleStoreChange}
             onUploadFile={handleUploadFile}
             onDeleteFile={handleDeleteFile}

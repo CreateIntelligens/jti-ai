@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, Eye, Pencil, X } from 'lucide-react';
+import { Download, Eye, FolderKanban, LibraryBig, Pencil, X } from 'lucide-react';
 import type { FileItem, KnowledgeTarget, CmsAppTarget, KnowledgeLanguage } from '../types';
 import CustomSelect from './CustomSelect';
 import * as api from '../services/api';
 
 interface SidebarProps {
   isOpen: boolean;
+  projectFilter: string;
+  projectFilterOptions: Array<{ value: string; label: string }>;
   knowledgeTargets: KnowledgeTarget[];
   currentTargetId: string | null;
   managedContext: {
@@ -14,6 +16,7 @@ interface SidebarProps {
   } | null;
   files: FileItem[];
   filesLoading: boolean;
+  onProjectFilterChange: (value: string) => void;
   onTargetChange: (targetId: string) => void;
   onUploadFile: (file: File) => void;
   onDeleteFile: (fileName: string) => void;
@@ -24,11 +27,14 @@ interface SidebarProps {
 
 export default function Sidebar({
   isOpen,
+  projectFilter,
+  projectFilterOptions,
   knowledgeTargets,
   currentTargetId,
   managedContext,
   files,
   filesLoading,
+  onProjectFilterChange,
   onTargetChange,
   onUploadFile,
   onDeleteFile,
@@ -46,8 +52,15 @@ export default function Sidebar({
   const [fileEditContent, setFileEditContent] = useState('');
   const [saving, setSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileViewRequestIdRef = useRef(0);
+  const currentTargetIdRef = useRef<string | null>(currentTargetId);
 
   useEffect(() => {
+    currentTargetIdRef.current = currentTargetId;
+  }, [currentTargetId]);
+
+  useEffect(() => {
+    fileViewRequestIdRef.current += 1;
     setViewingFile(null);
     setFileContent('');
     setFileEditable(false);
@@ -96,19 +109,28 @@ export default function Sidebar({
 
   const handleViewManagedFile = async (fileName: string) => {
     if (!managedContext) return;
+    const requestId = fileViewRequestIdRef.current + 1;
+    fileViewRequestIdRef.current = requestId;
+    const targetIdAtRequestStart = currentTargetIdRef.current;
     setViewingFile(fileName);
     setFileLoading(true);
     setIsEditing(false);
     try {
       const data = await api.getManagedKnowledgeFileContent(managedContext.appTarget, fileName, managedContext.language);
+      if (fileViewRequestIdRef.current !== requestId) return;
+      if (currentTargetIdRef.current !== targetIdAtRequestStart) return;
       setFileContent(data.content || '');
       setFileEditable(Boolean(data.editable));
     } catch (error) {
+      if (fileViewRequestIdRef.current !== requestId) return;
+      if (currentTargetIdRef.current !== targetIdAtRequestStart) return;
       console.error('Failed to load managed file content:', error);
       setFileContent('無法載入檔案內容');
       setFileEditable(false);
     } finally {
-      setFileLoading(false);
+      if (fileViewRequestIdRef.current === requestId) {
+        setFileLoading(false);
+      }
     }
   };
 
@@ -148,24 +170,33 @@ export default function Sidebar({
 
   return (
     <aside className={isOpen ? '' : 'closed'} aria-label="側邊欄">
-      <div className="sidebar-section fixed-section">
-        <h2>知識庫</h2>
-        <CustomSelect
-          value={currentTargetId || ''}
-          onChange={onTargetChange}
-          options={knowledgeTargets.length === 0 ? [{ value: '', label: '尚無知識庫' }] : knowledgeTargets.map((target) => ({
-            value: target.id,
-            label: target.label,
-          }))}
-          className="w-full"
-        />
-        <button
-          onClick={onRefresh}
-          className="secondary w-full mt-sm"
-          aria-label="重新整理知識庫"
-        >
-          ⟳ 重新整理
-        </button>
+      <div className="bento-grid">
+        <div className="bento-row-inline">
+          <div className="bento-select-wrapper" title="專案">
+            <FolderKanban className="bento-icon" size={16} />
+            <CustomSelect
+              value={projectFilter}
+              onChange={onProjectFilterChange}
+              options={projectFilterOptions}
+              className="w-full bento-minimal-select"
+            />
+          </div>
+        </div>
+
+        <div className="bento-row-inline">
+          <div className="bento-select-wrapper" title="知識庫">
+            <LibraryBig className="bento-icon" size={16} />
+            <CustomSelect
+              value={currentTargetId || ''}
+              onChange={onTargetChange}
+              options={knowledgeTargets.length === 0 ? [{ value: '', label: '尚無知識庫' }] : knowledgeTargets.map((target) => ({
+                value: target.id,
+                label: target.label,
+              }))}
+              className="w-full bento-minimal-select"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="sidebar-section scrollable-section">
@@ -211,22 +242,24 @@ export default function Sidebar({
               {files.map((file, i) => (
                 <li key={file.name} className="file-item-enter" style={{ animationDelay: `${i * 40}ms` }}>
                   <span
+                    className="file-name-text"
                     style={{
-                      flex: 1,
                       cursor: managedContext ? 'pointer' : 'default',
                       textDecoration: managedContext ? 'underline' : 'none',
                       textUnderlineOffset: managedContext ? '2px' : '0',
+                      color: managedContext ? 'var(--crystal-cyan)' : 'inherit'
                     }}
                     onClick={() => {
                       if (managedContext) {
                         void handleViewManagedFile(file.name);
                       }
                     }}
+                    title={file.display_name || file.name}
                   >
                     {file.display_name || file.name}
                   </span>
                   {managedContext ? (
-                    <div style={{ display: 'flex', gap: '0.25rem' }}>
+                    <div className="file-actions">
                       <button
                         onClick={() => void handleViewManagedFile(file.name)}
                         className="secondary small"
@@ -253,13 +286,15 @@ export default function Sidebar({
                       </button>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => onDeleteFile(file.name)}
-                      className="danger small"
-                      aria-label={`刪除文件 ${file.display_name || file.name}`}
-                    >
-                      ✕
-                    </button>
+                    <div className="file-actions">
+                      <button
+                        onClick={() => onDeleteFile(file.name)}
+                        className="danger small"
+                        aria-label={`刪除文件 ${file.display_name || file.name}`}
+                      >
+                        ✕
+                      </button>
+                    </div>
                   )}
                 </li>
               ))}

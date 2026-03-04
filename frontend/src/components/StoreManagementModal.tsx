@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import type { Store } from '../types';
 import { useEscapeKey } from '../hooks/useEscapeKey';
-import { getKeysCount } from '../services/api/general';
+import { getKeyInfos } from '../services/api/general';
 
 interface StoreManagementModalProps {
   isOpen: boolean;
@@ -24,14 +24,14 @@ export default function StoreManagementModal({
 }: StoreManagementModalProps) {
   const [newStoreName, setNewStoreName] = useState('');
   const [selectedKeyIndex, setSelectedKeyIndex] = useState(0);
-  const [keyCount, setKeyCount] = useState(1);
+  const [keyNames, setKeyNames] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
 
   useEscapeKey(onClose, isOpen);
 
   useEffect(() => {
     if (isOpen) {
-      getKeysCount().then(setKeyCount).catch(() => setKeyCount(1));
+      getKeyInfos().then(info => setKeyNames(info.names)).catch(() => setKeyNames([]));
     }
   }, [isOpen]);
 
@@ -75,15 +75,15 @@ export default function StoreManagementModal({
                 className="flex-1"
                 onKeyDown={e => e.key === 'Enter' && handleCreate()}
               />
-              {keyCount > 1 && (
+              {keyNames.length > 1 && (
                 <select
                   value={selectedKeyIndex}
                   onChange={e => setSelectedKeyIndex(Number(e.target.value))}
                   style={{ minWidth: '120px' }}
                   title="選擇使用哪個專案 key 建立"
                 >
-                  {Array.from({ length: keyCount }, (_, i) => (
-                    <option key={i} value={i}>Key #{i + 1}</option>
+                  {keyNames.map((name, i) => (
+                    <option key={i} value={i}>{name}</option>
                   ))}
                 </select>
               )}
@@ -112,9 +112,9 @@ export default function StoreManagementModal({
                           ◆ 使用中
                         </span>
                       )}
-                      {keyCount > 1 && store.key_index !== undefined && (
+                      {keyNames.length > 1 && store.key_index !== undefined && (
                         <span style={{ marginLeft: '0.5rem', color: '#8090b0', fontSize: '0.8em' }}>
-                          Key #{store.key_index + 1}
+                          {keyNames[store.key_index] ?? `Key #${store.key_index + 1}`}
                         </span>
                       )}
                     </span>

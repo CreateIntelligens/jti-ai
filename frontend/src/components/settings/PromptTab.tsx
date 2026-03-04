@@ -169,17 +169,9 @@ export default function PromptTab({
                       </div>
                     </div>
                     <div style={{ position: 'relative' }}>
-                      <pre style={{
-                        fontSize: '0.85rem',
-                        color: '#8090b0',
-                        whiteSpace: 'pre-wrap',
-                        background: 'rgba(0,0,0,0.2)',
-                        padding: '0.5rem',
-                        borderRadius: '4px',
-                        margin: 0,
+                      <pre className="prompt-preview-block" style={{
                         maxHeight: expandedIds.has(prompt.id) ? '400px' : 'none',
                         overflow: expandedIds.has(prompt.id) ? 'auto' : 'visible',
-                        transition: 'max-height 0.3s ease'
                       }}>
                         {expandedIds.has(prompt.id) ? prompt.content : getPreviewText(prompt.content)}
                       </pre>

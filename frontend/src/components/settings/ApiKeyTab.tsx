@@ -72,13 +72,7 @@ export default function ApiKeyTab({
         }}>
           <p style={{ fontWeight: 'bold', marginBottom: '0.5rem' }}>✓ API Key 已建立</p>
           <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>請妥善保存此金鑰，之後無法再次查看：</p>
-          <code style={{
-            display: 'block',
-            padding: '0.5rem',
-            background: 'rgba(0,0,0,0.2)',
-            borderRadius: '4px',
-            wordBreak: 'break-all'
-          }}>
+          <code className="api-key-code-block">
             {newApiKeyCreated}
           </code>
           <button

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from './useTheme';
 import * as api from '../services/api';
 import type {
@@ -9,6 +9,24 @@ import type {
   CmsAppTarget,
   KnowledgeLanguage,
 } from '../types';
+
+function normalizeKeyLabels(keyNames: unknown): string[] {
+  if (!Array.isArray(keyNames)) return [];
+  return keyNames.map((keyName, index) => {
+    if (typeof keyName === 'string') {
+      const trimmed = keyName.trim();
+      return trimmed || `Key #${index + 1}`;
+    }
+    if (keyName && typeof keyName === 'object') {
+      const candidate = [keyName.name, keyName.label, keyName.display_name]
+        .find((value): value is string => typeof value === 'string' && value.trim().length > 0);
+      if (candidate) {
+        return candidate.trim();
+      }
+    }
+    return `Key #${index + 1}`;
+  });
+}
 
 function buildKnowledgeTargets(storeList: Store[]): KnowledgeTarget[] {
   return storeList.map((store) => ({
@@ -37,6 +55,32 @@ function getManagedKnowledgeContext(target: KnowledgeTarget | null): {
   };
 }
 
+function getProjectFilterOptions(storeList: Store[], keyNames: string[]): Array<{ value: string; label: string }> {
+  const keyIndexes = Array.from(
+    new Set(
+      storeList
+        .map((store) => store.key_index)
+        .filter((keyIndex): keyIndex is number => keyIndex !== undefined),
+    ),
+  ).sort((a, b) => a - b);
+
+  return [
+    { value: 'all', label: '全部專案' },
+    ...keyIndexes.map((keyIndex) => ({
+      value: `key:${keyIndex}`,
+      label: keyNames[keyIndex] || `Key #${keyIndex + 1}`,
+    })),
+  ];
+}
+
+function filterStoresByProject(storeList: Store[], projectFilter: string): Store[] {
+  if (projectFilter === 'all') return storeList;
+  const [, keyIndexText] = projectFilter.split(':');
+  const keyIndex = Number(keyIndexText);
+  if (Number.isNaN(keyIndex)) return storeList;
+  return storeList.filter((store) => (store.key_index ?? 0) === keyIndex);
+}
+
 async function fetchFilesForTarget(target: KnowledgeTarget): Promise<FileItem[]> {
   if (target.kind !== 'store') {
     return [];
@@ -58,6 +102,8 @@ export function useAppChat() {
   const [conversationHistoryModalOpen, setConversationHistoryModalOpen] = useState(false);
   const [status, setStatus] = useState('');
   const [stores, setStores] = useState<Store[]>([]);
+  const [keyNames, setKeyNames] = useState<string[]>([]);
+  const [projectFilter, setProjectFilter] = useState('all');
   const [currentTargetId, setCurrentTargetId] = useState<string | null>(null);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
@@ -65,9 +111,13 @@ export function useAppChat() {
   const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const { theme, toggleTheme } = useTheme();
+  const currentTargetIdRef = useRef<string | null>(null);
+  const filesRequestIdRef = useRef(0);
 
-  const knowledgeTargets = buildKnowledgeTargets(stores);
-  const currentTarget = findKnowledgeTarget(currentTargetId, stores);
+  const projectFilterOptions = getProjectFilterOptions(stores, keyNames);
+  const filteredStores = filterStoresByProject(stores, projectFilter);
+  const knowledgeTargets = buildKnowledgeTargets(filteredStores);
+  const currentTarget = findKnowledgeTarget(currentTargetId, filteredStores);
   const currentStore = currentTarget?.kind === 'store' ? currentTarget.storeName : null;
   const managedContext = getManagedKnowledgeContext(currentTarget);
   const isManagedStore = managedContext !== null;
@@ -82,8 +132,12 @@ export function useAppChat() {
 
   const refreshStores = useCallback(async () => {
     try {
-      const data = await api.fetchStores();
+      const [data, keyInfo] = await Promise.all([
+        api.fetchStores(),
+        api.getKeyInfos().catch(() => ({ count: 0, names: [] })),
+      ]);
       setStores(data);
+      setKeyNames(normalizeKeyLabels(keyInfo.names));
       return data;
     } catch (e) {
       showStatus('載入知識庫列表失敗');
@@ -95,19 +149,29 @@ export function useAppChat() {
   const refreshFiles = useCallback(async (targetOverride?: KnowledgeTarget | null) => {
     const target = targetOverride ?? findKnowledgeTarget(currentTargetId, stores);
     if (!target) {
+      filesRequestIdRef.current += 1;
       setFiles([]);
+      setFilesLoading(false);
       return;
     }
 
+    const requestId = filesRequestIdRef.current + 1;
+    filesRequestIdRef.current = requestId;
     setFilesLoading(true);
     try {
       const nextFiles = await fetchFilesForTarget(target);
+      if (filesRequestIdRef.current !== requestId) return;
+      if (currentTargetIdRef.current !== target.id) return;
       setFiles(nextFiles);
     } catch (e) {
+      if (filesRequestIdRef.current !== requestId) return;
+      if (currentTargetIdRef.current !== target.id) return;
       console.error('Failed to fetch files:', e);
       setFiles([]);
     } finally {
-      setFilesLoading(false);
+      if (filesRequestIdRef.current === requestId) {
+        setFilesLoading(false);
+      }
     }
   }, [currentTargetId, stores]);
 
@@ -118,6 +182,10 @@ export function useAppChat() {
     if (target.kind !== 'store') return;
 
     setCurrentTargetId(target.id);
+    currentTargetIdRef.current = target.id;
+    filesRequestIdRef.current += 1;
+    setFiles([]);
+    setFilesLoading(true);
     setMessages([]);
     setSessionId(null);
     localStorage.setItem('lastKnowledgeTargetId', target.id);
@@ -151,36 +219,62 @@ export function useAppChat() {
 
   const handleRefreshKnowledge = useCallback(async () => {
     const nextStores = await refreshStores();
-    const nextTarget = findKnowledgeTarget(currentTargetId, nextStores);
+    const nextFilteredStores = filterStoresByProject(nextStores, projectFilter);
+    const nextTarget = findKnowledgeTarget(currentTargetId, nextFilteredStores);
     if (nextTarget) {
       await refreshFiles(nextTarget);
       return;
     }
-    const fallbackTarget = buildKnowledgeTargets(nextStores)[0] || null;
+    const fallbackTarget = buildKnowledgeTargets(nextFilteredStores)[0] || null;
     if (fallbackTarget) {
-      await handleStoreChange(fallbackTarget.id, nextStores);
+      await handleStoreChange(fallbackTarget.id, nextFilteredStores);
       await refreshFiles(fallbackTarget);
       return;
     }
     setCurrentTargetId(null);
+    currentTargetIdRef.current = null;
+    filesRequestIdRef.current += 1;
     setFiles([]);
-  }, [currentTargetId, refreshFiles, refreshStores, stores]);
+    setFilesLoading(false);
+  }, [currentTargetId, projectFilter, refreshFiles, refreshStores, stores]);
 
   useEffect(() => {
     const init = async () => {
       const storeList = await refreshStores();
-      const targets = buildKnowledgeTargets(storeList);
+      const targets = buildKnowledgeTargets(filterStoresByProject(storeList, projectFilter));
       const lastTargetId = localStorage.getItem('lastKnowledgeTargetId') || localStorage.getItem('lastStore');
       if (lastTargetId && targets.some((target) => target.id === lastTargetId)) {
-        await handleStoreChange(lastTargetId, storeList);
+        await handleStoreChange(lastTargetId, filterStoresByProject(storeList, projectFilter));
         return;
       }
       if (targets.length > 0) {
-        await handleStoreChange(targets[0].id, storeList);
+        await handleStoreChange(targets[0].id, filterStoresByProject(storeList, projectFilter));
       }
     };
     void init();
-  }, [refreshStores]);
+  }, [projectFilter, refreshStores]);
+
+  useEffect(() => {
+    currentTargetIdRef.current = currentTargetId;
+  }, [currentTargetId]);
+
+  useEffect(() => {
+    const nextTargets = buildKnowledgeTargets(filteredStores);
+    if (currentTargetId && nextTargets.some((target) => target.id === currentTargetId)) {
+      return;
+    }
+    if (nextTargets.length > 0) {
+      void handleStoreChange(nextTargets[0].id, filteredStores);
+      return;
+    }
+    setCurrentTargetId(null);
+    currentTargetIdRef.current = null;
+    filesRequestIdRef.current += 1;
+    setFiles([]);
+    setFilesLoading(false);
+    setMessages([]);
+    setSessionId(null);
+  }, [projectFilter, stores]);
 
   useEffect(() => {
     if (currentTarget) {
@@ -222,13 +316,17 @@ export function useAppChat() {
     try {
       await api.deleteStore(storeName);
       const nextStores = await refreshStores();
+      const nextFilteredStores = filterStoresByProject(nextStores, projectFilter);
       if (currentStore === storeName) {
-        const fallbackTarget = buildKnowledgeTargets(nextStores)[0] || null;
+        const fallbackTarget = buildKnowledgeTargets(nextFilteredStores)[0] || null;
         if (fallbackTarget) {
-          await handleStoreChange(fallbackTarget.id, nextStores);
+          await handleStoreChange(fallbackTarget.id, nextFilteredStores);
         } else {
           setCurrentTargetId(null);
+          currentTargetIdRef.current = null;
+          filesRequestIdRef.current += 1;
           setFiles([]);
+          setFilesLoading(false);
           setMessages([]);
           setSessionId(null);
         }
@@ -416,6 +514,8 @@ export function useAppChat() {
     conversationHistoryModalOpen, setConversationHistoryModalOpen,
     status,
     stores,
+    projectFilter,
+    projectFilterOptions,
     knowledgeTargets,
     currentTarget,
     currentTargetId,
@@ -434,6 +534,7 @@ export function useAppChat() {
     refreshStores,
     refreshFiles,
     handleRefreshKnowledge,
+    setProjectFilter,
     handleStoreChange,
     handleRestartChat,
     handleCreateStore,

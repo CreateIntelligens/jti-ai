@@ -23,10 +23,9 @@ export async function createStore(name: string, keyIndex: number = 0): Promise<S
   return handleResponse<Store>(response);
 }
 
-export async function getKeysCount(): Promise<number> {
+export async function getKeyInfos(): Promise<{ count: number; names: string[] }> {
   const response = await fetchWithUserGeminiKey(`${API_BASE}/keys/count`);
-  const data = await handleResponse<{ count: number }>(response);
-  return data.count;
+  return handleResponse<{ count: number; names: string[] }>(response);
 }
 
 export async function deleteStore(name: string): Promise<void> {

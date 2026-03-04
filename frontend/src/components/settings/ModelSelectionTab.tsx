@@ -30,18 +30,7 @@ export default function ModelSelectionTab({ selectedModel, onModelChange }: Mode
           <div
             key={model.id}
             onClick={() => onModelChange(model.id)}
-            style={{
-              padding: '1rem',
-              border: selectedModel === model.id
-                ? '2px solid var(--crystal-cyan)'
-                : '1px solid rgba(128,144,176,0.3)',
-              borderRadius: '8px',
-              cursor: 'pointer',
-              background: selectedModel === model.id
-                ? 'rgba(64,224,208,0.1)'
-                : 'rgba(0,0,0,0.2)',
-              transition: 'all 0.2s ease'
-            }}
+            className={`model-card ${selectedModel === model.id ? 'selected' : ''}`}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div>

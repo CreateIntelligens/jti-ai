@@ -246,39 +246,17 @@ export default function PromptManagementModal({
       <div className="modal app-container prompt-management-modal" onClick={e => e.stopPropagation()} style={{ maxWidth: '700px' }}>
         <h2>⚙ 設置</h2>
 
-        {/* Tab switcher */}
-        <div style={{
-          display: 'flex',
-          gap: '0.5rem',
-          marginBottom: '1.5rem',
-          padding: '0.25rem',
-          background: 'rgba(26, 31, 58, 0.6)',
-          borderRadius: '12px',
-          border: '1px solid rgba(61, 217, 211, 0.15)'
-        }}>
+        <div className="prompt-modal-tabs">
           {[
-            { key: 'model' as const, label: '🤖 模型', color: '#5be9ff', gradient: 'rgba(61, 217, 211, 0.25), rgba(91, 233, 255, 0.15)', shadow: 'rgba(61, 217, 211, 0.2)' },
-            { key: 'prompt' as const, label: '📝 Prompt', color: '#ffa959', gradient: 'rgba(255, 169, 89, 0.25), rgba(255, 205, 107, 0.15)', shadow: 'rgba(255, 169, 89, 0.2)' },
-            { key: 'apikey' as const, label: '🔑 API 金鑰', color: '#4da9ff', gradient: 'rgba(77, 169, 255, 0.25), rgba(91, 233, 255, 0.15)', shadow: 'rgba(77, 169, 255, 0.2)' },
+            { key: 'model' as const, label: '🤖 模型' },
+            { key: 'prompt' as const, label: '📝 Prompt' },
+            { key: 'apikey' as const, label: '🔑 API 金鑰' },
           ].map(tab => (
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
+              className={`prompt-modal-tab-btn ${activeTab === tab.key ? 'active' : ''} ${tab.key}`}
               type="button"
-              style={{
-                flex: 1,
-                padding: '0.75rem 1rem',
-                borderRadius: '8px',
-                border: 'none',
-                background: activeTab === tab.key
-                  ? `linear-gradient(135deg, ${tab.gradient})`
-                  : 'transparent',
-                color: activeTab === tab.key ? tab.color : '#8090b0',
-                fontWeight: activeTab === tab.key ? '600' : '400',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease',
-                boxShadow: activeTab === tab.key ? `0 2px 8px ${tab.shadow}` : 'none'
-              }}
             >
               {tab.label}
             </button>
