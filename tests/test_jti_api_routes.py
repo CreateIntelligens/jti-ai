@@ -30,6 +30,7 @@ class TestJtiApiRoutes(unittest.TestCase):
             ("/api/jti-admin/prompts/", ("GET",)),
             ("/api/jti-admin/knowledge/files/", ("GET",)),
             ("/api/jti-admin/quiz-bank/banks/", ("GET",)),
+            ("/api/admin/knowledge/files/", ("GET",)),
         }
 
         for route in expected:

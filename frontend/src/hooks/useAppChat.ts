@@ -1,7 +1,54 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useTheme } from './useTheme';
 import * as api from '../services/api';
-import type { Store, FileItem, Message } from '../types';
+import type {
+  Store,
+  FileItem,
+  Message,
+  KnowledgeTarget,
+  CmsAppTarget,
+  KnowledgeLanguage,
+} from '../types';
+
+function buildKnowledgeTargets(storeList: Store[]): KnowledgeTarget[] {
+  return storeList.map((store) => ({
+    id: store.name,
+    kind: 'store' as const,
+    label: store.display_name || store.name,
+    storeName: store.name,
+    managedApp: store.managed_app,
+    managedLanguage: store.managed_language,
+  }));
+}
+
+function findKnowledgeTarget(targetId: string | null, storeList: Store[]): KnowledgeTarget | null {
+  if (!targetId) return null;
+  return buildKnowledgeTargets(storeList).find((target) => target.id === targetId) || null;
+}
+
+function getManagedKnowledgeContext(target: KnowledgeTarget | null): {
+  appTarget: CmsAppTarget;
+  language: KnowledgeLanguage;
+} | null {
+  if (!target || target.kind !== 'store' || !target.managedApp || !target.managedLanguage) return null;
+  return {
+    appTarget: target.managedApp,
+    language: target.managedLanguage,
+  };
+}
+
+async function fetchFilesForTarget(target: KnowledgeTarget): Promise<FileItem[]> {
+  if (target.kind !== 'store') {
+    return [];
+  }
+  const managedContext = getManagedKnowledgeContext(target);
+  const files: FileItem[] = managedContext
+    ? ((await api.listManagedKnowledgeFiles(managedContext.appTarget, managedContext.language)).files || []) as FileItem[]
+    : await api.fetchFiles(target.storeName);
+
+  files.sort((a, b) => (a.display_name || a.name).localeCompare(b.display_name || b.name));
+  return files;
+}
 
 export function useAppChat() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -11,13 +58,20 @@ export function useAppChat() {
   const [conversationHistoryModalOpen, setConversationHistoryModalOpen] = useState(false);
   const [status, setStatus] = useState('');
   const [stores, setStores] = useState<Store[]>([]);
-  const [currentStore, setCurrentStore] = useState<string | null>(null);
+  const [currentTargetId, setCurrentTargetId] = useState<string | null>(null);
   const [files, setFiles] = useState<FileItem[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const { theme, toggleTheme } = useTheme();
+
+  const knowledgeTargets = buildKnowledgeTargets(stores);
+  const currentTarget = findKnowledgeTarget(currentTargetId, stores);
+  const currentStore = currentTarget?.kind === 'store' ? currentTarget.storeName : null;
+  const managedContext = getManagedKnowledgeContext(currentTarget);
+  const isManagedStore = managedContext !== null;
+  const chatStoreName = currentStore;
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
@@ -38,73 +92,108 @@ export function useAppChat() {
     }
   }, []);
 
-  const refreshFiles = useCallback(async () => {
-    if (!currentStore) return;
+  const refreshFiles = useCallback(async (targetOverride?: KnowledgeTarget | null) => {
+    const target = targetOverride ?? findKnowledgeTarget(currentTargetId, stores);
+    if (!target) {
+      setFiles([]);
+      return;
+    }
+
     setFilesLoading(true);
     try {
-      const data = await api.fetchFiles(currentStore);
-      data.sort((a, b) =>
-        (a.display_name || a.name).localeCompare(b.display_name || b.name)
-      );
-      setFiles(data);
+      const nextFiles = await fetchFilesForTarget(target);
+      setFiles(nextFiles);
     } catch (e) {
       console.error('Failed to fetch files:', e);
+      setFiles([]);
     } finally {
       setFilesLoading(false);
     }
-  }, [currentStore]);
+  }, [currentTargetId, stores]);
+
+  const handleStoreChange = async (targetId: string, storeListOverride?: Store[]) => {
+    const resolvedStores = storeListOverride ?? stores;
+    const target = findKnowledgeTarget(targetId, resolvedStores);
+    if (!target) return;
+    if (target.kind !== 'store') return;
+
+    setCurrentTargetId(target.id);
+    setMessages([]);
+    setSessionId(null);
+    localStorage.setItem('lastKnowledgeTargetId', target.id);
+
+    const nextManagedContext = getManagedKnowledgeContext(target);
+    if (nextManagedContext) {
+      showStatus(`已切換到 ${nextManagedContext.appTarget.toUpperCase()} ${nextManagedContext.language === 'zh' ? '中文' : 'English'} 知識庫`);
+    }
+
+    localStorage.setItem('lastStore', target.storeName);
+    try {
+      const result = await api.startChat(target.storeName);
+      if (result.prompt_applied) {
+        showStatus('✅ 已套用自訂 Prompt');
+      }
+      if (result.session_id) {
+        setSessionId(result.session_id);
+      }
+    } catch (e) {
+      const errorMsg = e instanceof Error ? e.message : String(e);
+      showStatus('連線失敗: ' + errorMsg);
+      setMessages([
+        {
+          role: 'model',
+          text: '連線失敗: ' + errorMsg,
+          error: true,
+        },
+      ]);
+    }
+  };
+
+  const handleRefreshKnowledge = useCallback(async () => {
+    const nextStores = await refreshStores();
+    const nextTarget = findKnowledgeTarget(currentTargetId, nextStores);
+    if (nextTarget) {
+      await refreshFiles(nextTarget);
+      return;
+    }
+    const fallbackTarget = buildKnowledgeTargets(nextStores)[0] || null;
+    if (fallbackTarget) {
+      await handleStoreChange(fallbackTarget.id, nextStores);
+      await refreshFiles(fallbackTarget);
+      return;
+    }
+    setCurrentTargetId(null);
+    setFiles([]);
+  }, [currentTargetId, refreshFiles, refreshStores, stores]);
 
   useEffect(() => {
     const init = async () => {
       const storeList = await refreshStores();
-      const lastStore = localStorage.getItem('lastStore');
-      if (lastStore && storeList.find(s => s.name === lastStore)) {
-        handleStoreChange(lastStore);
-      } else if (storeList.length > 0) {
-        handleStoreChange(storeList[0].name);
+      const targets = buildKnowledgeTargets(storeList);
+      const lastTargetId = localStorage.getItem('lastKnowledgeTargetId') || localStorage.getItem('lastStore');
+      if (lastTargetId && targets.some((target) => target.id === lastTargetId)) {
+        await handleStoreChange(lastTargetId, storeList);
+        return;
+      }
+      if (targets.length > 0) {
+        await handleStoreChange(targets[0].id, storeList);
       }
     };
-    init();
+    void init();
   }, [refreshStores]);
 
   useEffect(() => {
-    if (currentStore) {
-      refreshFiles();
+    if (currentTarget) {
+      void refreshFiles(currentTarget);
     }
-  }, [currentStore, refreshFiles]);
-
-  const handleStoreChange = async (storeName: string) => {
-    setCurrentStore(storeName);
-    setMessages([]);
-    if (storeName) {
-      localStorage.setItem('lastStore', storeName);
-      try {
-        const result = await api.startChat(storeName);
-        if (result.prompt_applied) {
-          showStatus('✅ 已套用自訂 Prompt');
-        }
-        // 儲存 session_id
-        if (result.session_id) {
-          setSessionId(result.session_id);
-        }
-      } catch (e) {
-        const errorMsg = e instanceof Error ? e.message : String(e);
-        showStatus('連線失敗: ' + errorMsg);
-        setMessages([{
-          role: 'model',
-          text: '連線失敗: ' + errorMsg,
-          error: true
-        }]);
-      }
-    }
-  };
+  }, [currentTargetId, stores]);
 
   const handleRestartChat = async () => {
-    if (!currentStore) return;
+    if (!chatStoreName) return;
     if (messages.length > 0 && !window.confirm('確定要重新開始對話嗎？')) return;
     setMessages([]);
     try {
-      const result = await api.startChat(currentStore, sessionId);
+      const result = await api.startChat(chatStoreName, sessionId);
       if (result.session_id) {
         setSessionId(result.session_id);
       }
@@ -120,8 +209,8 @@ export function useAppChat() {
   const handleCreateStore = async (name: string) => {
     try {
       const newStore = await api.createStore(name);
-      await refreshStores();
-      handleStoreChange(newStore.name);
+      const nextStores = await refreshStores();
+      await handleStoreChange(newStore.name, nextStores);
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : String(e);
       alert('建立失敗: ' + errorMsg);
@@ -132,12 +221,18 @@ export function useAppChat() {
     if (!storeName) return;
     try {
       await api.deleteStore(storeName);
+      const nextStores = await refreshStores();
       if (currentStore === storeName) {
-        setCurrentStore(null);
-        setFiles([]);
-        setMessages([]);
+        const fallbackTarget = buildKnowledgeTargets(nextStores)[0] || null;
+        if (fallbackTarget) {
+          await handleStoreChange(fallbackTarget.id, nextStores);
+        } else {
+          setCurrentTargetId(null);
+          setFiles([]);
+          setMessages([]);
+          setSessionId(null);
+        }
       }
-      await refreshStores();
       showStatus('知識庫已刪除');
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : String(e);
@@ -146,13 +241,17 @@ export function useAppChat() {
   };
 
   const handleUploadFile = async (file: File) => {
-    if (!currentStore) {
+    if (!currentTarget) {
       alert('請先選擇知識庫');
       return;
     }
     try {
-      await api.uploadFile(currentStore, file);
-      await refreshFiles();
+      if (managedContext) {
+        await api.uploadManagedKnowledgeFile(managedContext.appTarget, managedContext.language, file);
+      } else if (currentTarget.kind === 'store') {
+        await api.uploadFile(currentTarget.storeName, file);
+      }
+      await refreshFiles(currentTarget);
       showStatus('文件上傳成功');
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : String(e);
@@ -161,10 +260,14 @@ export function useAppChat() {
   };
 
   const handleDeleteFile = async (fileName: string) => {
-    if (!confirm('確定刪除此文件？')) return;
+    if (!currentTarget || !confirm('確定刪除此文件？')) return;
     try {
-      await api.deleteFile(fileName);
-      await refreshFiles();
+      if (managedContext) {
+        await api.deleteManagedKnowledgeFile(managedContext.appTarget, fileName, managedContext.language);
+      } else if (currentTarget.kind === 'store') {
+        await api.deleteFile(fileName);
+      }
+      await refreshFiles(currentTarget);
       showStatus('文件已刪除');
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : String(e);
@@ -173,20 +276,19 @@ export function useAppChat() {
   };
 
   const handleSendMessage = async (text: string) => {
-    // 一次性更新訊息，減少重新渲染次數
-    setMessages(prev => [
+    if (!chatStoreName) return;
+    setMessages((prev) => [
       ...prev,
       { role: 'user', text },
-      { role: 'model', loading: true }
+      { role: 'model', loading: true },
     ]);
     setLoading(true);
 
     try {
       let activeSessionId = sessionId;
 
-      // 保險：若 session_id 不存在，先建立一個新的 chat session
-      if (!activeSessionId && currentStore) {
-        const startResult = await api.startChat(currentStore);
+      if (!activeSessionId) {
+        const startResult = await api.startChat(chatStoreName);
         if (startResult.session_id) {
           activeSessionId = startResult.session_id;
           setSessionId(startResult.session_id);
@@ -194,9 +296,8 @@ export function useAppChat() {
       }
 
       const data = await api.sendMessage(text, activeSessionId || undefined);
-      setMessages(prev => {
+      setMessages((prev) => {
         const newMessages = [...prev];
-        // user message: 設定 turnNumber
         newMessages[newMessages.length - 2] = {
           ...newMessages[newMessages.length - 2],
           turnNumber: data.turn_number,
@@ -210,12 +311,12 @@ export function useAppChat() {
       });
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : String(e);
-      setMessages(prev => {
+      setMessages((prev) => {
         const newMessages = [...prev];
         newMessages[newMessages.length - 1] = {
           role: 'model',
           text: '錯誤: ' + errorMsg,
-          error: true
+          error: true,
         };
         return newMessages;
       });
@@ -225,19 +326,13 @@ export function useAppChat() {
   };
 
   const handleRegenerate = async (turnNumber: number) => {
-    if (!sessionId || loading) return;
+    if (!sessionId || loading || !chatStoreName) return;
 
-    // 找到該 turnNumber 的 user message 文字
-    const userMsg = messages.find(
-      m => m.role === 'user' && m.turnNumber === turnNumber
-    );
+    const userMsg = messages.find((message) => message.role === 'user' && message.turnNumber === turnNumber);
     if (!userMsg?.text) return;
 
-    // 前端截斷到該輪的 user message（含），丟掉 model 回覆及之後
-    setMessages(prev => {
-      const userIdx = prev.findIndex(
-        m => m.role === 'user' && m.turnNumber === turnNumber
-      );
+    setMessages((prev) => {
+      const userIdx = prev.findIndex((message) => message.role === 'user' && message.turnNumber === turnNumber);
       if (userIdx === -1) return prev;
       const truncated = prev.slice(0, userIdx + 1);
       return [...truncated, { role: 'model', loading: true }];
@@ -246,7 +341,7 @@ export function useAppChat() {
 
     try {
       const data = await api.sendMessage(userMsg.text, sessionId, turnNumber);
-      setMessages(prev => {
+      setMessages((prev) => {
         const newMessages = [...prev];
         newMessages[newMessages.length - 1] = {
           role: 'model',
@@ -257,7 +352,7 @@ export function useAppChat() {
       });
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : String(e);
-      setMessages(prev => {
+      setMessages((prev) => {
         const newMessages = [...prev];
         newMessages[newMessages.length - 1] = {
           role: 'model',
@@ -272,26 +367,19 @@ export function useAppChat() {
   };
 
   const handleEditAndResend = async (turnNumber: number, newText: string) => {
-    if (!sessionId || loading) return;
+    if (!sessionId || loading || !chatStoreName) return;
 
-    // 前端截斷到該輪之前，加入新的 user message 和 loading placeholder
-    setMessages(prev => {
-      const userIdx = prev.findIndex(
-        m => m.role === 'user' && m.turnNumber === turnNumber
-      );
+    setMessages((prev) => {
+      const userIdx = prev.findIndex((message) => message.role === 'user' && message.turnNumber === turnNumber);
       if (userIdx === -1) return prev;
       const truncated = prev.slice(0, userIdx);
-      return [
-        ...truncated,
-        { role: 'user', text: newText },
-        { role: 'model', loading: true },
-      ];
+      return [...truncated, { role: 'user', text: newText }, { role: 'model', loading: true }];
     });
     setLoading(true);
 
     try {
       const data = await api.sendMessage(newText, sessionId, turnNumber);
-      setMessages(prev => {
+      setMessages((prev) => {
         const newMessages = [...prev];
         newMessages[newMessages.length - 2] = {
           ...newMessages[newMessages.length - 2],
@@ -306,7 +394,7 @@ export function useAppChat() {
       });
     } catch (e) {
       const errorMsg = e instanceof Error ? e.message : String(e);
-      setMessages(prev => {
+      setMessages((prev) => {
         const newMessages = [...prev];
         newMessages[newMessages.length - 1] = {
           role: 'model',
@@ -328,17 +416,24 @@ export function useAppChat() {
     conversationHistoryModalOpen, setConversationHistoryModalOpen,
     status,
     stores,
+    knowledgeTargets,
+    currentTarget,
+    currentTargetId,
     currentStore,
+    chatStoreName,
+    managedContext,
     files,
     filesLoading,
     messages, setMessages,
     loading,
     sessionId, setSessionId,
+    isManagedStore,
     theme, toggleTheme,
     toggleSidebar,
     showStatus,
     refreshStores,
     refreshFiles,
+    handleRefreshKnowledge,
     handleStoreChange,
     handleRestartChat,
     handleCreateStore,
