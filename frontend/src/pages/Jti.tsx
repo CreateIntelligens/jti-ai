@@ -47,6 +47,10 @@ function getQuizTotalQuestions(session: SessionData): number {
   return session.selected_questions?.length || 4;
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => { window.setTimeout(resolve, ms); });
+}
+
 export default function Jti() {
   const { t, i18n } = useTranslation();
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -88,9 +92,14 @@ export default function Jti() {
     setTtsStateMap({});
   }, []);
 
-  const sleep = (ms: number) => new Promise<void>(resolve => {
-    window.setTimeout(resolve, ms);
-  });
+  const markTtsError = useCallback((id: string) => {
+    ttsPendingSinceRef.current.delete(id);
+    setTtsStateMap(prev => ({ ...prev, [id]: 'error' }));
+  }, []);
+
+  const isStaleEpoch = useCallback((startEpoch: number) =>
+    isUnmountedRef.current || ttsEpochRef.current !== startEpoch
+  , []);
 
   const warmupTtsAudio = useCallback((ttsMessageId?: string, force = false) => {
     const id = (ttsMessageId || '').trim();
@@ -107,17 +116,16 @@ export default function Jti() {
       try {
         const maxAttempts = 16;
         for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-          if (isUnmountedRef.current || ttsEpochRef.current !== startEpoch) {
-            return;
-          }
+          if (isStaleEpoch(startEpoch)) return;
+
           const res = await fetchWithApiKey(`/api/jti/tts/${encodeURIComponent(id)}`);
+
           if (res.status === 202) {
             await sleep(Math.min(350 + attempt * 80, 1200));
             continue;
           }
           if (res.status === 404) {
-            ttsPendingSinceRef.current.delete(id);
-            setTtsStateMap(prev => ({ ...prev, [id]: 'error' }));
+            markTtsError(id);
             return;
           }
           if (!res.ok) {
@@ -126,7 +134,7 @@ export default function Jti() {
 
           const blob = await res.blob();
           const audioUrl = URL.createObjectURL(blob);
-          if (isUnmountedRef.current || ttsEpochRef.current !== startEpoch) {
+          if (isStaleEpoch(startEpoch)) {
             URL.revokeObjectURL(audioUrl);
             return;
           }
@@ -138,12 +146,10 @@ export default function Jti() {
           setTtsStateMap(prev => ({ ...prev, [id]: 'ready' }));
           return;
         }
-        ttsPendingSinceRef.current.delete(id);
-        setTtsStateMap(prev => ({ ...prev, [id]: 'error' }));
+        markTtsError(id);
       } catch {
-        if (!isUnmountedRef.current && ttsEpochRef.current === startEpoch) {
-          ttsPendingSinceRef.current.delete(id);
-          setTtsStateMap(prev => ({ ...prev, [id]: 'error' }));
+        if (!isStaleEpoch(startEpoch)) {
+          markTtsError(id);
         }
       }
     })().finally(() => {
@@ -151,7 +157,7 @@ export default function Jti() {
     });
 
     ttsPendingMapRef.current.set(id, task);
-  }, []);
+  }, [markTtsError, isStaleEpoch]);
 
   const playAssistantTts = useCallback(async (msg: Message) => {
     let ttsMessageId = msg.ttsMessageId?.trim() || '';
@@ -203,29 +209,31 @@ export default function Jti() {
     });
   }, [warmupTtsAudio, currentLanguage]);
 
+  // Auto-recover stalled TTS warmups; skip 'error' state to avoid retrying permanent failures (e.g. 404)
   useEffect(() => {
+    const POLL_INTERVAL_MS = 3000;
+    const STALL_TIMEOUT_MS = 12000;
+
     const timer = window.setInterval(() => {
       const now = Date.now();
       messages.forEach(msg => {
         if (msg.type !== 'assistant') return;
         const id = msg.ttsMessageId?.trim();
-        if (!id) return;
-        if (ttsAudioUrlMapRef.current.has(id)) return;
+        if (!id || ttsAudioUrlMapRef.current.has(id)) return;
 
         const state = ttsStateMap[id];
         if (state === 'pending') {
           const startedAt = ttsPendingSinceRef.current.get(id) || 0;
-          if (startedAt > 0 && now - startedAt > 12000) {
+          if (startedAt > 0 && now - startedAt > STALL_TIMEOUT_MS) {
             warmupTtsAudio(id, true);
           }
           return;
         }
 
-        if (state !== 'ready' && state !== 'error') {
-          warmupTtsAudio(id);
-        }
+        if (state === 'ready' || state === 'error') return;
+        warmupTtsAudio(id);
       });
-    }, 3000);
+    }, POLL_INTERVAL_MS);
 
     return () => window.clearInterval(timer);
   }, [messages, ttsStateMap, warmupTtsAudio]);
@@ -245,6 +253,7 @@ export default function Jti() {
     }
   }, [editingTurn]);
 
+  // Reset unmounted flag on mount (required for HMR/hot reload where ref persists across remounts)
   useEffect(() => {
     isUnmountedRef.current = false;
     return () => {
