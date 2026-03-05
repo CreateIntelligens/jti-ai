@@ -108,9 +108,6 @@ def _normalize_runtime_settings(raw: Optional[Dict[str, Any]]) -> JtiRuntimeSett
             section_data = raw_sections.get(lang)
             if isinstance(section_data, dict):
                 for field in RULE_SECTION_FIELDS:
-                    if lang == "zh" and field == "role_scope":
-                        # ZH 角色與可做事項固定使用程式碼預設，不走可編輯設定。
-                        continue
                     value = section_data.get(field)
                     if isinstance(value, str) and value.strip():
                         settings["response_rule_sections"][lang][field] = value

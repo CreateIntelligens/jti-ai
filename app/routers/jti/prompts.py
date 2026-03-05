@@ -201,9 +201,6 @@ def _merge_runtime_settings(
             if not section:
                 continue
             for field in RULE_SECTION_FIELDS:
-                if lang == "zh" and field == "role_scope":
-                    # ZH 角色與可做事項固定值，不接受 API 編輯。
-                    continue
                 value = getattr(section, field, None)
                 if isinstance(value, str) and value.strip():
                     data["response_rule_sections"][lang][field] = value

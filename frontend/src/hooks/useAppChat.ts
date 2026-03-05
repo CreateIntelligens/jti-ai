@@ -17,16 +17,8 @@ function toErrorMessage(error: unknown): string {
 function normalizeKeyLabels(keyNames: unknown): string[] {
   if (!Array.isArray(keyNames)) return [];
   return keyNames.map((keyName, index) => {
-    if (typeof keyName === 'string') {
-      const trimmed = keyName.trim();
-      return trimmed || `Key #${index + 1}`;
-    }
-    if (keyName && typeof keyName === 'object') {
-      const candidate = [keyName.name, keyName.label, keyName.display_name]
-        .find((value): value is string => typeof value === 'string' && value.trim().length > 0);
-      if (candidate) {
-        return candidate.trim();
-      }
+    if (typeof keyName === 'string' && keyName.trim()) {
+      return keyName.trim();
     }
     return `Key #${index + 1}`;
   });
@@ -59,7 +51,7 @@ function getManagedKnowledgeContext(target: KnowledgeTarget | null): {
   };
 }
 
-function getProjectFilterOptions(storeList: Store[], keyNames: string[]): Array<{ value: string; label: string }> {
+function getProjectFilterOptions(keyNames: string[]): Array<{ value: string; label: string }> {
   if (keyNames.length <= 1) return [];
   return [
     { value: 'all', label: '全部專案' },
@@ -117,7 +109,7 @@ export function useAppChat() {
   const currentTargetIdRef = useRef<string | null>(null);
   const filesRequestIdRef = useRef(0);
 
-  const projectFilterOptions = getProjectFilterOptions(stores, keyNames);
+  const projectFilterOptions = getProjectFilterOptions(keyNames);
   const filteredStores = filterStoresByProject(stores, projectFilter);
   const knowledgeTargets = buildKnowledgeTargets(filteredStores);
   const currentTarget = findKnowledgeTarget(currentTargetId, filteredStores);

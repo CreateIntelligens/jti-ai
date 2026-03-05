@@ -92,7 +92,7 @@ export default function JtiPersonaTab({
     : 'zh';
   const customPrompts = prompts.filter(p => p.id !== SYSTEM_DEFAULT_ID);
   const defaultPrompt = prompts.find(p => p.id === SYSTEM_DEFAULT_ID);
-  const showRoleScopeField = currentLang !== 'zh';
+  const showRoleScopeField = true;
 
   useEffect(() => {
     setRuntimeDraft(runtimeSettings);
@@ -450,7 +450,7 @@ export default function JtiPersonaTab({
                 </div>
               </>
             )}
-            {(expandedIds.has(prompt.id) || editingId === prompt.id) && renderRuntimeSettings(prompt.id)}
+            {expandedIds.has(prompt.id) && editingId !== prompt.id && renderRuntimeSettings(prompt.id)}
           </div>
         ))}
       </div>
