@@ -34,13 +34,13 @@ from app.services.session.session_manager_factory import get_hciot_session_manag
 
 session_manager = get_hciot_session_manager()
 logger = logging.getLogger(__name__)
-FILE_SEARCH_MODEL = "gemini-2.5-flash-lite-preview-09-2025"
+FILE_SEARCH_MODEL = "gemini-3.1-flash-lite-preview"
 
 
 class HciotMainAgent(BaseAgent):
     def __init__(self):
         super().__init__(
-            model_name=os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite-preview-09-2025"),
+            model_name=os.getenv("GEMINI_MODEL_NAME", "gemini-3.1-flash-lite-preview"),
         )
 
     @property

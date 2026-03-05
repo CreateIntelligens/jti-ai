@@ -42,7 +42,7 @@ session_manager = get_session_manager()
 logger = logging.getLogger(__name__)
 
 # File Search 用 flash-lite（不帶 system_instruction 即可正常 grounding）
-FILE_SEARCH_MODEL = "gemini-2.5-flash-lite-preview-09-2025"
+FILE_SEARCH_MODEL = "gemini-3.1-flash-lite-preview"
 
 
 class MainAgent(BaseAgent):
@@ -50,7 +50,7 @@ class MainAgent(BaseAgent):
 
     def __init__(self):
         super().__init__(
-            model_name=os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite-preview-09-2025"),
+            model_name=os.getenv("GEMINI_MODEL_NAME", "gemini-3.1-flash-lite-preview"),
         )
 
     @property
