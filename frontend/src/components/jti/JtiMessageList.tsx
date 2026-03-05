@@ -1,5 +1,11 @@
 import React from 'react';
-import { TFunction } from 'i18next';
+import type { TFunction } from 'i18next';
+
+function getTtsButtonTitle(ttsState: 'pending' | 'ready' | 'error' | undefined): string {
+  if (ttsState === 'pending') return '語音準備中';
+  if (ttsState === 'error') return '語音產生失敗，點擊重試';
+  return '播放語音';
+}
 
 export interface Message {
   text: string;
@@ -7,6 +13,7 @@ export interface Message {
   toolCalls?: Array<{ tool: string }>;
   timestamp: number;
   turnNumber?: number;
+  ttsMessageId?: string;
 }
 
 interface QuickAction {
@@ -28,6 +35,8 @@ interface JtiMessageListProps {
   sendMessage: (message: string, turnNumber?: number) => void;
   handleRegenerate: (turnNumber: number) => void;
   handleEditAndResend: (turnNumber: number, newText: string) => void;
+  onPlayTts: (msg: Message) => void;
+  getTtsState: (ttsMessageId?: string) => 'pending' | 'ready' | 'error' | undefined;
   setEditingTurn: (turn: number | null) => void;
   setEditText: (text: string) => void;
   handleEditKeyDown: (e: React.KeyboardEvent, turnNumber: number) => void;
@@ -49,6 +58,8 @@ export default function JtiMessageList({
   sendMessage,
   handleRegenerate,
   handleEditAndResend,
+  onPlayTts,
+  getTtsState,
   setEditingTurn,
   setEditText,
   handleEditKeyDown,
@@ -91,19 +102,23 @@ export default function JtiMessageList({
         </div>
       ) : (
         <div className="messages-container">
-          {messages.map((msg, idx) => (
-            <div
-              key={`${msg.timestamp}-${idx}`}
-              className={`message ${msg.type}`}
-              style={{ animationDelay: `${idx * 0.05}s` }}
-            >
-              <div className="message-wrapper">
-                <div className="message-avatar">
-                  <span className="avatar-icon">
-                    {msg.type === 'user' ? '👤' : msg.type === 'assistant' ? '🤖' : '💡'}
-                  </span>
-                </div>
-                <div className="message-bubble">
+          {messages.map((msg, idx) => {
+            const ttsState = getTtsState(msg.ttsMessageId);
+            const audioBtnClass = `message-audio-btn${ttsState ? ` ${ttsState}` : ''}`;
+
+            return (
+              <div
+                key={`${msg.timestamp}-${idx}`}
+                className={`message ${msg.type}`}
+                style={{ animationDelay: `${idx * 0.05}s` }}
+              >
+                <div className="message-wrapper">
+                  <div className="message-avatar">
+                    <span className="avatar-icon">
+                      {msg.type === 'user' ? '👤' : msg.type === 'assistant' ? '🤖' : '💡'}
+                    </span>
+                  </div>
+                  <div className="message-bubble">
                   {editingTurn !== null && editingTurn === msg.turnNumber && msg.type === 'user' ? (
                     <div className="message-edit-area">
                       <textarea
@@ -161,23 +176,36 @@ export default function JtiMessageList({
                             </button>
                           )}
                           {msg.type === 'assistant' && (
-                            <button
-                              className="message-action-btn"
-                              onClick={() => msg.turnNumber && handleRegenerate(msg.turnNumber)}
-                              title="重新生成"
-                              aria-label="重新生成回覆"
-                            >
-                              ↻
-                            </button>
+                            <>
+                              <button
+                                className="message-action-btn"
+                                onClick={() => msg.turnNumber && handleRegenerate(msg.turnNumber)}
+                                title="重新生成"
+                                aria-label="重新生成回覆"
+                              >
+                                ↻
+                              </button>
+                            </>
                           )}
                         </div>
                       )}
                     </>
                   )}
                 </div>
+                  {msg.type === 'assistant' && msg.ttsMessageId && (
+                    <button
+                      className={audioBtnClass}
+                      onClick={() => onPlayTts(msg)}
+                      title={getTtsButtonTitle(ttsState)}
+                      aria-label="播放語音"
+                    >
+                      {ttsState === 'pending' ? '⏳' : '🔊'}
+                    </button>
+                  )}
               </div>
-            </div>
-          ))}
+              </div>
+            );
+          })}
 
           {isTyping && (
             <div className="message assistant typing-indicator">

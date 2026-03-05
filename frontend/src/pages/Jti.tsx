@@ -22,6 +22,8 @@ interface Message {
   toolCalls?: Array<{ tool: string }>;
   timestamp: number;
   turnNumber?: number;
+  ttsText?: string;
+  ttsMessageId?: string;
 }
 
 interface SessionData {
@@ -38,6 +40,8 @@ interface WelcomeContent {
   title: string;
   description: string;
 }
+
+type TtsState = 'pending' | 'ready' | 'error';
 
 function getQuizTotalQuestions(session: SessionData): number {
   return session.selected_questions?.length || 4;
@@ -56,6 +60,7 @@ export default function Jti() {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [welcomeContent, setWelcomeContent] = useState<WelcomeContent | null>(null);
+  const [ttsStateMap, setTtsStateMap] = useState<Record<string, TtsState>>({});
   const { theme, toggleTheme } = useTheme();
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -65,6 +70,94 @@ export default function Jti() {
   const [editingTurn, setEditingTurn] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const ttsAudioUrlMapRef = useRef<Map<string, string>>(new Map());
+  const ttsPendingMapRef = useRef<Map<string, Promise<void>>>(new Map());
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const isUnmountedRef = useRef(false);
+  const ttsEpochRef = useRef(0);
+
+  const clearTtsState = useCallback(() => {
+    ttsEpochRef.current += 1;
+    ttsPendingMapRef.current.clear();
+    currentAudioRef.current?.pause();
+    currentAudioRef.current = null;
+    ttsAudioUrlMapRef.current.forEach(url => URL.revokeObjectURL(url));
+    ttsAudioUrlMapRef.current.clear();
+    setTtsStateMap({});
+  }, []);
+
+  const sleep = (ms: number) => new Promise<void>(resolve => {
+    window.setTimeout(resolve, ms);
+  });
+
+  const warmupTtsAudio = useCallback((ttsMessageId?: string) => {
+    const id = (ttsMessageId || '').trim();
+    if (!id || ttsAudioUrlMapRef.current.has(id) || ttsPendingMapRef.current.has(id)) return;
+    const startEpoch = ttsEpochRef.current;
+
+    const task = (async () => {
+      setTtsStateMap(prev => ({ ...prev, [id]: 'pending' }));
+      try {
+        for (let attempt = 0; attempt < 40; attempt += 1) {
+          if (isUnmountedRef.current || ttsEpochRef.current !== startEpoch) return;
+          const res = await fetchWithApiKey(`/api/jti/tts/${encodeURIComponent(id)}`);
+          if (res.status === 202) {
+            await sleep(Math.min(500 + attempt * 120, 2500));
+            continue;
+          }
+          if (!res.ok) {
+            throw new Error(await res.text());
+          }
+
+          const blob = await res.blob();
+          const audioUrl = URL.createObjectURL(blob);
+          if (isUnmountedRef.current || ttsEpochRef.current !== startEpoch) {
+            URL.revokeObjectURL(audioUrl);
+            return;
+          }
+
+          const oldUrl = ttsAudioUrlMapRef.current.get(id);
+          if (oldUrl) URL.revokeObjectURL(oldUrl);
+          ttsAudioUrlMapRef.current.set(id, audioUrl);
+          setTtsStateMap(prev => ({ ...prev, [id]: 'ready' }));
+          return;
+        }
+        setTtsStateMap(prev => ({ ...prev, [id]: 'error' }));
+      } catch {
+        if (!isUnmountedRef.current && ttsEpochRef.current === startEpoch) {
+          setTtsStateMap(prev => ({ ...prev, [id]: 'error' }));
+        }
+      }
+    })().finally(() => {
+      ttsPendingMapRef.current.delete(id);
+    });
+
+    ttsPendingMapRef.current.set(id, task);
+  }, []);
+
+  const playAssistantTts = useCallback((msg: Message) => {
+    const ttsMessageId = msg.ttsMessageId?.trim();
+    if (!ttsMessageId) return;
+
+    const audioUrl = ttsAudioUrlMapRef.current.get(ttsMessageId);
+    if (!audioUrl) {
+      warmupTtsAudio(ttsMessageId);
+      return;
+    }
+
+    currentAudioRef.current?.pause();
+    const audio = new Audio(audioUrl);
+    currentAudioRef.current = audio;
+    void audio.play().catch(() => {
+      setTtsStateMap(prev => ({ ...prev, [ttsMessageId]: 'error' }));
+    });
+  }, [warmupTtsAudio]);
+
+  const getAssistantTtsState = useCallback((ttsMessageId?: string): TtsState | undefined => {
+    const id = (ttsMessageId || '').trim();
+    if (!id) return undefined;
+    return ttsStateMap[id];
+  }, [ttsStateMap]);
 
   // 進入編輯模式時自動 focus 編輯框
   useEffect(() => {
@@ -75,57 +168,51 @@ export default function Jti() {
     }
   }, [editingTurn]);
 
-  // 重新開始對話
-  const restartConversation = useCallback(async () => {
-    if (messages.length > 0) {
-      if (!window.confirm(t('restart_confirm'))) {
-        return;
-      }
-    }
+  useEffect(() => () => {
+    isUnmountedRef.current = true;
+    clearTtsState();
+  }, [clearTtsState]);
 
+  // 建立新 session 的共用邏輯
+  const startNewSession = useCallback(async (lang: string) => {
+    setLoading(false);
+    setIsTyping(false);
+    const res = await fetchWithApiKey('/api/jti/chat/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ language: lang, previous_session_id: sessionId }),
+    });
+    const data = await res.json();
+    setSessionId(data.session_id);
+    setMessages([]);
+    clearTtsState();
+    setStatusText(t('status_connected'));
+    setSessionInfo(`#${data.session_id.substring(0, 8)}`);
+    return data;
+  }, [sessionId, t, clearTtsState]);
+
+  const restartConversation = useCallback(async () => {
+    if (messages.length > 0 && !window.confirm(t('restart_confirm'))) {
+      return;
+    }
     try {
-      setLoading(false);
-      setIsTyping(false);
-      const res = await fetchWithApiKey('/api/jti/chat/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ language: currentLanguage, previous_session_id: sessionId }),
-      });
-      const data = await res.json();
-      setSessionId(data.session_id);
-      setMessages([]);
-      setStatusText(t('status_connected'));
-      setSessionInfo(`#${data.session_id.substring(0, 8)}`);
+      await startNewSession(currentLanguage);
       setTimeout(() => inputRef.current?.focus(), 100);
     } catch {
       setStatusText(t('status_failed'));
     }
-  }, [currentLanguage, sessionId, messages.length, t]);
+  }, [currentLanguage, messages.length, t, startNewSession]);
 
-  // 靜默重啟（切換 prompt 後使用，不需確認）
   const silentRestart = useCallback(async () => {
     try {
-      setLoading(false);
-      setIsTyping(false);
-      const res = await fetchWithApiKey('/api/jti/chat/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ language: currentLanguage, previous_session_id: sessionId }),
-      });
-      const data = await res.json();
-      setSessionId(data.session_id);
-      setMessages([]);
-      setStatusText(t('status_connected'));
-      setSessionInfo(`#${data.session_id.substring(0, 8)}`);
+      await startNewSession(currentLanguage);
       setTimeout(() => inputRef.current?.focus(), 100);
     } catch {
       setStatusText(t('status_failed'));
     }
-  }, [currentLanguage, sessionId, t]);
+  }, [currentLanguage, startNewSession]);
 
-  // 切換語言
   const toggleLanguage = useCallback(async () => {
-    // 如果有訊息記錄，警告使用者切換語言會重新開始
     if (messages.length > 0) {
       const confirmMessage = currentLanguage === 'zh'
         ? '切換語言將重新開始對話，確定要繼續嗎？'
@@ -140,24 +227,12 @@ export default function Jti() {
     setCurrentLanguage(newLang);
     localStorage.setItem('language', newLang);
 
-    // 重新建立 session
     try {
-      setLoading(false);
-      setIsTyping(false);
-      const res = await fetchWithApiKey('/api/jti/chat/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ language: newLang, previous_session_id: sessionId }),
-      });
-      const data = await res.json();
-      setSessionId(data.session_id);
-      setMessages([]);
-      setStatusText(t('status_connected'));
-      setSessionInfo(`#${data.session_id.substring(0, 8)}`);
+      await startNewSession(newLang);
     } catch {
       setStatusText(t('status_failed'));
     }
-  }, [currentLanguage, sessionId, i18n, messages.length, t]);
+  }, [currentLanguage, i18n, messages.length, t, startNewSession]);
 
   const refreshWelcomeContent = useCallback(async (lang?: string) => {
     const targetLang = (lang || currentLanguage) === 'en' ? 'en' : 'zh';
@@ -210,10 +285,8 @@ export default function Jti() {
   const sendMessage = useCallback(async (message: string, turnNumber?: number) => {
     if (!message || !sessionId || loading) return;
 
-    // 清除編輯狀態（新訊息送出前就清掉，避免殘留）
     setEditingTurn(null);
 
-    // 如果不是重新生成 (turnNumber undefined)，則加入 user message
     if (turnNumber === undefined) {
       setMessages(prev => [...prev, { text: message, type: 'user', timestamp: Date.now() }]);
     }
@@ -238,7 +311,6 @@ export default function Jti() {
       await new Promise(resolve => setTimeout(resolve, 300));
       setIsTyping(false);
 
-      // Console log: 對話記錄
       console.log(`[用戶] ${message}`);
       console.log(`[AI回應] ${data.message} (Turn: ${data.turn_number})`);
       if (data.session) {
@@ -267,65 +339,27 @@ export default function Jti() {
           type: 'assistant',
           toolCalls: data.tool_calls,
           timestamp: Date.now(),
-          turnNumber: data.turn_number // 從後端取得 turn_number
+          turnNumber: data.turn_number, // 從後端取得 turn_number
+          ttsText: data.tts_text,
+          ttsMessageId: data.tts_message_id,
         };
 
-      // 如果是重新生成，則更新訊息列表
-      if (turnNumber !== undefined) {
-        setMessages(prev => {
-          // 找到該 turn 的 user message (如果需要)
-          // Backend 回傳的 turn_number 是這輪對話的編號 (user answer pair)
-          // 我們需要把 user message 也標上 turnNumber
-
-          // 簡單策略：如果是 regenerate，我們已經截斷了後面的訊息 (在 handleRegenerate 中)，
-          // 所以現在最後一個 message 應該是 (如果是 edit) 或者 最後的 assistant message 是 loading (如果是 regenerate)
-
-          // 但因為我們在 handleRegenerate 已經 truncate 了，所以這裡直接 append 即可？
-          // 其實 handleRegenerate 有 truncate 邏輯。
-          // 讓我們看看 handleRegenerate 怎麼寫。
-          // 最好這裡是直接 append to end，由 handleRegenerate 負責 truncate。
-          // 但需更新剛才那個 user message 的 turnNumber (如果它沒有的話 - 雖然通常這在新對話才有)
-
-          // 為了簡單，我們假設 handleRegenerate 已經處理好了 messages 狀態 (截斷了舊的)
-          // 我們只需要 append 新的 assistant message
-          // 但是！如果是 EditAndResend，我們剛剛 append 了新的 user message
-          // 我們應該把 turnNumber 補上去給那個 user message
-
-          const newMessages = [...prev];
-          // 嘗試給最後一個 user message 補上 turnNumber (如果它對應到這次回應)
-          // 回應的 turn_number 應該跟最後一個 user message 是同一輪
-          let lastUserMsgIndex = -1;
-          for (let i = newMessages.length - 1; i >= 0; i--) {
-            if (newMessages[i].type === 'user') {
-              lastUserMsgIndex = i;
-              break;
-            }
-          }
-          if (lastUserMsgIndex !== -1) {
-            newMessages[lastUserMsgIndex].turnNumber = data.turn_number;
-          }
-
-          return [...newMessages, newMsg];
-        });
-      } else {
-        // 一般發送
-        setMessages(prev => {
-          const newMessages = [...prev];
-          let lastUserMsgIndex = -1;
-          for (let i = newMessages.length - 1; i >= 0; i--) {
-            if (newMessages[i].type === 'user') {
-              lastUserMsgIndex = i;
-              break;
-            }
-          }
-          if (lastUserMsgIndex !== -1) {
-            newMessages[lastUserMsgIndex].turnNumber = data.turn_number;
-          }
-          return [...newMessages, newMsg];
-        });
+      if (newMsg.type === 'assistant' && newMsg.ttsMessageId) {
+        warmupTtsAudio(newMsg.ttsMessageId);
       }
 
-      // 更新狀態
+      // 將回應的 turn_number 補到最後一個 user message，並 append assistant 回應
+      setMessages(prev => {
+        const updated = [...prev];
+        for (let i = updated.length - 1; i >= 0; i--) {
+          if (updated[i].type === 'user') {
+            updated[i] = { ...updated[i], turnNumber: data.turn_number };
+            break;
+          }
+        }
+        return [...updated, newMsg];
+      });
+
       if (data.session) {
         const s = data.session as SessionData;
         const count = Object.keys(s.answers || {}).length;
@@ -336,8 +370,6 @@ export default function Jti() {
         setStatusText(status);
       }
 
-      // 清除編輯狀態（防止殘留）
-      setEditingTurn(null);
     } catch {
       setIsTyping(false);
       setMessages(prev => [...prev, {
@@ -349,50 +381,34 @@ export default function Jti() {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [sessionId, loading]);
+  }, [sessionId, loading, warmupTtsAudio]);
 
   const handleRegenerate = async (turnNumber: number) => {
     if (!sessionId || loading) return;
 
-    // 找到該 turn 的 user message 文字
-    const userMsg = messages.find(
-      m => m.type === 'user' && m.turnNumber === turnNumber
-    );
+    const userMsg = messages.find(m => m.type === 'user' && m.turnNumber === turnNumber);
     if (!userMsg?.text) return;
 
-    // 前端截斷：保留到該 turn 的 user message (包含)，移除之後的所有訊息
+    // 截斷到該 turn 的 user message（含），移除後續訊息
     setMessages(prev => {
-      const userIdx = prev.findIndex(
-        m => m.type === 'user' && m.turnNumber === turnNumber
-      );
+      const userIdx = prev.findIndex(m => m.type === 'user' && m.turnNumber === turnNumber);
       if (userIdx === -1) return prev;
-      return prev.slice(0, userIdx + 1); // 保留 user message
+      return prev.slice(0, userIdx + 1);
     });
 
-    // 呼叫 sendMessage，帶上 turnNumber
-    // sendMessage 內部 logic 會 handle: 
-    // 1. 不會再 add user message to list (因為我們傳了 turnNumber 參數？ 不，sendMessage 的 logic 是 `if (turnNumber === undefined)` 才 add user message)
-    // 所以我們呼叫 sendMessage(userMsg.text, turnNumber)
     await sendMessage(userMsg.text, turnNumber);
   };
 
   const handleEditAndResend = async (turnNumber: number, newText: string) => {
     if (!sessionId || loading) return;
 
-    // 前端截斷：保留到該 turn 之前的所有訊息 (移除該 turn 的 user message 及之後所有)
+    // 截斷到該 turn 之前，插入新的 user message
     setMessages(prev => {
-      const userIdx = prev.findIndex(
-        m => m.type === 'user' && m.turnNumber === turnNumber
-      );
+      const userIdx = prev.findIndex(m => m.type === 'user' && m.turnNumber === turnNumber);
       if (userIdx === -1) return prev;
-      const truncated = prev.slice(0, userIdx);
-      // 加入新的 user message
-      return [...truncated, { text: newText, type: 'user', timestamp: Date.now() }];
+      return [...prev.slice(0, userIdx), { text: newText, type: 'user' as const, timestamp: Date.now() }];
     });
 
-    // 呼叫 sendMessage，帶上 turnNumber
-    // 這裡我們傳 turnNumber，backend 會 delete logs >= turnNumber
-    // 前端 sendMessage 會把 turnNumber 補給剛剛加的 user message
     await sendMessage(newText, turnNumber);
     setEditingTurn(null);
   };
@@ -507,6 +523,8 @@ export default function Jti() {
           quickActions={quickActions}
           welcomeTitle={welcomeContent?.title}
           welcomeDescription={welcomeContent?.description}
+          onPlayTts={playAssistantTts}
+          getTtsState={getAssistantTtsState}
           t={t}
         />
         <JtiInputArea
@@ -547,7 +565,10 @@ export default function Jti() {
             type: m.role as 'user' | 'assistant',
             timestamp: Date.now(),
             turnNumber: m.turnNumber,
+            ttsText: undefined,
+            ttsMessageId: undefined,
           })));
+          clearTtsState();
           setSessionInfo(`#${sid.substring(0, 8)}`);
 
           // 切換語言（如果有提供且與當前不同）

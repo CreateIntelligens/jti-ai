@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Optional, Union
 
 from fastapi import APIRouter, HTTPException, Depends
+from fastapi.responses import JSONResponse, Response
 import logging
 
 from app.auth import verify_admin, verify_auth
@@ -27,6 +28,7 @@ from app.services.jti.runtime_quiz_flow import (
     execute_quiz_start,
     make_quiz_tts_text,
 )
+from app.services.jti.tts_jobs import tts_job_manager
 from app.services.jti.tts_text import to_tts_text
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 from app.tools.jti.quiz import get_total_questions
@@ -54,6 +56,21 @@ admin_history_router = APIRouter(
     tags=["JTI Conversations"],
 )
 router = runtime_router
+
+
+def _queue_tts_generation(tts_text: Optional[str], language: str) -> Optional[str]:
+    if not tts_text:
+        return None
+    try:
+        return tts_job_manager.create_job(text=tts_text, language=language)
+    except Exception as exc:
+        logger.warning("Failed to queue TTS generation: %s", exc)
+        return None
+
+
+def _attach_tts_message_id(response: ChatResponse, language: str) -> ChatResponse:
+    response.tts_message_id = _queue_tts_generation(response.tts_text, language)
+    return response
 
 
 # === Endpoints ===
@@ -213,13 +230,14 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 final_turn_number = log_result[1] if log_result else None
                 logger.info(f"✅ QUIZ 作答成功: {request.message} → {user_choice}")
 
-                return ChatResponse(
+                response_payload = ChatResponse(
                     message=response_message,
                     tts_text=tts_text,
                     session=updated_session.model_dump(),
                     tool_calls=[{k: v for k, v in call.items() if k != "result"} for call in tool_calls],
                     turn_number=final_turn_number,
                 )
+                return _attach_tts_message_id(response_payload, updated_session.language)
             else:
                 # ❌ 無法判斷選項：hardcode 提示
                 if session.language == "en":
@@ -244,7 +262,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 )
                 final_turn_number = log_result[1] if log_result else None
 
-                return ChatResponse(
+                response_payload = ChatResponse(
                     message=response_message,
                     tts_text=to_tts_text(
                         f"{hint} {make_quiz_tts_text(q, current_q_num, session.language)}",
@@ -254,6 +272,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     tool_calls=[],
                     turn_number=final_turn_number
                 )
+                return _attach_tts_message_id(response_payload, session.language)
 
         # ========== 非 QUIZ 狀態 ==========
         start_keywords = [
@@ -278,7 +297,8 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 session_manager.update_session(session)
             if request.turn_number:
                 conversation_logger.delete_turns_from(request.session_id, request.turn_number)
-            return await execute_quiz_start(request.session_id, user_message=request.message)
+            quiz_response = await execute_quiz_start(request.session_id, user_message=request.message)
+            return _attach_tts_message_id(quiz_response, session.language)
 
         # 一般對話：走 LLM
         result = await main_agent.chat(
@@ -303,12 +323,41 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         # 非測驗回覆：tts_text 預設等同 message
         raw_tts = result.get("tts_text") or result.get("message")
         result["tts_text"] = to_tts_text(raw_tts, session.language)
+        result["tts_message_id"] = _queue_tts_generation(result.get("tts_text"), session.language)
 
         return ChatResponse(**result, turn_number=final_turn_number)
 
     except Exception as e:
         logger.error(f"Chat failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@runtime_router.get("/tts/{tts_message_id}")
+async def get_tts_audio(tts_message_id: str, auth: dict = Depends(verify_auth)):
+    """Get pre-generated TTS audio by message id."""
+    job = tts_job_manager.get_job(tts_message_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="TTS audio not found")
+
+    status = job.get("status")
+    if status == "pending":
+        return JSONResponse(status_code=202, content={"status": "pending"})
+    if status == "failed":
+        raise HTTPException(status_code=500, detail=job.get("error") or "TTS generation failed")
+
+    audio_bytes = job.get("audio_bytes")
+    if not isinstance(audio_bytes, (bytes, bytearray)) or not audio_bytes:
+        raise HTTPException(status_code=500, detail="TTS audio is unavailable")
+
+    content_type = job.get("content_type")
+    if not isinstance(content_type, str) or not content_type.strip():
+        content_type = "audio/mpeg"
+
+    return Response(
+        content=audio_bytes,
+        media_type=content_type,
+        headers={"Cache-Control": "private, max-age=300"},
+    )
 
 
 @compat_history_router.get(
