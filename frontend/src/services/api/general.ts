@@ -211,38 +211,52 @@ interface SavedApiKey {
 
 export function getSavedApiKeys(): SavedApiKey[] {
   try {
-    return JSON.parse(localStorage.getItem('userGeminiApiKeys') || '[]');
+    const raw = JSON.parse(localStorage.getItem('userGeminiApiKeys') || '[]');
+    if (!Array.isArray(raw)) return [];
+    return raw
+      .map((item: any) => ({
+        name: String(item?.name || '').trim(),
+        key: String(item?.key || '').trim(),
+      }))
+      .filter(item => item.name && item.key);
   } catch {
     return [];
   }
 }
 
 export function saveApiKey(name: string, key: string): void {
+  const normalizedName = (name || '').trim();
+  const normalizedKey = (key || '').trim();
+  if (!normalizedName || !normalizedKey) return;
+
   const keys = getSavedApiKeys();
-  const existing = keys.findIndex(k => k.name === name);
+  const existing = keys.findIndex(k => k.name === normalizedName);
   if (existing >= 0) {
-    keys[existing].key = key;
+    keys[existing].key = normalizedKey;
   } else {
-    keys.push({ name, key });
+    keys.push({ name: normalizedName, key: normalizedKey });
   }
   localStorage.setItem('userGeminiApiKeys', JSON.stringify(keys));
-  setActiveApiKey(name);
+  setActiveApiKey(normalizedName);
 }
 
 export function deleteApiKey(name: string): void {
-  const keys = getSavedApiKeys().filter(k => k.name !== name);
+  const normalizedName = (name || '').trim();
+  const keys = getSavedApiKeys().filter(k => k.name !== normalizedName);
   localStorage.setItem('userGeminiApiKeys', JSON.stringify(keys));
-  if (getActiveApiKeyName() === name) {
+  if (getActiveApiKeyName() === normalizedName) {
     setActiveApiKey('system');
   }
 }
 
 export function getActiveApiKeyName(): string {
-  return localStorage.getItem('activeGeminiApiKey') || 'system';
+  const active = (localStorage.getItem('activeGeminiApiKey') || 'system').trim();
+  return active || 'system';
 }
 
 export function setActiveApiKey(name: string): void {
-  localStorage.setItem('activeGeminiApiKey', name);
+  const normalizedName = (name || '').trim();
+  localStorage.setItem('activeGeminiApiKey', normalizedName || 'system');
 }
 
 // ========== General Chat Conversations ==========

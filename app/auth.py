@@ -36,7 +36,8 @@ def _extract_api_token(request: Request) -> str | None:
 
 def extract_user_gemini_api_key(request: Request) -> str | None:
     """從獨立 header 提取使用者自己的 Gemini API key。"""
-    return request.headers.get("x-gemini-api-key")
+    api_key = (request.headers.get("x-gemini-api-key") or "").strip()
+    return api_key or None
 
 
 def _is_same_origin(request: Request) -> bool:

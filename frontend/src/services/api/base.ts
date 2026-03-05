@@ -4,12 +4,13 @@ const STORAGE_KEYS = 'userGeminiApiKeys';
 const STORAGE_ACTIVE = 'activeGeminiApiKey';
 
 export function getUserApiKey(): string | null {
-  const activeName = localStorage.getItem(STORAGE_ACTIVE) || 'system';
+  const activeName = (localStorage.getItem(STORAGE_ACTIVE) || 'system').trim();
   if (activeName === 'system') return null;
   try {
     const keys: { name: string; key: string }[] = JSON.parse(localStorage.getItem(STORAGE_KEYS) || '[]');
-    const found = keys.find(k => k.name === activeName);
-    return found?.key || null;
+    const found = keys.find(k => (k.name || '').trim() === activeName);
+    const trimmedKey = (found?.key || '').trim();
+    return trimmedKey || null;
   } catch {
     return null;
   }
