@@ -245,10 +245,21 @@ class MainAgent(BaseAgent):
                 logger.info(f"[計時] Intent={intent}, File Search: {(time.time()-t0)*1000:.0f}ms")
 
             # 2. 組合訊息送給主 agent
-            if kb_result:
-                enriched_message = f"<知識庫查詢結果>\n{kb_result}\n</知識庫查詢結果>\n\n使用者問題：{user_message}"
+            # 每輪都注入動態 session 狀態，避免模型遺忘目前是否仍在測驗或已完成測驗。
+            session_state = self._get_session_state(session)
+            if session.language == "en":
+                question_block = f"User question: {user_message}"
             else:
-                enriched_message = user_message
+                question_block = f"使用者問題：{user_message}"
+
+            if kb_result:
+                enriched_message = (
+                    f"{session_state}\n\n"
+                    f"<知識庫查詢結果>\n{kb_result}\n</知識庫查詢結果>\n\n"
+                    f"{question_block}"
+                )
+            else:
+                enriched_message = f"{session_state}\n\n{question_block}"
 
             chat_session = self._get_or_create_chat_session(session)
 
@@ -259,7 +270,8 @@ class MainAgent(BaseAgent):
             logger.info(f"[計時] 主 Agent: {(t3-t2)*1000:.0f}ms | 總計: {(t3-t0)*1000:.0f}ms")
 
             # 3. 清理 chat session 歷史：把 enriched_message 替換回乾淨的 user_message
-            if kb_result:
+            #    避免 KB 結果和內部 session 狀態累積在歷史中，淹沒後續短追問。
+            if enriched_message != user_message:
                 self._clean_enriched_history(chat_session, user_message)
 
             tool_calls_log = []
