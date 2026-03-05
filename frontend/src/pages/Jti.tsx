@@ -177,8 +177,12 @@ export default function Jti() {
     }
   }, [currentLanguage]);
 
-  // 初始化 session
+  const sessionStarted = useRef(false);
+
+  // 初始化 session（StrictMode 雙呼叫防護，確保只打一次 API）
   useEffect(() => {
+    if (sessionStarted.current) return;
+    sessionStarted.current = true;
     const lang = localStorage.getItem('language') || 'zh';
     fetchWithApiKey('/api/jti/chat/start', {
       method: 'POST',
@@ -193,7 +197,8 @@ export default function Jti() {
         setTimeout(() => inputRef.current?.focus(), 100);
       })
       .catch(() => setStatusText(t('status_failed')));
-  }, [t]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     void refreshWelcomeContent();

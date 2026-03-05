@@ -69,20 +69,20 @@ export default function Hciot() {
     return result.session_id || null;
   }, [currentLanguage, t]);
 
-  const bootstrapStore = useCallback(async () => {
-    try {
-      await startSession();
-      setStoreName(HCIOT_DEFAULT_STORE_NAME);
-    } catch (error) {
-      console.error('Failed to initialize HCIoT session:', error);
-      setStoreMissing(true);
-      setStatusText(t('status_failed'));
-    }
-  }, [startSession, t]);
+  const bootstrapped = useRef(false);
 
   useEffect(() => {
-    void bootstrapStore();
-  }, [bootstrapStore]);
+    if (bootstrapped.current) return;
+    bootstrapped.current = true;
+    startSession()
+      .then(() => setStoreName(HCIOT_DEFAULT_STORE_NAME))
+      .catch((error) => {
+        console.error('Failed to initialize HCIoT session:', error);
+        setStoreMissing(true);
+        setStatusText(t('status_failed'));
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const restartConversation = useCallback(async () => {
     if (!storeName) return;

@@ -12,7 +12,7 @@ from datetime import datetime
 
 from app.models.session import Session, SessionStep
 from app.services.mongo_client import get_mongo_db
-from app.tools.quiz import complete_selected_questions, get_total_questions
+from app.tools.jti.quiz import complete_selected_questions, get_total_questions
 from .session_state_mixin import SessionStateMixin
 import logging
 
@@ -25,27 +25,26 @@ class MongoSessionManager(SessionStateMixin):
     def __init__(self, db_name: str | None = None):
         self.db = get_mongo_db(db_name)
         self.sessions_collection = self.db["sessions"]
+        self._pending: Dict[str, Session] = {}  # lazy write 暫存，尚未寫入 MongoDB
 
     def create_session(self, language: str = "zh") -> Session:
-        """建立新 session（lazy write：不立即存 MongoDB，等第一次 update 時才寫入）"""
+        """建立新 session（lazy write：暫存記憶體，第一次 update 時才寫入 MongoDB）"""
         session = Session(language=language)
-        logger.info(
-            f"Created session (in-memory only): {session.session_id} "
-            f"(language={language})"
-        )
+        self._pending[session.session_id] = session
+        logger.info(f"Created session (pending): {session.session_id} (language={language})")
         return session
 
     def get_session(self, session_id: str) -> Optional[Session]:
-        """取得 session"""
+        """取得 session，先查 pending 暫存再查 MongoDB"""
+        if session_id in self._pending:
+            return self._pending[session_id]
+
         try:
             doc = self.sessions_collection.find_one({"session_id": session_id})
-
             if doc is None:
                 logger.warning(f"Session not found in MongoDB: {session_id}")
                 return None
-
             return self._doc_to_session(doc)
-
         except Exception as e:
             logger.error(f"Failed to get session from MongoDB: {e}")
             return None
@@ -63,6 +62,7 @@ class MongoSessionManager(SessionStateMixin):
                 {"$set": session_dict},
                 upsert=True
             )
+            self._pending.pop(session.session_id, None)  # 已寫入 DB，從暫存移除
 
             logger.info(
                 f"Updated session in MongoDB: {session.session_id}, "
@@ -76,6 +76,7 @@ class MongoSessionManager(SessionStateMixin):
 
     def delete_session(self, session_id: str) -> bool:
         """刪除 session"""
+        self._pending.pop(session_id, None)
         try:
             result = self.sessions_collection.delete_one({"session_id": session_id})
 
