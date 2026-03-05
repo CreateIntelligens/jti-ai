@@ -70,7 +70,7 @@ class UpdateRuntimeSettingsRequest(BaseModel):
     prompt_id: Optional[str] = None
     response_rule_sections: Optional[Dict[str, RuntimeRuleSectionsPayload]] = None
     welcome: Optional[Dict[str, RuntimeWelcomePayload]] = None
-    max_response_chars: Optional[int] = Field(default=None, ge=30, le=600)
+    max_response_chars: Optional[int] = Field(default=None, ge=0, le=600)
 
 
 def _normalize_language(language: Optional[str]) -> str:

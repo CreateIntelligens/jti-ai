@@ -41,7 +41,8 @@ class JtiRuntimeSettings(BaseModel):
             "en": WelcomeBlock(**WELCOME_TEXT["en"]),
         }
     )
-    max_response_chars: int = Field(default=DEFAULT_MAX_RESPONSE_CHARS, ge=30, le=600)
+    # 0 = 不限制字數（由前端/使用者可選）
+    max_response_chars: int = Field(default=DEFAULT_MAX_RESPONSE_CHARS, ge=0, le=600)
 
 
 RULE_SECTION_FIELDS = ("role_scope", "scope_limits", "response_style", "knowledge_rules")
