@@ -112,7 +112,7 @@ class HciotMainAgent(BaseAgent):
                 logger.error(f"[HCIoT File Search] 失敗: {e}")
                 return None
 
-    def _check_intent_fast(self, query: str) -> str:
+    def _check_intent_fast(self, query: str, language: str = "zh") -> str:
         try:
             response = _gemini_service.client.models.generate_content(
                 model=FILE_SEARCH_MODEL,

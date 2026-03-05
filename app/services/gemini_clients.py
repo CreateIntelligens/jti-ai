@@ -103,17 +103,12 @@ def get_client_index(client: genai.Client) -> int:
 def get_store_key_index(store_name: str) -> int:
     """取得 store 對應的 key index（找不到回傳 0）。"""
     client = _store_to_client.get(store_name)
-    if client:
-        return get_client_index(client)
-    return 0
+    return get_client_index(client) if client else 0
 
 
 def get_client_for_store(store_name: str) -> genai.Client:
     """根據 store_name 取得對應的 client，找不到則回傳 default。"""
-    c = _store_to_client.get(store_name)
-    if c:
-        return c
-    return get_default_client()
+    return _store_to_client.get(store_name) or get_default_client()
 
 
 def get_default_client() -> genai.Client:

@@ -40,6 +40,23 @@ session_manager = get_session_manager()
 
 logger = logging.getLogger(__name__)
 
+_INTENT_PROMPT = {
+    "en": """Determine whether the following user message is related to JTI, Ploom X heated tobacco, tobacco sticks, accessories, or the lifestyle color quiz.
+If the user is asking about completely unrelated topics (for example: weather, food lists, travel spots, programming problems, politics), respond NO.
+If it is a greeting, gratitude, short everyday follow-up, or related to the topics above, respond YES.
+
+User message: "{query}"
+
+Reply with YES or NO only:""",
+    "zh": """判斷以下使用者語句是否與「JTI傑太日煙、Ploom X加熱菸、菸彈、配件、生活色彩測驗」相關。
+如果使用者在詢問完全無關的知識（例如：天氣、美食清單、旅遊景點、寫程式設計問題、政治等），請回覆 NO。
+如果是打招呼、表達感謝、日常簡短對話，或是與上述相關的主題，請回覆 YES。
+
+使用者訊息：「{query}」
+
+只能回覆 YES 或 NO：""",
+}
+
 
 class MainAgent(BaseAgent):
     """主要對話 Agent"""
@@ -132,16 +149,12 @@ class MainAgent(BaseAgent):
                 logger.error(f"[File Search] 失敗: {e}")
                 return None
 
-    def _check_intent_fast(self, query: str) -> str:
+    def _check_intent_fast(self, query: str, language: str = "zh") -> str:
         """快速判斷是否為不相關話題 (File Search 前置過濾)"""
         try:
-            prompt = f"""判斷以下使用者語句是否與「JTI傑太日煙、Ploom X加熱菸、菸彈、配件、生活色彩測驗」相關。
-如果使用者在詢問完全無關的知識（例如：天氣、美食清單、旅遊景點、寫程式設計問題、政治等），請回覆 NO。
-如果是打招呼、表達感謝、日常簡短對話，或是與上述相關的主題，請回覆 YES。
-
-使用者訊息：「{query}」
-
-只能回覆 YES 或 NO："""
+            lang_key = normalize_language(language)
+            template = _INTENT_PROMPT.get(lang_key, _INTENT_PROMPT["zh"])
+            prompt = template.format(query=query)
             response = gemini_with_retry(lambda: _gemini_service.client.models.generate_content(
                 model=self.FILE_SEARCH_MODEL,
                 contents=prompt,

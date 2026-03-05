@@ -198,7 +198,7 @@ class BaseAgent:
 
     # --- 子類可覆寫的 intent / file search 方法 ---
 
-    def _check_intent_fast(self, query: str) -> str:
+    def _check_intent_fast(self, query: str, language: str = "zh") -> str:
         """快速判斷是否為不相關話題，子類必須覆寫。"""
         raise NotImplementedError
 
@@ -215,7 +215,7 @@ class BaseAgent:
         t0 = time.time()
 
         intent_task = asyncio.ensure_future(
-            loop.run_in_executor(None, self._check_intent_fast, user_message))
+            loop.run_in_executor(None, self._check_intent_fast, user_message, language))
         search_task = asyncio.ensure_future(
             loop.run_in_executor(None, self._file_search, user_message, language))
 
