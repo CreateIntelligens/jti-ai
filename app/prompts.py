@@ -10,7 +10,6 @@ from typing import List, Optional, Dict, Any
 
 from pydantic import BaseModel, Field
 from pymongo import MongoClient
-from pymongo.server_api import ServerApi
 
 from .core import log
 
@@ -29,11 +28,13 @@ class StorePrompts(BaseModel):
     store_name: str
     prompts: List[Prompt] = Field(default_factory=list)
     active_prompt_id: Optional[str] = None
-    # JTI 舊版全域 runtime 設定（相容用）
+    # JTI 統一設定：每個人物設定綁定 persona + runtime settings
+    # key = prompt_id / system_default
+    # value = {"persona": {"zh": "...", "en": "..."}, "runtime_settings": {...}}
+    jti_profiles_by_prompt: Optional[Dict[str, Dict[str, Any]]] = None
+    # JTI 舊欄位（僅搬遷用）
     jti_runtime_settings: Optional[Dict[str, Any]] = None
-    # JTI 新版：每個人物設定各自綁定 runtime 設定（key = prompt_id / system_default）
     jti_runtime_settings_by_prompt: Optional[Dict[str, Dict[str, Any]]] = None
-    # JTI 人物設定多語版本（key = prompt_id, value = {"zh": "...", "en": "..."}）
     jti_persona_by_prompt: Optional[Dict[str, Dict[str, str]]] = None
     # HCIoT：每個人物設定各自綁定 runtime 設定（key = prompt_id / system_default）
     hciot_runtime_settings_by_prompt: Optional[Dict[str, Dict[str, Any]]] = None
@@ -80,7 +81,7 @@ class PromptManager:
 
     def _save_store_prompts(self, store_prompts: StorePrompts):
         """保存 Store 的 prompts"""
-        data = store_prompts.model_dump()
+        data = store_prompts.model_dump(exclude_none=True)
 
         self.collection.update_one(
             {"store_name": store_prompts.store_name},

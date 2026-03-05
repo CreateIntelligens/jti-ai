@@ -36,7 +36,7 @@ class BaseAgent:
 
     @property
     def _persona_map_attr(self) -> str:
-        """Attribute name on StorePrompts for persona mapping (e.g. 'jti_persona_by_prompt')."""
+        """Attribute name on StorePrompts for persona mapping."""
         raise NotImplementedError
 
     @staticmethod
@@ -63,29 +63,43 @@ class BaseAgent:
 
     def _get_active_prompt_context(self, language: str = "zh"):
         """取得目前啟用的人物設定資訊（prompt_manager / store_name / prompt_id / persona）。"""
-        prompt_manager = None
         store_name = self._get_store_name_for_language(language)
-        prompt_id = None  # will be set from runtime_settings default
-        persona = None
-        normalized_language = normalize_language(language)
+        lang = normalize_language(language)
+
         try:
             from app import deps
             prompt_manager = getattr(deps, "prompt_manager", None)
-            if prompt_manager:
-                active = prompt_manager.get_active_prompt(store_name)
-                if active:
-                    prompt_id = active.id
-                    persona = active.content
-                    store_prompts = prompt_manager._load_store_prompts(store_name)
-                    persona_map = getattr(store_prompts, self._persona_map_attr, None)
-                    if isinstance(persona_map, dict):
-                        persona_pair = persona_map.get(active.id)
-                        if isinstance(persona_pair, dict):
-                            value = persona_pair.get(normalized_language)
-                            if isinstance(value, str) and value.strip():
-                                persona = value
         except Exception:
-            prompt_manager = None
+            return None, store_name, None, None
+
+        if not prompt_manager:
+            return None, store_name, None, None
+
+        active = prompt_manager.get_active_prompt(store_name)
+        if not active:
+            return prompt_manager, store_name, None, None
+
+        prompt_id = active.id
+        persona = active.content
+
+        store_prompts = prompt_manager._load_store_prompts(store_name)
+        persona_map = getattr(store_prompts, self._persona_map_attr, None)
+        if not isinstance(persona_map, dict):
+            return prompt_manager, store_name, prompt_id, persona
+
+        raw_persona = persona_map.get(active.id)
+        if not isinstance(raw_persona, dict):
+            return prompt_manager, store_name, prompt_id, persona
+
+        # Unified profile map: {prompt_id: {"persona": {...}, ...}}
+        # Legacy map: {prompt_id: {"zh": "...", "en": "..."}}
+        inner_persona = raw_persona.get("persona")
+        persona_pair = inner_persona if isinstance(inner_persona, dict) else raw_persona
+
+        value = persona_pair.get(lang)
+        if isinstance(value, str) and value.strip():
+            persona = value
+
         return prompt_manager, store_name, prompt_id, persona
 
     def _get_system_instruction(self, session: Session) -> str:
@@ -102,14 +116,9 @@ class BaseAgent:
         if not persona:
             persona = self._get_default_persona(session.language)
 
-        response_rule_sections = runtime_settings.response_rule_sections.get(
-            session.language, runtime_settings.response_rule_sections.get("zh")
-        )
-        sections_payload = (
-            response_rule_sections.model_dump()
-            if hasattr(response_rule_sections, "model_dump")
-            else response_rule_sections
-        )
+        lang_key = session.language if session.language in runtime_settings.response_rule_sections else "zh"
+        rule_sections = runtime_settings.response_rule_sections[lang_key]
+        sections_payload = rule_sections.model_dump() if hasattr(rule_sections, "model_dump") else rule_sections
         return self._build_system_instruction(
             persona=persona,
             language=session.language,

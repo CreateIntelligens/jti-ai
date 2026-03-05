@@ -8,12 +8,15 @@ from pydantic import BaseModel, Field
 
 from app.services.jti.agent_prompts import (
     DEFAULT_MAX_RESPONSE_CHARS,
+    PERSONA,
     WELCOME_TEXT,
     get_default_response_rule_sections,
 )
 
 JTI_STORE_NAME = "__jti__"
 SYSTEM_DEFAULT_PROMPT_ID = "system_default"
+PROFILE_PERSONA_KEY = "persona"
+PROFILE_RUNTIME_KEY = "runtime_settings"
 
 
 class RuleSections(BaseModel):
@@ -61,21 +64,32 @@ def _resolve_runtime_prompt_id(store_prompts, prompt_id: Optional[str]) -> str:
     return active_prompt_id or SYSTEM_DEFAULT_PROMPT_ID
 
 
+def _default_persona_pair() -> Dict[str, str]:
+    zh = PERSONA.get("zh", "")
+    return {
+        "zh": zh,
+        "en": PERSONA.get("en", zh),
+    }
+
+
+def _get_profiles_map(store_prompts) -> Dict[str, Dict[str, Any]]:
+    raw_profiles = getattr(store_prompts, "jti_profiles_by_prompt", None)
+    return raw_profiles if isinstance(raw_profiles, dict) else {}
+
+
 def _load_raw_runtime_settings(store_prompts, prompt_id: str) -> Optional[Dict[str, Any]]:
-    """Load raw runtime settings from per-prompt map with legacy fallback."""
-    raw_by_prompt = getattr(store_prompts, "jti_runtime_settings_by_prompt", None)
-    if isinstance(raw_by_prompt, dict):
-        raw_for_prompt = raw_by_prompt.get(prompt_id)
-        if isinstance(raw_for_prompt, dict):
-            return raw_for_prompt
+    """Load raw runtime settings from unified per-prompt profile map.
 
-        raw_for_default = raw_by_prompt.get(SYSTEM_DEFAULT_PROMPT_ID)
-        if isinstance(raw_for_default, dict):
-            return raw_for_default
+    Falls back to system default profile if the requested prompt has no settings.
+    """
+    profiles = _get_profiles_map(store_prompts)
 
-    legacy_raw = getattr(store_prompts, "jti_runtime_settings", None)
-    if isinstance(legacy_raw, dict):
-        return legacy_raw
+    for pid in (prompt_id, SYSTEM_DEFAULT_PROMPT_ID):
+        profile = profiles.get(pid)
+        if isinstance(profile, dict):
+            raw = profile.get(PROFILE_RUNTIME_KEY)
+            if isinstance(raw, dict):
+                return raw
 
     return None
 
@@ -161,10 +175,13 @@ def save_runtime_settings_to_prompt_manager(
     store_prompts = prompt_manager._load_store_prompts(store_name)
     runtime_prompt_id = _resolve_runtime_prompt_id(store_prompts, prompt_id)
 
-    runtime_map = getattr(store_prompts, "jti_runtime_settings_by_prompt", None)
-    if not isinstance(runtime_map, dict):
-        runtime_map = {}
-    runtime_map[runtime_prompt_id] = settings.model_dump()
-    store_prompts.jti_runtime_settings_by_prompt = runtime_map
+    profiles_map = _get_profiles_map(store_prompts)
+    existing = profiles_map.get(runtime_prompt_id)
+    profile = existing if isinstance(existing, dict) else {}
+    profile.setdefault(PROFILE_PERSONA_KEY, _default_persona_pair())
+    profile[PROFILE_RUNTIME_KEY] = settings.model_dump()
+    profiles_map[runtime_prompt_id] = profile
+
+    store_prompts.jti_profiles_by_prompt = profiles_map
     prompt_manager._save_store_prompts(store_prompts)
     return runtime_prompt_id

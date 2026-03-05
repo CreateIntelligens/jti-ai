@@ -57,7 +57,7 @@ class MainAgent(BaseAgent):
 
     @property
     def _persona_map_attr(self) -> str:
-        return "jti_persona_by_prompt"
+        return "jti_profiles_by_prompt"
 
     # 重用 ToolExecutor 的 _format_options（避免重複定義）
     _format_options_text = staticmethod(ToolExecutor._format_options)
@@ -85,10 +85,11 @@ class MainAgent(BaseAgent):
     def _get_session_state(self, session: Session) -> str:
         """取得動態 Session 狀態（會變化的資訊）"""
         template = SESSION_STATE_TEMPLATES.get(session.language, SESSION_STATE_TEMPLATES["zh"])
+        not_yet = "Not calculated yet" if session.language == "en" else "尚未計算"
         return template.format(
             step_value=session.step.value,
             answers_count=len(session.answers),
-            color_result=session.color_result_id or ('Not calculated yet' if session.language == 'en' else '尚未計算')
+            color_result=session.color_result_id or not_yet,
         )
 
     def _file_search(self, query: str, language: str) -> str | None:
@@ -186,10 +187,8 @@ class MainAgent(BaseAgent):
             # 2. 組合訊息送給主 agent
             # 每輪都注入動態 session 狀態，避免模型遺忘目前是否仍在測驗或已完成測驗。
             session_state = self._get_session_state(session)
-            if session.language == "en":
-                question_block = f"User question: {user_message}"
-            else:
-                question_block = f"使用者問題：{user_message}"
+            question_prefix = "User question:" if session.language == "en" else "使用者問題："
+            question_block = f"{question_prefix} {user_message}"
 
             if kb_result:
                 enriched_message = (
@@ -283,7 +282,7 @@ class MainAgent(BaseAgent):
             config = types.GenerateContentConfig(
                 system_instruction=f"{system_instruction}\n\n{session_state}\n\n{instruction}",
                 thinking_config=types.ThinkingConfig(thinking_budget=0),
-                )
+            )
 
             response = gemini_with_retry(lambda: _gemini_service.client.models.generate_content(
                 model=self.model_name,
