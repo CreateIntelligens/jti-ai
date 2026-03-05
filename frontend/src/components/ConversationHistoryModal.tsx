@@ -179,8 +179,6 @@ export default function ConversationHistoryModal({
   useEffect(() => {
     if (!isOpen) return;
 
-    console.log('[ConversationHistory] Modal opened - mode:', mode, 'sessionId:', sessionId, 'storeName:', storeName, 'page:', currentPage);
-
     const fetchConversations = async () => {
       try {
         setLoading(true);
@@ -203,8 +201,6 @@ export default function ConversationHistoryModal({
           url += `${url.includes('?') ? '&' : '?'}date_to=${dateTo}`;
         }
 
-        console.log('[ConversationHistory] Fetching:', url);
-
         const response = await (isAdminMode ? fetchAsAdmin(url) : fetchWithApiKey(url));
         if (!response.ok) {
           console.error('[ConversationHistory] API Error:', response.status, response.statusText);
@@ -212,7 +208,6 @@ export default function ConversationHistoryModal({
         }
 
         const data = await response.json();
-        console.log('[ConversationHistory] Received:', data.total_sessions, 'sessions (total),', data.sessions.length, 'sessions (page)');
 
         const sessionsList = data.sessions || [];
         setSessions(sessionsList);
@@ -413,7 +408,6 @@ export default function ConversationHistoryModal({
         return next;
       });
 
-      console.log('[ConversationHistory] Deleted sessions:', sids.length);
     } catch (error) {
       console.error('[ConversationHistory] Delete error:', error);
       alert('刪除失敗，請稍後再試');

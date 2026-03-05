@@ -115,6 +115,11 @@ export default function Jti() {
             await sleep(Math.min(350 + attempt * 80, 1200));
             continue;
           }
+          if (res.status === 404) {
+            ttsPendingSinceRef.current.delete(id);
+            setTtsStateMap(prev => ({ ...prev, [id]: 'error' }));
+            return;
+          }
           if (!res.ok) {
             throw new Error(await res.text());
           }
@@ -216,7 +221,7 @@ export default function Jti() {
           return;
         }
 
-        if (state !== 'ready') {
+        if (state !== 'ready' && state !== 'error') {
           warmupTtsAudio(id);
         }
       });
