@@ -164,11 +164,12 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             current_q_num = len(session.answers) + 1
 
             if request.message.strip() == "中斷":
-                return ChatResponse(**(await _pause_quiz_and_respond(
+                pause_response = ChatResponse(**(await _pause_quiz_and_respond(
                     session_id=request.session_id,
                     log_user_message=request.message,
                     session=session,
                 )))
+                return _attach_tts_message_id(pause_response, session.language)
 
             options_text = _format_options_text(q.get("options", []))
             logger.info(f"[測驗進度] 第 {current_q_num}/{total_questions} 題 | 題目: {q.get('text', '')[:30]}...")
@@ -177,11 +178,12 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             logger.info(f"[答題判斷] 使用者回答: '{request.message}' -> 判定選項: {user_choice}")
 
             if user_choice == "PAUSE":
-                return ChatResponse(**(await _pause_quiz_and_respond(
+                pause_response = ChatResponse(**(await _pause_quiz_and_respond(
                     session_id=request.session_id,
                     log_user_message=request.message,
                     session=session,
                 )))
+                return _attach_tts_message_id(pause_response, session.language)
 
             if user_choice:
                 from app.tools.jti.tool_executor import tool_executor

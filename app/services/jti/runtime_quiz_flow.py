@@ -63,6 +63,7 @@ async def execute_quiz_start(
         final_turn_number = log_result[1] if log_result else None
         return ChatResponse(
             message=response_message,
+            tts_text=to_tts_text(response_message, session.language),
             session=session.model_dump(),
             tool_calls=[],
             turn_number=final_turn_number,
@@ -72,11 +73,14 @@ async def execute_quiz_start(
     updated_session = session_manager.get_session(session_id)
 
     if not tool_result.get("success"):
+        error_message = tool_result.get("error", "start_quiz failed")
+        fallback_lang = updated_session.language if updated_session else session.language
         return ChatResponse(
-            message=tool_result.get("error", "start_quiz failed"),
+            message=error_message,
+            tts_text=to_tts_text(error_message, fallback_lang),
             session=updated_session.model_dump() if updated_session else session.model_dump(),
             tool_calls=[],
-            error=tool_result.get("error"),
+            error=error_message,
         )
 
     lang = updated_session.language if updated_session else session.language
