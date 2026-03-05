@@ -9,13 +9,14 @@ Base Agent - 共用的 Gemini chat session 管理邏輯
 
 import asyncio
 import logging
-from typing import Any, Dict
+import time
+from typing import Any, Dict, Optional
 
 from google.genai import types
 
 from app.models.session import Session
 import app.services.gemini_service as _gemini_service
-from app.services.agent_utils import build_chat_history
+from app.services.agent_utils import build_chat_history, normalize_language
 
 logger = logging.getLogger(__name__)
 
@@ -29,16 +30,101 @@ class BaseAgent:
 
     # --- 子類必須實作 ---
 
-    def _get_system_instruction(self, session: Session) -> str:
-        raise NotImplementedError
-
-    # --- 子類使用的 session_manager 屬性 ---
-    # 子類應在 module level 設定 session_manager，
-    # 並在需要時透過 self._session_manager 存取。
-
     @property
     def _session_manager(self):
         raise NotImplementedError
+
+    @property
+    def _persona_map_attr(self) -> str:
+        """Attribute name on StorePrompts for persona mapping."""
+        raise NotImplementedError
+
+    @staticmethod
+    def _get_store_name_for_language(language: str) -> str:
+        raise NotImplementedError
+
+    def _get_default_persona(self, language: str) -> str:
+        """Return default persona text when no DB persona is configured."""
+        raise NotImplementedError
+
+    def _build_system_instruction(self, persona: str, language: str, response_rule_sections: dict, max_response_chars: int) -> str:
+        """Delegate to project-specific build_system_instruction."""
+        raise NotImplementedError
+
+    def _load_runtime_settings(self, prompt_manager, prompt_id: str, store_name: str):
+        """Delegate to project-specific load_runtime_settings_from_prompt_manager."""
+        raise NotImplementedError
+
+    def _load_default_runtime_settings(self):
+        """Delegate to project-specific load_runtime_settings_from_prompt_manager(None)."""
+        raise NotImplementedError
+
+    # --- 共用 prompt / system instruction 邏輯 ---
+
+    def _get_active_prompt_context(self, language: str = "zh"):
+        """取得目前啟用的人物設定資訊（prompt_manager / store_name / prompt_id / persona）。"""
+        store_name = self._get_store_name_for_language(language)
+        lang = normalize_language(language)
+
+        try:
+            from app import deps
+            prompt_manager = getattr(deps, "prompt_manager", None)
+        except Exception:
+            return None, store_name, None, None
+
+        if not prompt_manager:
+            return None, store_name, None, None
+
+        active = prompt_manager.get_active_prompt(store_name)
+        if not active:
+            return prompt_manager, store_name, None, None
+
+        prompt_id = active.id
+        persona = active.content
+
+        store_prompts = prompt_manager._load_store_prompts(store_name)
+        persona_map = getattr(store_prompts, self._persona_map_attr, None)
+        if not isinstance(persona_map, dict):
+            return prompt_manager, store_name, prompt_id, persona
+
+        raw_persona = persona_map.get(active.id)
+        if not isinstance(raw_persona, dict):
+            return prompt_manager, store_name, prompt_id, persona
+
+        # Unified profile map: {prompt_id: {"persona": {...}, ...}}
+        # Legacy map: {prompt_id: {"zh": "...", "en": "..."}}
+        inner_persona = raw_persona.get("persona")
+        persona_pair = inner_persona if isinstance(inner_persona, dict) else raw_persona
+
+        value = persona_pair.get(lang)
+        if isinstance(value, str) and value.strip():
+            persona = value
+
+        return prompt_manager, store_name, prompt_id, persona
+
+    def _get_system_instruction(self, session: Session) -> str:
+        """取得靜態 System Instruction（persona from DB + system rules from code）"""
+        try:
+            prompt_manager, store_name, runtime_prompt_id, persona = self._get_active_prompt_context(session.language)
+            runtime_settings = self._load_runtime_settings(
+                prompt_manager, runtime_prompt_id, store_name,
+            )
+        except Exception:
+            runtime_settings = self._load_default_runtime_settings()
+            persona = None
+
+        if not persona:
+            persona = self._get_default_persona(session.language)
+
+        lang_key = session.language if session.language in runtime_settings.response_rule_sections else "zh"
+        rule_sections = runtime_settings.response_rule_sections[lang_key]
+        sections_payload = rule_sections.model_dump() if hasattr(rule_sections, "model_dump") else rule_sections
+        return self._build_system_instruction(
+            persona=persona,
+            language=session.language,
+            response_rule_sections=sections_payload,
+            max_response_chars=runtime_settings.max_response_chars,
+        )
 
     # --- 共用 session 管理 ---
 
@@ -109,6 +195,44 @@ class BaseAgent:
             chat_session._curated_history.append(
                 types.Content(role="model", parts=[types.Part.from_text(text=model_message)])
             )
+
+    # --- 子類可覆寫的 intent / file search 方法 ---
+
+    def _check_intent_fast(self, query: str) -> str:
+        """快速判斷是否為不相關話題，子類必須覆寫。"""
+        raise NotImplementedError
+
+    def _file_search(self, query: str, language: str) -> Optional[str]:
+        """用 File Search 查知識庫，子類必須覆寫。"""
+        raise NotImplementedError
+
+    async def _concurrent_intent_and_search(self, user_message: str, language: str) -> Optional[str]:
+        """
+        併發跑 Intent Check + File Search。
+        Intent=NO 時快速攔截跳過知識庫；Intent=YES 時使用知識庫結果。
+        """
+        loop = asyncio.get_running_loop()
+        t0 = time.time()
+
+        intent_task = asyncio.ensure_future(
+            loop.run_in_executor(None, self._check_intent_fast, user_message))
+        search_task = asyncio.ensure_future(
+            loop.run_in_executor(None, self._file_search, user_message, language))
+
+        done, _ = await asyncio.wait(
+            [intent_task, search_task],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+
+        if intent_task in done and intent_task.result() == "NO":
+            logger.info(f"[計時] Intent=NO 快速攔截: {(time.time()-t0)*1000:.0f}ms")
+            return None
+
+        await asyncio.gather(intent_task, search_task)
+        intent = intent_task.result()
+        kb_result = search_task.result() if intent == "YES" else None
+        logger.info(f"[計時] Intent={intent}, File Search: {(time.time()-t0)*1000:.0f}ms")
+        return kb_result
 
     @staticmethod
     def _clean_enriched_history(chat_session, original_user_message: str):

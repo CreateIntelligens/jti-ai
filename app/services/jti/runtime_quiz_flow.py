@@ -7,7 +7,8 @@ import logging
 from fastapi import HTTPException
 
 from app.schemas.chat import ChatResponse
-from app.services.jti.quiz_helpers import _format_options_text
+from app.services.jti.quiz_helpers import _format_options_text, build_session_state
+from app.services.jti.tts_text import to_tts_text
 from app.services.session.session_manager_factory import (
     get_conversation_logger,
     get_session_manager,
@@ -56,14 +57,7 @@ async def execute_quiz_start(
             user_message=user_message,
             agent_response=response_message,
             tool_calls=[],
-            session_state={
-                "step": session.step.value,
-                "answers_count": len(session.answers),
-                "color_result_id": session.color_result_id,
-                "current_question_id": None,
-                "language": session.language,
-                "selected_questions": session.selected_questions,
-            },
+            session_state=build_session_state(session),
             mode="jti",
         )
         final_turn_number = log_result[1] if log_result else None
@@ -97,25 +91,17 @@ async def execute_quiz_start(
     else:
         response_message = f"{opening}\n\n第1題：{q.get('text', '')}\n{options_text}"
 
-    tts_text = (
+    raw_tts_text = (
         f"{opening} {make_quiz_tts_text(q, 1, lang)}" if isinstance(q, dict) else None
     )
+    tts_text = to_tts_text(raw_tts_text, lang)
 
     log_result = conversation_logger.log_conversation(
         session_id=session_id,
         user_message=user_message,
         agent_response=response_message,
         tool_calls=[{"tool": "start_quiz", "args": {"session_id": session_id}, "result": tool_result}],
-        session_state={
-            "step": updated_session.step.value if updated_session else session.step.value,
-            "answers_count": len(updated_session.answers) if updated_session else len(session.answers),
-            "color_result_id": updated_session.color_result_id if updated_session else session.color_result_id,
-            "current_question_id": q.get("id") if isinstance(q, dict) else None,
-            "language": lang,
-            "selected_questions": (
-                updated_session.selected_questions if updated_session else session.selected_questions
-            ),
-        },
+        session_state=build_session_state(updated_session or session),
         mode="jti",
     )
     final_turn_number = log_result[1] if log_result else None

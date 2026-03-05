@@ -2,7 +2,6 @@
 HCIoT main agent - patient education chat flow.
 """
 
-import asyncio
 import logging
 import os
 import time
@@ -27,7 +26,6 @@ from app.services.hciot.agent_prompts import (
 )
 from app.services.hciot.runtime_settings import (
     HCIOT_STORE_NAME,
-    SYSTEM_DEFAULT_PROMPT_ID,
     load_runtime_settings_from_prompt_manager,
 )
 from app.services.session.session_manager_factory import get_hciot_session_manager
@@ -47,66 +45,29 @@ class HciotMainAgent(BaseAgent):
     def _session_manager(self):
         return session_manager
 
+    @property
+    def _persona_map_attr(self) -> str:
+        return "hciot_persona_by_prompt"
+
     @staticmethod
     def _get_store_name_for_language(language: str) -> str:
         return "__hciot__en" if normalize_language(language) == "en" else HCIOT_STORE_NAME
 
-    @staticmethod
-    def _get_active_prompt_context(language: str = "zh"):
-        prompt_manager = None
-        store_name = HciotMainAgent._get_store_name_for_language(language)
-        prompt_id = SYSTEM_DEFAULT_PROMPT_ID
-        persona = None
-        normalized_language = normalize_language(language)
-        try:
-            from app import deps
-            prompt_manager = getattr(deps, "prompt_manager", None)
-            if prompt_manager:
-                active = prompt_manager.get_active_prompt(store_name)
-                if active:
-                    prompt_id = active.id
-                    persona = active.content
-                    store_prompts = prompt_manager._load_store_prompts(store_name)
-                    persona_map = getattr(store_prompts, "hciot_persona_by_prompt", None)
-                    if isinstance(persona_map, dict):
-                        persona_pair = persona_map.get(active.id)
-                        if isinstance(persona_pair, dict):
-                            value = persona_pair.get(normalized_language)
-                            if isinstance(value, str) and value.strip():
-                                persona = value
-        except Exception:
-            prompt_manager = None
-        return prompt_manager, store_name, prompt_id, persona
+    def _get_default_persona(self, language: str) -> str:
+        return PERSONA.get(language, PERSONA["zh"])
 
-    def _get_system_instruction(self, session: Session) -> str:
-        try:
-            prompt_manager, store_name, runtime_prompt_id, persona = self._get_active_prompt_context(session.language)
-            runtime_settings = load_runtime_settings_from_prompt_manager(
-                prompt_manager,
-                runtime_prompt_id,
-                store_name=store_name,
-            )
-        except Exception:
-            runtime_settings = load_runtime_settings_from_prompt_manager(None)
-            persona = None
-
-        if not persona:
-            persona = PERSONA.get(session.language, PERSONA["zh"])
-
-        response_rule_sections = runtime_settings.response_rule_sections.get(
-            session.language, runtime_settings.response_rule_sections.get("zh")
-        )
-        sections_payload = (
-            response_rule_sections.model_dump()
-            if hasattr(response_rule_sections, "model_dump")
-            else response_rule_sections
-        )
+    def _build_system_instruction(self, persona, language, response_rule_sections, max_response_chars):
         return build_system_instruction(
-            persona=persona,
-            language=session.language,
-            response_rule_sections=sections_payload,
-            max_response_chars=runtime_settings.max_response_chars,
+            persona=persona, language=language,
+            response_rule_sections=response_rule_sections,
+            max_response_chars=max_response_chars,
         )
+
+    def _load_runtime_settings(self, prompt_manager, prompt_id, store_name):
+        return load_runtime_settings_from_prompt_manager(prompt_manager, prompt_id, store_name=store_name)
+
+    def _load_default_runtime_settings(self):
+        return load_runtime_settings_from_prompt_manager(None)
 
     def _get_session_state(self, session: Session) -> str:
         template = SESSION_STATE_TEMPLATES.get(session.language, SESSION_STATE_TEMPLATES["zh"])
@@ -173,20 +134,7 @@ class HciotMainAgent(BaseAgent):
             if session is None:
                 return {"error": "Session not found", "message": "找不到對話記錄，請重新開始。"}
 
-            loop = asyncio.get_running_loop()
-            t0 = time.time()
-            intent_task = asyncio.ensure_future(loop.run_in_executor(None, self._check_intent_fast, user_message))
-            search_task = asyncio.ensure_future(loop.run_in_executor(None, self._file_search, user_message, session.language))
-
-            done, _ = await asyncio.wait([intent_task, search_task], return_when=asyncio.FIRST_COMPLETED)
-
-            if intent_task in done and intent_task.result() == "NO":
-                kb_result = None
-            else:
-                await asyncio.gather(intent_task, search_task)
-                intent = intent_task.result()
-                kb_result = search_task.result() if intent == "YES" else None
-                logger.info(f"[HCIoT timing] intent={intent}, total={(time.time()-t0)*1000:.0f}ms")
+            kb_result = await self._concurrent_intent_and_search(user_message, session.language)
 
             enriched_message = (
                 f"<知識庫查詢結果>\n{kb_result}\n</知識庫查詢結果>\n\n使用者問題：{user_message}"

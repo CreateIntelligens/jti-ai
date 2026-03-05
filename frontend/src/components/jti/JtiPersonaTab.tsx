@@ -183,7 +183,9 @@ export default function JtiPersonaTab({
 
         <div className="jti-runtime-readonly-item">
           <div className="jti-runtime-label">回覆字數上限（字元）</div>
-          <div className="jti-runtime-readonly-value">{settings.max_response_chars}</div>
+          <div className="jti-runtime-readonly-value">
+            {settings.max_response_chars === 0 ? '不限（0）' : settings.max_response_chars}
+          </div>
         </div>
 
         {showRoleScopeField && (
@@ -240,12 +242,13 @@ export default function JtiPersonaTab({
         <label className="jti-runtime-label">回覆字數上限（字元）</label>
         <input
           type="number"
-          min={30}
+          min={0}
           max={600}
           className="jti-prompt-input"
           value={runtimeDraft.max_response_chars}
           onChange={e => updateLengthLimit(e.target.value)}
         />
+        <div className="jti-runtime-hint">輸入 0 表示不限字數</div>
 
         {showRoleScopeField && (
           <>

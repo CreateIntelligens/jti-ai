@@ -405,6 +405,12 @@
   color: var(--gold);
 }
 
+.jti-runtime-hint {
+  margin-top: -0.2rem;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
 
 /* Scrollbar */
 .jti-settings-content::-webkit-scrollbar {

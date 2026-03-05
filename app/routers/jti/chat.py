@@ -27,6 +27,7 @@ from app.services.jti.runtime_quiz_flow import (
     execute_quiz_start,
     make_quiz_tts_text,
 )
+from app.services.jti.tts_text import to_tts_text
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 from app.tools.jti.quiz import get_total_questions
 from app.utils import group_conversations_by_session
@@ -35,6 +36,7 @@ from app.services.jti.quiz_helpers import (
     _format_options_text,
     _pause_quiz_and_respond,
     _judge_user_choice,
+    build_session_state,
 )
 
 session_manager = get_session_manager()
@@ -181,7 +183,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 if tool_result.get("is_complete"):
                     response_message = tool_result.get("message", "")
                     updated_session = session_manager.get_session(request.session_id)
-                    tts_text = response_message
+                    tts_text = to_tts_text(response_message, updated_session.language)
 
                     # 把測驗結果注入 chat_history，讓後續 LLM 對話能看到
                     main_agent.remove_session(request.session_id)
@@ -195,21 +197,17 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                         response_message = f"Question {q_num}: {next_q.get('text', '')}\n{next_options_text}"
                     else:
                         response_message = f"第{q_num}題：{next_q.get('text', '')}\n{next_options_text}"
-                    tts_text = make_quiz_tts_text(next_q, q_num, updated_session.language)
+                    tts_text = to_tts_text(
+                        make_quiz_tts_text(next_q, q_num, updated_session.language),
+                        updated_session.language,
+                    )
 
                 log_result = conversation_logger.log_conversation(
                     session_id=request.session_id,
                     user_message=request.message,
                     agent_response=response_message,
                     tool_calls=tool_calls,
-                    session_state={
-                        "step": updated_session.step.value,
-                        "answers_count": len(updated_session.answers),
-                        "color_result_id": updated_session.color_result_id,
-                        "current_question_id": updated_session.current_question.get("id") if updated_session.current_question else None,
-                        "language": updated_session.language,
-                        "selected_questions": updated_session.selected_questions,
-                    },
+                    session_state=build_session_state(updated_session),
                     mode="jti"
                 )
                 final_turn_number = log_result[1] if log_result else None
@@ -241,21 +239,17 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     user_message=request.message,
                     agent_response=response_message,
                     tool_calls=[],
-                    session_state={
-                        "step": session.step.value,
-                        "answers_count": len(session.answers),
-                        "color_result_id": session.color_result_id,
-                        "current_question_id": session.current_question.get("id") if session.current_question else None,
-                        "language": session.language,
-                        "selected_questions": session.selected_questions,
-                    },
+                    session_state=build_session_state(session),
                     mode="jti"
                 )
                 final_turn_number = log_result[1] if log_result else None
 
                 return ChatResponse(
                     message=response_message,
-                    tts_text=f"{hint} {make_quiz_tts_text(q, current_q_num, session.language)}",
+                    tts_text=to_tts_text(
+                        f"{hint} {make_quiz_tts_text(q, current_q_num, session.language)}",
+                        session.language,
+                    ),
                     session=session.model_dump(),
                     tool_calls=[],
                     turn_number=final_turn_number
@@ -301,17 +295,14 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             user_message=request.message,
             agent_response=result["message"],
             tool_calls=result.get("tool_calls", []),
-            session_state={
-                "step": session.step.value,
-                "answers_count": len(session.answers),
-                "color_result_id": session.color_result_id,
-                "current_question_id": session.current_question.get("id") if session.current_question else None,
-                "language": session.language,
-                "selected_questions": session.selected_questions,
-            },
+            session_state=build_session_state(session),
             mode="jti"
         )
         final_turn_number = log_result[1] if log_result else None
+
+        # 非測驗回覆：tts_text 預設等同 message
+        raw_tts = result.get("tts_text") or result.get("message")
+        result["tts_text"] = to_tts_text(raw_tts, session.language)
 
         return ChatResponse(**result, turn_number=final_turn_number)
 
