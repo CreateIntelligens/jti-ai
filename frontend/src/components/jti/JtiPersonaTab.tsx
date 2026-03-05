@@ -92,8 +92,6 @@ export default function JtiPersonaTab({
     : 'zh';
   const customPrompts = prompts.filter(p => p.id !== SYSTEM_DEFAULT_ID);
   const defaultPrompt = prompts.find(p => p.id === SYSTEM_DEFAULT_ID);
-  const showRoleScopeField = true;
-
   useEffect(() => {
     setRuntimeDraft(runtimeSettings);
   }, [runtimeSettings]);
@@ -118,10 +116,7 @@ export default function JtiPersonaTab({
 
   const handleStartEdit = (prompt: Prompt) => {
     onStartEdit(prompt);
-    if (!expandedIds.has(prompt.id)) {
-      setExpandedIds(new Set([prompt.id]));
-      void onSelectRuntimePrompt(prompt.id);
-    }
+    void onSelectRuntimePrompt(prompt.id);
   };
 
   const getPreview = (content: string, maxLines = 3) => {
@@ -188,14 +183,12 @@ export default function JtiPersonaTab({
           </div>
         </div>
 
-        {showRoleScopeField && (
-          <div className="jti-runtime-readonly-item">
-            <div className="jti-runtime-label">角色與可做事項（{currentLang.toUpperCase()}）</div>
-            <pre className="jti-prompt-content">
-              {settings.response_rule_sections[currentLang].role_scope}
-            </pre>
-          </div>
-        )}
+        <div className="jti-runtime-readonly-item">
+          <div className="jti-runtime-label">角色與可做事項（{currentLang.toUpperCase()}）</div>
+          <pre className="jti-prompt-content">
+            {settings.response_rule_sections[currentLang].role_scope}
+          </pre>
+        </div>
 
         <div className="jti-runtime-readonly-item">
           <div className="jti-runtime-label">範圍限制（{currentLang.toUpperCase()}）</div>
@@ -225,6 +218,18 @@ export default function JtiPersonaTab({
     if (targetPromptId === SYSTEM_DEFAULT_ID) {
       return renderReadonlyRuntimeSettings(defaultRuntimeSettings);
     }
+
+    if (editingId !== targetPromptId) {
+      if (runtimePromptId !== targetPromptId || !runtimeSettings) {
+        return (
+          <div className="jti-runtime-settings">
+            <div className="jti-settings-loading">載入回覆規則中...</div>
+          </div>
+        );
+      }
+      return renderReadonlyRuntimeSettings(runtimeSettings);
+    }
+
     if (!runtimeDraft || runtimePromptId !== targetPromptId) {
       return (
         <div className="jti-runtime-settings">
@@ -250,18 +255,14 @@ export default function JtiPersonaTab({
         />
         <div className="jti-runtime-hint">輸入 0 表示不限字數</div>
 
-        {showRoleScopeField && (
-          <>
-            <label className="jti-runtime-label">角色與可做事項（{currentLang.toUpperCase()}）</label>
-            <textarea
-              className="jti-prompt-textarea"
-              rows={6}
-              value={runtimeDraft.response_rule_sections[currentLang].role_scope}
-              onChange={e => updateRuleSection('role_scope', e.target.value)}
-              placeholder="可做事項..."
-            />
-          </>
-        )}
+        <label className="jti-runtime-label">角色與可做事項（{currentLang.toUpperCase()}）</label>
+        <textarea
+          className="jti-prompt-textarea"
+          rows={6}
+          value={runtimeDraft.response_rule_sections[currentLang].role_scope}
+          onChange={e => updateRuleSection('role_scope', e.target.value)}
+          placeholder="可做事項..."
+        />
 
         <label className="jti-runtime-label">範圍限制（{currentLang.toUpperCase()}）</label>
         <textarea
@@ -290,16 +291,46 @@ export default function JtiPersonaTab({
           placeholder="知識庫使用規則..."
         />
 
-        <button
-          className="jti-btn primary full-width"
-          onClick={() => onSaveRuntimeSettings(runtimeDraft, targetPromptId)}
-          disabled={savingRuntimeSettings}
-        >
-          {savingRuntimeSettings ? '儲存中...' : '儲存回覆規則'}
-        </button>
       </div>
     );
   };
+
+  const handleSavePersonaAndRules = async () => {
+    const targetPromptId = editingId;
+    if (!targetPromptId) {
+      await onSaveEdit();
+      return;
+    }
+
+    if (!runtimeDraft || runtimePromptId !== targetPromptId) {
+      alert('回覆規則載入中，請稍候再儲存。');
+      return;
+    }
+
+    await onSaveRuntimeSettings(runtimeDraft, targetPromptId);
+    await onSaveEdit();
+    setExpandedIds(prev => {
+      if (!prev.has(targetPromptId)) return prev;
+      const next = new Set(prev);
+      next.delete(targetPromptId);
+      return next;
+    });
+  };
+
+  const handleCancelPersonaEdit = () => {
+    const targetPromptId = editingId;
+    onCancelEdit();
+    setRuntimeDraft(runtimeSettings);
+    if (!targetPromptId) return;
+    setExpandedIds(prev => {
+      if (!prev.has(targetPromptId)) return prev;
+      const next = new Set(prev);
+      next.delete(targetPromptId);
+      return next;
+    });
+  };
+
+
 
   if (loading) {
     return <div className="jti-settings-loading">載入中...</div>;
@@ -386,12 +417,17 @@ export default function JtiPersonaTab({
                   placeholder="人物設定內容..."
                   rows={10}
                 />
+                {renderRuntimeSettings(prompt.id)}
                 <div className="jti-prompt-edit-actions">
-                  <button className="jti-btn primary" onClick={onSaveEdit}>
-                    儲存
-                  </button>
-                  <button className="jti-btn secondary" onClick={onCancelEdit}>
+                  <button className="jti-btn secondary" onClick={handleCancelPersonaEdit}>
                     取消
+                  </button>
+                  <button
+                    className="jti-btn primary"
+                    onClick={() => { void handleSavePersonaAndRules(); }}
+                    disabled={savingRuntimeSettings}
+                  >
+                    {savingRuntimeSettings ? '儲存中...' : '儲存全部'}
                   </button>
                 </div>
               </div>
@@ -450,7 +486,7 @@ export default function JtiPersonaTab({
                 </div>
               </>
             )}
-            {expandedIds.has(prompt.id) && editingId !== prompt.id && renderRuntimeSettings(prompt.id)}
+            {editingId !== prompt.id && expandedIds.has(prompt.id) && renderRuntimeSettings(prompt.id)}
           </div>
         ))}
       </div>

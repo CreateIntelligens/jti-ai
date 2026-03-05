@@ -221,6 +221,8 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
       const latestActivePromptId = await loadPrompts();
       await refreshRuntimeSettings(latestActivePromptId);
       if (editingId === activePromptId) onPromptChange();
+      setSuccessMsg('✅ 已儲存人物設定');
+      setTimeout(() => setSuccessMsg(null), 3000);
       cancelEdit();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
