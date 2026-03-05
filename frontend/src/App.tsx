@@ -49,7 +49,7 @@ export default function App() {
     promptModalOpen, setPromptModalOpen,
     userApiKeyModalOpen, setUserApiKeyModalOpen,
     conversationHistoryModalOpen, setConversationHistoryModalOpen,
-    status, stores, projectFilter, projectFilterOptions, knowledgeTargets, currentTargetId, currentStore, chatStoreName, managedContext,
+    status, stores, projectFilter, projectFilterOptions, knowledgeTargets, currentTargetId, currentStore, managedContext,
     files, filesLoading,
     messages, setMessages,
     loading,
@@ -75,8 +75,8 @@ export default function App() {
           activeGeminiKeyName={activeGeminiKeyName === 'system' ? '系統預設' : activeGeminiKeyName}
           onOpenConversationHistory={() => setConversationHistoryModalOpen(true)}
           onRestartChat={handleRestartChat}
-          canOpenConversationHistory={Boolean(chatStoreName)}
-          canRestartChat={Boolean(chatStoreName)}
+          canOpenConversationHistory={Boolean(currentStore)}
+          canRestartChat={Boolean(currentStore)}
           theme={theme}
           onToggleTheme={toggleTheme}
         />
@@ -101,7 +101,7 @@ export default function App() {
           <ChatArea
             messages={messages}
             onSendMessage={handleSendMessage}
-            disabled={!chatStoreName}
+            disabled={!currentStore}
             loading={loading}
             onRegenerate={handleRegenerate}
             onEditAndResend={handleEditAndResend}
@@ -120,7 +120,7 @@ export default function App() {
       <PromptManagementModal
         isOpen={promptModalOpen}
         onClose={() => setPromptModalOpen(false)}
-        currentStore={chatStoreName}
+        currentStore={currentStore}
         onRestartChat={handleRestartChat}
         stores={stores}
       />
@@ -136,7 +136,7 @@ export default function App() {
         isOpen={conversationHistoryModalOpen}
         onClose={() => setConversationHistoryModalOpen(false)}
         sessionId={sessionId || undefined}
-        storeName={chatStoreName || undefined}
+        storeName={currentStore || undefined}
         mode="general"
         onResumeSession={(sid, msgs, _lang) => {
           setSessionId(sid);

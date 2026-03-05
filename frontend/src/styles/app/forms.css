@@ -14,7 +14,6 @@
   transition: var(--transition-smooth);
 }
 
-/* Custom styling specifically for Selects to look better */
 .app-container select {
   appearance: none;
   -webkit-appearance: none;
@@ -48,7 +47,7 @@
   line-height: 1.6;
 }
 
-/* Base button styles — scope to non-header areas */
+/* Button styles (scoped to non-header areas) */
 .app-content button,
 .modal button,
 .overlay button {
@@ -289,11 +288,10 @@
   opacity: 0.8;
 }
 
-/* Apply directly to the element since CustomSelect passes className down to container */
 .bento-minimal-select .custom-select-trigger {
   background: transparent !important;
   border: none !important;
-  padding: 0.7rem 1.2rem 0.7rem 2.8rem !important; /* Extra left padding for the icon */
+  padding: 0.7rem 1.2rem 0.7rem 2.8rem !important;
   min-height: 44px;
   font-size: 0.95rem !important;
   font-weight: 500;
@@ -301,6 +299,5 @@
 }
 
 .bento-minimal-select .custom-select-dropdown {
-  /* Offset to align nicely */
   transform: translateY(-4px);
 }

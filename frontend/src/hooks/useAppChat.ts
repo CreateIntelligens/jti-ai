@@ -10,6 +10,10 @@ import type {
   KnowledgeLanguage,
 } from '../types';
 
+function toErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
 function normalizeKeyLabels(keyNames: unknown): string[] {
   if (!Array.isArray(keyNames)) return [];
   return keyNames.map((keyName, index) => {
@@ -127,7 +131,18 @@ export function useAppChat() {
   const currentStore = currentTarget?.kind === 'store' ? currentTarget.storeName : null;
   const managedContext = getManagedKnowledgeContext(currentTarget);
   const isManagedStore = managedContext !== null;
-  const chatStoreName = currentStore;
+
+  const clearSelection = (includeChatState: boolean = false): void => {
+    setCurrentTargetId(null);
+    currentTargetIdRef.current = null;
+    filesRequestIdRef.current += 1;
+    setFiles([]);
+    setFilesLoading(false);
+    if (includeChatState) {
+      setMessages([]);
+      setSessionId(null);
+    }
+  };
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
 
@@ -211,7 +226,7 @@ export function useAppChat() {
         setSessionId(result.session_id);
       }
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
+      const errorMsg = toErrorMessage(e);
       showStatus('連線失敗: ' + errorMsg);
       setMessages([
         {
@@ -237,11 +252,7 @@ export function useAppChat() {
       await refreshFiles(fallbackTarget);
       return;
     }
-    setCurrentTargetId(null);
-    currentTargetIdRef.current = null;
-    filesRequestIdRef.current += 1;
-    setFiles([]);
-    setFilesLoading(false);
+    clearSelection();
   }, [currentTargetId, projectFilter, refreshFiles, refreshStores, stores]);
 
   useEffect(() => {
@@ -273,13 +284,7 @@ export function useAppChat() {
       void handleStoreChange(nextTargets[0].id, filteredStores);
       return;
     }
-    setCurrentTargetId(null);
-    currentTargetIdRef.current = null;
-    filesRequestIdRef.current += 1;
-    setFiles([]);
-    setFilesLoading(false);
-    setMessages([]);
-    setSessionId(null);
+    clearSelection(true);
   }, [projectFilter, stores]);
 
   useEffect(() => {
@@ -289,11 +294,11 @@ export function useAppChat() {
   }, [currentTargetId, stores]);
 
   const handleRestartChat = async () => {
-    if (!chatStoreName) return;
+    if (!currentStore) return;
     if (messages.length > 0 && !window.confirm('確定要重新開始對話嗎？')) return;
     setMessages([]);
     try {
-      const result = await api.startChat(chatStoreName, sessionId);
+      const result = await api.startChat(currentStore, sessionId);
       if (result.session_id) {
         setSessionId(result.session_id);
       }
@@ -301,8 +306,7 @@ export function useAppChat() {
         showStatus('✅ 已套用新的 Prompt');
       }
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
-      showStatus('重新啟動失敗: ' + errorMsg);
+      showStatus('重新啟動失敗: ' + toErrorMessage(e));
     }
   };
 
@@ -312,8 +316,7 @@ export function useAppChat() {
       const nextStores = await refreshStores();
       await handleStoreChange(newStore.name, nextStores);
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
-      alert('建立失敗: ' + errorMsg);
+      alert('建立失敗: ' + toErrorMessage(e));
     }
   };
 
@@ -328,19 +331,12 @@ export function useAppChat() {
         if (fallbackTarget) {
           await handleStoreChange(fallbackTarget.id, nextFilteredStores);
         } else {
-          setCurrentTargetId(null);
-          currentTargetIdRef.current = null;
-          filesRequestIdRef.current += 1;
-          setFiles([]);
-          setFilesLoading(false);
-          setMessages([]);
-          setSessionId(null);
+          clearSelection(true);
         }
       }
       showStatus('知識庫已刪除');
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
-      alert('刪除失敗: ' + errorMsg);
+      alert('刪除失敗: ' + toErrorMessage(e));
     }
   };
 
@@ -358,8 +354,7 @@ export function useAppChat() {
       await refreshFiles(currentTarget);
       showStatus('文件上傳成功');
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
-      alert('上傳失敗: ' + errorMsg);
+      alert('上傳失敗: ' + toErrorMessage(e));
     }
   };
 
@@ -374,13 +369,12 @@ export function useAppChat() {
       await refreshFiles(currentTarget);
       showStatus('文件已刪除');
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
-      alert('刪除失敗: ' + errorMsg);
+      alert('刪除失敗: ' + toErrorMessage(e));
     }
   };
 
   const handleSendMessage = async (text: string) => {
-    if (!chatStoreName) return;
+    if (!currentStore) return;
     setMessages((prev) => [
       ...prev,
       { role: 'user', text },
@@ -392,7 +386,7 @@ export function useAppChat() {
       let activeSessionId = sessionId;
 
       if (!activeSessionId) {
-        const startResult = await api.startChat(chatStoreName);
+        const startResult = await api.startChat(currentStore);
         if (startResult.session_id) {
           activeSessionId = startResult.session_id;
           setSessionId(startResult.session_id);
@@ -414,15 +408,10 @@ export function useAppChat() {
         return newMessages;
       });
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
       setMessages((prev) => {
-        const newMessages = [...prev];
-        newMessages[newMessages.length - 1] = {
-          role: 'model',
-          text: '錯誤: ' + errorMsg,
-          error: true,
-        };
-        return newMessages;
+        const updated = [...prev];
+        updated[updated.length - 1] = { role: 'model', text: '錯誤: ' + toErrorMessage(e), error: true };
+        return updated;
       });
     } finally {
       setLoading(false);
@@ -430,7 +419,7 @@ export function useAppChat() {
   };
 
   const handleRegenerate = async (turnNumber: number) => {
-    if (!sessionId || loading || !chatStoreName) return;
+    if (!sessionId || loading || !currentStore) return;
 
     const userMsg = messages.find((message) => message.role === 'user' && message.turnNumber === turnNumber);
     if (!userMsg?.text) return;
@@ -455,15 +444,10 @@ export function useAppChat() {
         return newMessages;
       });
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
       setMessages((prev) => {
-        const newMessages = [...prev];
-        newMessages[newMessages.length - 1] = {
-          role: 'model',
-          text: '錯誤: ' + errorMsg,
-          error: true,
-        };
-        return newMessages;
+        const updated = [...prev];
+        updated[updated.length - 1] = { role: 'model', text: '錯誤: ' + toErrorMessage(e), error: true };
+        return updated;
       });
     } finally {
       setLoading(false);
@@ -471,7 +455,7 @@ export function useAppChat() {
   };
 
   const handleEditAndResend = async (turnNumber: number, newText: string) => {
-    if (!sessionId || loading || !chatStoreName) return;
+    if (!sessionId || loading || !currentStore) return;
 
     setMessages((prev) => {
       const userIdx = prev.findIndex((message) => message.role === 'user' && message.turnNumber === turnNumber);
@@ -497,15 +481,10 @@ export function useAppChat() {
         return newMessages;
       });
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
       setMessages((prev) => {
-        const newMessages = [...prev];
-        newMessages[newMessages.length - 1] = {
-          role: 'model',
-          text: '錯誤: ' + errorMsg,
-          error: true,
-        };
-        return newMessages;
+        const updated = [...prev];
+        updated[updated.length - 1] = { role: 'model', text: '錯誤: ' + toErrorMessage(e), error: true };
+        return updated;
       });
     } finally {
       setLoading(false);
@@ -526,7 +505,6 @@ export function useAppChat() {
     currentTarget,
     currentTargetId,
     currentStore,
-    chatStoreName,
     managedContext,
     files,
     filesLoading,

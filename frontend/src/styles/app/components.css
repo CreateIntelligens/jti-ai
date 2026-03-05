@@ -10,7 +10,6 @@
 
 .file-list li {
   padding: 0.6rem 0.8rem;
-  /* Reduced padding */
   background: rgba(26, 31, 58, 0.4);
   border: 1px solid rgba(61, 217, 211, 0.15);
   border-radius: 10px;
@@ -18,12 +17,10 @@
   justify-content: space-between;
   align-items: center;
   font-size: 0.85rem;
-  /* Slightly smaller font */
   color: #c5d4ff;
   transition: var(--transition-smooth);
   cursor: pointer;
   gap: 0.5rem;
-  /* Add gap flex layout for safety */
 }
 
 .file-list li:hover {
@@ -35,16 +32,11 @@
 
 .file-list li button {
   padding: 0.3rem 0.5rem;
-  /* Reduced button padding */
   font-size: 0.75rem;
-  /* Smaller icon font */
   margin-left: 0.2rem;
-  /* Reduced margin */
   min-width: 28px;
-  /* Ensure they don't get too squished */
 }
 
-/* Ensure the file name area can truncate instead of pushing buttons out */
 .file-list li .file-name-text {
   flex: 1;
   min-width: 0;
@@ -56,9 +48,7 @@
 .file-list li .file-actions {
   display: flex;
   gap: 0.2rem;
-  /* Small gap between buttons */
   flex-shrink: 0;
-  /* Prevent the buttons from shrinking */
 }
 
 /* File list animations */

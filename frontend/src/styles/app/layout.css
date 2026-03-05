@@ -221,8 +221,6 @@
   }
 }
 
-@media (prefers-reduced-motion: reduce) {}
-
 .chat-history {
   flex: 1;
   padding: 2.5rem;
