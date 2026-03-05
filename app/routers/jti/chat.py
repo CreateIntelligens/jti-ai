@@ -329,6 +329,8 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
 
         return ChatResponse(**result, turn_number=final_turn_number)
 
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Chat failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
