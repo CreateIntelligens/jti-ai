@@ -358,9 +358,9 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         # 非測驗回覆：tts_text 預設等同 message
         raw_tts = result.get("tts_text") or result.get("message")
         result["tts_text"] = to_tts_text(raw_tts, session.language)
-        result["tts_message_id"] = _queue_tts_generation(result.get("tts_text"), session.language)
 
-        return ChatResponse(**result, turn_number=final_turn_number)
+        response_payload = ChatResponse(**result, turn_number=final_turn_number)
+        return _attach_tts_message_id(response_payload, session.language)
 
     except HTTPException:
         raise
