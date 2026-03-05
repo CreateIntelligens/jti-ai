@@ -178,6 +178,13 @@
   cursor: pointer;
   transition: all 0.2s ease;
   margin-left: 0.2rem;
+  position: relative;
+}
+
+.audio-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .message-audio-btn:hover {
@@ -190,6 +197,26 @@
 .message-audio-btn.pending {
   color: #fbbf24;
   border-color: rgba(251, 191, 36, 0.45);
+}
+
+.message-audio-btn.pending::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 999px;
+  border: 2px solid rgba(251, 191, 36, 0.22);
+  border-top-color: rgba(251, 191, 36, 0.95);
+  animation: audioPendingSpin 0.9s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes audioPendingSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .message-audio-btn.error {

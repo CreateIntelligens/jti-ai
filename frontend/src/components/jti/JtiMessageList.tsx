@@ -199,7 +199,7 @@ export default function JtiMessageList({
                       title={getTtsButtonTitle(ttsState)}
                       aria-label="播放語音"
                     >
-                      {ttsState === 'pending' ? '⏳' : '🔊'}
+                      <span className="audio-icon">🔊</span>
                     </button>
                   )}
               </div>

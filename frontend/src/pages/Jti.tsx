@@ -72,6 +72,7 @@ export default function Jti() {
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
   const ttsAudioUrlMapRef = useRef<Map<string, string>>(new Map());
   const ttsPendingMapRef = useRef<Map<string, Promise<void>>>(new Map());
+  const ttsPendingSinceRef = useRef<Map<string, number>>(new Map());
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const isUnmountedRef = useRef(false);
   const ttsEpochRef = useRef(0);
@@ -79,6 +80,7 @@ export default function Jti() {
   const clearTtsState = useCallback(() => {
     ttsEpochRef.current += 1;
     ttsPendingMapRef.current.clear();
+    ttsPendingSinceRef.current.clear();
     currentAudioRef.current?.pause();
     currentAudioRef.current = null;
     ttsAudioUrlMapRef.current.forEach(url => URL.revokeObjectURL(url));
@@ -90,19 +92,25 @@ export default function Jti() {
     window.setTimeout(resolve, ms);
   });
 
-  const warmupTtsAudio = useCallback((ttsMessageId?: string) => {
+  const warmupTtsAudio = useCallback((ttsMessageId?: string, force = false) => {
     const id = (ttsMessageId || '').trim();
-    if (!id || ttsAudioUrlMapRef.current.has(id) || ttsPendingMapRef.current.has(id)) return;
+    if (!id || ttsAudioUrlMapRef.current.has(id)) return;
+    if (ttsPendingMapRef.current.has(id) && !force) return;
+    if (force) {
+      ttsPendingMapRef.current.delete(id);
+    }
     const startEpoch = ttsEpochRef.current;
 
     const task = (async () => {
       setTtsStateMap(prev => ({ ...prev, [id]: 'pending' }));
+      ttsPendingSinceRef.current.set(id, Date.now());
       try {
-        for (let attempt = 0; attempt < 40; attempt += 1) {
+        const maxAttempts = 16;
+        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
           if (isUnmountedRef.current || ttsEpochRef.current !== startEpoch) return;
           const res = await fetchWithApiKey(`/api/jti/tts/${encodeURIComponent(id)}`);
           if (res.status === 202) {
-            await sleep(Math.min(500 + attempt * 120, 2500));
+            await sleep(Math.min(350 + attempt * 80, 1200));
             continue;
           }
           if (!res.ok) {
@@ -119,12 +127,15 @@ export default function Jti() {
           const oldUrl = ttsAudioUrlMapRef.current.get(id);
           if (oldUrl) URL.revokeObjectURL(oldUrl);
           ttsAudioUrlMapRef.current.set(id, audioUrl);
+          ttsPendingSinceRef.current.delete(id);
           setTtsStateMap(prev => ({ ...prev, [id]: 'ready' }));
           return;
         }
+        ttsPendingSinceRef.current.delete(id);
         setTtsStateMap(prev => ({ ...prev, [id]: 'error' }));
       } catch {
         if (!isUnmountedRef.current && ttsEpochRef.current === startEpoch) {
+          ttsPendingSinceRef.current.delete(id);
           setTtsStateMap(prev => ({ ...prev, [id]: 'error' }));
         }
       }
@@ -141,7 +152,7 @@ export default function Jti() {
 
     const audioUrl = ttsAudioUrlMapRef.current.get(ttsMessageId);
     if (!audioUrl) {
-      warmupTtsAudio(ttsMessageId);
+      warmupTtsAudio(ttsMessageId, true);
       return;
     }
 
@@ -152,6 +163,33 @@ export default function Jti() {
       setTtsStateMap(prev => ({ ...prev, [ttsMessageId]: 'error' }));
     });
   }, [warmupTtsAudio]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      messages.forEach(msg => {
+        if (msg.type !== 'assistant') return;
+        const id = msg.ttsMessageId?.trim();
+        if (!id) return;
+        if (ttsAudioUrlMapRef.current.has(id)) return;
+
+        const state = ttsStateMap[id];
+        if (state === 'pending') {
+          const startedAt = ttsPendingSinceRef.current.get(id) || 0;
+          if (startedAt > 0 && now - startedAt > 12000) {
+            warmupTtsAudio(id, true);
+          }
+          return;
+        }
+
+        if (state !== 'ready') {
+          warmupTtsAudio(id);
+        }
+      });
+    }, 3000);
+
+    return () => window.clearInterval(timer);
+  }, [messages, ttsStateMap, warmupTtsAudio]);
 
   const getAssistantTtsState = useCallback((ttsMessageId?: string): TtsState | undefined => {
     const id = (ttsMessageId || '').trim();
@@ -296,16 +334,51 @@ export default function Jti() {
     setIsTyping(true);
 
     try {
-      const payload: any = { session_id: sessionId, message };
-      if (turnNumber !== undefined) {
-        payload.turn_number = turnNumber;
-      }
+      const postChatMessage = async (activeSessionId: string) => {
+        const payload: any = { session_id: activeSessionId, message };
+        if (turnNumber !== undefined) {
+          payload.turn_number = turnNumber;
+        }
+        return fetchWithApiKey('/api/jti/chat/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      };
 
-      const res = await fetchWithApiKey('/api/jti/chat/message', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
+      const isSessionNotFoundError = (statusCode: number, bodyText: string) =>
+        statusCode === 404 || /session not found/i.test(bodyText);
+
+      let activeSessionId = sessionId;
+      let res = await postChatMessage(activeSessionId);
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        if (isSessionNotFoundError(res.status, errorText)) {
+          const restartRes = await fetchWithApiKey('/api/jti/chat/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ language: currentLanguage, previous_session_id: activeSessionId }),
+          });
+          if (!restartRes.ok) {
+            throw new Error(await restartRes.text());
+          }
+          const restartData = await restartRes.json();
+          activeSessionId = restartData.session_id;
+          setSessionId(activeSessionId);
+          setSessionInfo(`#${activeSessionId.substring(0, 8)}`);
+          setStatusText(t('status_connected'));
+          clearTtsState();
+
+          res = await postChatMessage(activeSessionId);
+          if (!res.ok) {
+            const retryErrorText = await res.text();
+            throw new Error(retryErrorText || `HTTP ${res.status}`);
+          }
+        } else {
+          throw new Error(errorText || `HTTP ${res.status}`);
+        }
+      }
 
       const data = await res.json();
       await new Promise(resolve => setTimeout(resolve, 300));
@@ -351,11 +424,21 @@ export default function Jti() {
       // 將回應的 turn_number 補到最後一個 user message，並 append assistant 回應
       setMessages(prev => {
         const updated = [...prev];
+        let foundUser = false;
         for (let i = updated.length - 1; i >= 0; i--) {
           if (updated[i].type === 'user') {
             updated[i] = { ...updated[i], turnNumber: data.turn_number };
+            foundUser = true;
             break;
           }
+        }
+        if (!foundUser && turnNumber === undefined) {
+          updated.push({
+            text: message,
+            type: 'user',
+            timestamp: Date.now(),
+            turnNumber: data.turn_number,
+          });
         }
         return [...updated, newMsg];
       });
@@ -370,10 +453,11 @@ export default function Jti() {
         setStatusText(status);
       }
 
-    } catch {
+    } catch (error) {
       setIsTyping(false);
+      const errorMessage = error instanceof Error ? error.message : t('error_network');
       setMessages(prev => [...prev, {
-        text: `⚠️ ${t('error_network')}`,
+        text: `⚠️ ${errorMessage || t('error_network')}`,
         type: 'system',
         timestamp: Date.now()
       }]);
@@ -381,7 +465,7 @@ export default function Jti() {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [sessionId, loading, warmupTtsAudio]);
+  }, [sessionId, loading, warmupTtsAudio, currentLanguage, t, clearTtsState]);
 
   const handleRegenerate = async (turnNumber: number) => {
     if (!sessionId || loading) return;

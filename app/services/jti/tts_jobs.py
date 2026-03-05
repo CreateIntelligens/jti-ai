@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import threading
 import time
@@ -12,6 +13,8 @@ import uuid
 from typing import Any, Dict, Optional
 
 from app.services.jti.tts_text import to_tts_text
+
+logger = logging.getLogger(__name__)
 
 
 class JtiTtsJobManager:
@@ -52,6 +55,7 @@ class JtiTtsJobManager:
                 "audio_bytes": None,
                 "error": None,
             }
+        logger.info("[JTI TTS] queued job=%s lang=%s chars=%d", job_id, language, len(prepared_text))
 
         worker = threading.Thread(
             target=self._generate_job,
@@ -79,6 +83,13 @@ class JtiTtsJobManager:
             job["status"] = "failed"
             job["error"] = error
             job["updated_at"] = now
+            created_at = float(job.get("created_at", now))
+        logger.warning(
+            "[JTI TTS] failed job=%s elapsed_ms=%.0f error=%s",
+            job_id,
+            (now - created_at) * 1000,
+            error,
+        )
 
     def _set_job_ready(self, job_id: str, audio_bytes: bytes, content_type: str) -> None:
         with self._lock:
@@ -90,6 +101,14 @@ class JtiTtsJobManager:
             job["audio_bytes"] = audio_bytes
             job["content_type"] = content_type
             job["updated_at"] = now
+            created_at = float(job.get("created_at", now))
+        logger.info(
+            "[JTI TTS] ready job=%s elapsed_ms=%.0f bytes=%d content_type=%s",
+            job_id,
+            (now - created_at) * 1000,
+            len(audio_bytes),
+            content_type,
+        )
 
     def _generate_job(self, job_id: str, text: str, character: str) -> None:
         payload = json.dumps({"text": text, "character": character}).encode("utf-8")
