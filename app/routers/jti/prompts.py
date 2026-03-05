@@ -6,6 +6,7 @@ JTI 專用的人物設定管理。
 自訂人物設定最多 3 個，存在 MongoDB。
 """
 
+import re
 from datetime import datetime
 from typing import Optional, Dict
 
@@ -103,6 +104,40 @@ def _get_default_persona_pair() -> Dict[str, str]:
         "zh": PERSONA.get("zh", ""),
         "en": PERSONA.get("en", PERSONA.get("zh", "")),
     }
+
+
+def _next_custom_prompt_name(prompts, language: str) -> str:
+    lang = _normalize_language(language)
+    prefix = CUSTOM_PROMPT_NAME_PREFIX[lang]
+    pattern = re.compile(rf"^{re.escape(prefix)}\s+(\d+)$")
+
+    existing_names = {
+        p.name.strip()
+        for p in prompts
+        if isinstance(getattr(p, "name", None), str) and p.name.strip()
+    }
+    used_indices = set()
+    for name in existing_names:
+        match = pattern.match(name)
+        if match:
+            used_indices.add(int(match.group(1)))
+
+    next_index = 1
+    candidate = f"{prefix} {next_index}"
+    while next_index in used_indices or candidate in existing_names:
+        next_index += 1
+        candidate = f"{prefix} {next_index}"
+    return candidate
+
+
+def _prompt_order_key(name: str):
+    normalized = name.strip()
+    for prefix in set(CUSTOM_PROMPT_NAME_PREFIX.values()):
+        pattern = re.compile(rf"^{re.escape(prefix)}\s+(\d+)$")
+        match = pattern.match(normalized)
+        if match:
+            return (0, int(match.group(1)), normalized)
+    return (1, normalized)
 
 
 def _build_legacy_persona_pair(content: Optional[str]) -> Dict[str, str]:
@@ -240,6 +275,8 @@ def list_jti_prompts(language: str = "zh", auth: dict = Depends(verify_auth)):
     for p in custom_prompts:
         p["is_active"] = p["id"] == active_prompt_id
 
+    custom_prompts.sort(key=lambda p: _prompt_order_key(str(p.get("name", ""))))
+
     return {
         "prompts": [default_prompt] + custom_prompts,
         "active_prompt_id": active_prompt_id,
@@ -318,7 +355,7 @@ def clone_default_prompt(language: str = "zh", auth: dict = Depends(verify_auth)
     from app.prompts import Prompt
 
     clone = Prompt(
-        name=f"{CUSTOM_PROMPT_NAME_PREFIX[lang]} {len(prompts) + 1}",
+        name=_next_custom_prompt_name(prompts, lang),
         content=PERSONA.get(lang, PERSONA["zh"]),
     )
 
