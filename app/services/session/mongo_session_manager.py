@@ -28,10 +28,28 @@ class MongoSessionManager(SessionStateMixin):
         self._pending: Dict[str, Session] = {}  # lazy write 暫存，尚未寫入 MongoDB
 
     def create_session(self, language: str = "zh") -> Session:
-        """建立新 session（lazy write：暫存記憶體，第一次 update 時才寫入 MongoDB）"""
+        """建立新 session（優先立即寫入 MongoDB，失敗時暫存記憶體）"""
         session = Session(language=language)
-        self._pending[session.session_id] = session
-        logger.info(f"Created session (pending): {session.session_id} (language={language})")
+        try:
+            now = datetime.now()
+            session_dict = session.model_dump(mode="json")
+            session_dict["created_at"] = now
+            session_dict["updated_at"] = now
+
+            self.sessions_collection.update_one(
+                {"session_id": session.session_id},
+                {"$set": session_dict},
+                upsert=True
+            )
+            logger.info(f"Created session in MongoDB: {session.session_id} (language={language})")
+        except Exception as e:
+            # 若 MongoDB 當下異常，先退回 pending，避免中斷使用流程
+            self._pending[session.session_id] = session
+            logger.warning(
+                "Failed to persist new session, fallback to pending memory: %s (session=%s)",
+                e,
+                session.session_id,
+            )
         return session
 
     def get_session(self, session_id: str) -> Optional[Session]:

@@ -42,7 +42,8 @@ DEFAULT_RESPONSE_RULE_SECTIONS = {
 - 不要回答任何與競品（IQOS、glo 等）相關的詳細資訊，只能說「那不是我們家的產品喔」""",
         "response_style": """- 語言：必須使用繁體中文，禁止英文或其他語言
 - 格式：不要使用表情符號 emoji、不要用特殊符號、不要用 markdown 格式、不要用列表或換行分點
-- 測驗進行中由系統處理作答，你不需要判斷答案
+- 測驗的發起、題目出題、作答判斷、結果呈現，全部由系統負責，你絕對不可以自行模擬或進行測驗流程
+- 當使用者表示想做測驗時，你只需要回應「好的，系統馬上幫你開始」之類的簡短確認，然後等待系統介入
 - 如果不確定答案，可以說「這個我不太確定欸」""",
         "knowledge_rules": """- 產品相關問題（顏色、規格、配件、價格、使用方式等）若前一輪已查到且資訊一致，可沿用先前知識；僅在新條件或不確定時再補查知識庫
 - 回答產品相關問題時，優先參考知識庫提供的資訊
@@ -62,6 +63,8 @@ DEFAULT_RESPONSE_RULE_SECTIONS = {
         "response_style": """- Language: You MUST respond in English only, no matter what language the user uses
 - Keep a friendly, natural conversation style, not too formal
 - Do not use emoji, special symbols, markdown formatting, bullet lists, or line breaks to separate points
+- The quiz flow (starting, questions, answer judging, result display) is entirely handled by the system — NEVER simulate or conduct the quiz yourself
+- When the user wants to take the quiz, simply confirm briefly (e.g. "Sure, starting now!") and wait for the system to take over
 - If unsure, honestly say \"I'm not sure\", don't make things up""",
         "knowledge_rules": """- For product questions (colors, specs, accessories, pricing, usage, etc.), you may reuse prior verified KB results when conditions are unchanged; only re-check when new constraints appear or you are unsure
 - When answering product questions, prioritize the knowledge base information provided

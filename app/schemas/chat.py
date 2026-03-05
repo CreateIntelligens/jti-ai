@@ -30,6 +30,7 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     message: str
     tts_text: Optional[str] = None
+    tts_message_id: Optional[str] = None
     session: Optional[Dict[str, Any]] = None
     tool_calls: Optional[list] = None
     turn_number: Optional[int] = None

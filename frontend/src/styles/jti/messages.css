@@ -38,7 +38,7 @@
 .message-wrapper {
   display: flex;
   gap: 1rem;
-  align-items: flex-start;
+  align-items: center;
   width: 100%;
 }
 
@@ -161,6 +161,73 @@
   background: rgba(224, 192, 104, 0.1);
   color: var(--gold);
   border-color: var(--gold);
+}
+
+.message-audio-btn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(224, 192, 104, 0.4);
+  background: rgba(224, 192, 104, 0.08);
+  color: var(--gold);
+  font-size: 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-left: 0.2rem;
+  position: relative;
+}
+
+.audio-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.message-audio-btn:hover {
+  background: rgba(224, 192, 104, 0.2);
+  border-color: var(--gold);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(224, 192, 104, 0.2);
+}
+
+.message-audio-btn.pending {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.45);
+}
+
+.message-audio-btn.pending::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 999px;
+  border: 2px solid rgba(251, 191, 36, 0.22);
+  border-top-color: rgba(251, 191, 36, 0.95);
+  animation: audioPendingSpin 0.9s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes audioPendingSpin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.message-audio-btn.error {
+  color: #fca5a5;
+  border-color: rgba(252, 165, 165, 0.5);
+  background: rgba(127, 29, 29, 0.25);
+}
+
+.message.user .message-audio-btn,
+.message.system .message-audio-btn {
+  display: none;
 }
 
 .message-edit-area {

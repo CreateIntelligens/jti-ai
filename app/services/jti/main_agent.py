@@ -33,23 +33,24 @@ from app.services.jti.agent_prompts import (
 from app.services.jti.runtime_settings import (
     load_runtime_settings_from_prompt_manager,
 )
+from app.services.jti.tts_text import to_tts_text
 
 # 使用工廠函數取得適當的實作（MongoDB 或記憶體）
 session_manager = get_session_manager()
 
 logger = logging.getLogger(__name__)
 
-# File Search 用 flash-lite（不帶 system_instruction 即可正常 grounding）
-FILE_SEARCH_MODEL = "gemini-3.1-flash-lite-preview"
-
 
 class MainAgent(BaseAgent):
     """主要對話 Agent"""
 
+    # JTI 用固定的 flash-lite，避免較強的 model 自行進行測驗流程
+    CHAT_MODEL = "gemini-2.5-flash-lite"
+    # File Search / Intent Check 也用 flash-lite（不帶 system_instruction 即可正常 grounding）
+    FILE_SEARCH_MODEL = "gemini-2.5-flash-lite"
+
     def __init__(self):
-        super().__init__(
-            model_name=os.getenv("GEMINI_MODEL_NAME", "gemini-3.1-flash-lite-preview"),
-        )
+        super().__init__(model_name=self.CHAT_MODEL)
 
     @property
     def _session_manager(self):
@@ -107,7 +108,7 @@ class MainAgent(BaseAgent):
         for attempt in range(3):
             try:
                 response = client.models.generate_content(
-                    model=FILE_SEARCH_MODEL,
+                    model=self.FILE_SEARCH_MODEL,
                     contents=query,
                     config=types.GenerateContentConfig(
                         tools=[
@@ -142,7 +143,7 @@ class MainAgent(BaseAgent):
 
 只能回覆 YES 或 NO："""
             response = gemini_with_retry(lambda: _gemini_service.client.models.generate_content(
-                model=FILE_SEARCH_MODEL,
+                model=self.FILE_SEARCH_MODEL,
                 contents=prompt,
                 config=types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=0)),
             ))
@@ -168,16 +169,20 @@ class MainAgent(BaseAgent):
         """
         try:
             if not _gemini_service.client:
+                message = "系統未正確初始化，請檢查 API Key 設定。"
                 return {
                     "error": "Gemini client not initialized",
-                    "message": "系統未正確初始化，請檢查 API Key 設定。"
+                    "message": message,
+                    "tts_text": to_tts_text(message, "zh"),
                 }
 
             session = session_manager.get_session(session_id)
             if session is None:
+                message = "找不到對話記錄，請重新開始。"
                 return {
                     "error": "Session not found",
-                    "message": "找不到對話記錄，請重新開始。"
+                    "message": message,
+                    "tts_text": to_tts_text(message, "zh"),
                 }
 
             # 1. 併發執行 Intent Check 和 File Search
@@ -225,15 +230,18 @@ class MainAgent(BaseAgent):
 
             return {
                 "message": final_message,
+                "tts_text": to_tts_text(final_message, session.language),
                 "session": updated_session.model_dump() if updated_session else None,
                 "tool_calls": []
             }
 
         except Exception as e:
             logger.error(f"Chat failed: {e}", exc_info=True)
+            message = f"抱歉，發生錯誤：{str(e)}"
             return {
                 "error": str(e),
-                "message": f"抱歉，發生錯誤：{str(e)}"
+                "message": message,
+                "tts_text": to_tts_text(message, "zh"),
             }
 
     async def chat_with_tool_result(
@@ -250,7 +258,12 @@ class MainAgent(BaseAgent):
         try:
             session = session_manager.get_session(session_id)
             if not session:
-                return {"error": "Session not found", "message": "找不到 session"}
+                message = "找不到 session"
+                return {
+                    "error": "Session not found",
+                    "message": message,
+                    "tts_text": to_tts_text(message, "zh"),
+                }
 
             # 根據工具結果生成指示
             if "instruction_for_llm" in tool_result:
@@ -322,14 +335,17 @@ class MainAgent(BaseAgent):
 
             return {
                 "message": final_message,
+                "tts_text": to_tts_text(final_message, session.language),
                 "session": session.model_dump()
             }
 
         except Exception as e:
             logger.error(f"chat_with_tool_result failed: {e}", exc_info=True)
+            message = "收到！"
             return {
                 "error": str(e),
-                "message": "收到！"
+                "message": message,
+                "tts_text": to_tts_text(message, "zh"),
             }
 
 
