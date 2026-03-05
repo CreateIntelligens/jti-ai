@@ -29,7 +29,7 @@ def load_quiz_bank(language: str = "zh"):
     if language not in quiz_data_cache:
         # MongoDB first
         try:
-            from app.services.quiz_bank_store import get_quiz_bank_store
+            from app.services.jti.quiz_bank_store import get_quiz_bank_store
             store = get_quiz_bank_store()
             bank = store.get_full_bank(language)
             if bank and bank.get("questions"):

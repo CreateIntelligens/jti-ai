@@ -4,7 +4,7 @@ from app.models.session import Session, SessionStep
 from app.services.session.session_manager_factory import get_session_manager
 
 session_manager = get_session_manager()
-from app.tools.tool_executor import tool_executor
+from app.tools.jti.tool_executor import tool_executor
 
 
 class SessionModelTests(unittest.TestCase):

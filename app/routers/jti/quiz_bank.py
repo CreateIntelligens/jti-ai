@@ -18,10 +18,10 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from app.auth import verify_admin, verify_auth
-from app.services.quiz_bank_store import get_quiz_bank_store, DEFAULT_BANK_ID
-from app.services.color_results_store import get_color_results_store, DEFAULT_SET_ID
-from app.tools.quiz import invalidate_quiz_cache
-from app.tools.color_results import invalidate_color_results_cache
+from app.services.jti.quiz_bank_store import get_quiz_bank_store, DEFAULT_BANK_ID
+from app.services.jti.color_results_store import get_color_results_store, DEFAULT_SET_ID
+from app.tools.jti.quiz import invalidate_quiz_cache
+from app.tools.jti.color_results import invalidate_color_results_cache
 
 logger = logging.getLogger(__name__)
 

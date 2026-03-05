@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.auth import verify_auth
 from app.models.session import SessionStep
-from app.schemas.jti import ChatResponse
+from app.schemas.chat import ChatResponse
 from app.services.jti.quiz_helpers import (
     _get_or_rebuild_session,
     _pause_quiz_and_respond,

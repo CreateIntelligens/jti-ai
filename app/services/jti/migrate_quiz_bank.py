@@ -13,8 +13,8 @@ import logging
 from pathlib import Path
 from typing import Any
 
-from app.services.quiz_bank_store import DEFAULT_BANK_ID
-from app.services.color_results_store import DEFAULT_SET_ID
+from app.services.jti.quiz_bank_store import DEFAULT_BANK_ID
+from app.services.jti.color_results_store import DEFAULT_SET_ID
 
 logger = logging.getLogger(__name__)
 
@@ -150,7 +150,7 @@ def _default_color_results_are_outdated(
 
 def migrate_quiz_bank() -> None:
     """Seed quiz bank from JSON → MongoDB and sync stale default banks."""
-    from app.services.quiz_bank_store import get_quiz_bank_store
+    from app.services.jti.quiz_bank_store import get_quiz_bank_store
 
     # First, upgrade any legacy data
     _upgrade_legacy_data()
@@ -231,7 +231,7 @@ def _upgrade_legacy_color_results() -> None:
 
 def migrate_color_results() -> None:
     """Seed color results from JSON → MongoDB and sync stale default sets."""
-    from app.services.color_results_store import get_color_results_store
+    from app.services.jti.color_results_store import get_color_results_store
 
     # First, upgrade any legacy data
     _upgrade_legacy_color_results()

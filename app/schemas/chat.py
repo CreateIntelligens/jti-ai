@@ -1,4 +1,4 @@
-"""Shared JTI and conversation API schemas."""
+"""Shared chat and conversation API schemas (used by JTI, HCIoT, General)."""
 
 from __future__ import annotations
 

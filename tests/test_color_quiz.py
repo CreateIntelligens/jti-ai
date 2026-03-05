@@ -2,8 +2,8 @@ import random
 import unittest
 
 from app.models.session import Session
-from app.tools.quiz import generate_random_quiz, load_quiz_bank, complete_selected_questions
-from app.tools.color_results import calculate_color_result
+from app.tools.jti.quiz import generate_random_quiz, load_quiz_bank, complete_selected_questions
+from app.tools.jti.color_results import calculate_color_result
 
 
 class TestColorQuizSession(unittest.TestCase):

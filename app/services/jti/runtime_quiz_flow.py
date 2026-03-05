@@ -6,13 +6,13 @@ import logging
 
 from fastapi import HTTPException
 
-from app.schemas.jti import ChatResponse
+from app.schemas.chat import ChatResponse
 from app.services.jti.quiz_helpers import _format_options_text
 from app.services.session.session_manager_factory import (
     get_conversation_logger,
     get_session_manager,
 )
-from app.tools.tool_executor import tool_executor
+from app.tools.jti.tool_executor import tool_executor
 
 session_manager = get_session_manager()
 conversation_logger = get_conversation_logger()

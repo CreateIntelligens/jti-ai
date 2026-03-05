@@ -11,7 +11,7 @@ import logging
 
 from app.auth import verify_admin, verify_auth
 from app.models.session import SessionStep
-from app.schemas.jti import (
+from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
     ConversationsBySessionResponse,
@@ -28,7 +28,7 @@ from app.services.jti.runtime_quiz_flow import (
     make_quiz_tts_text,
 )
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
-from app.tools.quiz import get_total_questions
+from app.tools.jti.quiz import get_total_questions
 from app.utils import group_conversations_by_session
 from app.services.jti.quiz_helpers import (
     _get_or_rebuild_session,
@@ -165,7 +165,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 )))
 
             if user_choice:
-                from app.tools.tool_executor import tool_executor
+                from app.tools.jti.tool_executor import tool_executor
                 tool_result = await tool_executor.execute("submit_answer", {
                     "session_id": request.session_id,
                     "user_choice": user_choice

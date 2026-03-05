@@ -94,7 +94,6 @@ async def _pause_quiz_and_respond(
     }
 
 
-
 async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]:
     """
     先用規則判斷，判不出時用 LLM 判斷使用者選擇哪個選項

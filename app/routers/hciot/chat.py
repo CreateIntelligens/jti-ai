@@ -9,7 +9,7 @@ from typing import Optional, Union
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import verify_admin, verify_auth
-from app.schemas.jti import (
+from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
     ConversationsBySessionResponse,

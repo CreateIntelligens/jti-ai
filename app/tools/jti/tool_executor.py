@@ -7,14 +7,14 @@ Tool 執行器
 from typing import Dict, Any, Optional
 import logging
 from google.genai import types
-from app.tools.quiz import (
+from app.tools.jti.quiz import (
     generate_quiz,
     get_total_questions,
     generate_random_quiz,
     get_question_from_selected,
     complete_selected_questions,
 )
-from app.tools.color_results import calculate_color_result as calc_color_result
+from app.tools.jti.color_results import calculate_color_result as calc_color_result
 from app.services.session.session_manager_factory import get_session_manager
 
 # 使用 factory 取得正確的 session manager（MongoDB 或記憶體版）

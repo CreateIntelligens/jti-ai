@@ -15,7 +15,7 @@ from pydantic import BaseModel
 
 from app.auth import verify_auth, extract_user_gemini_api_key
 from app.core import FileSearchManager
-from app.schemas.jti import (
+from app.schemas.chat import (
     DeleteConversationRequest,
     DeleteConversationResponse,
     ExportGeneralConversationsResponse,

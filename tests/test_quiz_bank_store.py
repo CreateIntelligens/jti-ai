@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock
 
-from app.services.quiz_bank_store import QuizBankStore
+from app.services.jti.quiz_bank_store import QuizBankStore
 
 
 class TestQuizBankStore(unittest.TestCase):

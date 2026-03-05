@@ -7,7 +7,6 @@ MongoDB 對話日誌記錄器
 3. 保留檔案日誌備份（可選）
 """
 
-import json
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any

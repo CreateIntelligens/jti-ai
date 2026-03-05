@@ -19,13 +19,13 @@ from app.services.session.session_manager_factory import get_session_manager
 import app.services.gemini_service as _gemini_service
 from app.services.gemini_service import gemini_with_retry
 from app.services.agent_utils import (
-    build_chat_history,
     extract_response_text,
     normalize_language,
     strip_citations,
 )
+from app.services.base_agent import BaseAgent
 from app.services.gemini_clients import get_client_for_store
-from app.tools.tool_executor import tool_executor, ToolExecutor
+from app.tools.jti.tool_executor import tool_executor, ToolExecutor
 from app.services.jti.agent_prompts import (
     PERSONA,
     SESSION_STATE_TEMPLATES,
@@ -45,66 +45,17 @@ logger = logging.getLogger(__name__)
 FILE_SEARCH_MODEL = "gemini-2.5-flash-lite-preview-09-2025"
 
 
-class MainAgent:
+class MainAgent(BaseAgent):
     """主要對話 Agent"""
 
     def __init__(self):
-        self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite-preview-09-2025")
-        # 持久 chat session：session_id → Gemini ChatSession
-        self._chat_sessions: Dict[str, any] = {}
-
-    def _get_or_create_chat_session(self, session: Session):
-        """取得或建立持久 Gemini chat session（不帶任何 tool）"""
-        sid = session.session_id
-        if sid in self._chat_sessions:
-            return self._chat_sessions[sid]
-
-        # 從 session.chat_history 恢復歷史
-        history = build_chat_history(session.chat_history) if session.chat_history else []
-        if history:
-            logger.info(f"從歷史恢復 chat session: {len(history)} 筆 (session={sid[:8]}...)")
-
-        system_instruction = self._get_system_instruction(session)
-        config = types.GenerateContentConfig(
-            system_instruction=[types.Part.from_text(text=system_instruction)],
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
+        super().__init__(
+            model_name=os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite-preview-09-2025"),
         )
 
-        chat_session = _gemini_service.client.chats.create(
-            model=self.model_name,
-            config=config,
-            history=history
-        )
-        self._chat_sessions[sid] = chat_session
-        return chat_session
-
-    def _sync_history_to_db(self, session_id: str, user_message: str, assistant_message: str):
-        """將 user/model 訊息同步到 MongoDB（不截斷）"""
-        session = session_manager.get_session(session_id)
-        if not session:
-            return
-        session.chat_history.append({"role": "user", "content": user_message})
-        session.chat_history.append({"role": "assistant", "content": assistant_message})
-        session_manager.update_session(session)
-
-    def _sync_history_to_db_background(self, session_id: str, user_message: str, assistant_message: str):
-        """背景非同步寫入 DB，不阻塞回應"""
-        try:
-            loop = asyncio.get_running_loop()
-            loop.run_in_executor(None, self._sync_history_to_db, session_id, user_message, assistant_message)
-        except Exception:
-            self._sync_history_to_db(session_id, user_message, assistant_message)
-
-    def remove_session(self, session_id: str):
-        """清除記憶體中的 chat session"""
-        self._chat_sessions.pop(session_id, None)
-
-    def remove_all_sessions(self):
-        """清除所有記憶體中的 chat sessions（切換 prompt 時使用）"""
-        count = len(self._chat_sessions)
-        self._chat_sessions.clear()
-        if count > 0:
-            logger.info(f"已清除 {count} 個 chat sessions")
+    @property
+    def _session_manager(self):
+        return session_manager
 
     # 重用 ToolExecutor 的 _format_options（避免重複定義）
     _format_options_text = staticmethod(ToolExecutor._format_options)
@@ -308,12 +259,8 @@ class MainAgent:
             logger.info(f"[計時] 主 Agent: {(t3-t2)*1000:.0f}ms | 總計: {(t3-t0)*1000:.0f}ms")
 
             # 3. 清理 chat session 歷史：把 enriched_message 替換回乾淨的 user_message
-            #    避免 KB 結果累積在歷史中淹沒後續的短追問
-            if kb_result and hasattr(chat_session, '_curated_history') and chat_session._curated_history:
-                last_user = chat_session._curated_history[-2]  # send_message 後倒數第二筆是 user
-                if last_user.role == "user":
-                    last_user.parts = [types.Part.from_text(text=user_message)]
-                    logger.info(f"[歷史清理] 已將 enriched_message 替換回乾淨的 user_message")
+            if kb_result:
+                self._clean_enriched_history(chat_session, user_message)
 
             tool_calls_log = []
 
@@ -438,16 +385,6 @@ class MainAgent:
                 "message": "收到！"
             }
 
-    @staticmethod
-    def _append_to_chat_history(chat_session, user_message: str, model_message: str):
-        """將乾淨的 user/model 訊息追加到 SDK chat session 的內部歷史"""
-        if hasattr(chat_session, '_curated_history'):
-            chat_session._curated_history.append(
-                types.Content(role="user", parts=[types.Part.from_text(text=user_message)])
-            )
-            chat_session._curated_history.append(
-                types.Content(role="model", parts=[types.Part.from_text(text=model_message)])
-            )
 
 
 # 全域實例

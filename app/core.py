@@ -234,16 +234,12 @@ class FileSearchManager:
 
     @staticmethod
     def _build_history_contents(chat_history: list) -> list:
-        """將 MongoDB 格式的 chat_history 轉換為 Gemini SDK Content 物件"""
-        contents = []
-        for msg in chat_history:
-            contents.append(
-                types.Content(
-                    role=msg["role"],
-                    parts=[types.Part.from_text(text=msg["content"])]
-                )
-            )
-        return contents
+        """將 MongoDB 格式的 chat_history 轉換為 Gemini SDK Content 物件。
+
+        Delegates to agent_utils.build_chat_history for role normalisation.
+        """
+        from app.services.agent_utils import build_chat_history
+        return build_chat_history(chat_history)
 
     @staticmethod
     def _normalize_store_name(store_name: str) -> str:
@@ -329,22 +325,20 @@ class FileSearchManager:
         """取得對話歷史紀錄。"""
         if not hasattr(self, 'chat_session') or not self.chat_session:
             return []
-        
+
         # 使用 _curated_history，因為 history 屬性不存在
         # 注意：這依賴於 SDK 的內部實作，未來版本可能會變
         raw_history = getattr(self.chat_session, '_curated_history', [])
-        
-        history = []
-        for content in raw_history:
-            role = content.role # 'user' or 'model'
-            # 簡單處理：只取第一個 part 的 text
-            text = ""
-            if content.parts:
-                for part in content.parts:
-                    if part.text:
-                        text += part.text
-            history.append({"role": role, "text": text})
-        return history
+
+        return [
+            {
+                "role": content.role,
+                "text": "".join(
+                    part.text for part in (content.parts or []) if part.text
+                ),
+            }
+            for content in raw_history
+        ]
 
     def query(
         self,

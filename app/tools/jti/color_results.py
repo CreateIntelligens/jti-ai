@@ -12,7 +12,7 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, Optional
 
-from app.tools.quiz import load_quiz_bank
+from app.tools.jti.quiz import load_quiz_bank
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ def load_color_results(language: str = "zh") -> Dict[str, Any]:
     if language not in _color_results_cache:
         # MongoDB first
         try:
-            from app.services.color_results_store import get_color_results_store
+            from app.services.jti.color_results_store import get_color_results_store
             store = get_color_results_store()
             results = store.get_all_results(language)
             if results:

@@ -19,11 +19,11 @@ def extract_response_text(response) -> str:
     """從 Gemini GenerateContentResponse 擷取所有文字 part 並串接。"""
     if not response.candidates or not response.candidates[0].content.parts:
         return ""
-    parts = []
-    for part in response.candidates[0].content.parts:
-        if hasattr(part, "text") and part.text:
-            parts.append(part.text)
-    return "".join(parts)
+    return "".join(
+        part.text
+        for part in response.candidates[0].content.parts
+        if hasattr(part, "text") and part.text
+    )
 
 
 def strip_citations(text: str) -> str:

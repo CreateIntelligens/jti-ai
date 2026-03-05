@@ -13,11 +13,11 @@ from google.genai import types
 from app.models.session import Session
 import app.services.gemini_service as _gemini_service
 from app.services.agent_utils import (
-    build_chat_history,
     extract_response_text,
     normalize_language,
     strip_citations,
 )
+from app.services.base_agent import BaseAgent
 from app.services.gemini_clients import get_client_for_store
 from app.services.hciot.agent_prompts import (
     PERSONA,
@@ -37,51 +37,15 @@ logger = logging.getLogger(__name__)
 FILE_SEARCH_MODEL = "gemini-2.5-flash-lite-preview-09-2025"
 
 
-class HciotMainAgent:
+class HciotMainAgent(BaseAgent):
     def __init__(self):
-        self.model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite-preview-09-2025")
-        self._chat_sessions: Dict[str, any] = {}
-
-    def _get_or_create_chat_session(self, session: Session):
-        sid = session.session_id
-        if sid in self._chat_sessions:
-            return self._chat_sessions[sid]
-
-        history = build_chat_history(session.chat_history) if session.chat_history else []
-
-        system_instruction = self._get_system_instruction(session)
-        config = types.GenerateContentConfig(
-            system_instruction=[types.Part.from_text(text=system_instruction)],
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
+        super().__init__(
+            model_name=os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite-preview-09-2025"),
         )
-        chat_session = _gemini_service.client.chats.create(
-            model=self.model_name,
-            config=config,
-            history=history,
-        )
-        self._chat_sessions[sid] = chat_session
-        return chat_session
 
-    def _sync_history_to_db(self, session_id: str, user_message: str, assistant_message: str):
-        session = session_manager.get_session(session_id)
-        if not session:
-            return
-        session.chat_history.append({"role": "user", "content": user_message})
-        session.chat_history.append({"role": "assistant", "content": assistant_message})
-        session_manager.update_session(session)
-
-    def _sync_history_to_db_background(self, session_id: str, user_message: str, assistant_message: str):
-        try:
-            loop = asyncio.get_running_loop()
-            loop.run_in_executor(None, self._sync_history_to_db, session_id, user_message, assistant_message)
-        except Exception:
-            self._sync_history_to_db(session_id, user_message, assistant_message)
-
-    def remove_session(self, session_id: str):
-        self._chat_sessions.pop(session_id, None)
-
-    def remove_all_sessions(self):
-        self._chat_sessions.clear()
+    @property
+    def _session_manager(self):
+        return session_manager
 
     @staticmethod
     def _get_store_name_for_language(language: str) -> str:
@@ -232,10 +196,8 @@ class HciotMainAgent:
             chat_session = self._get_or_create_chat_session(session)
             response = chat_session.send_message(enriched_message)
 
-            if kb_result and hasattr(chat_session, "_curated_history") and chat_session._curated_history:
-                last_user = chat_session._curated_history[-2]
-                if last_user.role == "user":
-                    last_user.parts = [types.Part.from_text(text=user_message)]
+            if kb_result:
+                self._clean_enriched_history(chat_session, user_message)
 
             final_message = extract_response_text(response)
             if not final_message:
