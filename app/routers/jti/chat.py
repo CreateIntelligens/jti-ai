@@ -2,6 +2,7 @@
 JTI Chat API — session management, chat messages, and conversation history.
 """
 
+import re
 from copy import deepcopy
 from datetime import datetime
 from typing import Optional, Union
@@ -74,9 +75,35 @@ def _queue_tts_generation(tts_text: Optional[str], language: str) -> Optional[st
         return None
 
 
+_EMOJI_RE = re.compile(
+    "["
+    "\U0001f300-\U0001f9ff"   # miscellaneous symbols, emoticons, supplemental
+    "\U0001fa00-\U0001faff"   # symbols extended-A
+    "\U00002600-\U000027bf"   # misc symbols & dingbats
+    "\U0000fe00-\U0000fe0f"   # variation selectors
+    "\U0000200d"              # zero width joiner
+    "\U000023cf-\U000023fa"   # misc technical
+    "\U00002b50-\U00002b55"   # stars
+    "]+",
+    flags=re.UNICODE,
+)
+
+
+def _strip_emoji(text: str) -> str:
+    """移除文字中的 emoji 符號。"""
+    return _EMOJI_RE.sub("", text).strip()
+
+
 def _attach_tts_message_id(response: ChatResponse, language: str) -> ChatResponse:
-    response.tts_message_id = _queue_tts_generation(response.tts_text, language)
-    return response
+    """Strip emoji from display/tts text and queue TTS generation."""
+    cleaned_message = _strip_emoji(response.message)
+    cleaned_tts = _strip_emoji(response.tts_text) if response.tts_text else response.tts_text
+    tts_message_id = _queue_tts_generation(cleaned_tts, language)
+    return response.model_copy(update={
+        "message": cleaned_message,
+        "tts_text": cleaned_tts,
+        "tts_message_id": tts_message_id,
+    })
 
 
 # === Endpoints ===
