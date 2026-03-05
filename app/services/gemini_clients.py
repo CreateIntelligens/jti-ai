@@ -51,16 +51,15 @@ def init_registry() -> None:
         name, api_key = _parse_key_token(token, i)
         try:
             c = genai.Client(api_key=api_key)
+            stores = list(c.file_search_stores.list())
             _clients.append(c)
             _key_names.append(name)
-
-            stores = list(c.file_search_stores.list())
             logger.info(f"[Registry] {name} ({api_key[:8]}...): 發現 {len(stores)} 個 stores")
             for s in stores:
                 logger.info(f"  - {s.name} ({s.display_name})")
                 _store_to_client[s.name] = c
         except Exception as e:
-            logger.error(f"[Registry] {name} ({api_key[:8]}...) 初始化失敗: {e}")
+            logger.error(f"[Registry] {name} ({api_key[:8]}...) 初始化失敗（已跳過）: {e}")
 
     logger.info(f"[Registry] 共 {len(_clients)} 個 clients, {len(_store_to_client)} 個 store mappings")
 

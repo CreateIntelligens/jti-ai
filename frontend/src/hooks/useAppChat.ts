@@ -60,19 +60,12 @@ function getManagedKnowledgeContext(target: KnowledgeTarget | null): {
 }
 
 function getProjectFilterOptions(storeList: Store[], keyNames: string[]): Array<{ value: string; label: string }> {
-  const keyIndexes = Array.from(
-    new Set(
-      storeList
-        .map((store) => store.key_index)
-        .filter((keyIndex): keyIndex is number => keyIndex !== undefined),
-    ),
-  ).sort((a, b) => a - b);
-
+  if (keyNames.length <= 1) return [];
   return [
     { value: 'all', label: '全部專案' },
-    ...keyIndexes.map((keyIndex) => ({
-      value: `key:${keyIndex}`,
-      label: keyNames[keyIndex] || `Key #${keyIndex + 1}`,
+    ...keyNames.map((name, i) => ({
+      value: `key:${i}`,
+      label: name || `Key #${i + 1}`,
     })),
   ];
 }
