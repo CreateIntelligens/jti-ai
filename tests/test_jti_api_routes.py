@@ -22,6 +22,7 @@ class TestJtiApiRoutes(unittest.TestCase):
         expected = {
             ("/api/jti/chat/start", ("POST",)),
             ("/api/jti/chat/message", ("POST",)),
+            ("/api/jti/tts", ("POST",)),
             ("/api/jti/tts/{tts_message_id}", ("GET",)),
             ("/api/jti/quiz/start", ("POST",)),
             ("/api/jti/quiz/pause", ("POST",)),

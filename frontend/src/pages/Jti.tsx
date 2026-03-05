@@ -107,7 +107,9 @@ export default function Jti() {
       try {
         const maxAttempts = 16;
         for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-          if (isUnmountedRef.current || ttsEpochRef.current !== startEpoch) return;
+          if (isUnmountedRef.current || ttsEpochRef.current !== startEpoch) {
+            return;
+          }
           const res = await fetchWithApiKey(`/api/jti/tts/${encodeURIComponent(id)}`);
           if (res.status === 202) {
             await sleep(Math.min(350 + attempt * 80, 1200));
@@ -146,9 +148,41 @@ export default function Jti() {
     ttsPendingMapRef.current.set(id, task);
   }, []);
 
-  const playAssistantTts = useCallback((msg: Message) => {
-    const ttsMessageId = msg.ttsMessageId?.trim();
-    if (!ttsMessageId) return;
+  const playAssistantTts = useCallback(async (msg: Message) => {
+    let ttsMessageId = msg.ttsMessageId?.trim() || '';
+
+    if (!ttsMessageId) {
+      const sourceText = (msg.ttsText || msg.text || '').trim();
+      if (!sourceText) return;
+
+      const createRes = await fetchWithApiKey('/api/jti/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: sourceText, language: currentLanguage }),
+      });
+      if (!createRes.ok) return;
+
+      const createData = await createRes.json();
+      ttsMessageId = String(createData?.tts_message_id || '').trim();
+      if (!ttsMessageId) return;
+
+      setMessages(prev => {
+        let matched = false;
+        return prev.map(item => {
+          if (matched) return item;
+          if (
+            item.timestamp === msg.timestamp &&
+            item.type === msg.type &&
+            item.turnNumber === msg.turnNumber &&
+            item.text === msg.text
+          ) {
+            matched = true;
+            return { ...item, ttsMessageId };
+          }
+          return item;
+        });
+      });
+    }
 
     const audioUrl = ttsAudioUrlMapRef.current.get(ttsMessageId);
     if (!audioUrl) {
@@ -162,7 +196,7 @@ export default function Jti() {
     void audio.play().catch(() => {
       setTtsStateMap(prev => ({ ...prev, [ttsMessageId]: 'error' }));
     });
-  }, [warmupTtsAudio]);
+  }, [warmupTtsAudio, currentLanguage]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -206,9 +240,12 @@ export default function Jti() {
     }
   }, [editingTurn]);
 
-  useEffect(() => () => {
-    isUnmountedRef.current = true;
-    clearTtsState();
+  useEffect(() => {
+    isUnmountedRef.current = false;
+    return () => {
+      isUnmountedRef.current = true;
+      clearTtsState();
+    };
   }, [clearTtsState]);
 
   // 建立新 session 的共用邏輯
@@ -386,24 +423,6 @@ export default function Jti() {
 
       console.log(`[用戶] ${message}`);
       console.log(`[AI回應] ${data.message} (Turn: ${data.turn_number})`);
-      if (data.session) {
-        const s = data.session as SessionData;
-        const count = Object.keys(s.answers || {}).length;
-        const totalQuestions = getQuizTotalQuestions(s);
-        if (s.step === 'QUIZ') {
-          console.log(`[測驗進度] ${count}/${totalQuestions} 題`);
-        }
-        if (s.color_scores && Object.keys(s.color_scores).length > 0) {
-          const sorted = Object.entries(s.color_scores).sort(([, a], [, b]) => (b as number) - (a as number));
-          console.log(`[當前分數] ${sorted.map(([k, v]) => `${k}:${v}`).join(' | ')}`);
-        }
-        if (s.color_result_id) {
-          console.log(`[測驗結果] ${s.color_result_id} - ${s.color_result?.title || ''}`);
-        }
-      }
-      if (data.tool_calls?.length) {
-        console.log(`[工具呼叫]`, data.tool_calls);
-      }
 
       const newMsg: Message = data.error && !data.message
         ? { text: `⚠️ ${data.error}`, type: 'system', timestamp: Date.now() }

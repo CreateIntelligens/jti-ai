@@ -13,6 +13,7 @@ export interface Message {
   toolCalls?: Array<{ tool: string }>;
   timestamp: number;
   turnNumber?: number;
+  ttsText?: string;
   ttsMessageId?: string;
 }
 
@@ -192,7 +193,7 @@ export default function JtiMessageList({
                     </>
                   )}
                 </div>
-                  {msg.type === 'assistant' && msg.ttsMessageId && (
+                  {msg.type === 'assistant' && (msg.ttsMessageId || msg.ttsText || msg.text) && (
                     <button
                       className={audioBtnClass}
                       onClick={() => onPlayTts(msg)}

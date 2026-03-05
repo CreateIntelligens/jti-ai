@@ -9,6 +9,7 @@ from typing import Optional, Union
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import JSONResponse, Response
 import logging
+from pydantic import BaseModel, Field
 
 from app.auth import verify_admin, verify_auth
 from app.models.session import SessionStep
@@ -56,6 +57,11 @@ admin_history_router = APIRouter(
     tags=["JTI Conversations"],
 )
 router = runtime_router
+
+
+class TtsCreateRequest(BaseModel):
+    text: str = Field(..., description="Text content for TTS generation")
+    language: str = Field("zh", description="Language code, e.g. zh or en")
 
 
 def _queue_tts_generation(tts_text: Optional[str], language: str) -> Optional[str]:
@@ -362,6 +368,21 @@ async def get_tts_audio(tts_message_id: str, auth: dict = Depends(verify_auth)):
         media_type=content_type,
         headers={"Cache-Control": "private, max-age=300"},
     )
+
+
+@runtime_router.post("/tts")
+async def create_tts_audio(request: TtsCreateRequest, auth: dict = Depends(verify_auth)):
+    """Create a new background TTS job and return its message id."""
+    text = (request.text or "").strip()
+    if not text:
+        raise HTTPException(status_code=400, detail="TTS text is empty")
+
+    language = (request.language or "zh").strip().lower() or "zh"
+    tts_message_id = _queue_tts_generation(text, language)
+    if not tts_message_id:
+        raise HTTPException(status_code=500, detail="Failed to queue TTS generation")
+
+    return {"tts_message_id": tts_message_id}
 
 
 @compat_history_router.get(
