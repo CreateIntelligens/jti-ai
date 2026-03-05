@@ -267,8 +267,12 @@ def health_check():
     except Exception:
         checks["mongodb"] = False
 
-    # 2. Gemini API Key
-    checks["gemini_api_key"] = bool(os.getenv("GEMINI_API_KEY"))
+    # 2. Gemini API Keys registry
+    try:
+        from .services.gemini_clients import get_key_count
+        checks["gemini_api_key"] = get_key_count() > 0
+    except Exception:
+        checks["gemini_api_key"] = False
 
     # 3. FileSearchManager
     checks["file_search_manager"] = deps.manager is not None

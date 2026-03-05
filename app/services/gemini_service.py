@@ -30,7 +30,7 @@ def init_gemini_client():
         client = get_default_client()
         logger.info("Gemini client initialized from registry")
     except ValueError:
-        logger.warning("GEMINI_API_KEY not found - Gemini client not initialized")
+        logger.warning("GEMINI_API_KEYS not found - Gemini client not initialized")
 
 
 class GeminiService:

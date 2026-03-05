@@ -24,10 +24,6 @@ _clients: list[genai.Client] = []
 # key index → 顯示名稱
 _key_names: list[str] = []
 
-# fallback client cache（避免每次呼叫 get_default_client 都新建）
-_fallback_client: genai.Client | None = None
-
-
 def _parse_key_token(token: str, index: int) -> tuple[str, str]:
     """解析 'name:key' 或 'key' 格式，回傳 (name, api_key)。"""
     if ":" in token:
@@ -38,18 +34,17 @@ def _parse_key_token(token: str, index: int) -> tuple[str, str]:
 
 def init_registry() -> None:
     """讀取所有 API keys，建立 clients，掃描 stores 建立 mapping。"""
-    global _store_to_client, _clients, _key_names, _fallback_client
+    global _store_to_client, _clients, _key_names
     _store_to_client = {}
     _clients = []
     _key_names = []
-    _fallback_client = None
 
-    # 優先讀 GEMINI_API_KEYS（逗號分隔），fallback 到 GEMINI_API_KEY
-    keys_raw = os.getenv("GEMINI_API_KEYS", "") or os.getenv("GEMINI_API_KEY", "")
+    # 只讀 GEMINI_API_KEYS（逗號分隔）
+    keys_raw = os.getenv("GEMINI_API_KEYS", "")
     tokens = [t.strip() for t in keys_raw.split(",") if t.strip()]
 
     if not tokens:
-        logger.warning("未設定 GEMINI_API_KEYS 或 GEMINI_API_KEY")
+        logger.warning("未設定 GEMINI_API_KEYS")
         return
 
     for i, token in enumerate(tokens):
@@ -126,12 +121,4 @@ def get_default_client() -> genai.Client:
     """回傳第一把 key 的 client。"""
     if _clients:
         return _clients[0]
-    # 最後手段：用 GEMINI_API_KEY 建一個（cache 起來避免重複建立）
-    global _fallback_client
-    if _fallback_client:
-        return _fallback_client
-    api_key = os.getenv("GEMINI_API_KEY")
-    if api_key:
-        _fallback_client = genai.Client(api_key=api_key)
-        return _fallback_client
-    raise ValueError("No Gemini API key available")
+    raise ValueError("No Gemini API keys available (set GEMINI_API_KEYS)")

@@ -368,11 +368,15 @@ class FileSearchManager:
 
 def main():
     """主程式進入點。"""
-    api_key = os.getenv("GEMINI_API_KEY")
+    keys_raw = os.getenv("GEMINI_API_KEYS", "")
+    tokens = [t.strip() for t in keys_raw.split(",") if t.strip()]
+    first_token = tokens[0] if tokens else ""
+    # 支援 "name:key" 格式，取出 key 部分
+    api_key = first_token.split(":", 1)[-1].strip()
 
     if not api_key:
-        log("錯誤：未設定 GEMINI_API_KEY")
-        log("請複製 .env.example 為 .env 並填入 API Key")
+        log("錯誤：未設定 GEMINI_API_KEYS")
+        log("請複製 .env.example 為 .env 並填入 GEMINI_API_KEYS")
         return
 
     manager = FileSearchManager(api_key)
