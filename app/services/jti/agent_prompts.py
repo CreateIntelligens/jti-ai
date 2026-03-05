@@ -89,6 +89,13 @@ def _compose_response_rules(
     sections: Dict[str, str],
     max_response_chars: int,
 ) -> str:
+    if max_response_chars > 0:
+        length_rule_en = f"- Length: keep each response within {max_response_chars} characters"
+        length_rule_zh = f"- 字數：每次回覆不超過{max_response_chars}字（必要時更短）"
+    else:
+        length_rule_en = "- Length: no strict character limit"
+        length_rule_zh = "- 字數：不限制（可依情境自然回覆）"
+
     if language == "en":
         return f"""## Your Role
 
@@ -101,7 +108,7 @@ def _compose_response_rules(
 ## Response Rules
 
 {sections.get('response_style', '')}
-- Length: keep each response within {max_response_chars} characters
+{length_rule_en}
 
 ## Knowledge Base Usage (Most Important)
 
@@ -118,7 +125,7 @@ def _compose_response_rules(
 ## 回應規則
 
 {sections.get('response_style', '')}
-- 字數：每次回覆不超過{max_response_chars}字（必要時更短）
+{length_rule_zh}
 
 ## 知識庫使用規則（最重要）
 

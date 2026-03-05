@@ -5,9 +5,9 @@ Gemini File Search FastAPI 後端
 import logging
 import os
 import re
+import time
 import uuid
 import warnings
-import time
 from datetime import datetime
 from typing import Optional
 
@@ -66,6 +66,7 @@ from pydantic import BaseModel
 from google.genai.errors import ClientError
 
 from .auth import verify_auth, _extract_bearer_token
+from .services.agent_utils import strip_citations
 from .routers.jti import chat as jti_chat, quiz as jti_quiz, prompts as jti_prompts, knowledge as jti_knowledge, quiz_bank as jti_quiz_bank
 from .routers.general import chat, stores, prompts, api_keys, knowledge_admin
 from .routers.hciot import chat as hciot_chat, prompts as hciot_prompts, knowledge as hciot_knowledge
@@ -221,9 +222,7 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
         response = deps.manager.query(store_name, last_message, system_instruction=system_prompt, model=model_name)
 
         # 如果有警告，附加到回覆開頭
-        answer_text = response.text
-        # 清除 Gemini File Search 的 citation 標記
-        answer_text = re.sub(r'\s*\[cite:\s*[^\]]*\]', '', answer_text).strip()
+        answer_text = strip_citations(response.text)
         if warning:
             answer_text = f"⚠️ {warning}\n\n{answer_text}"
 

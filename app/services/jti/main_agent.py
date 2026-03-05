@@ -7,9 +7,8 @@ Main Agent - 核心對話邏輯
 - Intent=YES → 帶知識庫結果給主 agent 回應
 """
 
-import asyncio
-import os
 import logging
+import os
 import time
 from typing import Dict
 
@@ -33,7 +32,6 @@ from app.services.jti.agent_prompts import (
 )
 from app.services.jti.runtime_settings import (
     load_runtime_settings_from_prompt_manager,
-    SYSTEM_DEFAULT_PROMPT_ID,
 )
 
 # 使用工廠函數取得適當的實作（MongoDB 或記憶體）
@@ -57,6 +55,10 @@ class MainAgent(BaseAgent):
     def _session_manager(self):
         return session_manager
 
+    @property
+    def _persona_map_attr(self) -> str:
+        return "jti_persona_by_prompt"
+
     # 重用 ToolExecutor 的 _format_options（避免重複定義）
     _format_options_text = staticmethod(ToolExecutor._format_options)
 
@@ -64,64 +66,21 @@ class MainAgent(BaseAgent):
     def _get_store_name_for_language(language: str) -> str:
         return "__jti__en" if normalize_language(language) == "en" else "__jti__"
 
-    @staticmethod
-    def _get_active_prompt_context(language: str = "zh"):
-        """取得目前啟用的人物設定資訊（prompt_manager / store_name / prompt_id / persona）。"""
-        prompt_manager = None
-        store_name = MainAgent._get_store_name_for_language(language)
-        prompt_id = SYSTEM_DEFAULT_PROMPT_ID
-        persona = None
-        normalized_language = normalize_language(language)
-        try:
-            from app import deps
-            prompt_manager = getattr(deps, "prompt_manager", None)
-            if prompt_manager:
-                active = prompt_manager.get_active_prompt(store_name)
-                if active:
-                    prompt_id = active.id
-                    persona = active.content
-                    store_prompts = prompt_manager._load_store_prompts(store_name)
-                    persona_map = getattr(store_prompts, "jti_persona_by_prompt", None)
-                    if isinstance(persona_map, dict):
-                        persona_pair = persona_map.get(active.id)
-                        if isinstance(persona_pair, dict):
-                            persona_by_lang = persona_pair.get(normalized_language)
-                            if isinstance(persona_by_lang, str) and persona_by_lang.strip():
-                                persona = persona_by_lang
-        except Exception:
-            prompt_manager = None
-        return prompt_manager, store_name, prompt_id, persona
+    def _get_default_persona(self, language: str) -> str:
+        return PERSONA.get(language, PERSONA["zh"])
 
-    def _get_system_instruction(self, session: Session) -> str:
-        """取得靜態 System Instruction（persona from DB + system rules from code）"""
-        try:
-            prompt_manager, store_name, runtime_prompt_id, persona = self._get_active_prompt_context(session.language)
-            runtime_settings = load_runtime_settings_from_prompt_manager(
-                prompt_manager,
-                runtime_prompt_id,
-                store_name=store_name,
-            )
-        except Exception:
-            runtime_settings = load_runtime_settings_from_prompt_manager(None)
-            persona = None
-
-        if not persona:
-            persona = PERSONA.get(session.language, PERSONA["zh"])
-
-        response_rule_sections = runtime_settings.response_rule_sections.get(
-            session.language, runtime_settings.response_rule_sections.get("zh")
-        )
-        sections_payload = (
-            response_rule_sections.model_dump()
-            if hasattr(response_rule_sections, "model_dump")
-            else response_rule_sections
-        )
+    def _build_system_instruction(self, persona, language, response_rule_sections, max_response_chars):
         return build_system_instruction(
-            persona=persona,
-            language=session.language,
-            response_rule_sections=sections_payload,
-            max_response_chars=runtime_settings.max_response_chars,
+            persona=persona, language=language,
+            response_rule_sections=response_rule_sections,
+            max_response_chars=max_response_chars,
         )
+
+    def _load_runtime_settings(self, prompt_manager, prompt_id, store_name):
+        return load_runtime_settings_from_prompt_manager(prompt_manager, prompt_id, store_name=store_name)
+
+    def _load_default_runtime_settings(self):
+        return load_runtime_settings_from_prompt_manager(None)
 
     def _get_session_state(self, session: Session) -> str:
         """取得動態 Session 狀態（會變化的資訊）"""
@@ -221,28 +180,8 @@ class MainAgent(BaseAgent):
                 }
 
             # 1. 併發執行 Intent Check 和 File Search
-            loop = asyncio.get_running_loop()
             t0 = time.time()
-
-            intent_task = asyncio.ensure_future(
-                loop.run_in_executor(None, self._check_intent_fast, user_message))
-            search_task = asyncio.ensure_future(
-                loop.run_in_executor(None, self._file_search, user_message, session.language))
-
-            # 等第一個完成；若 intent 先回 NO 就不等 File Search
-            done, _ = await asyncio.wait(
-                [intent_task, search_task],
-                return_when=asyncio.FIRST_COMPLETED,
-            )
-
-            if intent_task in done and intent_task.result() == "NO":
-                kb_result = None
-                logger.info(f"[計時] Intent=NO 快速攔截: {(time.time()-t0)*1000:.0f}ms")
-            else:
-                await asyncio.gather(intent_task, search_task)
-                intent = intent_task.result()
-                kb_result = search_task.result() if intent == "YES" else None
-                logger.info(f"[計時] Intent={intent}, File Search: {(time.time()-t0)*1000:.0f}ms")
+            kb_result = await self._concurrent_intent_and_search(user_message, session.language)
 
             # 2. 組合訊息送給主 agent
             # 每輪都注入動態 session 狀態，避免模型遺忘目前是否仍在測驗或已完成測驗。
@@ -270,13 +209,10 @@ class MainAgent(BaseAgent):
             logger.info(f"[計時] 主 Agent: {(t3-t2)*1000:.0f}ms | 總計: {(t3-t0)*1000:.0f}ms")
 
             # 3. 清理 chat session 歷史：把 enriched_message 替換回乾淨的 user_message
-            #    避免 KB 結果和內部 session 狀態累積在歷史中，淹沒後續短追問。
             if enriched_message != user_message:
                 self._clean_enriched_history(chat_session, user_message)
 
-            tool_calls_log = []
-
-            # 3. 取得回應
+            # 4. 取得回應
             final_message = extract_response_text(response)
             if not final_message:
                 final_message = "AI目前故障 請聯絡"
@@ -284,14 +220,14 @@ class MainAgent(BaseAgent):
 
             final_message = strip_citations(final_message)
 
-            # 4. 同步 DB（背景）
+            # 5. 同步 DB（背景）
             self._sync_history_to_db_background(session_id, user_message, final_message)
             updated_session = session_manager.get_session(session_id)
 
             return {
                 "message": final_message,
                 "session": updated_session.model_dump() if updated_session else None,
-                "tool_calls": tool_calls_log
+                "tool_calls": []
             }
 
         except Exception as e:
@@ -396,7 +332,6 @@ class MainAgent(BaseAgent):
                 "error": str(e),
                 "message": "收到！"
             }
-
 
 
 # 全域實例

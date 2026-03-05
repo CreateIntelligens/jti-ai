@@ -18,6 +18,18 @@ session_manager = get_session_manager()
 conversation_logger = get_conversation_logger()
 
 
+def build_session_state(session) -> dict:
+    """Build a session_state dict for conversation logging."""
+    return {
+        "step": session.step.value,
+        "answers_count": len(session.answers),
+        "color_result_id": session.color_result_id,
+        "current_question_id": session.current_question.get("id") if session.current_question else None,
+        "language": session.language,
+        "selected_questions": session.selected_questions,
+    }
+
+
 def _get_or_rebuild_session(session_id: str):
     """取得 session，若已過期則嘗試從 conversation logs 重建"""
     session = session_manager.get_session(session_id)
@@ -69,18 +81,13 @@ async def _pause_quiz_and_respond(
     if turn_number_hint:
         conversation_logger.delete_turns_from(session_id, turn_number_hint)
 
+    effective_session = updated_session or session
     log_result = conversation_logger.log_conversation(
         session_id=session_id,
         user_message=log_user_message,
         agent_response=response_message,
         tool_calls=[],
-        session_state={
-            "step": updated_session.step.value if updated_session else session.step.value,
-            "answers_count": len(updated_session.answers) if updated_session else len(session.answers),
-            "color_result_id": updated_session.color_result_id if updated_session else session.color_result_id,
-            "current_question_id": None,
-            "language": updated_session.language if updated_session else session.language,
-        },
+        session_state=build_session_state(effective_session),
         mode="jti",
     )
 
@@ -88,7 +95,7 @@ async def _pause_quiz_and_respond(
 
     return {
         "message": response_message,
-        "session": updated_session.model_dump() if updated_session else session.model_dump(),
+        "session": effective_session.model_dump(),
         "tool_calls": [],
         "turn_number": final_turn_number,
     }
