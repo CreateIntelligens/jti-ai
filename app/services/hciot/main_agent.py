@@ -4,8 +4,10 @@ HCIoT main agent - patient education chat flow.
 
 import logging
 import os
+import re
 import time
 from typing import Dict
+from urllib.parse import urlparse
 
 from google.genai import types
 
@@ -28,14 +30,17 @@ from app.services.hciot.runtime_settings import (
     HCIOT_STORE_NAME,
     load_runtime_settings_from_prompt_manager,
 )
+from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.session.session_manager_factory import get_hciot_session_manager
 
 session_manager = get_hciot_session_manager()
 logger = logging.getLogger(__name__)
-FILE_SEARCH_MODEL = "gemini-3.1-flash-lite-preview"
+FILE_SEARCH_MODEL = "gemini-2.5-flash"
 
 
 class HciotMainAgent(BaseAgent):
+    IMAGE_TOKEN_PATTERN = re.compile(r"IMG_[A-Za-z0-9_]+", re.IGNORECASE)
+
     def __init__(self):
         super().__init__(model_name=FILE_SEARCH_MODEL)
 
@@ -81,6 +86,21 @@ class HciotMainAgent(BaseAgent):
             return store_id
         return f"fileSearchStores/{store_id}"
 
+    @classmethod
+    def _extract_top_citation_image_id(
+        cls,
+        citations: list[dict] | None,
+    ) -> str | None:
+        """Return IMG_ token from the top citation's filename, or None."""
+        if not isinstance(citations, list) or not citations:
+            return None
+        first = citations[0]
+        if not isinstance(first, dict):
+            return None
+        title = first.get("title") or ""
+        match = cls.IMAGE_TOKEN_PATTERN.search(title)
+        return match.group(0) if match else None
+
     def _file_search(self, query: str, language: str) -> tuple[str | None, list[dict] | None]:
         store_name = self._get_file_search_store_name(language)
         if not store_name:
@@ -103,13 +123,80 @@ class HciotMainAgent(BaseAgent):
                     ),
                 )
                 result = response.text.strip() if response.text else None
-                return result, self._extract_citations(response)
+                return result, self._extract_citations_with_context(response)
             except Exception as e:
                 if "503" in str(e) and attempt < 2:
                     time.sleep(1)
                     continue
                 logger.error(f"[HCIoT File Search] 失敗: {e}")
                 return None, None
+
+    @staticmethod
+    def _extract_citations_with_context(response) -> list[dict] | None:
+        """Extract citation list for HCIoT and keep chunk text for image-id matching."""
+        try:
+            chunks = response.candidates[0].grounding_metadata.grounding_chunks
+        except (AttributeError, IndexError, TypeError):
+            return None
+        if not chunks:
+            return None
+
+        citations: list[dict] = []
+        seen: set[str] = set()
+        for chunk in chunks:
+            ctx = getattr(chunk, "retrieved_context", None)
+            if not ctx:
+                continue
+            uri = getattr(ctx, "uri", None) or ""
+            title = getattr(ctx, "title", None) or uri or "參考資料"
+            key = uri or title
+            if key in seen:
+                continue
+            citation = {"uri": uri, "title": title}
+            text = getattr(ctx, "text", None)
+            if isinstance(text, str) and text.strip():
+                citation["text"] = text
+            citations.append(citation)
+            seen.add(key)
+        return citations or None
+
+    @staticmethod
+    def _citation_filename(value: str | None) -> str:
+        if not isinstance(value, str) or not value.strip():
+            return ""
+        parsed = urlparse(value)
+        candidate = parsed.path or value
+        return os.path.basename(candidate).strip()
+
+    @classmethod
+    def _localize_citations(cls, language: str, citations: list[dict] | None) -> list[dict] | None:
+        if not citations:
+            return citations
+
+        file_map = {
+            item["name"].lower(): item.get("display_name") or item["name"]
+            for item in get_hciot_knowledge_store().list_files(language)
+            if item.get("name")
+        }
+
+        localized: list[dict] = []
+        for citation in citations:
+            if not isinstance(citation, dict):
+                continue
+
+            localized_citation = dict(citation)
+            filename_candidates = [
+                cls._citation_filename(localized_citation.get("title")),
+                cls._citation_filename(localized_citation.get("uri")),
+            ]
+            for filename in filename_candidates:
+                display_name = file_map.get(filename.lower())
+                if display_name:
+                    localized_citation["title"] = display_name
+                    break
+            localized.append(localized_citation)
+
+        return localized or None
 
     def _check_intent_fast(self, query: str, language: str = "zh") -> str:
         try:
@@ -134,6 +221,8 @@ class HciotMainAgent(BaseAgent):
                 return {"error": "Session not found", "message": "找不到對話記錄，請重新開始。"}
 
             kb_result, citations = await self._concurrent_intent_and_search(user_message, session.language)
+            citations = self._localize_citations(session.language, citations)
+            image_id = self._extract_top_citation_image_id(citations)
 
             enriched_message = (
                 f"<知識庫查詢結果>\n{kb_result}\n</知識庫查詢結果>\n\n使用者問題：{user_message}"
@@ -151,6 +240,8 @@ class HciotMainAgent(BaseAgent):
                 final_message = "目前無法回應，請稍後再試。"
 
             final_message = strip_citations(final_message)
+            if not final_message:
+                final_message = "目前無法回應，請稍後再試。"
             self._sync_history_to_db_background(session_id, user_message, final_message, citations)
             updated_session = session_manager.get_session(session_id)
 
@@ -159,6 +250,7 @@ class HciotMainAgent(BaseAgent):
                 "session": updated_session.model_dump() if updated_session else None,
                 "tool_calls": [],
                 "citations": citations,
+                "image_id": image_id,
             }
         except Exception as e:
             logger.error(f"HCIoT chat failed: {e}", exc_info=True)

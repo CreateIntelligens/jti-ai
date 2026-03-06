@@ -91,6 +91,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             },
             mode="hciot",
             citations=result.get("citations"),
+            image_id=result.get("image_id"),
         )
         final_turn_number = log_result[1] if log_result else None
         return ChatResponse(**result, turn_number=final_turn_number)

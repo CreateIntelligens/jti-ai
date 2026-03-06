@@ -55,6 +55,7 @@ class MongoConversationLogger:
         mode: str = "jti",
         responded_at: Optional[datetime] = None,
         citations: Optional[List[Dict]] = None,
+        image_id: Optional[str] = None,
     ) -> Optional[str]:
         """記錄一次對話
 
@@ -92,6 +93,8 @@ class MongoConversationLogger:
                 "error": error,
                 "citations": citations or [],
             }
+            if isinstance(image_id, str) and image_id.strip():
+                log_entry["image_id"] = image_id.strip()
 
             result = self.conversations_collection.insert_one(log_entry)
 

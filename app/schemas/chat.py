@@ -31,6 +31,7 @@ class ChatResponse(BaseModel):
     message: str
     tts_text: Optional[str] = None
     tts_message_id: Optional[str] = None
+    image_id: Optional[str] = None
     session: Optional[Dict[str, Any]] = None
     tool_calls: Optional[list] = None
     citations: Optional[List[Dict[str, Any]]] = None
