@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import type { Message } from '../types';
 import CitationsList from './CitationsList';
 
@@ -101,71 +101,75 @@ export default function ChatArea({
           messages.map((msg, idx) => (
             <div
               key={idx}
-              className={`message ${msg.role} ${msg.error ? 'error' : ''}`}
-              role="article"
-              aria-label={msg.role === 'user' ? '使用者訊息' : 'AI 回覆'}
+              className={`message-wrapper ${msg.role}`}
             >
-              {msg.loading ? (
-                <span className="loading-dots" aria-label="AI 思考中">思考中</span>
-              ) : editingTurn !== null && msg.role === 'user' && msg.turnNumber === editingTurn ? (
-                /* 編輯模式 */
-                <div className="message-edit-area">
-                  <textarea
-                    ref={editTextareaRef}
-                    className="message-edit-textarea"
-                    value={editText}
-                    onChange={e => setEditText(e.target.value)}
-                    onKeyDown={e => handleEditKeyDown(e, editingTurn)}
-                    rows={Math.min(editText.split('\n').length + 1, 8)}
-                  />
-                  <div className="message-edit-actions">
-                    <button
-                      className="message-edit-btn save"
-                      onClick={() => handleEditSubmit(editingTurn)}
-                      disabled={!editText.trim()}
-                    >
-                      送出
-                    </button>
-                    <button
-                      className="message-edit-btn cancel"
-                      onClick={() => setEditingTurn(null)}
-                    >
-                      取消
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {msg.text}
-                  {msg.citations && msg.citations.length > 0 && (
-                    <CitationsList citations={msg.citations} messageIndex={idx} />
-                  )}
-                  {/* 操作按鈕 - hover 時顯示 */}
-                  {!loading && msg.turnNumber && !msg.error && (
-                    <div className="message-actions">
-                      {msg.role === 'user' && onEditAndResend && (
-                        <button
-                          className="message-action-btn"
-                          onClick={() => startEditing(msg)}
-                          title="編輯並重送"
-                          aria-label="編輯訊息"
-                        >
-                          &#9998;
-                        </button>
-                      )}
-                      {msg.role === 'model' && onRegenerate && (
-                        <button
-                          className="message-action-btn"
-                          onClick={() => onRegenerate(msg.turnNumber!)}
-                          title="重新生成"
-                          aria-label="重新生成回覆"
-                        >
-                          &#8635;
-                        </button>
-                      )}
+              <div
+                className={`message ${msg.role} ${msg.error ? 'error' : ''}`}
+                role="article"
+                aria-label={msg.role === 'user' ? '使用者訊息' : 'AI 回覆'}
+              >
+                {msg.loading ? (
+                  <span className="loading-dots" aria-label="AI 思考中">思考中</span>
+                ) : editingTurn !== null && msg.role === 'user' && msg.turnNumber === editingTurn ? (
+                  /* 編輯模式 */
+                  <div className="message-edit-area">
+                    <textarea
+                      ref={editTextareaRef}
+                      className="message-edit-textarea"
+                      value={editText}
+                      onChange={e => setEditText(e.target.value)}
+                      onKeyDown={e => handleEditKeyDown(e, editingTurn)}
+                      rows={Math.min(editText.split('\n').length + 1, 8)}
+                    />
+                    <div className="message-edit-actions">
+                      <button
+                        className="message-edit-btn save"
+                        onClick={() => handleEditSubmit(editingTurn)}
+                        disabled={!editText.trim()}
+                      >
+                        送出
+                      </button>
+                      <button
+                        className="message-edit-btn cancel"
+                        onClick={() => setEditingTurn(null)}
+                      >
+                        取消
+                      </button>
                     </div>
-                  )}
-                </>
+                  </div>
+                ) : (
+                  <>
+                    {msg.text}
+                    {/* 操作按鈕 - hover 時顯示 */}
+                    {!loading && msg.turnNumber && !msg.error && (
+                      <div className="message-actions">
+                        {msg.role === 'user' && onEditAndResend && (
+                          <button
+                            className="message-action-btn"
+                            onClick={() => startEditing(msg)}
+                            title="編輯並重送"
+                            aria-label="編輯訊息"
+                          >
+                            &#9998;
+                          </button>
+                        )}
+                        {msg.role === 'model' && onRegenerate && (
+                          <button
+                            className="message-action-btn"
+                            onClick={() => onRegenerate(msg.turnNumber!)}
+                            title="重新生成"
+                            aria-label="重新生成回覆"
+                          >
+                            &#8635;
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+              {msg.citations && msg.citations.length > 0 && (
+                <CitationsList citations={msg.citations} messageIndex={idx} />
               )}
             </div>
           ))

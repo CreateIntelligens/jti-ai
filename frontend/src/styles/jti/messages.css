@@ -67,6 +67,23 @@
   border-color: rgba(148, 163, 184, 0.3);
 }
 
+.message-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+  align-items: flex-start;
+}
+
+.message.user .message-content {
+  align-items: flex-end;
+}
+
+.message.system .message-content {
+  align-items: center;
+}
+
 .message-bubble {
   flex: 1;
   background: var(--bg-light);
@@ -214,6 +231,7 @@
   0% {
     transform: rotate(0deg);
   }
+
   100% {
     transform: rotate(360deg);
   }
@@ -692,6 +710,7 @@
 .messages-area::-webkit-scrollbar-thumb:hover {
   background: rgba(224, 192, 104, 0.35);
 }
+
 
 /* ─── Responsive ─── */
 

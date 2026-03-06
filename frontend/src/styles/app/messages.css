@@ -1,5 +1,20 @@
 /* ==================== MESSAGES ==================== */
 
+.app-container .message-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.app-container .message-wrapper.user {
+  align-items: flex-end;
+}
+
+.app-container .message-wrapper.model {
+  align-items: flex-start;
+}
+
 .app-container .message {
   max-width: 75%;
   padding: 1.25rem 1.75rem;
@@ -40,7 +55,6 @@
 }
 
 .app-container .message.user {
-  align-self: flex-end;
   background: var(--primary-color);
   border: 1px solid rgba(61, 217, 211, 0.3);
   color: #ffffff;
@@ -67,7 +81,6 @@
 }
 
 .app-container .message.model {
-  align-self: flex-start;
   background: var(--bg-surface);
   border: 1px solid rgba(255, 255, 255, 0.1);
   color: var(--text-primary);
@@ -103,7 +116,7 @@
   left: 8px;
 }
 
-.app-container .message:hover .message-actions {
+.app-container .message-wrapper:hover .message-actions {
   opacity: 1;
 }
 
