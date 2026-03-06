@@ -37,9 +37,7 @@ FILE_SEARCH_MODEL = "gemini-3.1-flash-lite-preview"
 
 class HciotMainAgent(BaseAgent):
     def __init__(self):
-        super().__init__(
-            model_name=os.getenv("GEMINI_MODEL_NAME", "gemini-3.1-flash-lite-preview"),
-        )
+        super().__init__(model_name=FILE_SEARCH_MODEL)
 
     @property
     def _session_manager(self):
@@ -83,11 +81,11 @@ class HciotMainAgent(BaseAgent):
             return store_id
         return f"fileSearchStores/{store_id}"
 
-    def _file_search(self, query: str, language: str) -> str | None:
+    def _file_search(self, query: str, language: str) -> tuple[str | None, list[dict] | None]:
         store_name = self._get_file_search_store_name(language)
         if not store_name:
             logger.warning("未設定 HCIoT 知識庫，跳過 File Search")
-            return None
+            return None, None
 
         client = get_client_for_store(store_name)
         for attempt in range(3):
@@ -104,13 +102,14 @@ class HciotMainAgent(BaseAgent):
                         thinking_config=types.ThinkingConfig(thinking_budget=0),
                     ),
                 )
-                return response.text.strip() if response.text else None
+                result = response.text.strip() if response.text else None
+                return result, self._extract_citations(response)
             except Exception as e:
                 if "503" in str(e) and attempt < 2:
                     time.sleep(1)
                     continue
                 logger.error(f"[HCIoT File Search] 失敗: {e}")
-                return None
+                return None, None
 
     def _check_intent_fast(self, query: str, language: str = "zh") -> str:
         try:
@@ -134,7 +133,7 @@ class HciotMainAgent(BaseAgent):
             if session is None:
                 return {"error": "Session not found", "message": "找不到對話記錄，請重新開始。"}
 
-            kb_result = await self._concurrent_intent_and_search(user_message, session.language)
+            kb_result, citations = await self._concurrent_intent_and_search(user_message, session.language)
 
             enriched_message = (
                 f"<知識庫查詢結果>\n{kb_result}\n</知識庫查詢結果>\n\n使用者問題：{user_message}"
@@ -152,13 +151,14 @@ class HciotMainAgent(BaseAgent):
                 final_message = "目前無法回應，請稍後再試。"
 
             final_message = strip_citations(final_message)
-            self._sync_history_to_db_background(session_id, user_message, final_message)
+            self._sync_history_to_db_background(session_id, user_message, final_message, citations)
             updated_session = session_manager.get_session(session_id)
 
             return {
                 "message": final_message,
                 "session": updated_session.model_dump() if updated_session else None,
                 "tool_calls": [],
+                "citations": citations,
             }
         except Exception as e:
             logger.error(f"HCIoT chat failed: {e}", exc_info=True)

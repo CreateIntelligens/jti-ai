@@ -33,6 +33,7 @@ class ChatResponse(BaseModel):
     tts_message_id: Optional[str] = None
     session: Optional[Dict[str, Any]] = None
     tool_calls: Optional[list] = None
+    citations: Optional[List[Dict[str, Any]]] = None
     turn_number: Optional[int] = None
     error: Optional[str] = None
 

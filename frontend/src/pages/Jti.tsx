@@ -20,6 +20,7 @@ interface Message {
   text: string;
   type: 'user' | 'assistant' | 'system';
   toolCalls?: Array<{ tool: string }>;
+  citations?: Array<{ title: string; uri: string }>;
   timestamp: number;
   turnNumber?: number;
   ttsText?: string;
@@ -99,7 +100,7 @@ export default function Jti() {
 
   const isStaleEpoch = useCallback((startEpoch: number) =>
     isUnmountedRef.current || ttsEpochRef.current !== startEpoch
-  , []);
+    , []);
 
   const warmupTtsAudio = useCallback((ttsMessageId?: string, force = false) => {
     const id = (ttsMessageId || '').trim();
@@ -361,7 +362,7 @@ export default function Jti() {
         setTimeout(() => inputRef.current?.focus(), 100);
       })
       .catch(() => setStatusText(t('status_failed')));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -444,6 +445,7 @@ export default function Jti() {
           text: data.message,
           type: 'assistant',
           toolCalls: data.tool_calls,
+          citations: data.citations,
           timestamp: Date.now(),
           turnNumber: data.turn_number, // 從後端取得 turn_number
           ttsText: data.tts_text,
@@ -682,6 +684,7 @@ export default function Jti() {
             type: m.role as 'user' | 'assistant',
             timestamp: Date.now(),
             turnNumber: m.turnNumber,
+            citations: m.citations,
             ttsText: undefined,
             ttsMessageId: undefined,
           })));

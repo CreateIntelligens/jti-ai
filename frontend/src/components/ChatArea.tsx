@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Message } from '../types';
+import CitationsList from './CitationsList';
 
 interface ChatAreaProps {
   messages: Message[];
@@ -136,6 +137,9 @@ export default function ChatArea({
               ) : (
                 <>
                   {msg.text}
+                  {msg.citations && msg.citations.length > 0 && (
+                    <CitationsList citations={msg.citations} messageIndex={idx} />
+                  )}
                   {/* 操作按鈕 - hover 時顯示 */}
                   {!loading && msg.turnNumber && !msg.error && (
                     <div className="message-actions">

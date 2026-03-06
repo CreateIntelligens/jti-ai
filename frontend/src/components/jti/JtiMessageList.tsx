@@ -1,6 +1,8 @@
 import React from 'react';
 import type { TFunction } from 'i18next';
 
+import CitationsList from '../CitationsList';
+
 function getTtsButtonTitle(ttsState: 'pending' | 'ready' | 'error' | undefined): string {
   if (ttsState === 'pending') return '語音準備中';
   if (ttsState === 'error') return '語音產生失敗，點擊重試';
@@ -11,6 +13,7 @@ export interface Message {
   text: string;
   type: 'user' | 'assistant' | 'system';
   toolCalls?: Array<{ tool: string }>;
+  citations?: Array<{ title: string; uri: string }>;
   timestamp: number;
   turnNumber?: number;
   ttsText?: string;
@@ -120,64 +123,67 @@ export default function JtiMessageList({
                     </span>
                   </div>
                   <div className="message-bubble">
-                  {editingTurn !== null && editingTurn === msg.turnNumber && msg.type === 'user' ? (
-                    <div className="message-edit-area">
-                      <textarea
-                        ref={editTextareaRef}
-                        className="message-edit-textarea"
-                        value={editText}
-                        onChange={e => setEditText(e.target.value)}
-                        onKeyDown={e => handleEditKeyDown(e, msg.turnNumber!)}
-                        rows={Math.min(editText.split('\n').length + 1, 5)}
-                      />
-                      <div className="message-edit-actions">
-                        <button
-                          className="message-edit-btn save"
-                          onClick={() => msg.turnNumber && handleEditAndResend(msg.turnNumber, editText.trim())}
-                          disabled={!editText.trim()}
-                        >
-                          送出
-                        </button>
-                        <button
-                          className="message-edit-btn cancel"
-                          onClick={() => setEditingTurn(null)}
-                        >
-                          取消
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="message-text">{msg.text}</div>
-                      {msg.toolCalls && msg.toolCalls.length > 0 && (
-                        <div className="tool-badge">
-                          <span className="tool-icon">⚡</span>
-                          <span className="tool-text">
-                            {msg.toolCalls.map(t => t.tool).join(' → ')}
-                          </span>
+                    {editingTurn !== null && editingTurn === msg.turnNumber && msg.type === 'user' ? (
+                      <div className="message-edit-area">
+                        <textarea
+                          ref={editTextareaRef}
+                          className="message-edit-textarea"
+                          value={editText}
+                          onChange={e => setEditText(e.target.value)}
+                          onKeyDown={e => handleEditKeyDown(e, msg.turnNumber!)}
+                          rows={Math.min(editText.split('\n').length + 1, 5)}
+                        />
+                        <div className="message-edit-actions">
+                          <button
+                            className="message-edit-btn save"
+                            onClick={() => msg.turnNumber && handleEditAndResend(msg.turnNumber, editText.trim())}
+                            disabled={!editText.trim()}
+                          >
+                            送出
+                          </button>
+                          <button
+                            className="message-edit-btn cancel"
+                            onClick={() => setEditingTurn(null)}
+                          >
+                            取消
+                          </button>
                         </div>
-                      )}
+                      </div>
+                    ) : (
+                      <>
+                        <div className="message-text">{msg.text}</div>
+                        {msg.toolCalls && msg.toolCalls.length > 0 && (
+                          <div className="tool-badge">
+                            <span className="tool-icon">⚡</span>
+                            <span className="tool-text">
+                              {msg.toolCalls.map(t => t.tool).join(' → ')}
+                            </span>
+                          </div>
+                        )}
 
-                      {/* 操作按鈕 - hover 時顯示 */}
-                      {!loading && msg.turnNumber && (
-                        <div className="message-actions">
-                          {msg.type === 'user' && (
-                            <button
-                              className="message-action-btn"
-                              onClick={() => {
-                                if (msg.turnNumber && !loading) {
-                                  setEditingTurn(msg.turnNumber);
-                                  setEditText(msg.text);
-                                }
-                              }}
-                              title="編輯並重送"
-                              aria-label="編輯訊息"
-                            >
-                              ✎
-                            </button>
-                          )}
-                          {msg.type === 'assistant' && (
-                            <>
+                        {msg.citations && msg.citations.length > 0 && (
+                          <CitationsList citations={msg.citations} messageIndex={idx} />
+                        )}
+
+                        {/* 操作按鈕 - hover 時顯示 */}
+                        {!loading && msg.turnNumber && (
+                          <div className="message-actions">
+                            {msg.type === 'user' && (
+                              <button
+                                className="message-action-btn"
+                                onClick={() => {
+                                  if (msg.turnNumber && !loading) {
+                                    setEditingTurn(msg.turnNumber);
+                                    setEditText(msg.text);
+                                  }
+                                }}
+                                title="編輯並重送"
+                                aria-label="編輯訊息"
+                              >
+                                ✎
+                              </button>
+                            )}
+                            {msg.type === 'assistant' && (
                               <button
                                 className="message-action-btn"
                                 onClick={() => msg.turnNumber && handleRegenerate(msg.turnNumber)}
@@ -186,13 +192,12 @@ export default function JtiMessageList({
                               >
                                 ↻
                               </button>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                   {msg.type === 'assistant' && (msg.ttsMessageId || msg.ttsText || msg.text) && (
                     <button
                       className={audioBtnClass}
@@ -203,7 +208,7 @@ export default function JtiMessageList({
                       <span className="audio-icon">🔊</span>
                     </button>
                   )}
-              </div>
+                </div>
               </div>
             );
           })}

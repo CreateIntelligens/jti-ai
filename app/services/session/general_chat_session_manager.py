@@ -70,13 +70,16 @@ class GeneralChatSessionManager:
             logger.error(f"Failed to get general chat session: {e}")
             return None
 
-    def add_message(self, session_id: str, role: str, content: str) -> bool:
+    def add_message(self, session_id: str, role: str, content: str, citations: Optional[List[Dict]] = None) -> bool:
         """新增訊息到對話歷史"""
         try:
+            entry: Dict[str, Any] = {"role": role, "content": content}
+            if citations:
+                entry["citations"] = citations
             result = self.collection.update_one(
                 {"session_id": session_id},
                 {
-                    "$push": {"chat_history": {"role": role, "content": content}},
+                    "$push": {"chat_history": entry},
                     "$set": {"updated_at": datetime.now()},
                 },
             )

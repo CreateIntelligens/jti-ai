@@ -81,7 +81,11 @@ export async function hciotSendMessage(text: string, sessionId: string, turnNumb
     body: JSON.stringify(payload),
   });
   const data = await handleResponse<Record<string, unknown>>(response);
-  return { answer: (data.message ?? data.answer ?? '') as string, turn_number: data.turn_number as number | undefined };
+  return {
+    answer: (data.message ?? data.answer ?? '') as string,
+    turn_number: data.turn_number as number | undefined,
+    citations: data.citations as Array<{ title: string; uri: string }> | undefined,
+  };
 }
 
 export async function listHciotPrompts(language: string = 'zh'): Promise<HciotPromptListResponse> {

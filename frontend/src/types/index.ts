@@ -41,12 +41,14 @@ export interface Message {
   loading?: boolean;
   error?: boolean;
   turnNumber?: number;
+  citations?: Array<{ title: string; uri: string }>;
 }
 
 export interface ChatResponse {
   answer: string;
   prompt_applied?: boolean;
   turn_number?: number;
+  citations?: Array<{ title: string; uri: string }>;
 }
 
 export interface StartChatResponse {

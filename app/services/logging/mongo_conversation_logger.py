@@ -53,7 +53,8 @@ class MongoConversationLogger:
         session_state: Optional[Dict] = None,
         error: Optional[str] = None,
         mode: str = "jti",
-        responded_at: Optional[datetime] = None
+        responded_at: Optional[datetime] = None,
+        citations: Optional[List[Dict]] = None,
     ) -> Optional[str]:
         """記錄一次對話
 
@@ -88,7 +89,8 @@ class MongoConversationLogger:
                 "agent_response": agent_response,
                 "tool_calls": tool_calls or [],
                 "session_snapshot": session_state or {},
-                "error": error
+                "error": error,
+                "citations": citations or [],
             }
 
             result = self.conversations_collection.insert_one(log_entry)

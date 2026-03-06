@@ -110,13 +110,13 @@ class MainAgent(BaseAgent):
             color_result=session.color_result_id or not_yet,
         )
 
-    def _file_search(self, query: str, language: str) -> str | None:
+    def _file_search(self, query: str, language: str) -> tuple[str | None, list[dict] | None]:
         """用 flash 跑 File Search 查知識庫"""
         store_env_key = f"JTI_STORE_ID_{language.upper()}"
         store_id = os.getenv(store_env_key) or os.getenv("JTI_STORE_ID_ZH")
         if not store_id:
             logger.warning("未設定知識庫，跳過 File Search")
-            return None
+            return None, None
 
         store_name = f"fileSearchStores/{store_id}"
         logger.info(f"[File Search] 查詢: {query[:100]}...")
@@ -139,15 +139,16 @@ class MainAgent(BaseAgent):
                     ),
                 )
                 result = response.text.strip() if response.text else None
-                logger.info(f"[File Search] 結果: {len(result) if result else 0} 字")
-                return result
+                citations = self._extract_citations(response)
+                logger.info(f"[File Search] 結果: {len(result) if result else 0} 字, 來源: {len(citations) if citations else 0} 筆")
+                return result, citations
             except Exception as e:
                 if "503" in str(e) and attempt < 2:
                     logger.warning(f"[File Search] 503，{attempt+1}/3 次重試...")
                     time.sleep(1)
                     continue
                 logger.error(f"[File Search] 失敗: {e}")
-                return None
+                return None, None
 
     def _check_intent_fast(self, query: str, language: str = "zh") -> str:
         """快速判斷是否為不相關話題 (File Search 前置過濾)"""
@@ -200,7 +201,7 @@ class MainAgent(BaseAgent):
 
             # 1. 併發執行 Intent Check 和 File Search
             t0 = time.time()
-            kb_result = await self._concurrent_intent_and_search(user_message, session.language)
+            kb_result, citations = await self._concurrent_intent_and_search(user_message, session.language)
 
             # 2. 組合訊息送給主 agent
             # 每輪都注入動態 session 狀態，避免模型遺忘目前是否仍在測驗或已完成測驗。
@@ -238,14 +239,15 @@ class MainAgent(BaseAgent):
             final_message = strip_citations(final_message)
 
             # 5. 同步 DB（背景）
-            self._sync_history_to_db_background(session_id, user_message, final_message)
+            self._sync_history_to_db_background(session_id, user_message, final_message, citations)
             updated_session = session_manager.get_session(session_id)
 
             return {
                 "message": final_message,
                 "tts_text": to_tts_text(final_message, session.language),
                 "session": updated_session.model_dump() if updated_session else None,
-                "tool_calls": []
+                "tool_calls": [],
+                "citations": citations
             }
 
         except Exception as e:

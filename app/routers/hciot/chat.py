@@ -90,6 +90,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 "language": updated_session.language if updated_session else "zh",
             },
             mode="hciot",
+            citations=result.get("citations"),
         )
         final_turn_number = log_result[1] if log_result else None
         return ChatResponse(**result, turn_number=final_turn_number)

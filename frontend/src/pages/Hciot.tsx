@@ -144,6 +144,7 @@ export default function Hciot() {
         type: 'assistant',
         timestamp: Date.now(),
         turnNumber: data.turn_number,
+        citations: data.citations,
       };
 
       setMessages((prev) => {
@@ -343,6 +344,7 @@ export default function Hciot() {
               type: message.role === 'assistant' ? 'assistant' : 'user',
               timestamp: Date.now() + index,
               turnNumber: message.turnNumber,
+              citations: message.citations,
             })),
           );
           setSessionInfo(`#${sid.substring(0, 8)}`);

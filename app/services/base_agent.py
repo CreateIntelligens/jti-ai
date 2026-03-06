@@ -155,24 +155,27 @@ class BaseAgent:
         self._chat_sessions[sid] = chat_session
         return chat_session
 
-    def _sync_history_to_db(self, session_id: str, user_message: str, assistant_message: str):
+    def _sync_history_to_db(self, session_id: str, user_message: str, assistant_message: str, citations: list | None = None):
         """將 user/model 訊息同步到 MongoDB"""
         session = self._session_manager.get_session(session_id)
         if not session:
             return
         session.chat_history.append({"role": "user", "content": user_message})
-        session.chat_history.append({"role": "assistant", "content": assistant_message})
+        entry = {"role": "assistant", "content": assistant_message}
+        if citations:
+            entry["citations"] = citations
+        session.chat_history.append(entry)
         self._session_manager.update_session(session)
 
-    def _sync_history_to_db_background(self, session_id: str, user_message: str, assistant_message: str):
+    def _sync_history_to_db_background(self, session_id: str, user_message: str, assistant_message: str, citations: list | None = None):
         """背景非同步寫入 DB，不阻塞回應"""
         try:
             loop = asyncio.get_running_loop()
             loop.run_in_executor(
-                None, self._sync_history_to_db, session_id, user_message, assistant_message,
+                None, self._sync_history_to_db, session_id, user_message, assistant_message, citations,
             )
         except Exception:
-            self._sync_history_to_db(session_id, user_message, assistant_message)
+            self._sync_history_to_db(session_id, user_message, assistant_message, citations)
 
     def remove_session(self, session_id: str):
         """清除記憶體中的 chat session"""
@@ -196,17 +199,40 @@ class BaseAgent:
                 types.Content(role="model", parts=[types.Part.from_text(text=model_message)])
             )
 
+    @staticmethod
+    def _extract_citations(response) -> list[dict] | None:
+        """從 Gemini response 的 grounding_metadata 提取來源列表。"""
+        try:
+            chunks = response.candidates[0].grounding_metadata.grounding_chunks
+        except (AttributeError, IndexError, TypeError):
+            return None
+        if not chunks:
+            return None
+        citations = []
+        seen = set()
+        for c in chunks:
+            ctx = getattr(c, 'retrieved_context', None)
+            if not ctx:
+                continue
+            uri = getattr(ctx, 'uri', None) or ""
+            title = getattr(ctx, 'title', None) or uri or "參考資料"
+            key = uri or title
+            if key not in seen:
+                citations.append({"uri": uri, "title": title})
+                seen.add(key)
+        return citations or None
+
     # --- 子類可覆寫的 intent / file search 方法 ---
 
     def _check_intent_fast(self, query: str, language: str = "zh") -> str:
         """快速判斷是否為不相關話題，子類必須覆寫。"""
         raise NotImplementedError
 
-    def _file_search(self, query: str, language: str) -> Optional[str]:
+    def _file_search(self, query: str, language: str) -> tuple[str | None, list[dict] | None]:
         """用 File Search 查知識庫，子類必須覆寫。"""
         raise NotImplementedError
 
-    async def _concurrent_intent_and_search(self, user_message: str, language: str) -> Optional[str]:
+    async def _concurrent_intent_and_search(self, user_message: str, language: str) -> tuple[str | None, list[dict] | None]:
         """
         併發跑 Intent Check + File Search。
         Intent=NO 時快速攔截跳過知識庫；Intent=YES 時使用知識庫結果。
@@ -226,13 +252,13 @@ class BaseAgent:
 
         if intent_task in done and intent_task.result() == "NO":
             logger.info(f"[計時] Intent=NO 快速攔截: {(time.time()-t0)*1000:.0f}ms")
-            return None
+            return None, None
 
         await asyncio.gather(intent_task, search_task)
         intent = intent_task.result()
-        kb_result = search_task.result() if intent == "YES" else None
+        kb_text, citations = search_task.result() if intent == "YES" else (None, None)
         logger.info(f"[計時] Intent={intent}, File Search: {(time.time()-t0)*1000:.0f}ms")
-        return kb_result
+        return kb_text, citations
 
     @staticmethod
     def _clean_enriched_history(chat_session, original_user_message: str):

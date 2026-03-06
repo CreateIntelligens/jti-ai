@@ -351,7 +351,8 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             agent_response=result["message"],
             tool_calls=result.get("tool_calls", []),
             session_state=build_session_state(session),
-            mode="jti"
+            mode="jti",
+            citations=result.get("citations"),
         )
         final_turn_number = log_result[1] if log_result else None
 

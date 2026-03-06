@@ -1,5 +1,6 @@
 import React from 'react';
 
+import CitationsList from '../CitationsList';
 import HciotHero from './HciotHero';
 
 export interface HciotMessage {
@@ -7,6 +8,7 @@ export interface HciotMessage {
   type: 'user' | 'assistant' | 'system';
   timestamp: number;
   turnNumber?: number;
+  citations?: Array<{ title: string; uri: string }>;
 }
 
 interface HciotMessageListProps {
@@ -103,6 +105,9 @@ export default function HciotMessageList({
                 ) : (
                   <>
                     <div className="hciot-message-text">{msg.text}</div>
+                    {msg.citations && msg.citations.length > 0 && (
+                      <CitationsList citations={msg.citations} messageIndex={idx} />
+                    )}
                     {!loading && msg.turnNumber ? (
                       <div className="hciot-message-tools">
                         {msg.type === 'user' ? (

@@ -389,6 +389,7 @@ export function useAppChat() {
           role: 'model',
           text: data.answer,
           turnNumber: data.turn_number,
+          citations: data.citations,
         };
         return newMessages;
       });
@@ -425,6 +426,7 @@ export function useAppChat() {
           role: 'model',
           text: data.answer,
           turnNumber: data.turn_number,
+          citations: data.citations,
         };
         return newMessages;
       });
@@ -462,6 +464,7 @@ export function useAppChat() {
           role: 'model',
           text: data.answer,
           turnNumber: data.turn_number,
+          citations: data.citations,
         };
         return newMessages;
       });

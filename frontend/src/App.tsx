@@ -144,6 +144,7 @@ export default function App() {
             role: m.role === 'assistant' ? 'model' : m.role,
             text: m.text,
             turnNumber: m.turnNumber,
+            citations: m.citations,
           })));
           // General 模式目前不處理語言切換（沒有多語言支援）
         }}
