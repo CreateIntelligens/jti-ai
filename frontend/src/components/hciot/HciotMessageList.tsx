@@ -9,6 +9,7 @@ export interface HciotMessage {
   timestamp: number;
   turnNumber?: number;
   citations?: Array<{ title: string; uri: string }>;
+  imageId?: string;
 }
 
 interface HciotMessageListProps {
@@ -105,6 +106,9 @@ export default function HciotMessageList({
                 ) : (
                   <>
                     <div className="hciot-message-text">{msg.text}</div>
+                    {msg.imageId ? (
+                      <div className="hciot-image-source">Image ID: {msg.imageId}</div>
+                    ) : null}
                     {msg.citations && msg.citations.length > 0 && (
                       <CitationsList citations={msg.citations} messageIndex={idx} />
                     )}

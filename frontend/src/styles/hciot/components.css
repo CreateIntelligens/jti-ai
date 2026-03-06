@@ -222,6 +222,21 @@
   color: #fff;
 }
 
+.hciot-image-source {
+  margin-top: 0.5rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 0.5rem;
+  background: rgba(14, 116, 144, 0.08);
+  color: var(--hciot-ink-soft);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.hciot-message.user .hciot-image-source {
+  background: rgba(255, 255, 255, 0.24);
+  color: #fff;
+}
+
 .hciot-message-tools,
 .hciot-message-actions-row {
   display: flex;

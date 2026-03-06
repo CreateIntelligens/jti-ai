@@ -49,6 +49,7 @@ export interface ChatResponse {
   prompt_applied?: boolean;
   turn_number?: number;
   citations?: Array<{ title: string; uri: string }>;
+  image_id?: string;
 }
 
 export interface StartChatResponse {

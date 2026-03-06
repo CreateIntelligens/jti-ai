@@ -145,6 +145,7 @@ export default function Hciot() {
         timestamp: Date.now(),
         turnNumber: data.turn_number,
         citations: data.citations,
+        imageId: data.image_id,
       };
 
       setMessages((prev) => {
@@ -345,6 +346,7 @@ export default function Hciot() {
               timestamp: Date.now() + index,
               turnNumber: message.turnNumber,
               citations: message.citations,
+              imageId: message.imageId,
             })),
           );
           setSessionInfo(`#${sid.substring(0, 8)}`);

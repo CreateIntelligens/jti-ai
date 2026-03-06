@@ -28,6 +28,7 @@ interface ConversationEntry {
   user_message: string;
   agent_response: string;
   citations?: Array<{ title: string; uri: string }>;
+  image_id?: string;
   tool_calls: Array<{
     tool_name?: string;
     tool?: string;
@@ -66,7 +67,7 @@ interface ConversationHistoryModalProps {
   sessionId?: string;
   storeName?: string;
   mode?: 'jti' | 'hciot' | 'general';
-  onResumeSession?: (sessionId: string, messages: Array<{ role: 'user' | 'assistant'; text: string; turnNumber?: number; citations?: Array<{ title: string; uri: string }> }>, language?: string) => void;
+  onResumeSession?: (sessionId: string, messages: Array<{ role: 'user' | 'assistant'; text: string; turnNumber?: number; citations?: Array<{ title: string; uri: string }>; imageId?: string }>, language?: string) => void;
 }
 
 export default function ConversationHistoryModal({
@@ -437,7 +438,7 @@ export default function ConversationHistoryModal({
     const truncated = convs.filter((conv) => (conv.turn_number || 0) <= turnNumber);
     const messages = truncated.flatMap((conv) => [
       { role: 'user' as const, text: conv.user_message, turnNumber: conv.turn_number },
-      { role: 'assistant' as const, text: conv.agent_response, turnNumber: conv.turn_number, citations: conv.citations },
+      { role: 'assistant' as const, text: conv.agent_response, turnNumber: conv.turn_number, citations: conv.citations, imageId: conv.image_id },
     ]);
 
     onResumeSession(sid, messages);
@@ -727,7 +728,7 @@ export default function ConversationHistoryModal({
                             }
                             const messages = convs.flatMap((conv) => [
                               { role: 'user' as const, text: conv.user_message, turnNumber: conv.turn_number },
-                              { role: 'assistant' as const, text: conv.agent_response, turnNumber: conv.turn_number, citations: conv.citations },
+                              { role: 'assistant' as const, text: conv.agent_response, turnNumber: conv.turn_number, citations: conv.citations, imageId: conv.image_id },
                             ]);
                             const sessionLanguage = (session as SessionSummary).language || convs[0]?.session_snapshot?.language;
                             onResumeSession(session.session_id, messages, sessionLanguage);
