@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Download, Eye, FolderKanban, LibraryBig, Pencil, X } from 'lucide-react';
+import { Download, FolderKanban, LibraryBig, Pencil, X } from 'lucide-react';
 import type { FileItem, KnowledgeTarget, CmsAppTarget, KnowledgeLanguage } from '../types';
 import CustomSelect from './CustomSelect';
 import * as api from '../services/api';
@@ -260,14 +260,6 @@ export default function Sidebar({
                   </span>
                   {managedContext ? (
                     <div className="file-actions">
-                      <button
-                        onClick={() => void handleViewManagedFile(file.name)}
-                        className="secondary small"
-                        aria-label={`查看文件 ${file.display_name || file.name}`}
-                        title="查看"
-                      >
-                        <Eye size={12} />
-                      </button>
                       <button
                         onClick={() => handleDownloadManagedFile(file.name)}
                         className="secondary small"

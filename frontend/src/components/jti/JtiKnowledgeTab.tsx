@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { Upload, FileText, Trash2, Download, Eye, Pencil, X } from 'lucide-react';
+import { Upload, FileText, Trash2, Download, Pencil, X } from 'lucide-react';
 import ConfirmDialog from '../ConfirmDialog';
 
 interface KBFile {
@@ -137,13 +137,6 @@ export default function JtiKnowledgeTab({
                 )}
               </div>
               <div className="jti-kb-file-actions">
-                <button
-                  className="jti-btn small secondary"
-                  onClick={() => onViewFile(file.name)}
-                  title="檢視"
-                >
-                  <Eye size={12} />
-                </button>
                 <button
                   className="jti-btn small secondary"
                   onClick={() => onDownloadFile(file.name)}
