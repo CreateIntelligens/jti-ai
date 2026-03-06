@@ -22,6 +22,7 @@ from app.schemas.chat import (
     GeneralConversationsBySessionResponse,
     GeneralConversationsResponse,
 )
+from app.services.base_agent import BaseAgent
 from app.utils import group_conversations_by_session, group_conversations_as_summary
 import app.deps as deps
 
@@ -30,7 +31,7 @@ router = APIRouter(prefix="/api/chat", tags=["General Chat"])
 
 class ChatStartRequest(BaseModel):
     store_name: Optional[str] = None  # admin 自由選，一般 key 會被強制覆蓋
-    model: str = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+    model: str = os.getenv("GEMINI_MODEL_NAME", "gemini-3.1-flash-lite-preview")
     previous_session_id: Optional[str] = None  # 舊 session ID，用於清理記憶體
 
 
@@ -175,7 +176,7 @@ def send_message(req: ChatMessageRequest, request: Request, auth: dict = Depends
             if active_prompt:
                 system_instruction = active_prompt.content
 
-        model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+        model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-3.1-flash-lite-preview")
         history_contents = FileSearchManager._build_history_contents(history)
         mgr.start_chat(store_name, model_name, system_instruction=system_instruction, history=history_contents)
 
@@ -212,10 +213,12 @@ def send_message(req: ChatMessageRequest, request: Request, auth: dict = Depends
         # 清除 Gemini File Search 的 citation 標記
         answer = re.sub(r'\s*\[cite:\s*[^\]]*\]', '', answer).strip()
 
+        citations = BaseAgent._extract_citations(response)
+
         # 持久化對話到 MongoDB
         if deps.general_session_manager and session_id:
             deps.general_session_manager.add_message(session_id, "user", req.message)
-            deps.general_session_manager.add_message(session_id, "model", answer)
+            deps.general_session_manager.add_message(session_id, "model", answer, citations)
 
         # 記錄對話日誌
         log_result = deps.conversation_logger.log_conversation(
@@ -224,7 +227,8 @@ def send_message(req: ChatMessageRequest, request: Request, auth: dict = Depends
             agent_response=answer,
             tool_calls=[],
             session_state={"store": current_store},
-            mode="general"
+            mode="general",
+            citations=citations,
         )
         result_turn = log_result[1] if log_result else None
 
@@ -234,6 +238,7 @@ def send_message(req: ChatMessageRequest, request: Request, auth: dict = Depends
             "answer": answer,
             "session_id": session_id,
             "turn_number": result_turn,
+            "citations": citations,
         }
     except ValueError as e:
         # 記錄錯誤對話
