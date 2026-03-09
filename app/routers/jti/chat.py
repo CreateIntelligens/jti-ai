@@ -33,6 +33,7 @@ from app.services.jti.runtime_quiz_flow import (
 from app.services.jti.tts_jobs import tts_job_manager
 from app.services.jti.tts_text import to_tts_text
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
+
 from app.tools.jti.quiz import get_total_questions
 from app.utils import group_conversations_by_session
 from app.services.jti.quiz_helpers import (
@@ -42,6 +43,11 @@ from app.services.jti.quiz_helpers import (
     _judge_user_choice,
     build_session_state,
 )
+
+_OPENING_MESSAGE: dict[str, str] = {
+    "zh": "Hello，我是今天的活動大使Lady X，對我說「測驗」即可做「尋找命定前蓋」小遊戲，或想知道關於Ploom X加熱菸更多資訊，都歡迎和我聊聊，很樂意為您解答！",
+    "en": "Hi! I'm LULU. Got any questions, or want to take a quiz?",
+}
 
 session_manager = get_session_manager()
 conversation_logger = get_conversation_logger()
@@ -119,7 +125,8 @@ async def create_session(request: CreateSessionRequest, auth: dict = Depends(ver
         session = session_manager.create_session(language=request.language)
         logger.info(f"Created new session: {session.session_id} (language={request.language})")
 
-        return CreateSessionResponse(session_id=session.session_id)
+        opening = _OPENING_MESSAGE.get(request.language, _OPENING_MESSAGE["zh"])
+        return CreateSessionResponse(session_id=session.session_id, opening_message=opening)
 
     except Exception as e:
         logger.error(f"Failed to create session: {e}")

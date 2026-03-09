@@ -62,6 +62,10 @@ export default function Hciot() {
     setSessionInfo(result.session_id ? `#${result.session_id.substring(0, 8)}` : '');
     setStatusText(t('status_connected'));
     setStoreMissing(false);
+    const opening = result.opening_message
+      ? [{ text: result.opening_message, type: 'assistant' as const, timestamp: Date.now() }]
+      : [];
+    setMessages(opening);
     if (lang !== currentLanguage) {
       setCurrentLanguage(lang);
     }
@@ -91,7 +95,6 @@ export default function Hciot() {
     }
     setLoading(false);
     setIsTyping(false);
-    setMessages([]);
     await startSession(sessionId);
   }, [storeName, messages.length, sessionId, startSession, t]);
 
@@ -109,7 +112,6 @@ export default function Hciot() {
     i18n.changeLanguage(nextLanguage);
     localStorage.setItem('language', nextLanguage);
     setCurrentLanguage(nextLanguage);
-    setMessages([]);
 
     if (storeName) {
       await startSession(sessionId, nextLanguage);

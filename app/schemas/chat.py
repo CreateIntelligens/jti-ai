@@ -16,6 +16,7 @@ class CreateSessionResponse(BaseModel):
     ok: bool = True
     session_id: str
     message: str = "Session created"
+    opening_message: Optional[str] = None
 
 
 class ChatRequest(BaseModel):

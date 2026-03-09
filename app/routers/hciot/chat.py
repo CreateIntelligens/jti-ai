@@ -24,6 +24,11 @@ from app.services.hciot.main_agent import main_agent
 from app.services.session.session_manager_factory import get_hciot_conversation_logger, get_hciot_session_manager
 from app.utils import group_conversations_by_session
 
+_OPENING_MESSAGE: dict[str, str] = {
+    "zh": "您好，歡迎來到元復醫院。\n我是元復醫院的智慧AI小元。\n如果您想了解門診資訊、衛教或醫療相關問題，都可以詢問我。\n很高興為您服務。",
+    "en": "Hello, welcome to Yuanfu Hospital. I'm Xiao Yuan, the smart AI assistant. Feel free to ask me about outpatient information, health education, or any medical questions. Happy to help!",
+}
+
 session_manager = get_hciot_session_manager()
 conversation_logger = get_hciot_conversation_logger()
 logger = logging.getLogger(__name__)
@@ -51,7 +56,8 @@ async def create_session(request: CreateSessionRequest, auth: dict = Depends(ver
         session = session_manager.create_session(language=request.language)
         session.metadata["app_mode"] = "hciot"
         session_manager.update_session(session)
-        return CreateSessionResponse(session_id=session.session_id)
+        opening = _OPENING_MESSAGE.get(request.language, _OPENING_MESSAGE["zh"])
+        return CreateSessionResponse(session_id=session.session_id, opening_message=opening)
     except Exception as e:
         logger.error("Failed to create HCIoT session: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

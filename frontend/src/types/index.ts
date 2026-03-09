@@ -55,4 +55,5 @@ export interface ChatResponse {
 export interface StartChatResponse {
   prompt_applied?: boolean;
   session_id?: string;
+  opening_message?: string;
 }

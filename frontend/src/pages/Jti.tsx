@@ -274,7 +274,10 @@ export default function Jti() {
     });
     const data = await res.json();
     setSessionId(data.session_id);
-    setMessages([]);
+    const opening = data.opening_message
+      ? [{ text: data.opening_message, type: 'assistant' as const, timestamp: Date.now() }]
+      : [];
+    setMessages(opening);
     clearTtsState();
     setStatusText(t('status_connected'));
     setSessionInfo(`#${data.session_id.substring(0, 8)}`);
@@ -349,18 +352,8 @@ export default function Jti() {
     if (sessionStarted.current) return;
     sessionStarted.current = true;
     const lang = localStorage.getItem('language') || 'zh';
-    fetchWithApiKey('/api/jti/chat/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ language: lang }),
-    })
-      .then(res => res.json())
-      .then(data => {
-        setSessionId(data.session_id);
-        setStatusText(t('status_connected'));
-        setSessionInfo(`#${data.session_id.substring(0, 8)}`);
-        setTimeout(() => inputRef.current?.focus(), 100);
-      })
+    startNewSession(lang)
+      .then(() => setTimeout(() => inputRef.current?.focus(), 100))
       .catch(() => setStatusText(t('status_failed')));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -561,7 +554,7 @@ export default function Jti() {
   };
 
   const quickActions = [
-    { icon: '🎮', text: t('quick_action_quiz'), msg: t('quick_action_quiz'), primary: true },
+    { text: t('quick_action_quiz'), msg: t('quick_action_quiz'), primary: true },
     { text: t('quick_action_htp'), msg: t('quick_action_htp'), primary: false },
     { icon: '👋', text: t('quick_action_greeting'), msg: t('quick_action_greeting'), primary: false },
   ];
@@ -646,6 +639,21 @@ export default function Jti() {
           getTtsState={getAssistantTtsState}
           t={t}
         />
+        {messages.length === 1 && messages[0].type === 'assistant' && (
+          <div className="quick-reply-chips">
+            {quickActions.map((action, i) => (
+              <button
+                key={i}
+                className={`quick-reply-chip${action.primary ? ' primary' : ''}`}
+                onClick={() => sendMessage(action.msg)}
+                disabled={loading || !sessionId}
+              >
+                {action.icon && <span>{action.icon}</span>}
+                {action.text}
+              </button>
+            ))}
+          </div>
+        )}
         <JtiInputArea
           userInput={userInput}
           loading={loading}

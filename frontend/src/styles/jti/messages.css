@@ -745,3 +745,42 @@
     opacity: 1;
   }
 }
+/* Quick reply chips (shown below opening message) */
+.quick-reply-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+}
+
+.quick-reply-chip {
+  padding: 0.4rem 0.85rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+
+.quick-reply-chip:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.quick-reply-chip.primary {
+  border-color: rgba(139, 92, 246, 0.6);
+  background: rgba(139, 92, 246, 0.15);
+  color: #c4b5fd;
+}
+
+.quick-reply-chip.primary:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.3);
+}
+
+.quick-reply-chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
