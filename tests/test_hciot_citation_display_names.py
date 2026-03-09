@@ -1,4 +1,4 @@
-from app.services.hciot.main_agent import HciotMainAgent
+from app.services.hciot.main_agent import FILE_SEARCH_MODEL, HciotMainAgent
 
 
 def test_localize_citations_uses_display_name(monkeypatch):
@@ -31,3 +31,10 @@ def test_localize_citations_uses_display_name(monkeypatch):
         {"title": "幽門螺旋桿菌.csv", "uri": "file:///tmp/helicobacter_pylori.csv"},
         {"title": "Unmapped", "uri": ""},
     ]
+
+
+def test_hciot_agent_uses_flash_lite_for_chat_and_file_search():
+    agent = HciotMainAgent()
+
+    assert agent.model_name == "gemini-2.5-flash-lite"
+    assert FILE_SEARCH_MODEL == "gemini-2.5-flash-lite"

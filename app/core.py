@@ -282,7 +282,7 @@ class FileSearchManager:
             ),
         )
 
-    def start_chat(self, store_name: str, model: str = "gemini-2.5-flash",
+    def start_chat(self, store_name: str, model: str = "gemini-2.5-flash-lite",
                    system_instruction: str = None, history: list = None):
         """開始一個新的 Chat Session (多輪對話)。
 
@@ -344,7 +344,7 @@ class FileSearchManager:
         self,
         store_name: str,
         question: str,
-        model: str = "gemini-2.5-flash",
+        model: str = "gemini-2.5-flash-lite",
         system_instruction: str | None = None,
     ) -> types.GenerateContentResponse:
         """使用 File Search 查詢。

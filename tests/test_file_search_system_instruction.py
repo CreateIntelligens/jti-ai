@@ -11,7 +11,7 @@ from google.genai import types
 
 API_KEY = os.getenv("GEMINI_API_KEY")
 STORE_ID = os.getenv("JTI_STORE_ID_ZH")
-MODEL = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+MODEL = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
 
 client = genai.Client(api_key=API_KEY)
 store_name = f"fileSearchStores/{STORE_ID}"

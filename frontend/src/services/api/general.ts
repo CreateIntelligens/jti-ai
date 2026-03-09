@@ -113,7 +113,7 @@ export async function deleteManagedKnowledgeFile(appTarget: CmsAppTarget, fileNa
 // ========== Chat ==========
 
 function getSelectedModel(): string {
-  return localStorage.getItem('selectedModel') || 'gemini-2.5-flash';
+  return localStorage.getItem('selectedModel') || 'gemini-2.5-flash-lite';
 }
 
 export async function startChat(storeName: string, previousSessionId?: string | null): Promise<StartChatResponse> {

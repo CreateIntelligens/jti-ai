@@ -45,7 +45,7 @@ cp .env.example .env
 
 ```env
 GEMINI_API_KEYS=your_key_1,your_key_2
-GEMINI_MODEL_NAME=gemini-2.5-flash
+GEMINI_MODEL_NAME=gemini-2.5-flash-lite
 MONGODB_URI=mongodb+srv://...
 ADMIN_API_KEY=your_admin_key
 PORT=8008

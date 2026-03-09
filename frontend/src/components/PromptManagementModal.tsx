@@ -60,7 +60,7 @@ export default function PromptManagementModal({
   const [editContent, setEditContent] = useState('');
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [selectedModel, setSelectedModel] = useState(() =>
-    localStorage.getItem('selectedModel') || 'gemini-2.5-flash'
+    localStorage.getItem('selectedModel') || 'gemini-2.5-flash-lite'
   );
 
   // === API Key state ===

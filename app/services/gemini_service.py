@@ -36,7 +36,7 @@ def init_gemini_client():
 class GeminiService:
     """Gemini 服務封裝"""
 
-    def __init__(self, model_name: str = "gemini-2.5-flash"):
+    def __init__(self, model_name: str = "gemini-2.5-flash-lite"):
         self.model_name = model_name
         self.file_search_store_id: Optional[str] = None
         self.client = client
