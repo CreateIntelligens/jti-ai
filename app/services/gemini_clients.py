@@ -47,13 +47,19 @@ def init_registry() -> None:
         logger.warning("未設定 GEMINI_API_KEYS")
         return
 
+    seen_keys: set[str] = set()
     for i, token in enumerate(tokens):
         name, api_key = _parse_key_token(token, i)
         try:
             c = genai.Client(api_key=api_key)
-            stores = list(c.file_search_stores.list())
             _clients.append(c)
             _key_names.append(name)
+            # 同一把 key 只掃一次 store，避免後面的 index 覆蓋前面的 mapping
+            if api_key in seen_keys:
+                logger.info(f"[Registry] {name} ({api_key[:8]}...): 同 key，跳過 store 掃描")
+                continue
+            seen_keys.add(api_key)
+            stores = list(c.file_search_stores.list())
             logger.info(f"[Registry] {name} ({api_key[:8]}...): 發現 {len(stores)} 個 stores")
             for s in stores:
                 logger.info(f"  - {s.name} ({s.display_name})")
