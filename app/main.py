@@ -1,6 +1,4 @@
-"""
-Gemini File Search FastAPI 後端
-"""
+"""Gemini File Search FastAPI backend."""
 
 import logging
 import os
@@ -11,27 +9,27 @@ import warnings
 from datetime import datetime
 from typing import Optional
 
-# 設定 app logger 輸出
+# Configure app logger output
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(name)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-# 降低第三方套件的 log 等級（減少雜訊）
+# Reduce third-party log noise
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("google").setLevel(logging.WARNING)
 
-# 過濾 Gemini AFC 警告（我們故意使用 Manual Function Calling）
+# Suppress Gemini AFC warnings (we use manual function calling)
 warnings.filterwarnings('ignore', message='.*automatic function calling.*')
 warnings.filterwarnings('ignore', message='.*AFC.*')
 
-# 設定 uvicorn 日誌格式（加上時間戳，保留顏色，狀態碼上色）
+# Configure uvicorn log format with timestamps and colored status codes
 import uvicorn.logging
 
-# ANSI 顏色碼
+# ANSI color codes
 GREEN = "\033[32m"
 YELLOW = "\033[33m"
 RED = "\033[31m"
 RESET = "\033[0m"
 
-# 狀態碼 → 顏色 mapping
+# Status code color mapping
 _STATUS_COLORS: dict[str, str] = {
     "200": GREEN, "201": GREEN,
     "400": RED, "401": RED, "403": RED, "404": RED,
@@ -40,7 +38,7 @@ _STATUS_COLORS: dict[str, str] = {
 }
 
 class TimestampFormatter(uvicorn.logging.ColourizedFormatter):
-    """在 uvicorn 原有的彩色格式前加上時間戳，並對狀態碼上色。"""
+    """Prepend timestamp to uvicorn's colorized format and colorize status codes."""
     def formatMessage(self, record):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         msg = super().formatMessage(record)
@@ -53,7 +51,7 @@ class TimestampFormatter(uvicorn.logging.ColourizedFormatter):
 
         return f"[{timestamp}] {msg}"
 
-# 覆蓋 uvicorn 的 logger 格式
+# Override uvicorn logger formatters
 for logger_name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
     uvicorn_logger = logging.getLogger(logger_name)
     for handler in uvicorn_logger.handlers:
@@ -69,7 +67,7 @@ from .auth import verify_auth, _extract_bearer_token
 from .services.agent_utils import strip_citations
 from .routers.jti import chat as jti_chat, quiz as jti_quiz, prompts as jti_prompts, knowledge as jti_knowledge, quiz_bank as jti_quiz_bank
 from .routers.general import chat, stores, prompts, api_keys, knowledge_admin
-from .routers.hciot import chat as hciot_chat, prompts as hciot_prompts, knowledge as hciot_knowledge
+from .routers.hciot import chat as hciot_chat, prompts as hciot_prompts, knowledge as hciot_knowledge, images as hciot_images
 from .services.mongo_client import get_mongo_client
 import app.deps as deps
 
@@ -77,13 +75,13 @@ app = FastAPI(title="Gemini File Search API")
 
 @app.exception_handler(ClientError)
 async def gemini_client_error_handler(request: Request, exc: ClientError):
-    """處理 Google GenAI Client 錯誤 (例如 429 配額不足)。"""
+    """Handle Google GenAI client errors (e.g. 429 quota exceeded)."""
     error_msg = str(exc)
-    print(f"[Gemini API Error] {error_msg}")  # 打印完整錯誤
+    print(f"[Gemini API Error] {error_msg}")
 
     if "RESOURCE_EXHAUSTED" in error_msg or "429" in error_msg:
         status_code = 429
-        detail = "目前使用量已達上限 (429)，請稍後再試。"
+        detail = "Rate limit exceeded (429). Please try again later."
     else:
         status_code = 400
         detail = error_msg
@@ -103,7 +101,7 @@ app.add_middleware(
 
 @app.on_event("startup")
 def startup():
-    """應用程式啟動時初始化 Manager。"""
+    """Initialize managers on application startup."""
     deps.init_managers()
 
 
@@ -113,7 +111,7 @@ class OpenAIChatMessage(BaseModel):
     role: str
     content: str
 
-# 支援的 Gemini 模型
+# Supported Gemini models
 SUPPORTED_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3.1-flash-lite-preview"]
 DEFAULT_MODEL = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
 
@@ -139,14 +137,8 @@ class OpenAIChatResponse(BaseModel):
 
 
 def _get_system_prompt(api_key_info, store_name: str, messages: list) -> Optional[str]:
-    """
-    根據優先順序決定使用哪個 system prompt:
-    1. Request 帶的 system message → 最優先
-    2. API Key 指定的 prompt_index → 次之
-    3. 知識庫的預設 (active_prompt_id) → 兜底
-    4. 都沒有 → None
-    """
-    # 1. 檢查 request 中的 system message
+    """Resolve system prompt by priority: request > API key > store default."""
+    # 1. System message from request (highest priority)
     system_messages = [msg for msg in messages if msg.role == "system"]
     if system_messages:
         return system_messages[-1].content
@@ -154,13 +146,13 @@ def _get_system_prompt(api_key_info, store_name: str, messages: list) -> Optiona
     if not deps.prompt_manager:
         return None
 
-    # 2. 檢查 API Key 指定的 prompt_index
+    # 2. Prompt index specified by API key
     if api_key_info and api_key_info.prompt_index is not None:
         prompts = deps.prompt_manager.list_prompts(store_name)
         if 0 <= api_key_info.prompt_index < len(prompts):
             return prompts[api_key_info.prompt_index].content
 
-    # 3. 使用知識庫預設的 active prompt
+    # 3. Store's active prompt (fallback)
     active_prompt = deps.prompt_manager.get_active_prompt(store_name)
     if active_prompt:
         return active_prompt.content
@@ -170,58 +162,43 @@ def _get_system_prompt(api_key_info, store_name: str, messages: list) -> Optiona
 
 @app.post("/v1/chat/completions")
 async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Request, auth: dict = Depends(verify_auth)):
-    """
-    OpenAI 兼容的 Chat Completions API
-
-    使用 Authorization: Bearer sk-xxx 驗證，API Key 綁定知識庫
-    也接受 Admin Key（需在 request 的 messages 中指定 store，或使用預設知識庫）
-
-    Prompt 優先順序:
-    1. Request 帶的 system message
-    2. API Key 指定的 prompt_index
-    3. 知識庫的預設 prompt
-    """
+    """OpenAI-compatible Chat Completions API with knowledge-base-bound API keys."""
     if not deps.manager:
-        raise HTTPException(status_code=500, detail="未設定 Gemini API Key")
+        raise HTTPException(status_code=500, detail="Gemini API key not configured")
 
-    # 決定 store_name 和 api_key_info
+    # Resolve store_name and api_key_info
     api_key_info = None
     if auth["role"] == "admin":
-        # Admin 使用預設中文知識庫（或可從 system message 解析）
         store_name = os.getenv("JTI_STORE_ID_ZH", "")
         if not store_name:
-            raise HTTPException(status_code=400, detail="未設定知識庫，請配置 JTI_STORE_ID_ZH")
+            raise HTTPException(status_code=400, detail="Knowledge store not configured (JTI_STORE_ID_ZH)")
     else:
-        # 一般 key → 從 auth 取得綁定的 store
         if not deps.api_key_manager:
-            raise HTTPException(status_code=500, detail="API Key Manager 未初始化")
+            raise HTTPException(status_code=500, detail="API Key Manager not initialized")
         token = _extract_bearer_token(raw_request)
         api_key_info = deps.api_key_manager.verify_key(token) if token else None
         store_name = auth["store_name"]
 
-    # 取得最後一條用戶消息
+    # Extract last user message
     user_messages = [msg for msg in request.messages if msg.role == "user"]
     if not user_messages:
-        raise HTTPException(status_code=400, detail="沒有找到用戶消息")
+        raise HTTPException(status_code=400, detail="No user message found")
 
     last_message = user_messages[-1].content
 
-    # 決定 system prompt
     system_prompt = _get_system_prompt(api_key_info, store_name, request.messages)
 
-    # 驗證 model 並決定實際使用的模型
+    # Validate model
     warning = None
     if request.model in SUPPORTED_MODELS:
         model_name = request.model
     else:
         model_name = DEFAULT_MODEL
-        warning = f"不支援的模型 '{request.model}'，已改用預設模型 '{DEFAULT_MODEL}'。支援的模型: {', '.join(SUPPORTED_MODELS)}"
+        warning = f"Unsupported model '{request.model}', using default '{DEFAULT_MODEL}'. Supported: {', '.join(SUPPORTED_MODELS)}"
 
     try:
-        # 使用 query 進行單次 RAG 查詢（不依賴 session）
         response = deps.manager.query(store_name, last_message, system_instruction=system_prompt, model=model_name)
 
-        # 如果有警告，附加到回覆開頭
         answer_text = strip_citations(response.text)
         if warning:
             answer_text = f"⚠️ {warning}\n\n{answer_text}"
@@ -229,7 +206,7 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
         result = OpenAIChatResponse(
             id=f"chatcmpl-{uuid.uuid4().hex[:8]}",
             created=int(time.time()),
-            model=model_name,  # 返回實際使用的模型
+            model=model_name,
             choices=[
                 OpenAIChatChoice(
                     index=0,
@@ -257,7 +234,7 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
 
 @app.get("/health")
 def health_check():
-    """服務健康檢查（不需認證）"""
+    """Service health check (no auth required)."""
     checks = {}
 
     # 1. MongoDB
@@ -297,7 +274,7 @@ def health_check():
 
 @app.get("/")
 def index():
-    """API 入口。"""
+    """API root."""
     return {"message": "Gemini File Search API", "docs": "/docs"}
 
 
@@ -319,6 +296,7 @@ app.include_router(hciot_prompts.router, prefix="/api/hciot-admin/prompts")
 app.include_router(hciot_prompts.router, prefix="/api/hciot/prompts", include_in_schema=False)
 app.include_router(hciot_knowledge.router, prefix="/api/hciot-admin/knowledge")
 app.include_router(hciot_knowledge.router, prefix="/api/hciot/knowledge", include_in_schema=False)
+app.include_router(hciot_images.router, prefix="/api/hciot")
 app.include_router(chat.router)
 app.include_router(prompts.router)  # before stores (more specific path patterns)
 app.include_router(knowledge_admin.router)
