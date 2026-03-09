@@ -4,6 +4,7 @@ import { Library, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
 export interface Citation {
   title: string;
   uri: string;
+  text?: string;
 }
 
 interface CitationsListProps {
@@ -13,9 +14,15 @@ interface CitationsListProps {
 
 export default function CitationsList({ citations, messageIndex }: CitationsListProps) {
   const [expanded, setExpanded] = useState(false);
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
   const toggle = useCallback(() => {
     setExpanded(prev => !prev);
+    setPreviewIndex(null);
+  }, []);
+
+  const togglePreview = useCallback((i: number) => {
+    setPreviewIndex(prev => (prev === i ? null : i));
   }, []);
 
   if (citations.length === 0) return null;
@@ -39,24 +46,40 @@ export default function CitationsList({ citations, messageIndex }: CitationsList
         <div className="citations-list">
           {citations.map((cit, i) => {
             const title = cit.title || cit.uri || '參考資料';
-            return cit.uri ? (
-              <a
-                key={`${messageIndex}-cit-${i}`}
-                href={cit.uri}
-                target="_blank"
-                rel="noreferrer"
-                className="citation-badge link"
-                title={title}
-              >
-                <span className="citation-number">[{i + 1}]</span>
-                <span className="citation-title">{title}</span>
-                <ExternalLink size={12} className="citation-external-icon" />
-              </a>
-            ) : (
-              <span key={`${messageIndex}-cit-${i}`} className="citation-badge" title={title}>
-                <span className="citation-number">[{i + 1}]</span>
-                <span className="citation-title">{title}</span>
-              </span>
+            const isPreviewOpen = previewIndex === i;
+            return (
+              <div key={`${messageIndex}-cit-${i}`} className="citation-item">
+                {cit.uri ? (
+                  <a
+                    href={cit.uri}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="citation-badge link"
+                    title={title}
+                  >
+                    <span className="citation-number">[{i + 1}]</span>
+                    <span className="citation-title">{title}</span>
+                    <ExternalLink size={12} className="citation-external-icon" />
+                  </a>
+                ) : (
+                  <span
+                    className={`citation-badge${cit.text ? ' has-preview' : ''}`}
+                    title={title}
+                    onClick={cit.text ? () => togglePreview(i) : undefined}
+                  >
+                    <span className="citation-number">[{i + 1}]</span>
+                    <span className="citation-title">{title}</span>
+                    {cit.text && (
+                      isPreviewOpen
+                        ? <ChevronUp size={12} className="citation-external-icon" />
+                        : <ChevronDown size={12} className="citation-external-icon" />
+                    )}
+                  </span>
+                )}
+                {cit.text && isPreviewOpen && (
+                  <pre className="citation-preview">{cit.text}</pre>
+                )}
+              </div>
             );
           })}
         </div>

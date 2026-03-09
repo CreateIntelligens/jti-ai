@@ -56,7 +56,7 @@ export default function App() {
     sessionId, setSessionId,
     theme, toggleTheme,
     toggleSidebar, showStatus,
-    refreshStores, refreshFiles, handleRefreshKnowledge, setProjectFilter,
+    refreshStores, handleRefreshKnowledge, setProjectFilter,
     handleStoreChange, handleRestartChat,
     handleCreateStore, handleDeleteStore,
     handleUploadFile, handleDeleteFile,

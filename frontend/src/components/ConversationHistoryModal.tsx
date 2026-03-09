@@ -27,7 +27,7 @@ interface ConversationEntry {
   timestamp: string;
   user_message: string;
   agent_response: string;
-  citations?: Array<{ title: string; uri: string }>;
+  citations?: Array<{ title: string; uri: string; text?: string }>;
   image_id?: string;
   tool_calls: Array<{
     tool_name?: string;
@@ -67,7 +67,7 @@ interface ConversationHistoryModalProps {
   sessionId?: string;
   storeName?: string;
   mode?: 'jti' | 'hciot' | 'general';
-  onResumeSession?: (sessionId: string, messages: Array<{ role: 'user' | 'assistant'; text: string; turnNumber?: number; citations?: Array<{ title: string; uri: string }>; imageId?: string }>, language?: string) => void;
+  onResumeSession?: (sessionId: string, messages: Array<{ role: 'user' | 'assistant'; text: string; turnNumber?: number; citations?: Array<{ title: string; uri: string; text?: string }>; imageId?: string }>, language?: string) => void;
 }
 
 export default function ConversationHistoryModal({
@@ -326,23 +326,14 @@ export default function ConversationHistoryModal({
     }
     setExpandedSessionId(sid);
 
-    // General 模式：按需載入完整對話
-    if (mode === 'general' && !detailCache[sid]) {
+    // General / HCIoT 模式：按需載入完整對話
+    if ((mode === 'general' || mode === 'hciot') && !detailCache[sid]) {
       setDetailLoading(sid);
       try {
-        const data = await getGeneralConversationDetail(sid);
-        setDetailCache((prev) => ({ ...prev, [sid]: data.conversations || [] }));
-      } catch (error) {
-        console.error('[ConversationHistory] Failed to load detail:', error);
-      } finally {
-        setDetailLoading(null);
-      }
-    }
-    if (mode === 'hciot' && !detailCache[sid]) {
-      setDetailLoading(sid);
-      try {
-        const data = await getHciotConversationDetail(sid);
-        setDetailCache((prev) => ({ ...prev, [sid]: data.conversations || [] }));
+        const data = mode === 'hciot'
+          ? await getHciotConversationDetail(sid)
+          : await getGeneralConversationDetail(sid);
+        setDetailCache((prev) => ({ ...prev, [sid]: (data.conversations || []) as ConversationEntry[] }));
       } catch (error) {
         console.error('[ConversationHistory] Failed to load detail:', error);
       } finally {

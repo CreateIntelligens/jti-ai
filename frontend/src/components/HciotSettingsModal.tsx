@@ -25,7 +25,7 @@ interface HciotSettingsModalProps {
   language?: string;
 }
 
-interface KBFile { name: string; display_name: string; size?: number; editable?: boolean; }
+interface KBFile { name: string; display_name?: string; size?: number; editable?: boolean; }
 
 const MAX_CUSTOM = 3;
 const SYSTEM_DEFAULT_ID = 'system_default';

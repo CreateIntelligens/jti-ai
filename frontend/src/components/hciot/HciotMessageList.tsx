@@ -8,7 +8,7 @@ export interface HciotMessage {
   type: 'user' | 'assistant' | 'system';
   timestamp: number;
   turnNumber?: number;
-  citations?: Array<{ title: string; uri: string }>;
+  citations?: Array<{ title: string; uri: string; text?: string }>;
   imageId?: string;
 }
 

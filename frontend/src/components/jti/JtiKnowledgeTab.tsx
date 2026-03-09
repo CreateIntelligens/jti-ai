@@ -4,7 +4,7 @@ import ConfirmDialog from '../ConfirmDialog';
 
 interface KBFile {
   name: string;
-  display_name: string;
+  display_name?: string;
   size?: number;
   editable?: boolean;
 }
@@ -129,7 +129,7 @@ export default function JtiKnowledgeTab({
                 onClick={() => onViewFile(file.name)}
               >
                 <FileText size={16} className="jti-kb-file-icon" />
-                <span className="jti-kb-file-name">{file.display_name}</span>
+                <span className="jti-kb-file-name">{file.display_name || file.name}</span>
                 {file.size && (
                   <span className="jti-kb-file-size">
                     {file.size > 1024 ? `${(file.size / 1024).toFixed(1)}KB` : `${file.size}B`}

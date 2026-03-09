@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React from 'react';
 import type { TFunction } from 'i18next';
 
 import CitationsList from '../CitationsList';
@@ -13,7 +13,7 @@ export interface Message {
   text: string;
   type: 'user' | 'assistant' | 'system';
   toolCalls?: Array<{ tool: string }>;
-  citations?: Array<{ title: string; uri: string }>;
+  citations?: Array<{ title: string; uri: string; text?: string }>;
   timestamp: number;
   turnNumber?: number;
   ttsText?: string;

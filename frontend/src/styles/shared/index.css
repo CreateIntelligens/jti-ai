@@ -314,7 +314,7 @@ body::before {
 
 .citations-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 0.5rem;
   animation: fadeIn 0.3s ease;
 }
@@ -368,4 +368,32 @@ body::before {
   opacity: 0.5;
   color: inherit;
   flex-shrink: 0;
+}
+
+.citation-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.citation-badge.has-preview {
+  cursor: pointer;
+}
+
+.citation-badge.has-preview:hover {
+  background: var(--citation-hover-bg, rgba(99, 102, 241, 0.15));
+}
+
+.citation-preview {
+  font-size: 0.75rem;
+  line-height: 1.5;
+  padding: 0.5rem 0.75rem;
+  background: var(--preview-bg, rgba(0, 0, 0, 0.15));
+  border-left: 2px solid var(--accent-color, #6366f1);
+  border-radius: 0 4px 4px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-secondary, rgba(255,255,255,0.6));
+  max-height: 200px;
+  overflow-y: auto;
 }

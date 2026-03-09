@@ -55,6 +55,7 @@ export interface HciotKnowledgeFile {
 export interface HciotKnowledgeFileContent {
   filename: string;
   content: string;
+  editable?: boolean;
 }
 
 const HCIOT_ADMIN_BASE = `${API_BASE}/hciot-admin`;

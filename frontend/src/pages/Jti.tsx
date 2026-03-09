@@ -20,7 +20,7 @@ interface Message {
   text: string;
   type: 'user' | 'assistant' | 'system';
   toolCalls?: Array<{ tool: string }>;
-  citations?: Array<{ title: string; uri: string }>;
+  citations?: Array<{ title: string; uri: string; text?: string }>;
   timestamp: number;
   turnNumber?: number;
   ttsText?: string;
