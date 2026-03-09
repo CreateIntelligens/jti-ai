@@ -142,9 +142,11 @@ def build_system_instruction(
 
 
 def build_intent_prompt(query: str) -> str:
-    return f"""判斷以下使用者語句是否與「醫院衛教資料、疾病、檢查、治療、照護、復健、用藥、飲食與健康教育」相關。
+    """Build a YES/NO intent-classification prompt for the knowledge-base search gate."""
+    return f"""判斷以下使用者語句是否需要查詢「醫院衛教資料、疾病、檢查、治療、照護、復健、用藥、飲食與健康教育」相關知識庫。
 如果使用者是在詢問疾病、症狀、治療、照護、飲食、復健、檢查、藥物衛教、病人教育，請回覆 YES。
-如果是打招呼、表達感謝、延續上一輪的簡短追問，也請回覆 YES。
+如果是打招呼、表達感謝，請回覆 YES。
+如果使用者在詢問對話本身（例如：我前面說什麼、你剛才說什麼、我問了什麼），請回覆 NO。
 如果使用者在詢問完全無關的知識（例如：天氣、美食推薦、旅遊、政治、投資、寫程式），請回覆 NO。
 
 使用者訊息：「{query}」

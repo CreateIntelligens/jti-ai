@@ -35,7 +35,7 @@ from app.services.session.session_manager_factory import get_hciot_session_manag
 
 session_manager = get_hciot_session_manager()
 logger = logging.getLogger(__name__)
-FILE_SEARCH_MODEL = "gemini-2.5-flash"
+FILE_SEARCH_MODEL = "gemini-2.5-flash-lite"
 
 
 class HciotMainAgent(BaseAgent):
@@ -104,7 +104,7 @@ class HciotMainAgent(BaseAgent):
     def _file_search(self, query: str, language: str) -> tuple[str | None, list[dict] | None]:
         store_name = self._get_file_search_store_name(language)
         if not store_name:
-            logger.warning("未設定 HCIoT 知識庫，跳過 File Search")
+            logger.warning("[HCIoT File Search] no knowledge store configured, skipping")
             return None, None
 
         client = get_client_for_store(store_name)
@@ -128,7 +128,7 @@ class HciotMainAgent(BaseAgent):
                 if "503" in str(e) and attempt < 2:
                     time.sleep(1)
                     continue
-                logger.error(f"[HCIoT File Search] 失敗: {e}")
+                logger.error("[HCIoT File Search] failed: %s", e)
                 return None, None
 
     @staticmethod
@@ -199,17 +199,18 @@ class HciotMainAgent(BaseAgent):
         return localized or None
 
     def _check_intent_fast(self, query: str, language: str = "zh") -> str:
+        """Classify whether *query* needs a knowledge-base lookup. Returns 'YES' or 'NO'."""
         try:
             response = _gemini_service.client.models.generate_content(
                 model=FILE_SEARCH_MODEL,
                 contents=build_intent_prompt(query),
                 config=types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=0)),
             )
-            res = response.text.strip().upper() if response.text else "YES"
-            return "NO" if "NO" in res else "YES"
+            answer = response.text.strip().upper() if response.text else "NO"
+            return "NO" if "NO" in answer else "YES"
         except Exception as e:
-            logger.error(f"[HCIoT Intent Check] failed: {e}")
-            return "YES"
+            logger.error("[HCIoT Intent Check] failed: %s", e)
+            return "NO"
 
     async def chat(self, session_id: str, user_message: str) -> Dict:
         try:
