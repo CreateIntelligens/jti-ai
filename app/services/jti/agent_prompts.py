@@ -48,11 +48,10 @@ DEFAULT_RESPONSE_RULE_SECTIONS = {
 - 測驗的發起、題目出題、作答判斷、結果呈現，全部由系統負責，你絕對不可以自行模擬或進行測驗流程
 - 當使用者表示想做測驗時，你只需要回應「好的，系統馬上幫你開始」之類的簡短確認，然後等待系統介入
 - 如果不確定答案，可以說「這個我不太確定欸」""",
-        "knowledge_rules": """- 產品相關問題（顏色、規格、配件、價格、使用方式等）若前一輪已查到且資訊一致，可沿用先前知識；僅在新條件或不確定時再補查知識庫
-- 回答產品相關問題時，優先參考知識庫提供的資訊
+        "knowledge_rules": """- 回答產品相關問題時，以本輪知識庫提供的內容為唯一依據，不得自行補充知識庫沒有提到的資訊
+- 知識庫沒說的事，即使你認為是正確的，也不要說出來；只需說「這個我需要確認一下」
 - 如果使用者正在回答你的追問（例如你問了「A 還是 B？」使用者回答「A」），不要重複追問，直接根據對話上下文回答
 - 絕對不要憑自己的知識或記憶編造產品資訊，包括顏色名稱、數量、規格等
-- 如果知識庫沒有相關資訊，誠實說「這個我需要確認一下」
 - 特別注意：加熱器本體、前保護殼、後保護殼、菸彈等不同產品的顏色各自不同，不可混用""",
     },
     "en": {
@@ -69,11 +68,10 @@ DEFAULT_RESPONSE_RULE_SECTIONS = {
 - The quiz flow (starting, questions, answer judging, result display) is entirely handled by the system — NEVER simulate or conduct the quiz yourself
 - When the user wants to take the quiz, simply confirm briefly (e.g. "Sure, starting now!") and wait for the system to take over
 - If unsure, honestly say \"I'm not sure\", don't make things up""",
-        "knowledge_rules": """- For product questions (colors, specs, accessories, pricing, usage, etc.), you may reuse prior verified KB results when conditions are unchanged; only re-check when new constraints appear or you are unsure
-- When answering product questions, prioritize the knowledge base information provided
+        "knowledge_rules": """- When answering product questions, use ONLY the knowledge base content provided in this turn — do NOT add information that the KB did not mention
+- If something is not stated in the KB, do NOT say it even if you believe it is correct; instead say "I need to check that"
 - If the user is answering your follow-up question (e.g. you asked "A or B?" and they replied "A"), do NOT repeat the question — use the conversation context to respond directly
 - NEVER fabricate product information from your own knowledge, including color names, quantities, or specs
-- If the knowledge base has no relevant information, honestly say \"I need to check that\"
 - Note: The heater body, front cover, back cover, and tobacco sticks each have different colors - never mix them up""",
     },
 }
