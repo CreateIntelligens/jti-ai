@@ -5,7 +5,6 @@ Homepage CMS knowledge management API for JTI and HCIoT.
 import io
 import mimetypes
 import os
-import tempfile
 import uuid
 import zipfile
 import xml.etree.ElementTree as ET
@@ -17,7 +16,10 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 
 from app.auth import verify_admin, verify_auth
-from app.deps import _get_or_create_manager
+from app.routers.knowledge_utils import (
+    delete_from_gemini as _shared_delete_from_gemini,
+    sync_to_gemini as _shared_sync_to_gemini,
+)
 from app.services.knowledge_store import get_knowledge_store
 
 router = APIRouter(prefix="/api/admin/knowledge", tags=["CMS Knowledge"], dependencies=[Depends(verify_admin)])
@@ -117,42 +119,14 @@ def _sync_to_gemini(app_name: str, language: str, filename: str, file_bytes: byt
     store_name = _get_store_name(app_name, language)
     if not store_name:
         return False
-
-    mgr = _get_or_create_manager()
-    try:
-        existing = mgr.list_files(store_name)
-        for doc in existing:
-            if doc.display_name == filename:
-                mgr.delete_file(doc.name)
-                break
-    except Exception:
-        pass
-
-    suffix = Path(filename).suffix or ".tmp"
-    tmp_path = None
-    try:
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            tmp.write(file_bytes)
-            tmp_path = tmp.name
-        mgr.upload_file(store_name, tmp_path, filename)
-        return True
-    finally:
-        if tmp_path and os.path.exists(tmp_path):
-            os.unlink(tmp_path)
+    return _shared_sync_to_gemini(store_name, filename, file_bytes)
 
 
-def _delete_from_gemini(app_name: str, language: str, filename: str) -> bool:
+def _delete_from_gemini(app_name: str, language: str, filename: str) -> int:
     store_name = _get_store_name(app_name, language)
     if not store_name:
-        return False
-
-    mgr = _get_or_create_manager()
-    existing = mgr.list_files(store_name)
-    for doc in existing:
-        if doc.display_name == filename:
-            mgr.delete_file(doc.name)
-            return True
-    return False
+        return 0
+    return _shared_delete_from_gemini(store_name, filename)
 
 
 class UpdateContentRequest(BaseModel):
@@ -330,12 +304,26 @@ def delete_knowledge_file(
     namespace = _normalize_app_name(app_name)
     safe_name = _safe_filename(filename)
     store = get_knowledge_store()
-    store.delete_file(language, safe_name, namespace=namespace)
+    doc = store.get_file(language, safe_name, namespace=namespace)
+    if not doc:
+        raise HTTPException(status_code=404, detail="檔案不存在")
 
+    gemini_deleted_count = 0
     if _get_store_name(namespace, language):
         try:
-            _delete_from_gemini(namespace, language, safe_name)
+            gemini_deleted_count = _delete_from_gemini(namespace, language, safe_name)
         except Exception as e:
             print(f"[CMS KB] Gemini delete failed for {namespace}/{safe_name}: {e}")
+            raise HTTPException(status_code=502, detail="Gemini 同步刪除失敗，Mongo 未刪除")
 
-    return {"message": "已刪除", "app": namespace}
+    deleted = store.delete_file(language, safe_name, namespace=namespace)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="檔案不存在")
+
+    return {
+        "message": "已刪除",
+        "app": namespace,
+        "synced": True,
+        "mongo_deleted": True,
+        "gemini_deleted_count": gemini_deleted_count,
+    }

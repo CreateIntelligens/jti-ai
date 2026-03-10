@@ -111,17 +111,9 @@ def write_docx_text(original_data: bytes, text: str) -> bytes:
 
 
 def sync_to_gemini(store_name: str, filename: str, file_bytes: bytes) -> bool:
-    """Upload a file to Gemini File Search, replacing any existing file with the same name."""
+    """Upload a file to Gemini File Search, replacing all existing files with the same name."""
     mgr = _get_or_create_manager()
-
-    try:
-        existing = mgr.list_files(store_name)
-        for doc in existing:
-            if doc.display_name == filename:
-                mgr.delete_file(doc.name)
-                break
-    except Exception:
-        pass
+    delete_from_gemini(store_name, filename)
 
     suffix = Path(filename).suffix or ".tmp"
     tmp_path = None
@@ -136,15 +128,16 @@ def sync_to_gemini(store_name: str, filename: str, file_bytes: bytes) -> bool:
             os.unlink(tmp_path)
 
 
-def delete_from_gemini(store_name: str, filename: str) -> bool:
-    """Delete a file from Gemini File Search by display name."""
+def delete_from_gemini(store_name: str, filename: str) -> int:
+    """Delete all files from Gemini File Search that share the same display name."""
     mgr = _get_or_create_manager()
     existing = mgr.list_files(store_name)
+    deleted_count = 0
     for doc in existing:
         if doc.display_name == filename:
             mgr.delete_file(doc.name)
-            return True
-    return False
+            deleted_count += 1
+    return deleted_count
 
 
 def sync_gemini_db_background(
@@ -184,6 +177,7 @@ def sync_gemini_db_background(
             if doc.display_name not in db_names:
                 logger.info(f"[{log_prefix}] Gemini-only, registering: {doc.display_name}")
                 store.insert_file(language, doc.display_name, b"", editable=False, **extra_kwargs)
+                db_names.add(doc.display_name)
     except Exception as e:
         logger.warning(f"[{log_prefix}] background sync error: {e}")
 

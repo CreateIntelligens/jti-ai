@@ -175,13 +175,25 @@ async def upload_knowledge_file(
 def delete_knowledge_file(filename: str, language: str = "zh", auth: dict = Depends(verify_auth)):
     safe_name = safe_filename(filename)
     store = get_hciot_knowledge_store()
+    doc = store.get_file(language, safe_name)
+    if not doc:
+        raise HTTPException(status_code=404, detail="檔案不存在")
 
     store_name = _store_name(language)
+    gemini_deleted_count = 0
     if store_name:
         try:
-            delete_from_gemini(store_name, safe_name)
+            gemini_deleted_count = delete_from_gemini(store_name, safe_name)
         except Exception as e:
             logger.warning(f"[HCIoT KB] Gemini delete failed for {safe_name}: {e}")
+            raise HTTPException(status_code=502, detail="Gemini 同步刪除失敗，Mongo 未刪除")
 
-    store.delete_file(language, safe_name)
-    return {"message": "已刪除"}
+    deleted = store.delete_file(language, safe_name)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="檔案不存在")
+    return {
+        "message": "已刪除",
+        "synced": True,
+        "mongo_deleted": True,
+        "gemini_deleted_count": gemini_deleted_count,
+    }
