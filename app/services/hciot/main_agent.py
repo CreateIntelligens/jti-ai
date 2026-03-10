@@ -5,11 +5,8 @@ HCIoT main agent - patient education chat flow.
 import logging
 import os
 import re
-import time
 from typing import Dict
 from urllib.parse import urlparse
-
-from google.genai import types
 
 from app.models.session import Session
 import app.services.gemini_service as _gemini_service
@@ -18,8 +15,7 @@ from app.services.agent_utils import (
     normalize_language,
     strip_citations,
 )
-from app.services.base_agent import BaseAgent
-from app.services.gemini_clients import get_client_for_store
+from app.services.base_agent import FILE_SEARCH_MODEL, BaseAgent
 from app.services.hciot.agent_prompts import (
     PERSONA,
     SESSION_STATE_TEMPLATES,
@@ -35,7 +31,6 @@ from app.services.session.session_manager_factory import get_hciot_session_manag
 
 session_manager = get_hciot_session_manager()
 logger = logging.getLogger(__name__)
-FILE_SEARCH_MODEL = "gemini-2.5-flash-lite"
 
 
 class HciotMainAgent(BaseAgent):
@@ -55,6 +50,16 @@ class HciotMainAgent(BaseAgent):
     @staticmethod
     def _get_store_name_for_language(language: str) -> str:
         return "__hciot__en" if normalize_language(language) == "en" else HCIOT_STORE_NAME
+
+    @staticmethod
+    def _get_file_search_store_name(language: str) -> str | None:
+        lang_upper = normalize_language(language).upper()
+        store_id = os.getenv(f"HCIOT_STORE_ID_{lang_upper}") or os.getenv("HCIOT_STORE_ID")
+        if not store_id:
+            return None
+        if store_id.startswith("fileSearchStores/"):
+            return store_id
+        return f"fileSearchStores/{store_id}"
 
     def _get_default_persona(self, language: str) -> str:
         return PERSONA.get(language, PERSONA["zh"])
@@ -76,15 +81,16 @@ class HciotMainAgent(BaseAgent):
         template = SESSION_STATE_TEMPLATES.get(session.language, SESSION_STATE_TEMPLATES["zh"])
         return template.format(step_value=session.step.value)
 
-    @staticmethod
-    def _get_file_search_store_name(language: str) -> str | None:
-        lang_upper = normalize_language(language).upper()
-        store_id = os.getenv(f"HCIOT_STORE_ID_{lang_upper}") or os.getenv("HCIOT_STORE_ID")
-        if not store_id:
-            return None
-        if store_id.startswith("fileSearchStores/"):
-            return store_id
-        return f"fileSearchStores/{store_id}"
+    def _build_intent_prompt(self, query: str, language: str) -> str:
+        return build_intent_prompt(query)
+
+    def _intent_default_on_error(self) -> str:
+        """HCIoT defaults to NO on intent check failure (block unrelated queries)."""
+        return "NO"
+
+    def _extract_file_search_citations(self, response) -> list[dict] | None:
+        """Extract citation list for HCIoT, keeping chunk text for image-id matching."""
+        return self._extract_citations(response, include_text=True)
 
     @classmethod
     def _extract_top_citation_image_id(
@@ -100,65 +106,6 @@ class HciotMainAgent(BaseAgent):
         title = first.get("title") or ""
         match = cls.IMAGE_TOKEN_PATTERN.search(title)
         return match.group(0) if match else None
-
-    def _file_search(self, query: str, language: str) -> tuple[str | None, list[dict] | None]:
-        store_name = self._get_file_search_store_name(language)
-        if not store_name:
-            logger.warning("[HCIoT File Search] no knowledge store configured, skipping")
-            return None, None
-
-        client = get_client_for_store(store_name)
-        for attempt in range(3):
-            try:
-                response = client.models.generate_content(
-                    model=FILE_SEARCH_MODEL,
-                    contents=query,
-                    config=types.GenerateContentConfig(
-                        tools=[
-                            types.Tool(
-                                file_search=types.FileSearch(file_search_store_names=[store_name])
-                            )
-                        ],
-                        thinking_config=types.ThinkingConfig(thinking_budget=0),
-                    ),
-                )
-                result = response.text.strip() if response.text else None
-                return result, self._extract_citations_with_context(response)
-            except Exception as e:
-                if "503" in str(e) and attempt < 2:
-                    time.sleep(1)
-                    continue
-                logger.error("[HCIoT File Search] failed: %s", e)
-                return None, None
-
-    @staticmethod
-    def _extract_citations_with_context(response) -> list[dict] | None:
-        """Extract citation list for HCIoT and keep chunk text for image-id matching."""
-        try:
-            chunks = response.candidates[0].grounding_metadata.grounding_chunks
-        except (AttributeError, IndexError, TypeError):
-            return None
-        if not chunks:
-            return None
-
-        citations: list[dict] = []
-        seen: set[str] = set()
-        for chunk in chunks:
-            ctx = getattr(chunk, "retrieved_context", None)
-            if not ctx:
-                continue
-            uri = getattr(ctx, "uri", None) or ""
-            title = getattr(ctx, "title", None) or uri or "參考資料"
-            key = uri or title
-            if key in seen:
-                continue
-            citation = {"uri": uri, "title": title}
-            text = getattr(ctx, "text", None)
-            if isinstance(text, str) and text.strip():
-                citation["text"] = text
-            citations.append(citation)
-            seen.add(key)
-        return citations or None
 
     @staticmethod
     def _citation_filename(value: str | None) -> str:
@@ -198,20 +145,6 @@ class HciotMainAgent(BaseAgent):
 
         return localized or None
 
-    def _check_intent_fast(self, query: str, language: str = "zh") -> str:
-        """Classify whether *query* needs a knowledge-base lookup. Returns 'YES' or 'NO'."""
-        try:
-            response = _gemini_service.client.models.generate_content(
-                model=FILE_SEARCH_MODEL,
-                contents=build_intent_prompt(query),
-                config=types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=0)),
-            )
-            answer = response.text.strip().upper() if response.text else "NO"
-            return "NO" if "NO" in answer else "YES"
-        except Exception as e:
-            logger.error("[HCIoT Intent Check] failed: %s", e)
-            return "NO"
-
     async def chat(self, session_id: str, user_message: str) -> Dict:
         try:
             if not _gemini_service.client:
@@ -221,26 +154,16 @@ class HciotMainAgent(BaseAgent):
             if session is None:
                 return {"error": "Session not found", "message": "找不到對話記錄，請重新開始。"}
 
-            kb_result, citations = await self._concurrent_intent_and_search(user_message, session.language)
+            kb_result, citations = await self._concurrent_intent_and_search(user_message, session.language, session_id)
             citations = self._localize_citations(session.language, citations)
             image_id = self._extract_top_citation_image_id(citations)
 
             session_state = self._get_session_state(session)
-            question_label = "User question:" if session.language == "en" else "使用者問題："
-            question_block = f"{question_label} {user_message}"
-
-            if kb_result:
-                enriched_message = (
-                    f"{session_state}\n\n"
-                    f"<知識庫查詢結果>\n{kb_result}\n</知識庫查詢結果>\n\n"
-                    f"{question_block}"
-                )
-            else:
-                enriched_message = f"{session_state}\n\n{question_block}"
+            enriched_message = self._build_enriched_message(session_state, user_message, session.language, kb_result)
             chat_session = self._get_or_create_chat_session(session)
             response = chat_session.send_message(enriched_message)
 
-            if kb_result:
+            if enriched_message != user_message:
                 self._clean_enriched_history(chat_session, user_message)
 
             final_message = extract_response_text(response)

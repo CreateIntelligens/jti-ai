@@ -23,7 +23,6 @@ from app.services.agent_utils import (
     strip_citations,
 )
 from app.services.base_agent import BaseAgent
-from app.services.gemini_clients import get_client_for_store
 from app.tools.jti.tool_executor import tool_executor, ToolExecutor
 from app.services.jti.agent_prompts import (
     PERSONA,
@@ -63,8 +62,6 @@ class MainAgent(BaseAgent):
 
     # JTI 用固定的 flash-lite，避免較強的 model 自行進行測驗流程
     CHAT_MODEL = "gemini-2.5-flash-lite"
-    # File Search / Intent Check 也用 flash-lite（不帶 system_instruction 即可正常 grounding）
-    FILE_SEARCH_MODEL = "gemini-2.5-flash-lite"
 
     def __init__(self):
         super().__init__(model_name=self.CHAT_MODEL)
@@ -83,6 +80,13 @@ class MainAgent(BaseAgent):
     @staticmethod
     def _get_store_name_for_language(language: str) -> str:
         return "__jti__en" if normalize_language(language) == "en" else "__jti__"
+
+    @staticmethod
+    def _get_file_search_store_name(language: str) -> str | None:
+        store_id = os.getenv(f"JTI_STORE_ID_{language.upper()}") or os.getenv("JTI_STORE_ID_ZH")
+        if not store_id:
+            return None
+        return f"fileSearchStores/{store_id}"
 
     def _get_default_persona(self, language: str) -> str:
         return PERSONA.get(language, PERSONA["zh"])
@@ -110,63 +114,14 @@ class MainAgent(BaseAgent):
             color_result=session.color_result_id or not_yet,
         )
 
-    def _file_search(self, query: str, language: str) -> tuple[str | None, list[dict] | None]:
-        """用 flash 跑 File Search 查知識庫"""
-        store_env_key = f"JTI_STORE_ID_{language.upper()}"
-        store_id = os.getenv(store_env_key) or os.getenv("JTI_STORE_ID_ZH")
-        if not store_id:
-            logger.warning("未設定知識庫，跳過 File Search")
-            return None, None
+    def _build_intent_prompt(self, query: str, language: str) -> str:
+        lang_key = normalize_language(language)
+        template = _INTENT_PROMPT.get(lang_key, _INTENT_PROMPT["zh"])
+        return template.format(query=query)
 
-        store_name = f"fileSearchStores/{store_id}"
-        logger.info(f"[File Search] 查詢: {query[:100]}...")
-        client = get_client_for_store(store_name)
-
-        for attempt in range(3):
-            try:
-                response = client.models.generate_content(
-                    model=self.FILE_SEARCH_MODEL,
-                    contents=query,
-                    config=types.GenerateContentConfig(
-                        tools=[
-                            types.Tool(
-                                file_search=types.FileSearch(
-                                    file_search_store_names=[store_name]
-                                )
-                            )
-                        ],
-                        thinking_config=types.ThinkingConfig(thinking_budget=0),
-                    ),
-                )
-                result = response.text.strip() if response.text else None
-                citations = self._extract_citations(response)
-                logger.info(f"[File Search] 結果: {len(result) if result else 0} 字, 來源: {len(citations) if citations else 0} 筆")
-                return result, citations
-            except Exception as e:
-                if "503" in str(e) and attempt < 2:
-                    logger.warning(f"[File Search] 503，{attempt+1}/3 次重試...")
-                    time.sleep(1)
-                    continue
-                logger.error(f"[File Search] 失敗: {e}")
-                return None, None
-
-    def _check_intent_fast(self, query: str, language: str = "zh") -> str:
-        """快速判斷是否為不相關話題 (File Search 前置過濾)"""
-        try:
-            lang_key = normalize_language(language)
-            template = _INTENT_PROMPT.get(lang_key, _INTENT_PROMPT["zh"])
-            prompt = template.format(query=query)
-            response = gemini_with_retry(lambda: _gemini_service.client.models.generate_content(
-                model=self.FILE_SEARCH_MODEL,
-                contents=prompt,
-                config=types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=0)),
-            ))
-            res = response.text.strip().upper() if response.text else "YES"
-            logger.info(f"[Intent Check] 結果: {res} | 訊息: '{query[:30]}...'")
-            return "NO" if "NO" in res else "YES"
-        except Exception as e:
-            logger.error(f"[Intent Check] failed: {e}")
-            return "YES"
+    def _extract_file_search_citations(self, response) -> list[dict] | None:
+        """Extract citation list for JTI, keeping chunk text for inline previews."""
+        return self._extract_citations(response, include_text=True)
 
     async def chat(
         self,
@@ -201,23 +156,12 @@ class MainAgent(BaseAgent):
 
             # 1. 併發執行 Intent Check 和 File Search
             t0 = time.time()
-            kb_result, citations = await self._concurrent_intent_and_search(user_message, session.language)
+            kb_result, citations = await self._concurrent_intent_and_search(user_message, session.language, session_id)
 
             # 2. 組合訊息送給主 agent
             # 每輪都注入動態 session 狀態，避免模型遺忘目前是否仍在測驗或已完成測驗。
             session_state = self._get_session_state(session)
-            question_prefix = "User question:" if session.language == "en" else "使用者問題："
-            question_block = f"{question_prefix} {user_message}"
-
-            if kb_result:
-                enriched_message = (
-                    f"{session_state}\n\n"
-                    f"<知識庫查詢結果>\n{kb_result}\n</知識庫查詢結果>\n\n"
-                    f"{question_block}"
-                )
-            else:
-                enriched_message = f"{session_state}\n\n{question_block}"
-
+            enriched_message = self._build_enriched_message(session_state, user_message, session.language, kb_result)
             chat_session = self._get_or_create_chat_session(session)
 
             logger.info(f"使用者訊息: {user_message[:200]}...")

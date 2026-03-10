@@ -42,7 +42,7 @@ def test_hciot_agent_uses_flash_lite_for_chat_and_file_search():
     assert FILE_SEARCH_MODEL == "gemini-2.5-flash-lite"
 
 
-async def _fake_concurrent_result(user_message, language):
+async def _fake_concurrent_result(user_message, language, session_id=None):
     return "PRP 是使用自體血液的治療方式", None
 
 

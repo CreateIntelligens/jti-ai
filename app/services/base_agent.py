@@ -3,6 +3,7 @@ Base Agent - 共用的 Gemini chat session 管理邏輯
 
 提供 JTI MainAgent 與 HCIoT HciotMainAgent 共用的：
 - Gemini chat session 建立與快取
+- File Search chat session 管理與查詢
 - MongoDB 歷史同步（含背景非同步寫入）
 - session 清除
 """
@@ -10,15 +11,18 @@ Base Agent - 共用的 Gemini chat session 管理邏輯
 import asyncio
 import logging
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 from google.genai import types
 
 from app.models.session import Session
 import app.services.gemini_service as _gemini_service
 from app.services.agent_utils import build_chat_history, normalize_language
+from app.services.gemini_clients import get_client_for_store
 
 logger = logging.getLogger(__name__)
+
+FILE_SEARCH_MODEL = "gemini-2.5-flash-lite"
 
 
 class BaseAgent:
@@ -27,6 +31,7 @@ class BaseAgent:
     def __init__(self, model_name: str):
         self.model_name = model_name
         self._chat_sessions: Dict[str, Any] = {}
+        self._fs_sessions: Dict[str, Any] = {}  # File Search chat sessions (memory only)
 
     # --- 子類必須實作 ---
 
@@ -42,6 +47,19 @@ class BaseAgent:
     @staticmethod
     def _get_store_name_for_language(language: str) -> str:
         raise NotImplementedError
+
+    @staticmethod
+    def _get_file_search_store_name(language: str) -> str | None:
+        """Return the full fileSearchStores/... name for File Search, or None if unconfigured."""
+        raise NotImplementedError
+
+    def _build_intent_prompt(self, query: str, language: str) -> str:
+        """Build the intent classification prompt. Subclasses must override."""
+        raise NotImplementedError
+
+    def _intent_default_on_error(self) -> str:
+        """Return default intent value when intent check fails. 'YES' = pass through, 'NO' = block."""
+        return "YES"
 
     def _get_default_persona(self, language: str) -> str:
         """Return default persona text when no DB persona is configured."""
@@ -180,11 +198,15 @@ class BaseAgent:
     def remove_session(self, session_id: str):
         """清除記憶體中的 chat session"""
         self._chat_sessions.pop(session_id, None)
+        # fs_sessions key 格式: "session_id:language"
+        for key in [k for k in self._fs_sessions if k.startswith(f"{session_id}:")]:
+            del self._fs_sessions[key]
 
     def remove_all_sessions(self):
         """清除所有記憶體中的 chat sessions"""
-        count = len(self._chat_sessions)
+        count = len(self._chat_sessions) + len(self._fs_sessions)
         self._chat_sessions.clear()
+        self._fs_sessions.clear()
         if count > 0:
             logger.info("已清除 %d 個 chat sessions", count)
 
@@ -200,7 +222,7 @@ class BaseAgent:
             )
 
     @staticmethod
-    def _extract_citations(response) -> list[dict] | None:
+    def _extract_citations(response, include_text: bool = False) -> list[dict] | None:
         """從 Gemini response 的 grounding_metadata 提取來源列表。"""
         try:
             chunks = response.candidates[0].grounding_metadata.grounding_chunks
@@ -218,21 +240,126 @@ class BaseAgent:
             title = getattr(ctx, 'title', None) or uri or "參考資料"
             key = uri or title
             if key not in seen:
-                citations.append({"uri": uri, "title": title})
+                citation = {"uri": uri, "title": title}
+                if include_text:
+                    text = getattr(ctx, "text", None)
+                    if isinstance(text, str) and text.strip():
+                        citation["text"] = text
+                citations.append(citation)
                 seen.add(key)
         return citations or None
 
-    # --- 子類可覆寫的 intent / file search 方法 ---
+    def _get_recent_history_summary(self, session_id: str, max_turns: int = 3) -> list[str]:
+        """從第二層 chat session 提取最近幾輪用戶訊息，供 intent check 使用。"""
+        chat_session = self._chat_sessions.get(session_id)
+        if not chat_session:
+            return []
+        history = getattr(chat_session, '_curated_history', None)
+        if not history:
+            return []
+        user_messages = []
+        for content in reversed(history):
+            if content.role == "user" and content.parts:
+                text = content.parts[0].text if hasattr(content.parts[0], 'text') else ""
+                if text:
+                    user_messages.append(text[:100])
+            if len(user_messages) >= max_turns:
+                break
+        user_messages.reverse()
+        return user_messages
 
-    def _check_intent_fast(self, query: str, language: str = "zh") -> str:
-        """快速判斷是否為不相關話題，子類必須覆寫。"""
-        raise NotImplementedError
+    # --- 共用 enriched message 組裝 ---
 
-    def _file_search(self, query: str, language: str) -> tuple[str | None, list[dict] | None]:
-        """用 File Search 查知識庫，子類必須覆寫。"""
-        raise NotImplementedError
+    def _build_enriched_message(self, session_state: str, user_message: str, language: str, kb_result: str | None) -> str:
+        """組合 session 狀態、知識庫結果、使用者問題為完整 enriched message"""
+        question_label = "User question:" if language == "en" else "使用者問題："
+        question_block = f"{question_label} {user_message}"
 
-    async def _concurrent_intent_and_search(self, user_message: str, language: str) -> tuple[str | None, list[dict] | None]:
+        if kb_result:
+            return (
+                f"{session_state}\n\n"
+                f"<知識庫查詢結果>\n{kb_result}\n</知識庫查詢結果>\n\n"
+                f"{question_block}"
+            )
+        return f"{session_state}\n\n{question_block}"
+
+    # --- 共用 intent check / file search ---
+
+    def _check_intent_fast(self, query: str, language: str = "zh", session_id: str | None = None) -> str:
+        """快速判斷是否為不相關話題 (File Search 前置過濾)"""
+        try:
+            base_prompt = self._build_intent_prompt(query, language)
+            recent = self._get_recent_history_summary(session_id) if session_id else []
+            if recent:
+                lang_key = normalize_language(language)
+                context_label = "Recent conversation:" if lang_key == "en" else "最近對話："
+                context_block = "\n".join(f"- {m}" for m in recent)
+                prompt = f"{context_label}\n{context_block}\n\n{base_prompt}"
+            else:
+                prompt = base_prompt
+            response = _gemini_service.client.models.generate_content(
+                model=FILE_SEARCH_MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=0)),
+            )
+            answer = response.text.strip().upper() if response.text else self._intent_default_on_error()
+            result = "NO" if "NO" in answer else "YES"
+            logger.info(f"[Intent Check] 結果: {result} | 訊息: '{query[:30]}...'")
+            return result
+        except Exception as e:
+            logger.error(f"[Intent Check] failed: {e}")
+            return self._intent_default_on_error()
+
+    def _extract_file_search_citations(self, response) -> list[dict] | None:
+        """從 File Search response 提取 citations。子類可覆寫以自訂提取邏輯。"""
+        return self._extract_citations(response)
+
+    def _file_search(self, query: str, language: str, session_id: str | None = None) -> tuple[str | None, list[dict] | None]:
+        """用 File Search chat session 查知識庫（同一 session 複用以保留上下文）"""
+        store_name = self._get_file_search_store_name(language)
+        if not store_name:
+            logger.warning("[File Search] no knowledge store configured, skipping")
+            return None, None
+
+        client = get_client_for_store(store_name)
+        logger.info(f"[File Search] 查詢: {query[:100]}...")
+
+        # 取得或建立 File Search chat session
+        fs_key = f"{session_id}:{language}" if session_id else None
+        fs_session = self._fs_sessions.get(fs_key) if fs_key else None
+        if not fs_session:
+            fs_session = client.chats.create(
+                model=FILE_SEARCH_MODEL,
+                config=types.GenerateContentConfig(
+                    tools=[
+                        types.Tool(
+                            file_search=types.FileSearch(
+                                file_search_store_names=[store_name]
+                            )
+                        )
+                    ],
+                    thinking_config=types.ThinkingConfig(thinking_budget=0),
+                ),
+            )
+            if fs_key:
+                self._fs_sessions[fs_key] = fs_session
+
+        for attempt in range(3):
+            try:
+                response = fs_session.send_message(query)
+                result = response.text.strip() if response.text else None
+                citations = self._extract_file_search_citations(response)
+                logger.info(f"[File Search] 結果: {len(result) if result else 0} 字, 來源: {len(citations) if citations else 0} 筆")
+                return result, citations
+            except Exception as e:
+                if "503" in str(e) and attempt < 2:
+                    logger.warning(f"[File Search] 503，{attempt+1}/3 次重試...")
+                    time.sleep(1)
+                    continue
+                logger.error(f"[File Search] 失敗: {e}")
+                return None, None
+
+    async def _concurrent_intent_and_search(self, user_message: str, language: str, session_id: str | None = None) -> tuple[str | None, list[dict] | None]:
         """
         併發跑 Intent Check + File Search。
         Intent=NO 時快速攔截跳過知識庫；Intent=YES 時使用知識庫結果。
@@ -241,9 +368,9 @@ class BaseAgent:
         t0 = time.time()
 
         intent_task = asyncio.ensure_future(
-            loop.run_in_executor(None, self._check_intent_fast, user_message, language))
+            loop.run_in_executor(None, self._check_intent_fast, user_message, language, session_id))
         search_task = asyncio.ensure_future(
-            loop.run_in_executor(None, self._file_search, user_message, language))
+            loop.run_in_executor(None, self._file_search, user_message, language, session_id))
 
         done, _ = await asyncio.wait(
             [intent_task, search_task],
