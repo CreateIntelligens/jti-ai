@@ -60,7 +60,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   const [kbLoading, setKbLoading] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [confirmDeleteFile, setConfirmDeleteFile] = useState<string | null>(null);
-  const [deletingFile, setDeletingFile] = useState(false);
+  const [deletingFiles, setDeletingFiles] = useState<string[]>([]);
 
   // === File viewer state ===
   const [viewingFile, setViewingFile] = useState<string | null>(null);
@@ -279,15 +279,15 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   };
 
   // === KB handlers ===
-  const loadKbFiles = async () => {
-    setKbLoading(true);
+  const loadKbFiles = async (showSpinner: boolean = true) => {
+    if (showSpinner) setKbLoading(true);
     try {
       const data = await api.listJtiKnowledgeFiles(normalizedLanguage);
       setKbFiles(data.files || []);
     } catch (e) {
       console.error('Failed to load KB files:', e);
     } finally {
-      setKbLoading(false);
+      if (showSpinner) setKbLoading(false);
     }
   };
 
@@ -360,18 +360,23 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
 
   const handleDeleteFileConfirm = async () => {
     if (!confirmDeleteFile) return;
-    setDeletingFile(true);
+    const fileName = confirmDeleteFile;
+    setConfirmDeleteFile(null);
+    setDeletingFiles(prev => [...prev, fileName]);
+    setKbFiles(prev => prev.filter(file => file.name !== fileName));
+    if (viewingFile === fileName) {
+      closeViewer();
+    }
     try {
-      await api.deleteJtiKnowledgeFile(confirmDeleteFile, normalizedLanguage);
-      setConfirmDeleteFile(null);
-      await loadKbFiles();
+      await api.deleteJtiKnowledgeFile(fileName, normalizedLanguage);
       setSuccessMsg('✅ 已刪除檔案');
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       alert('刪除失敗: ' + msg);
     } finally {
-      setDeletingFile(false);
+      setDeletingFiles(prev => prev.filter(name => name !== fileName));
+      void loadKbFiles(false);
     }
   };
 
@@ -451,7 +456,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
               onDownloadFile={handleDownloadFile}
               onDeleteFileClick={handleDeleteFileClick}
               confirmDeleteFile={confirmDeleteFile}
-              deletingFile={deletingFile}
+              deletingFiles={deletingFiles}
               onDeleteFileConfirm={handleDeleteFileConfirm}
               onDeleteFileCancel={handleDeleteFileCancel}
               viewingFile={viewingFile}

@@ -23,7 +23,7 @@ export interface JtiKnowledgeTabProps {
   onDeleteFileClick: (filename: string) => void;
   // Delete confirm
   confirmDeleteFile: string | null;
-  deletingFile: boolean;
+  deletingFiles: string[];
   onDeleteFileConfirm: () => Promise<void>;
   onDeleteFileCancel: () => void;
   // Viewer
@@ -52,7 +52,7 @@ export default function JtiKnowledgeTab({
   onDownloadFile,
   onDeleteFileClick,
   confirmDeleteFile,
-  deletingFile,
+  deletingFiles,
   onDeleteFileConfirm,
   onDeleteFileCancel,
   viewingFile,
@@ -122,38 +122,43 @@ export default function JtiKnowledgeTab({
         <div className="jti-kb-empty">知識庫尚無檔案</div>
       ) : (
         <div className="jti-kb-file-list">
-          {kbFiles.map((file) => (
-            <div key={file.name} className="jti-kb-file-item">
-              <div
-                className="jti-kb-file-info"
-                onClick={() => onViewFile(file.name)}
-              >
-                <FileText size={16} className="jti-kb-file-icon" />
-                <span className="jti-kb-file-name">{file.display_name || file.name}</span>
-                {file.size && (
-                  <span className="jti-kb-file-size">
-                    {file.size > 1024 ? `${(file.size / 1024).toFixed(1)}KB` : `${file.size}B`}
-                  </span>
-                )}
-              </div>
-              <div className="jti-kb-file-actions">
-                <button
-                  className="jti-btn small secondary"
-                  onClick={() => onDownloadFile(file.name)}
-                  title="下載"
+          {kbFiles.map((file) => {
+            const isDeleting = deletingFiles.includes(file.name);
+            return (
+              <div key={file.name} className="jti-kb-file-item">
+                <div
+                  className="jti-kb-file-info"
+                  onClick={() => onViewFile(file.name)}
                 >
-                  <Download size={12} />
-                </button>
-                <button
-                  className="jti-btn small secondary"
-                  onClick={() => onDeleteFileClick(file.name)}
-                  title="刪除"
-                >
-                  <Trash2 size={12} />
-                </button>
+                  <FileText size={16} className="jti-kb-file-icon" />
+                  <span className="jti-kb-file-name">{file.display_name || file.name}</span>
+                  {file.size && (
+                    <span className="jti-kb-file-size">
+                      {file.size > 1024 ? `${(file.size / 1024).toFixed(1)}KB` : `${file.size}B`}
+                    </span>
+                  )}
+                </div>
+                <div className="jti-kb-file-actions">
+                  <button
+                    className="jti-btn small secondary"
+                    onClick={() => onDownloadFile(file.name)}
+                    title="下載"
+                    disabled={isDeleting}
+                  >
+                    <Download size={12} />
+                  </button>
+                  <button
+                    className="jti-btn small secondary"
+                    onClick={() => onDeleteFileClick(file.name)}
+                    title={isDeleting ? '刪除中' : '刪除'}
+                    disabled={isDeleting}
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -162,7 +167,6 @@ export default function JtiKnowledgeTab({
         message="確定要刪除此檔案嗎？"
         onConfirm={onDeleteFileConfirm}
         onCancel={onDeleteFileCancel}
-        loading={deletingFile}
       />
 
       {/* File viewer/editor modal */}
