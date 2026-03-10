@@ -1,3 +1,5 @@
+import pytest
+
 from app.services.hciot.main_agent import FILE_SEARCH_MODEL, HciotMainAgent
 
 
@@ -38,3 +40,47 @@ def test_hciot_agent_uses_flash_lite_for_chat_and_file_search():
 
     assert agent.model_name == "gemini-2.5-flash-lite"
     assert FILE_SEARCH_MODEL == "gemini-2.5-flash-lite"
+
+
+async def _fake_concurrent_result(user_message, language):
+    return "PRP 是使用自體血液的治療方式", None
+
+
+@pytest.mark.asyncio
+async def test_hciot_chat_injects_session_state_into_prompt(monkeypatch):
+    agent = HciotMainAgent()
+    captured = {}
+
+    class FakeChatSession:
+        def send_message(self, message):
+            captured["message"] = message
+            part = type("Part", (), {"text": "繁體回覆"})()
+            content = type("Content", (), {"parts": [part]})()
+            candidate = type("Candidate", (), {"content": content})()
+            return type("Response", (), {"candidates": [candidate]})()
+
+    session = type(
+        "Session",
+        (),
+        {
+            "session_id": "sid-123",
+            "language": "zh",
+            "chat_history": [],
+            "step": type("Step", (), {"value": "WELCOME"})(),
+            "model_dump": lambda self: {"session_id": "sid-123"},
+        },
+    )()
+
+    monkeypatch.setattr("app.services.hciot.main_agent._gemini_service.client", object())
+    monkeypatch.setattr("app.services.hciot.main_agent.session_manager.get_session", lambda sid: session)
+    monkeypatch.setattr(agent, "_concurrent_intent_and_search", _fake_concurrent_result)
+    monkeypatch.setattr(agent, "_get_or_create_chat_session", lambda s: FakeChatSession())
+    monkeypatch.setattr(agent, "_sync_history_to_db_background", lambda *a, **kw: None)
+
+    result = await agent.chat("sid-123", "PRP是什麼")
+
+    assert result["message"] == "繁體回覆"
+    assert captured["message"].startswith("<內部狀態資訊 - 不要在回應中提及>")
+    assert "必須使用繁體中文回應所有內容" in captured["message"]
+    assert "使用者問題：" in captured["message"]
+    assert "PRP是什麼" in captured["message"]

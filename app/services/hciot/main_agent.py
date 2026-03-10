@@ -225,11 +225,18 @@ class HciotMainAgent(BaseAgent):
             citations = self._localize_citations(session.language, citations)
             image_id = self._extract_top_citation_image_id(citations)
 
-            enriched_message = (
-                f"<知識庫查詢結果>\n{kb_result}\n</知識庫查詢結果>\n\n使用者問題：{user_message}"
-                if kb_result
-                else user_message
-            )
+            session_state = self._get_session_state(session)
+            question_label = "User question:" if session.language == "en" else "使用者問題："
+            question_block = f"{question_label} {user_message}"
+
+            if kb_result:
+                enriched_message = (
+                    f"{session_state}\n\n"
+                    f"<知識庫查詢結果>\n{kb_result}\n</知識庫查詢結果>\n\n"
+                    f"{question_block}"
+                )
+            else:
+                enriched_message = f"{session_state}\n\n{question_block}"
             chat_session = self._get_or_create_chat_session(session)
             response = chat_session.send_message(enriched_message)
 
