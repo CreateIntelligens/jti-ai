@@ -3,7 +3,7 @@ import type {
   FileItem,
   ChatResponse,
   StartChatResponse,
-  CmsAppTarget,
+  AppTarget,
 } from '../../types';
 import { API_BASE, fetchAsAdmin, fetchWithApiKey, fetchWithUserGeminiKey, handleResponse } from './base';
 
@@ -38,52 +38,38 @@ export async function fetchFiles(storeName: string): Promise<FileItem[]> {
   return handleResponse<FileItem[]>(response);
 }
 
-export async function uploadFile(storeName: string, file: File): Promise<void> {
-  const formData = new FormData();
-  formData.append('file', file);
-  const response = await fetchWithUserGeminiKey(`${API_BASE}/stores/${storeName}/upload`, {
-    method: 'POST',
-    body: formData,
-  });
-  await handleResponse<void>(response);
+// ========== Knowledge Management ==========
+
+function knowledgeParams(appTarget: AppTarget, language: string): URLSearchParams {
+  const normalizedLanguage = language.toLowerCase().startsWith('en') ? 'en' : 'zh';
+  return new URLSearchParams({ app: appTarget, language: normalizedLanguage });
 }
 
-export async function deleteFile(fileName: string): Promise<void> {
-  const response = await fetchWithUserGeminiKey(`${API_BASE}/files/${fileName}`, { method: 'DELETE' });
-  await handleResponse<void>(response);
+function knowledgeFileUrl(filename: string, suffix: string, appTarget: AppTarget, language: string): string {
+  return `${API_BASE}/knowledge/files/${encodeURIComponent(filename)}${suffix}?${knowledgeParams(appTarget, language)}`;
 }
 
-// ========== Homepage CMS Knowledge ==========
-
-function normalizeKnowledgeLanguage(language: string): string {
-  return language.toLowerCase().startsWith('en') ? 'en' : 'zh';
-}
-
-export async function listManagedKnowledgeFiles(appTarget: CmsAppTarget, language: string = 'zh'): Promise<any> {
-  const params = new URLSearchParams({ app: appTarget, language: normalizeKnowledgeLanguage(language) });
-  const response = await fetchAsAdmin(`${API_BASE}/admin/knowledge/files/?${params}`);
+export async function listManagedKnowledgeFiles(appTarget: AppTarget, language: string = 'zh'): Promise<any> {
+  const response = await fetchAsAdmin(`${API_BASE}/knowledge/files/?${knowledgeParams(appTarget, language)}`);
   return handleResponse<any>(response);
 }
 
-export async function getManagedKnowledgeFileContent(appTarget: CmsAppTarget, filename: string, language: string = 'zh'): Promise<any> {
-  const params = new URLSearchParams({ app: appTarget, language: normalizeKnowledgeLanguage(language) });
-  const response = await fetchAsAdmin(`${API_BASE}/admin/knowledge/files/${encodeURIComponent(filename)}/content?${params}`);
+export async function getManagedKnowledgeFileContent(appTarget: AppTarget, filename: string, language: string = 'zh'): Promise<any> {
+  const response = await fetchAsAdmin(knowledgeFileUrl(filename, '/content', appTarget, language));
   return handleResponse<any>(response);
 }
 
-export function downloadManagedKnowledgeFile(appTarget: CmsAppTarget, filename: string, language: string = 'zh'): void {
-  const params = new URLSearchParams({ app: appTarget, language: normalizeKnowledgeLanguage(language) });
-  window.open(`${API_BASE}/admin/knowledge/files/${encodeURIComponent(filename)}/download?${params}`, '_blank');
+export function downloadManagedKnowledgeFile(appTarget: AppTarget, filename: string, language: string = 'zh'): void {
+  window.open(knowledgeFileUrl(filename, '/download', appTarget, language), '_blank');
 }
 
 export async function updateManagedKnowledgeFileContent(
-  appTarget: CmsAppTarget,
+  appTarget: AppTarget,
   filename: string,
   content: string,
   language: string = 'zh',
 ): Promise<any> {
-  const params = new URLSearchParams({ app: appTarget, language: normalizeKnowledgeLanguage(language) });
-  const response = await fetchAsAdmin(`${API_BASE}/admin/knowledge/files/${encodeURIComponent(filename)}/content?${params}`, {
+  const response = await fetchAsAdmin(knowledgeFileUrl(filename, '/content', appTarget, language), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content }),
@@ -91,20 +77,18 @@ export async function updateManagedKnowledgeFileContent(
   return handleResponse<any>(response);
 }
 
-export async function uploadManagedKnowledgeFile(appTarget: CmsAppTarget, language: string, file: File): Promise<any> {
+export async function uploadManagedKnowledgeFile(appTarget: AppTarget, language: string, file: File): Promise<any> {
   const formData = new FormData();
   formData.append('file', file);
-  const params = new URLSearchParams({ app: appTarget, language: normalizeKnowledgeLanguage(language) });
-  const response = await fetchAsAdmin(`${API_BASE}/admin/knowledge/upload/?${params}`, {
+  const response = await fetchAsAdmin(`${API_BASE}/knowledge/upload/?${knowledgeParams(appTarget, language)}`, {
     method: 'POST',
     body: formData,
   });
   return handleResponse<any>(response);
 }
 
-export async function deleteManagedKnowledgeFile(appTarget: CmsAppTarget, fileName: string, language: string = 'zh'): Promise<any> {
-  const params = new URLSearchParams({ app: appTarget, language: normalizeKnowledgeLanguage(language) });
-  const response = await fetchAsAdmin(`${API_BASE}/admin/knowledge/files/${encodeURIComponent(fileName)}?${params}`, {
+export async function deleteManagedKnowledgeFile(appTarget: AppTarget, fileName: string, language: string = 'zh'): Promise<any> {
+  const response = await fetchAsAdmin(knowledgeFileUrl(fileName, '', appTarget, language), {
     method: 'DELETE',
   });
   return handleResponse<any>(response);

@@ -3,11 +3,8 @@ Store Management API Endpoints
 """
 
 import os
-import shutil
-import uuid
-from pathlib import Path
 
-from fastapi import APIRouter, File, UploadFile, Depends, Request
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 
 from app.auth import verify_auth, require_admin, extract_user_gemini_api_key
@@ -37,6 +34,9 @@ def _normalize_store_name(store_name: str | None) -> str | None:
 
 def _resolve_managed_store_context(store_name: str) -> dict[str, str] | None:
     normalized = _normalize_store_name(store_name)
+    if not normalized:
+        return None
+
     mappings = [
         ("jti", "zh", os.getenv("JTI_STORE_ID_ZH")),
         ("jti", "en", os.getenv("JTI_STORE_ID_EN")),
@@ -45,7 +45,7 @@ def _resolve_managed_store_context(store_name: str) -> dict[str, str] | None:
     ]
 
     for app_name, language, configured_store in mappings:
-        if normalized and normalized == _normalize_store_name(configured_store):
+        if normalized == _normalize_store_name(configured_store):
             return {"managed_app": app_name, "managed_language": language}
     return None
 
@@ -104,40 +104,6 @@ def list_files(store_name: str, request: Request, auth: dict = Depends(verify_au
     mgr = _get_or_create_manager(user_api_key=extract_user_gemini_api_key(request))
     files = mgr.list_files(store_name)
     return [{"name": f.name, "display_name": f.display_name} for f in files]
-
-
-@router.delete("/files/{file_name:path}")
-def delete_file(file_name: str, request: Request, auth: dict = Depends(verify_auth)):
-    """刪除檔案。（Admin only）"""
-    require_admin(auth)
-    mgr = _get_or_create_manager(user_api_key=extract_user_gemini_api_key(request))
-    print(f"嘗試刪除檔案: {file_name}")
-    mgr.delete_file(file_name)
-    return {"ok": True}
-
-
-@router.post("/stores/{store_name:path}/upload")
-async def upload_file(store_name: str, request: Request, file: UploadFile = File(...), auth: dict = Depends(verify_auth)):
-    """上傳檔案到 Store。（Admin only）"""
-    require_admin(auth)
-    mgr = _get_or_create_manager(user_api_key=extract_user_gemini_api_key(request))
-
-    temp_dir = Path("/tmp/gemini-upload")
-    temp_dir.mkdir(exist_ok=True)
-    ext = Path(file.filename).suffix if file.filename else ""
-    safe_filename = f"{uuid.uuid4()}{ext}"
-    temp_path = temp_dir / safe_filename
-
-    with open(temp_path, "wb") as f:
-        shutil.copyfileobj(file.file, f)
-
-    try:
-        result = mgr.upload_file(
-            store_name, str(temp_path), file.filename, mime_type=None
-        )
-        return {"name": result}
-    finally:
-        temp_path.unlink(missing_ok=True)
 
 
 @router.post("/query")

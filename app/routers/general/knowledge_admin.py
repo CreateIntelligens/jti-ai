@@ -1,5 +1,5 @@
 """
-Homepage CMS knowledge management API for JTI and HCIoT.
+Knowledge Management API for JTI and HCIoT.
 """
 
 import io
@@ -22,7 +22,7 @@ from app.routers.knowledge_utils import (
 )
 from app.services.knowledge_store import get_knowledge_store
 
-router = APIRouter(prefix="/api/admin/knowledge", tags=["CMS Knowledge"], dependencies=[Depends(verify_admin)])
+router = APIRouter(prefix="/api/knowledge", tags=["Knowledge Management"], dependencies=[Depends(verify_admin)])
 
 EDITABLE_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".yaml", ".yml", ".docx"}
 TEXT_PREVIEW_EXTENSIONS = EDITABLE_EXTENSIONS | {".log", ".py", ".js", ".html"}
@@ -44,14 +44,12 @@ def _get_store_name(app_name: str, language: str) -> str | None:
     normalized_app = _normalize_app_name(app_name)
     normalized_language = "en" if str(language).lower().startswith("en") else "zh"
 
-    if normalized_app == "jti":
-        if normalized_language == "en":
-            store_id = os.getenv("JTI_STORE_ID_EN")
-        else:
-            store_id = os.getenv("JTI_STORE_ID_ZH")
-    else:
-        env_key = f"HCIOT_STORE_ID_{normalized_language.upper()}"
-        store_id = os.getenv(env_key) or os.getenv("HCIOT_STORE_ID")
+    env_key = f"{normalized_app.upper()}_STORE_ID_{normalized_language.upper()}"
+    store_id = os.getenv(env_key)
+
+    # HCIoT fallback: try language-neutral HCIOT_STORE_ID if language-specific key is missing
+    if not store_id and normalized_app == "hciot":
+        store_id = os.getenv("HCIOT_STORE_ID")
 
     if not store_id:
         return None
@@ -283,7 +281,7 @@ async def upload_knowledge_file(
         try:
             gemini_synced = _sync_to_gemini(namespace, language, saved["name"], file_bytes)
         except Exception as e:
-            print(f"[CMS KB] Gemini sync failed for {namespace}/{saved['name']}: {e}")
+            print(f"[Knowledge] Gemini sync failed for {namespace}/{saved['name']}: {e}")
 
     return {
         "name": saved["name"],
@@ -313,7 +311,7 @@ def delete_knowledge_file(
         try:
             gemini_deleted_count = _delete_from_gemini(namespace, language, safe_name)
         except Exception as e:
-            print(f"[CMS KB] Gemini delete failed for {namespace}/{safe_name}: {e}")
+            print(f"[Knowledge] Gemini delete failed for {namespace}/{safe_name}: {e}")
             raise HTTPException(status_code=502, detail="Gemini 同步刪除失敗，Mongo 未刪除")
 
     deleted = store.delete_file(language, safe_name, namespace=namespace)

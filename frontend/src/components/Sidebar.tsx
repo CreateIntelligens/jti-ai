@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Download, FolderKanban, LibraryBig, Pencil, X } from 'lucide-react';
-import type { FileItem, KnowledgeTarget, CmsAppTarget, KnowledgeLanguage } from '../types';
+import type { FileItem, KnowledgeTarget, AppTarget, KnowledgeLanguage } from '../types';
 import CustomSelect from './CustomSelect';
 import * as api from '../services/api';
 
@@ -11,7 +11,7 @@ interface SidebarProps {
   knowledgeTargets: KnowledgeTarget[];
   currentTargetId: string | null;
   managedContext: {
-    appTarget: CmsAppTarget;
+    appTarget: AppTarget;
     language: KnowledgeLanguage;
   } | null;
   files: FileItem[];
@@ -258,8 +258,8 @@ export default function Sidebar({
                   >
                     {file.display_name || file.name}
                   </span>
-                  {managedContext ? (
-                    <div className="file-actions">
+                  <div className="file-actions">
+                    {managedContext && (
                       <button
                         onClick={() => handleDownloadManagedFile(file.name)}
                         className="secondary small"
@@ -268,26 +268,16 @@ export default function Sidebar({
                       >
                         <Download size={12} />
                       </button>
-                      <button
-                        onClick={() => onDeleteFile(file.name)}
-                        className="danger small"
-                        aria-label={`刪除文件 ${file.display_name || file.name}`}
-                        title="刪除"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="file-actions">
-                      <button
-                        onClick={() => onDeleteFile(file.name)}
-                        className="danger small"
-                        aria-label={`刪除文件 ${file.display_name || file.name}`}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  )}
+                    )}
+                    <button
+                      onClick={() => onDeleteFile(file.name)}
+                      className="danger small"
+                      aria-label={`刪除文件 ${file.display_name || file.name}`}
+                      title="刪除"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>

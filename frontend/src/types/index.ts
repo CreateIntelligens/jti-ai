@@ -3,12 +3,12 @@ export interface Store {
   display_name?: string;
   file_count?: number;
   created_at?: string;
-  managed_app?: CmsAppTarget | null;
+  managed_app?: AppTarget | null;
   managed_language?: KnowledgeLanguage | null;
   key_index?: number;
 }
 
-export type CmsAppTarget = 'jti' | 'hciot';
+export type AppTarget = 'jti' | 'hciot';
 export type KnowledgeLanguage = 'zh' | 'en';
 
 export type KnowledgeTarget =
@@ -17,14 +17,14 @@ export type KnowledgeTarget =
       kind: 'store';
       label: string;
       storeName: string;
-      managedApp?: CmsAppTarget | null;
+      managedApp?: AppTarget | null;
       managedLanguage?: KnowledgeLanguage | null;
     }
   | {
       id: string;
       kind: 'app';
       label: string;
-      appTarget: CmsAppTarget;
+      appTarget: AppTarget;
       language: KnowledgeLanguage;
     };
 

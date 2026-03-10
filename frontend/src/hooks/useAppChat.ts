@@ -6,7 +6,7 @@ import type {
   FileItem,
   Message,
   KnowledgeTarget,
-  CmsAppTarget,
+  AppTarget,
   KnowledgeLanguage,
 } from '../types';
 
@@ -41,7 +41,7 @@ function findKnowledgeTarget(targetId: string | null, storeList: Store[]): Knowl
 }
 
 function getManagedKnowledgeContext(target: KnowledgeTarget | null): {
-  appTarget: CmsAppTarget;
+  appTarget: AppTarget;
   language: KnowledgeLanguage;
 } | null {
   if (!target || target.kind !== 'store' || !target.managedApp || !target.managedLanguage) return null;
@@ -330,12 +330,12 @@ export function useAppChat() {
       alert('請先選擇知識庫');
       return;
     }
+    if (!managedContext) {
+      alert('此知識庫不支援直接上傳，請透過知識庫管理功能操作');
+      return;
+    }
     try {
-      if (managedContext) {
-        await api.uploadManagedKnowledgeFile(managedContext.appTarget, managedContext.language, file);
-      } else if (currentTarget.kind === 'store') {
-        await api.uploadFile(currentTarget.storeName, file);
-      }
+      await api.uploadManagedKnowledgeFile(managedContext.appTarget, managedContext.language, file);
       await refreshFiles(currentTarget);
       showStatus('文件上傳成功');
     } catch (e) {
@@ -345,12 +345,12 @@ export function useAppChat() {
 
   const handleDeleteFile = async (fileName: string) => {
     if (!currentTarget || !confirm('確定刪除此文件？')) return;
+    if (!managedContext) {
+      alert('此知識庫不支援直接刪除，請透過知識庫管理功能操作');
+      return;
+    }
     try {
-      if (managedContext) {
-        await api.deleteManagedKnowledgeFile(managedContext.appTarget, fileName, managedContext.language);
-      } else if (currentTarget.kind === 'store') {
-        await api.deleteFile(fileName);
-      }
+      await api.deleteManagedKnowledgeFile(managedContext.appTarget, fileName, managedContext.language);
       await refreshFiles(currentTarget);
       showStatus('文件已刪除');
     } catch (e) {
