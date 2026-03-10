@@ -11,7 +11,7 @@ Base Agent - 共用的 Gemini chat session 管理邏輯
 import asyncio
 import logging
 import time
-from typing import Any, Dict
+from typing import Any
 
 from google.genai import types
 
@@ -23,6 +23,7 @@ from app.services.gemini_clients import get_client_for_store
 logger = logging.getLogger(__name__)
 
 FILE_SEARCH_MODEL = "gemini-2.5-flash-lite"
+FILE_SEARCH_MAX_RETRIES = 3
 
 
 class BaseAgent:
@@ -30,8 +31,7 @@ class BaseAgent:
 
     def __init__(self, model_name: str):
         self.model_name = model_name
-        self._chat_sessions: Dict[str, Any] = {}
-        self._fs_sessions: Dict[str, Any] = {}  # File Search chat sessions (memory only)
+        self._chat_sessions: dict[str, Any] = {}
 
     # --- 子類必須實作 ---
 
@@ -60,6 +60,10 @@ class BaseAgent:
     def _intent_default_on_error(self) -> str:
         """Return default intent value when intent check fails. 'YES' = pass through, 'NO' = block."""
         return "YES"
+
+    def _prepare_search_query(self, query: str, language: str) -> str:
+        """可覆寫：在送出 File Search 前對 query 加工。預設原樣回傳。"""
+        return query
 
     def _get_default_persona(self, language: str) -> str:
         """Return default persona text when no DB persona is configured."""
@@ -198,15 +202,11 @@ class BaseAgent:
     def remove_session(self, session_id: str):
         """清除記憶體中的 chat session"""
         self._chat_sessions.pop(session_id, None)
-        # fs_sessions key 格式: "session_id:language"
-        for key in [k for k in self._fs_sessions if k.startswith(f"{session_id}:")]:
-            del self._fs_sessions[key]
 
     def remove_all_sessions(self):
         """清除所有記憶體中的 chat sessions"""
-        count = len(self._chat_sessions) + len(self._fs_sessions)
+        count = len(self._chat_sessions)
         self._chat_sessions.clear()
-        self._fs_sessions.clear()
         if count > 0:
             logger.info("已清除 %d 個 chat sessions", count)
 
@@ -315,45 +315,40 @@ class BaseAgent:
         return self._extract_citations(response)
 
     def _file_search(self, query: str, language: str, session_id: str | None = None) -> tuple[str | None, list[dict] | None]:
-        """用 File Search chat session 查知識庫（同一 session 複用以保留上下文）"""
+        """用 File Search 查知識庫（無狀態，每次獨立查詢以確保 grounding）"""
         store_name = self._get_file_search_store_name(language)
         if not store_name:
             logger.warning("[File Search] no knowledge store configured, skipping")
             return None, None
 
         client = get_client_for_store(store_name)
-        logger.info(f"[File Search] 查詢: {query[:100]}...")
+        search_query = self._prepare_search_query(query, language)
+        logger.info(f"[File Search] 查詢: {search_query[:100]}...")
 
-        # 取得或建立 File Search chat session
-        fs_key = f"{session_id}:{language}" if session_id else None
-        fs_session = self._fs_sessions.get(fs_key) if fs_key else None
-        if not fs_session:
-            fs_session = client.chats.create(
-                model=FILE_SEARCH_MODEL,
-                config=types.GenerateContentConfig(
-                    tools=[
-                        types.Tool(
-                            file_search=types.FileSearch(
-                                file_search_store_names=[store_name]
-                            )
-                        )
-                    ],
-                    thinking_config=types.ThinkingConfig(thinking_budget=0),
-                ),
-            )
-            if fs_key:
-                self._fs_sessions[fs_key] = fs_session
-
-        for attempt in range(3):
+        for attempt in range(FILE_SEARCH_MAX_RETRIES):
             try:
-                response = fs_session.send_message(query)
+                response = client.models.generate_content(
+                    model=FILE_SEARCH_MODEL,
+                    contents=search_query,
+                    config=types.GenerateContentConfig(
+                        tools=[
+                            types.Tool(
+                                file_search=types.FileSearch(
+                                    file_search_store_names=[store_name]
+                                )
+                            )
+                        ],
+                        thinking_config=types.ThinkingConfig(thinking_budget=0),
+                    ),
+                )
                 result = response.text.strip() if response.text else None
                 citations = self._extract_file_search_citations(response)
                 logger.info(f"[File Search] 結果: {len(result) if result else 0} 字, 來源: {len(citations) if citations else 0} 筆")
                 return result, citations
             except Exception as e:
-                if "503" in str(e) and attempt < 2:
-                    logger.warning(f"[File Search] 503，{attempt+1}/3 次重試...")
+                is_retryable = "503" in str(e) and attempt < FILE_SEARCH_MAX_RETRIES - 1
+                if is_retryable:
+                    logger.warning(f"[File Search] 503，{attempt+1}/{FILE_SEARCH_MAX_RETRIES} 次重試...")
                     time.sleep(1)
                     continue
                 logger.error(f"[File Search] 失敗: {e}")

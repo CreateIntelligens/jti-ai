@@ -10,7 +10,6 @@ Main Agent - 核心對話邏輯
 import logging
 import os
 import time
-from typing import Dict
 
 from google.genai import types
 from app.models.session import Session
@@ -114,6 +113,44 @@ class MainAgent(BaseAgent):
             color_result=session.color_result_id or not_yet,
         )
 
+    def _prepare_search_query(self, query: str, language: str) -> str:
+        prefix = "Please search the knowledge base: " if language == "en" else "請你在知識庫查："
+        return f"{prefix}{query}"
+
+    def _file_search(self, query: str, language: str, session_id: str | None = None) -> tuple[str | None, list[dict] | None]:
+        """JTI: 用 File Search 取 top 3 citations，再從 MongoDB 讀原始檔案內容"""
+        _, citations = super()._file_search(query, language, session_id)
+        if not citations:
+            return None, None
+
+        from app.services.knowledge_store import get_knowledge_store
+
+        top_citations = citations[:3]
+        store = get_knowledge_store()
+        lang = normalize_language(language)
+
+        contents: list[str] = []
+        for citation in top_citations:
+            filename = citation.get("title", "")
+            if not filename:
+                continue
+            data = store.get_file_data(lang, filename, namespace="jti")
+            if not data:
+                continue
+            try:
+                text = data.decode("utf-8").strip()
+            except UnicodeDecodeError:
+                continue
+            if text:
+                contents.append(f"[{filename}]\n{text}")
+
+        if not contents:
+            return None, top_citations
+
+        kb_text = "\n\n".join(contents)
+        logger.info(f"[File Search] 原始檔案內容: {len(contents)} 筆, {len(kb_text)} 字")
+        return kb_text, top_citations
+
     def _build_intent_prompt(self, query: str, language: str) -> str:
         lang_key = normalize_language(language)
         template = _INTENT_PROMPT.get(lang_key, _INTENT_PROMPT["zh"])
@@ -127,7 +164,7 @@ class MainAgent(BaseAgent):
         self,
         session_id: str,
         user_message: str,
-    ) -> Dict:
+    ) -> dict:
         """
         處理對話
 
