@@ -397,3 +397,47 @@ body::before {
   max-height: 200px;
   overflow-y: auto;
 }
+
+/* ==================== HCIOT IMAGE ATTACHMENT ==================== */
+
+.hciot-image-attachment {
+  margin-top: 0.85rem;
+  overflow: hidden;
+  border: 1px solid var(--hciot-border, var(--border-color));
+  border-radius: 1rem;
+  background: var(--hciot-panel, var(--bg-secondary));
+  box-shadow: var(--hciot-shadow, var(--shadow-sm));
+}
+
+.hciot-image-link {
+  display: block;
+  background: linear-gradient(180deg, rgba(2, 132, 199, 0.08), rgba(15, 23, 42, 0.02));
+}
+
+.hciot-image-link:focus-visible {
+  outline: 2px solid var(--hciot-accent, var(--primary-color));
+  outline-offset: 2px;
+}
+
+.hciot-image-link:hover .hciot-image-preview {
+  transform: scale(1.01);
+}
+
+.hciot-image-preview {
+  display: block;
+  width: 100%;
+  max-height: min(22rem, 52vh);
+  object-fit: contain;
+  background: rgba(15, 23, 42, 0.06);
+  transition: transform 0.25s ease;
+}
+
+.hciot-image-caption {
+  padding: 0.7rem 0.85rem;
+  border-top: 1px solid var(--hciot-border, var(--border-color));
+  color: var(--hciot-ink-soft, var(--text-secondary));
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  word-break: break-all;
+}

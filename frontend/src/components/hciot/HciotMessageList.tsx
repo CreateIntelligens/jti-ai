@@ -2,6 +2,7 @@ import React from 'react';
 
 import CitationsList from '../CitationsList';
 import HciotHero from './HciotHero';
+import HciotImageAttachment from './HciotImageAttachment';
 
 export interface HciotMessage {
   text: string;
@@ -106,9 +107,7 @@ export default function HciotMessageList({
                 ) : (
                   <>
                     <div className="hciot-message-text">{msg.text}</div>
-                    {msg.imageId ? (
-                      <div className="hciot-image-source">Image ID: {msg.imageId}</div>
-                    ) : null}
+                    {msg.imageId ? <HciotImageAttachment imageId={msg.imageId} /> : null}
                     {msg.citations && msg.citations.length > 0 && (
                       <CitationsList citations={msg.citations} messageIndex={idx} />
                     )}

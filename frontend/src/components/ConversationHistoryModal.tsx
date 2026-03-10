@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { deleteConversations, fetchAsAdmin, fetchWithApiKey, getGeneralConversationDetail, getHciotConversationDetail } from '../services/api';
 import MiniCalendar from './MiniCalendar';
+import HciotImageAttachment from './hciot/HciotImageAttachment';
 
 interface ConversationEntry {
   _id: string;
@@ -805,6 +806,9 @@ export default function ConversationHistoryModal({
                                 <div className="turn-detail-label">AI {t('response') || '回應'}</div>
                                 <div className="turn-detail-response">
                                   <p>{conv.agent_response}</p>
+                                  {mode === 'hciot' && conv.image_id ? (
+                                    <HciotImageAttachment imageId={conv.image_id} alt={`HCIoT reference image ${conv.image_id}`} />
+                                  ) : null}
                                   <button
                                     className="secondary small copy-btn"
                                     onClick={() => copyToClipboard(conv.agent_response, `agent-${conv._id}`)}
