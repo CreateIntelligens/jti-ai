@@ -28,6 +28,7 @@ from app.schemas.chat import (
 from app.services.jti.main_agent import main_agent
 from app.services.jti.runtime_quiz_flow import (
     execute_quiz_start,
+    extract_option_texts,
     make_quiz_tts_text,
 )
 from app.services.jti.tts_jobs import tts_job_manager
@@ -239,9 +240,11 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     scores_str = " | ".join([f"{k}:{v}" for k, v in sorted(updated_session.color_scores.items(), key=lambda x: -x[1])])
                     logger.info(f"[當前分數] {scores_str}")
 
-                if tool_result.get("is_complete"):
+                is_complete = tool_result.get("is_complete")
+                next_q = tool_result.get("next_question") if not is_complete else None
+
+                if is_complete:
                     response_message = tool_result.get("message", "")
-                    updated_session = session_manager.get_session(request.session_id)
                     tts_text = to_tts_text(response_message, updated_session.language)
 
                     # 把測驗結果注入 chat_history，讓後續 LLM 對話能看到
@@ -249,7 +252,6 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     updated_session.chat_history.append({"role": "assistant", "content": response_message})
                     session_manager.update_session(updated_session)
                 else:
-                    next_q = tool_result["next_question"]
                     q_num = len(updated_session.answers) + 1
                     next_options_text = _format_options_text(next_q.get("options", []))
                     if updated_session.language == "en":
@@ -270,18 +272,21 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     mode="jti"
                 )
                 final_turn_number = log_result[1] if log_result else None
-                logger.info(f"✅ QUIZ 作答成功: {request.message} → {user_choice}")
+                logger.info(f"QUIZ 作答成功: {request.message} -> {user_choice}")
 
+                color_result = tool_result.get("color_result") or {}
                 response_payload = ChatResponse(
                     message=response_message,
                     tts_text=tts_text,
+                    options=extract_option_texts(next_q),
+                    quiz_result_id=color_result.get("color_id") if is_complete else None,
                     session=updated_session.model_dump(),
                     tool_calls=[{k: v for k, v in call.items() if k != "result"} for call in tool_calls],
                     turn_number=final_turn_number,
                 )
                 return _attach_tts_message_id(response_payload, updated_session.language)
             else:
-                # ❌ 無法判斷選項：hardcode 提示
+                # 無法判斷選項：hardcode 提示
                 if session.language == "en":
                     hint = "Please choose one of the options!"
                     response_message = f"{hint}\n\nQuestion {current_q_num}: {q.get('text', '')}\n{options_text}"
@@ -289,7 +294,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     hint = "請從選項中選一個喜歡的答案喔！"
                     response_message = f"{hint}\n\n第{current_q_num}題：{q.get('text', '')}\n{options_text}"
 
-                logger.info(f"⚠️ QUIZ 無法判斷選項，hardcode 提示: {request.message}")
+                logger.info(f"QUIZ 無法判斷選項，hardcode 提示: {request.message}")
 
                 if request.turn_number:
                     conversation_logger.delete_turns_from(request.session_id, request.turn_number)
@@ -310,6 +315,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                         f"{hint} {make_quiz_tts_text(q, current_q_num, session.language)}",
                         session.language,
                     ),
+                    options=extract_option_texts(q),
                     session=session.model_dump(),
                     tool_calls=[],
                     turn_number=final_turn_number

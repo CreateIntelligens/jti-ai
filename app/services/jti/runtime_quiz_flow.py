@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
 from fastapi import HTTPException
 
 from app.schemas.chat import ChatResponse
-from app.services.jti.quiz_helpers import _format_options_text, build_session_state
+from app.services.jti.quiz_helpers import (
+    _format_options_text,
+    _label_options,
+    build_session_state,
+)
 from app.services.jti.tts_text import to_tts_text
 from app.services.session.session_manager_factory import (
     get_conversation_logger,
@@ -31,6 +36,16 @@ def make_quiz_tts_text(q: dict, q_num: int, language: str) -> str:
     if language == "en":
         return f"Question {q_num}: {text}"
     return f"第{q_num}題：{text}"
+
+
+def extract_option_texts(q: Optional[dict]) -> Optional[list[str]]:
+    """Extract labelled option list (e.g. ['A. 簡約', 'B. 可愛']) from a question dict."""
+    if not isinstance(q, dict):
+        return None
+    options = q.get("options", [])
+    if not options:
+        return None
+    return _label_options(options)
 
 
 async def execute_quiz_start(
@@ -113,6 +128,7 @@ async def execute_quiz_start(
     return ChatResponse(
         message=response_message,
         tts_text=tts_text,
+        options=extract_option_texts(q),
         session=updated_session.model_dump() if updated_session else session.model_dump(),
         tool_calls=[{"tool": "start_quiz", "args": {"session_id": session_id}}],
         turn_number=final_turn_number,

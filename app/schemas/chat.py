@@ -33,6 +33,8 @@ class ChatResponse(BaseModel):
     tts_text: Optional[str] = None
     tts_message_id: Optional[str] = None
     image_id: Optional[str] = None
+    options: Optional[List[str]] = None
+    quiz_result_id: Optional[str] = None
     session: Optional[Dict[str, Any]] = None
     tool_calls: Optional[list] = None
     citations: Optional[List[Dict[str, Any]]] = None

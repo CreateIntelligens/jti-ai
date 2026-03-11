@@ -51,13 +51,19 @@ def _get_or_rebuild_session(session_id: str):
     return session
 
 
-def _format_options_text(options: list) -> str:
+def _label_options(options: list) -> list[str]:
+    """Return labelled option strings, e.g. ['A. 簡約', 'B. 可愛']."""
     labels = "ABCDE"
-    lines = []
-    for idx, opt in enumerate(options):
-        label = labels[idx] if idx < len(labels) else str(idx + 1)
-        lines.append(f"{label}. {opt.get('text', '')}")
-    return "\n".join(lines)
+    return [
+        f"{labels[i]}. {opt.get('text', '')}"
+        for i, opt in enumerate(options)
+        if i < len(labels)
+    ]
+
+
+def _format_options_text(options: list) -> str:
+    """Format options as a newline-separated string for display in messages."""
+    return "\n".join(_label_options(options))
 
 
 async def _pause_quiz_and_respond(
