@@ -1,13 +1,9 @@
 """Tests for KnowledgeStore namespace isolation."""
 
-import sys
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 mock_db = MagicMock()
-mock_mongo_client_module = MagicMock()
-mock_mongo_client_module.get_mongo_db.return_value = mock_db
-sys.modules.setdefault("app.services.mongo_client", mock_mongo_client_module)
 
 from app.services.knowledge_store import KnowledgeStore
 
@@ -19,6 +15,9 @@ class FakeCursor(list):
 
 class TestKnowledgeStoreNamespace(unittest.TestCase):
     def setUp(self):
+        patcher = patch("app.services.knowledge_store.get_mongo_db", return_value=mock_db)
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.store = KnowledgeStore()
         self.col = self.store.collection
         self.col.reset_mock(return_value=True, side_effect=True)

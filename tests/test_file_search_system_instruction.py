@@ -8,22 +8,33 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import google.genai as genai
 from google.genai import types
+import pytest
 
 API_KEY = os.getenv("GEMINI_API_KEY")
 STORE_ID = os.getenv("JTI_STORE_ID_ZH")
 MODEL = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
+FILE_SEARCH_SUPPORTED = hasattr(types, "FileSearch")
 
-client = genai.Client(api_key=API_KEY)
-store_name = f"fileSearchStores/{STORE_ID}"
+pytestmark = pytest.mark.skipif(
+    not API_KEY or not STORE_ID or not FILE_SEARCH_SUPPORTED,
+    reason="requires GEMINI_API_KEY, JTI_STORE_ID_ZH, and google.genai.types.FileSearch",
+)
+
+client = genai.Client(api_key=API_KEY) if API_KEY else None
+store_name = f"fileSearchStores/{STORE_ID}" if STORE_ID else ""
 question = "Ploom X 機身有哪些顏色"
 
-file_search_tools = [
-    types.Tool(
-        file_search=types.FileSearch(
-            file_search_store_names=[store_name]
+file_search_tools = (
+    [
+        types.Tool(
+            file_search=types.FileSearch(
+                file_search_store_names=[store_name]
+            )
         )
-    )
-]
+    ]
+    if FILE_SEARCH_SUPPORTED and STORE_ID
+    else []
+)
 
 LONG_SYSTEM_PROMPT = """你是 Ploom X 加熱器的智慧客服人員。
 
@@ -40,7 +51,7 @@ LONG_SYSTEM_PROMPT = """你是 Ploom X 加熱器的智慧客服人員。
 1. 回答關於 Ploom X 加熱菸產品的問題（使用知識庫）
 2. 與使用者親切閒聊
 3. 引導使用者進行「尋找命定前蓋」測驗
-4. 測驗完成後提供色系結果與推薦色
+4. 測驗完成後提供測驗結果與推薦色
 
 ## 回應規則
 

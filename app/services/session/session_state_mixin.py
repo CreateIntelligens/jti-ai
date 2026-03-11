@@ -35,9 +35,9 @@ class SessionStateMixin:
         session.answers = {}
         session.current_question = None
         session.selected_questions = selected_questions
-        session.color_scores = {}
-        session.color_result_id = None
-        session.color_result = None
+        session.quiz_scores = {}
+        session.quiz_result_id = None
+        session.quiz_result = None
 
         return self.update_session(session)
 
@@ -52,9 +52,9 @@ class SessionStateMixin:
         session.current_q_index = 0
         session.answers = {}
         session.selected_questions = None
-        session.color_scores = {}
-        session.color_result_id = None
-        session.color_result = None
+        session.quiz_scores = {}
+        session.quiz_result_id = None
+        session.quiz_result = None
 
         return self.update_session(session)
 
@@ -99,17 +99,17 @@ class SessionStateMixin:
     def complete_scoring(
         self,
         session_id: str,
-        color_result_id: str,
+        quiz_result_id: str,
         scores: Dict[str, int],
-        color_result: Optional[Dict[str, Any]] = None,
+        quiz_result: Optional[Dict[str, Any]] = None,
     ) -> Optional[Session]:
         session = self.get_session(session_id)
         if not session:
             return None
 
-        session.color_result_id = color_result_id
-        session.color_scores = scores
-        session.color_result = color_result
+        session.quiz_result_id = quiz_result_id
+        session.quiz_scores = scores
+        session.quiz_result = quiz_result
         session.step = SessionStep.DONE
         return self.update_session(session)
 

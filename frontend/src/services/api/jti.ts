@@ -189,21 +189,21 @@ export interface QuizBankMetadata {
   is_default: boolean;
 }
 
-export interface ColorResult {
-  color_id: string;
+export interface QuizResult {
+  quiz_id: string;
   title: string;
   color_name: string;
   recommended_colors: string[];
   description: string;
 }
 
-export interface ColorSet {
+export interface QuizSet {
   set_id: string;
   name: string;
   language: string;
   is_active: boolean;
   is_default: boolean;
-  color_count: number;
+  quiz_count: number;
 }
 
 export interface QuizBankStats {
@@ -300,13 +300,13 @@ export async function updateQuizBankMetadata(language: string, data: Partial<Qui
   return handleResponse(response);
 }
 
-export async function listColorSets(language: string = 'zh'): Promise<{ sets: ColorSet[]; total: number; max: number }> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/color-results/sets/?language=${language}`);
+export async function listQuizSets(language: string = 'zh'): Promise<{ sets: QuizSet[]; total: number; max: number }> {
+  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/quiz-results/sets/?language=${language}`);
   return handleResponse(response);
 }
 
-export async function createColorSet(language: string, name: string): Promise<ColorSet> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/color-results/sets/?language=${language}`, {
+export async function createQuizSet(language: string, name: string): Promise<QuizSet> {
+  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/quiz-results/sets/?language=${language}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
@@ -314,31 +314,31 @@ export async function createColorSet(language: string, name: string): Promise<Co
   return handleResponse(response);
 }
 
-export async function deleteColorSet(language: string, setId: string): Promise<void> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/color-results/sets/${encodeURIComponent(setId)}?language=${language}`, {
+export async function deleteQuizSet(language: string, setId: string): Promise<void> {
+  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/quiz-results/sets/${encodeURIComponent(setId)}?language=${language}`, {
     method: 'DELETE',
   });
   await handleResponse(response);
 }
 
-export async function activateColorSet(language: string, setId: string): Promise<void> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/color-results/sets/${encodeURIComponent(setId)}/activate?language=${language}`, {
+export async function activateQuizSet(language: string, setId: string): Promise<void> {
+  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/quiz-results/sets/${encodeURIComponent(setId)}/activate?language=${language}`, {
     method: 'POST',
   });
   await handleResponse(response);
 }
 
-export async function listColorResults(language: string = 'zh', setId?: string): Promise<{ results: ColorResult[]; total: number }> {
+export async function listQuizResults(language: string = 'zh', setId?: string): Promise<{ results: QuizResult[]; total: number }> {
   const params = new URLSearchParams({ language });
   if (setId) params.set('set_id', setId);
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/color-results/?${params}`);
+  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/quiz-results/?${params}`);
   return handleResponse(response);
 }
 
-export async function updateColorResult(language: string, colorId: string, data: Partial<ColorResult>, setId?: string): Promise<ColorResult> {
+export async function updateQuizResult(language: string, quizId: string, data: Partial<QuizResult>, setId?: string): Promise<QuizResult> {
   const params = new URLSearchParams({ language });
   if (setId) params.set('set_id', setId);
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/color-results/${encodeURIComponent(colorId)}?${params}`, {
+  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/quiz-results/${encodeURIComponent(quizId)}?${params}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -346,15 +346,15 @@ export async function updateColorResult(language: string, colorId: string, data:
   return handleResponse(response);
 }
 
-export async function exportColorResultsCsv(language: string): Promise<void> {
-  const params = new URLSearchParams({ language, type: 'colors' });
+export async function exportQuizResultsCsv(language: string): Promise<void> {
+  const params = new URLSearchParams({ language, type: 'results' });
   const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/transfer/export?${params}`);
   if (!response.ok) throw new Error('Export failed');
   const blob = await response.blob();
   const url = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `color_results_${language}.csv`;
+  a.download = `quiz_results_${language}.csv`;
   document.body.appendChild(a);
   a.click();
   a.remove();

@@ -39,14 +39,14 @@ session_manager = get_session_manager()
 logger = logging.getLogger(__name__)
 
 _INTENT_PROMPT = {
-    "en": """Determine whether the following user message is related to JTI, Ploom X heated tobacco, tobacco sticks, accessories, or the lifestyle color quiz.
+    "en": """Determine whether the following user message is related to JTI, Ploom X heated tobacco, tobacco sticks, accessories, or the "Find Your Destined Front Cover" quiz.
 If the user is asking about completely unrelated topics (for example: weather, food lists, travel spots, programming problems, politics), respond NO.
 If it is a greeting, gratitude, short everyday follow-up, or related to the topics above, respond YES.
 
 User message: "{query}"
 
 Reply with YES or NO only:""",
-    "zh": """判斷以下使用者語句是否與「JTI傑太日煙、Ploom X加熱菸、菸彈、配件、生活色彩測驗」相關。
+    "zh": """判斷以下使用者語句是否與「JTI傑太日煙、Ploom X加熱菸、菸彈、配件、尋找命定前蓋測驗」相關。
 如果使用者在詢問完全無關的知識（例如：天氣、美食清單、旅遊景點、寫程式設計問題、政治等），請回覆 NO。
 如果是打招呼、表達感謝、日常簡短對話，或是與上述相關的主題，請回覆 YES。
 
@@ -110,7 +110,7 @@ class MainAgent(BaseAgent):
         return template.format(
             step_value=session.step.value,
             answers_count=len(session.answers),
-            color_result=session.color_result_id or not_yet,
+            quiz_result=session.quiz_result_id or not_yet,
         )
 
     def _prepare_search_query(self, query: str, language: str) -> str:
@@ -264,14 +264,14 @@ class MainAgent(BaseAgent):
             # 根據工具結果生成指示
             if "instruction_for_llm" in tool_result:
                 instruction = tool_result["instruction_for_llm"]
-            elif "color_result" in tool_result and tool_result.get("message"):
-                instruction = f"""使用者剛完成色彩測驗。
+            elif "quiz_result" in tool_result and tool_result.get("message"):
+                instruction = f"""使用者剛完成「尋找命定前蓋」測驗。
 
 {tool_result['message']}
 
 請用友善、鼓勵的語氣回應，包含：
 1. 恭喜完成測驗
-2. 色系結果與推薦色"""
+2. 結果與推薦前蓋"""
             else:
                 instruction = "請簡短回應使用者"
 

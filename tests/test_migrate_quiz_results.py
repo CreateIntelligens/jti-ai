@@ -1,9 +1,9 @@
 import unittest
 
-from app.services.jti.migrate_quiz_bank import _default_color_results_are_outdated
+from app.services.jti.migrate_quiz_bank import _default_quiz_results_are_outdated
 
 
-class TestMigrateColorResults(unittest.TestCase):
+class TestMigrateQuizResults(unittest.TestCase):
     def setUp(self):
         self.seed_data = {
             "analyst": {
@@ -14,19 +14,19 @@ class TestMigrateColorResults(unittest.TestCase):
             }
         }
         self.zh_meta = {
-            "name": "預設色彩結果",
+            "name": "預設測驗結果",
             "is_active": True,
             "is_default": True,
         }
         self.en_meta = {
-            "name": "Default Personality Results",
+            "name": "Default Quiz Results",
             "is_active": True,
             "is_default": True,
         }
 
     def test_no_sync_when_en_results_match_seed(self):
         self.assertFalse(
-            _default_color_results_are_outdated(
+            _default_quiz_results_are_outdated(
                 self.en_meta,
                 self.seed_data,
                 self.seed_data,
@@ -39,7 +39,7 @@ class TestMigrateColorResults(unittest.TestCase):
         stale_meta["name"] = "Old Name"
 
         self.assertTrue(
-            _default_color_results_are_outdated(
+            _default_quiz_results_are_outdated(
                 stale_meta,
                 self.seed_data,
                 self.seed_data,
@@ -58,7 +58,7 @@ class TestMigrateColorResults(unittest.TestCase):
         }
 
         self.assertTrue(
-            _default_color_results_are_outdated(
+            _default_quiz_results_are_outdated(
                 self.en_meta,
                 stale_results,
                 self.seed_data,

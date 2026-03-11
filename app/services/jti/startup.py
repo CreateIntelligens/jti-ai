@@ -151,7 +151,7 @@ def _migrate_jti_profile_storage(prompt_manager) -> None:
 
 
 def _seed_quiz_data() -> None:
-    """Seed quiz bank & color results from JSON → MongoDB."""
-    from .migrate_quiz_bank import migrate_quiz_bank, migrate_color_results
+    """Seed quiz bank and quiz results from JSON into MongoDB."""
+    from .migrate_quiz_bank import migrate_quiz_bank, migrate_quiz_results
     migrate_quiz_bank()
-    migrate_color_results()
+    migrate_quiz_results()

@@ -137,9 +137,9 @@ class MongoSessionManager(SessionStateMixin):
             # === 從 logs 提取資料 ===
             answers = {}            # {question_id: option_id}
             selected_questions = [] # 按順序收集的題目
-            color_scores = {}
-            color_result = None
-            color_result_id = None
+            quiz_scores = {}
+            quiz_result = None
+            quiz_result_id = None
             chat_history = []
 
             for log in logs:
@@ -171,17 +171,17 @@ class MongoSessionManager(SessionStateMixin):
                             # 後續題目
                             selected_questions.append(result["next_question"])
 
-                        # 提取 color_result（最後一題完成時）
-                        if result.get("color_result"):
-                            cr = result["color_result"]
-                            color_scores = cr.get("color_scores", {})
-                            color_result = cr.get("result")
+                        # 提取 quiz_result（最後一題完成時）
+                        if result.get("quiz_result"):
+                            cr = result["quiz_result"]
+                            quiz_scores = cr.get("quiz_scores", {})
+                            quiz_result = cr.get("result")
 
             # === 從最後一筆 log 的 session_snapshot 取得狀態 ===
             last_log = logs[-1]
             snapshot = last_log.get("session_snapshot") or last_log.get("session_state") or {}
             step = snapshot.get("step", "WELCOME")
-            color_result_id = snapshot.get("color_result_id") or color_result_id
+            quiz_result_id = snapshot.get("quiz_result_id") or quiz_result_id
 
             # === 推斷語言（優先使用最後一筆 snapshot） ===
             language = snapshot.get("language", existing_language)
@@ -244,9 +244,9 @@ class MongoSessionManager(SessionStateMixin):
                 current_q_index=current_q_index,
                 answers=answers,
                 selected_questions=selected_questions if selected_questions else None,
-                color_result_id=color_result_id,
-                color_scores=color_scores,
-                color_result=color_result,
+                quiz_result_id=quiz_result_id,
+                quiz_scores=quiz_scores,
+                quiz_result=quiz_result,
                 chat_history=chat_history,
                 current_question=current_question,
                 metadata=metadata,

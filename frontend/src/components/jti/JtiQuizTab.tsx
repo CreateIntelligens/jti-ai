@@ -6,7 +6,7 @@ interface JtiQuizTabProps {
        language: string;
 }
 
-type SubTab = 'questions' | 'colors';
+type SubTab = 'questions' | 'results';
 
 const EMPTY_OPTION: api.QuizQuestionOption = { id: '', text: '', score: {} };
 
@@ -46,19 +46,19 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
        // Expanded
        const [expandedId, setExpandedId] = useState<string | null>(null);
 
-       // --- Color set state ---
-       const [colorSets, setColorSets] = useState<api.ColorSet[]>([]);
-       const [selectedColorSetId, setSelectedColorSetId] = useState<string>('default');
-       const [creatingColorSet, setCreatingColorSet] = useState(false);
-       const [newColorSetName, setNewColorSetName] = useState('');
-       const [confirmDeleteColorSet, setConfirmDeleteColorSet] = useState<string | null>(null);
+       // --- Quiz result set state ---
+       const [quizSets, setQuizSets] = useState<api.QuizSet[]>([]);
+       const [selectedQuizSetId, setSelectedQuizSetId] = useState<string>('default');
+       const [creatingQuizSet, setCreatingQuizSet] = useState(false);
+       const [newQuizSetName, setNewQuizSetName] = useState('');
+       const [confirmDeleteQuizSet, setConfirmDeleteQuizSet] = useState<string | null>(null);
 
-       // --- Color state ---
-       const [colorResults, setColorResults] = useState<api.ColorResult[]>([]);
-       const [colorLoading, setColorLoading] = useState(false);
-       const [editColorId, setEditColorId] = useState<string | null>(null);
-       const [editColorData, setEditColorData] = useState<Partial<api.ColorResult>>({});
-       const [savingColor, setSavingColor] = useState(false);
+       // --- Quiz result state ---
+       const [quizResults, setQuizResults] = useState<api.QuizResult[]>([]);
+       const [quizLoading, setQuizLoading] = useState(false);
+       const [editQuizId, setEditQuizId] = useState<string | null>(null);
+       const [editQuizData, setEditQuizData] = useState<Partial<api.QuizResult>>({});
+       const [savingQuizResult, setSavingQuizResult] = useState(false);
 
        // --- Load data ---
        const loadBanks = useCallback(async () => {
@@ -94,38 +94,38 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
               }
        }, [language, selectedBankId]);
 
-       const loadColorSets = useCallback(async () => {
+       const loadQuizSets = useCallback(async () => {
               try {
-                     const data = await api.listColorSets(language);
-                     setColorSets(data.sets || []);
-                     if (data.sets.length > 0 && !data.sets.find(s => s.set_id === selectedColorSetId)) {
+                     const data = await api.listQuizSets(language);
+                     setQuizSets(data.sets || []);
+                     if (data.sets.length > 0 && !data.sets.find(s => s.set_id === selectedQuizSetId)) {
                             const active = data.sets.find(s => s.is_active);
-                            setSelectedColorSetId(active ? active.set_id : data.sets[0].set_id);
+                            setSelectedQuizSetId(active ? active.set_id : data.sets[0].set_id);
                      }
               } catch (e) {
-                     console.error('Failed to load color sets:', e);
+                     console.error('Failed to load quiz sets:', e);
               }
        }, [language]); // eslint-disable-line react-hooks/exhaustive-deps
 
-       const loadColors = useCallback(async () => {
-              setColorLoading(true);
+       const loadQuizResults = useCallback(async () => {
+              setQuizLoading(true);
               try {
-                     const data = await api.listColorResults(language, selectedColorSetId);
-                     setColorResults(data.results || []);
+                     const data = await api.listQuizResults(language, selectedQuizSetId);
+                     setQuizResults(data.results || []);
               } catch (e) {
-                     console.error('Failed to load color results:', e);
+                     console.error('Failed to load quiz results:', e);
               } finally {
-                     setColorLoading(false);
+                     setQuizLoading(false);
               }
-       }, [language, selectedColorSetId]);
+       }, [language, selectedQuizSetId]);
 
        useEffect(() => { void loadBanks(); }, [loadBanks]);
-       useEffect(() => { void loadColorSets(); }, [loadColorSets]);
+       useEffect(() => { void loadQuizSets(); }, [loadQuizSets]);
 
        useEffect(() => {
               if (subTab === 'questions') void loadQuestions();
-              else void loadColors();
-       }, [subTab, loadQuestions, loadColors]);
+              else void loadQuizResults();
+       }, [subTab, loadQuestions, loadQuizResults]);
 
        const showSuccess = (msg: string) => {
               setSuccessMsg(msg);
@@ -197,12 +197,12 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
               }
        };
 
-       const handleExportColors = async () => {
+       const handleExportQuizResults = async () => {
               try {
-                     await api.exportColorResultsCsv(language);
+                     await api.exportQuizResultsCsv(language);
               } catch (e) {
                      const msg = e instanceof Error ? e.message : String(e);
-                     alert('匯出色彩結果失敗: ' + msg);
+                     alert('匯出測驗結果失敗: ' + msg);
               }
        };
 
@@ -268,69 +268,69 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
               }
        };
 
-       // --- Color Set actions ---
-       const handleCreateColorSet = async () => {
-              if (!newColorSetName.trim()) return;
+       // --- Quiz Result Set actions ---
+       const handleCreateQuizSet = async () => {
+              if (!newQuizSetName.trim()) return;
               try {
-                     const set = await api.createColorSet(language, newColorSetName.trim());
-                     setCreatingColorSet(false);
-                     setNewColorSetName('');
-                     setSelectedColorSetId(set.set_id);
-                     await loadColorSets();
-                     showSuccess('✅ 已建立新色彩結果集');
+                     const set = await api.createQuizSet(language, newQuizSetName.trim());
+                     setCreatingQuizSet(false);
+                     setNewQuizSetName('');
+                     setSelectedQuizSetId(set.set_id);
+                     await loadQuizSets();
+                     showSuccess('✅ 已建立新測驗結果集');
               } catch (e) {
                      const msg = e instanceof Error ? e.message : String(e);
                      alert('建立失敗: ' + msg);
               }
        };
 
-       const handleDeleteColorSet = async (setId: string) => {
+       const handleDeleteQuizSet = async (setId: string) => {
               try {
-                     await api.deleteColorSet(language, setId);
-                     setConfirmDeleteColorSet(null);
-                     if (selectedColorSetId === setId) setSelectedColorSetId('default');
-                     await loadColorSets();
-                     showSuccess('✅ 已刪除色彩結果集');
+                     await api.deleteQuizSet(language, setId);
+                     setConfirmDeleteQuizSet(null);
+                     if (selectedQuizSetId === setId) setSelectedQuizSetId('default');
+                     await loadQuizSets();
+                     showSuccess('✅ 已刪除測驗結果集');
               } catch (e) {
                      const msg = e instanceof Error ? e.message : String(e);
                      alert('刪除失敗: ' + msg);
               }
        };
 
-       const handleActivateColorSet = async (setId: string) => {
+       const handleActivateQuizSet = async (setId: string) => {
               try {
-                     await api.activateColorSet(language, setId);
-                     await loadColorSets();
-                     showSuccess('✅ 已切換使用中的色彩結果集');
+                     await api.activateQuizSet(language, setId);
+                     await loadQuizSets();
+                     showSuccess('✅ 已切換使用中的測驗結果集');
               } catch (e) {
                      const msg = e instanceof Error ? e.message : String(e);
                      alert('切換失敗: ' + msg);
               }
        };
 
-       // --- Color CRUD ---
-       const handleStartColorEdit = (cr: api.ColorResult) => {
-              setEditColorId(cr.color_id);
-              setEditColorData({
-                     title: cr.title, color_name: cr.color_name,
-                     recommended_colors: [...cr.recommended_colors], description: cr.description,
+       // --- Quiz Result CRUD ---
+       const handleStartQuizEdit = (qr: api.QuizResult) => {
+              setEditQuizId(qr.quiz_id);
+              setEditQuizData({
+                     title: qr.title, color_name: qr.color_name,
+                     recommended_colors: [...qr.recommended_colors], description: qr.description,
               });
        };
 
-       const handleSaveColor = async () => {
-              if (!editColorId) return;
-              setSavingColor(true);
+       const handleSaveQuizResult = async () => {
+              if (!editQuizId) return;
+              setSavingQuizResult(true);
               try {
-                     await api.updateColorResult(language, editColorId, editColorData, selectedColorSetId);
-                     setEditColorId(null);
-                     setEditColorData({});
-                     await loadColors();
-                     showSuccess('✅ 已更新色彩結果');
+                     await api.updateQuizResult(language, editQuizId, editQuizData, selectedQuizSetId);
+                     setEditQuizId(null);
+                     setEditQuizData({});
+                     await loadQuizResults();
+                     showSuccess('✅ 已更新測驗結果');
               } catch (e) {
                      const msg = e instanceof Error ? e.message : String(e);
                      alert('更新失敗: ' + msg);
               } finally {
-                     setSavingColor(false);
+                     setSavingQuizResult(false);
               }
        };
 
@@ -368,10 +368,10 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                                    題庫管理
                             </button>
                             <button
-                                   className={`jti-quiz-subtab ${subTab === 'colors' ? 'active' : ''}`}
-                                   onClick={() => setSubTab('colors')}
+                                   className={`jti-quiz-subtab ${subTab === 'results' ? 'active' : ''}`}
+                                   onClick={() => setSubTab('results')}
                             >
-                                   色彩結果
+                                   測驗結果
                             </button>
                      </div>
 
@@ -624,18 +624,18 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                             </div>
                      )}
 
-                     {/* ========== Colors Sub-tab ========== */}
-                     {subTab === 'colors' && (
-                            <div className="jti-quiz-colors">
+                     {/* ========== Quiz Results Sub-tab ========== */}
+                     {subTab === 'results' && (
+                            <div className="jti-quiz-result-section">
 
-                                   {/* Color Set Selector Bar */}
+                                   {/* Quiz Result Set Selector Bar */}
                                    <div className="jti-bank-bar">
                                           <div className="jti-bank-list">
-                                                 {colorSets.map(set => (
+                                                 {quizSets.map(set => (
                                                         <div
                                                                key={set.set_id}
-                                                               className={`jti-bank-card ${selectedColorSetId === set.set_id ? 'selected' : ''}`}
-                                                               onClick={() => setSelectedColorSetId(set.set_id)}
+                                                               className={`jti-bank-card ${selectedQuizSetId === set.set_id ? 'selected' : ''}`}
+                                                               onClick={() => setSelectedQuizSetId(set.set_id)}
                                                         >
                                                                <div className="jti-bank-card-top">
                                                                       <span className="jti-bank-name">{set.name || set.set_id}</span>
@@ -646,11 +646,11 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                                                                       )}
                                                                </div>
                                                                <div className="jti-bank-card-bottom">
-                                                                      <span className="jti-bank-count">{set.color_count} 色</span>
+                                                                      <span className="jti-bank-count">{set.quiz_count} 項</span>
                                                                       {!set.is_active && (
                                                                              <button
                                                                                     className="jti-bank-activate-btn"
-                                                                                    onClick={(e) => { e.stopPropagation(); handleActivateColorSet(set.set_id); }}
+                                                                                    onClick={(e) => { e.stopPropagation(); handleActivateQuizSet(set.set_id); }}
                                                                                     title="設為使用中"
                                                                              >
                                                                                     啟用
@@ -659,7 +659,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                                                                       {!set.is_default && (
                                                                              <button
                                                                                     className="jti-bank-delete-btn"
-                                                                                    onClick={(e) => { e.stopPropagation(); setConfirmDeleteColorSet(set.set_id); }}
+                                                                                    onClick={(e) => { e.stopPropagation(); setConfirmDeleteQuizSet(set.set_id); }}
                                                                                     title="刪除"
                                                                              >
                                                                                     <Trash2 size={11} />
@@ -667,35 +667,35 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                                                                       )}
                                                                </div>
 
-                                                               {confirmDeleteColorSet === set.set_id && (
+                                                               {confirmDeleteQuizSet === set.set_id && (
                                                                       <div className="jti-bank-delete-confirm" onClick={e => e.stopPropagation()}>
                                                                              <span>確定刪除？</span>
-                                                                             <button onClick={() => handleDeleteColorSet(set.set_id)}>刪除</button>
-                                                                             <button className="cancel" onClick={() => setConfirmDeleteColorSet(null)}>取消</button>
+                                                                             <button onClick={() => handleDeleteQuizSet(set.set_id)}>刪除</button>
+                                                                             <button className="cancel" onClick={() => setConfirmDeleteQuizSet(null)}>取消</button>
                                                                       </div>
                                                                )}
                                                         </div>
                                                  ))}
 
-                                                 {colorSets.length < 3 && (
-                                                        creatingColorSet ? (
+                                                 {quizSets.length < 3 && (
+                                                        creatingQuizSet ? (
                                                                <div className="jti-bank-card creating">
                                                                       <input
                                                                              placeholder="結果集名稱"
-                                                                             value={newColorSetName}
-                                                                             onChange={e => setNewColorSetName(e.target.value)}
-                                                                             onKeyDown={e => e.key === 'Enter' && handleCreateColorSet()}
+                                                                             value={newQuizSetName}
+                                                                             onChange={e => setNewQuizSetName(e.target.value)}
+                                                                             onKeyDown={e => e.key === 'Enter' && handleCreateQuizSet()}
                                                                              autoFocus
                                                                       />
                                                                       <div className="jti-bank-create-actions">
-                                                                             <button onClick={handleCreateColorSet}>建立</button>
-                                                                             <button className="cancel" onClick={() => { setCreatingColorSet(false); setNewColorSetName(''); }}>
+                                                                             <button onClick={handleCreateQuizSet}>建立</button>
+                                                                             <button className="cancel" onClick={() => { setCreatingQuizSet(false); setNewQuizSetName(''); }}>
                                                                                     <X size={12} />
                                                                              </button>
                                                                       </div>
                                                                </div>
                                                         ) : (
-                                                               <button className="jti-bank-add" onClick={() => setCreatingColorSet(true)}>
+                                                               <button className="jti-bank-add" onClick={() => setCreatingQuizSet(true)}>
                                                                       <Plus size={14} /> 新增結果集
                                                                </button>
                                                         )
@@ -706,52 +706,52 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                                    <div className="jti-quiz-toolbar" style={{ justifyContent: 'flex-end', marginBottom: '10px' }}>
                                           <button
                                                  className="jti-quiz-export-btn"
-                                                 onClick={handleExportColors}
-                                                 title="匯出色彩結果 CSV"
-                                                 disabled={!colorResults.length}
+                                                 onClick={handleExportQuizResults}
+                                                 title="匯出測驗結果 CSV"
+                                                 disabled={!quizResults.length}
                                           >
                                                  <Download size={13} /> 匯出
                                           </button>
                                    </div>
-                                   {colorLoading ? (
+                                   {quizLoading ? (
                                           <div className="jti-quiz-loading">載入中...</div>
                                    ) : (
-                                          <div className="jti-color-list">
-                                                 {colorResults.map(cr => (
-                                                        <div key={cr.color_id} className="jti-color-card">
-                                                               <div className="jti-color-card-header">
-                                                                      <span className={`jti-color-badge jti-color-${cr.color_id}`}>{cr.color_name}</span>
-                                                                      <span className="jti-color-title">{cr.title}</span>
-                                                                      {selectedColorSetId !== 'default' && (
-                                                                             <button className="icon-btn" onClick={() => editColorId === cr.color_id ? setEditColorId(null) : handleStartColorEdit(cr)}>
-                                                                                    {editColorId === cr.color_id ? <X size={14} /> : <Pencil size={14} />}
+                                          <div className="jti-quiz-result-list">
+                                                 {quizResults.map(qr => (
+                                                        <div key={qr.quiz_id} className="jti-quiz-result-card">
+                                                               <div className="jti-quiz-result-card-header">
+                                                                      <span className={`jti-quiz-result-badge jti-quiz-${qr.quiz_id}`}>{qr.color_name}</span>
+                                                                      <span className="jti-quiz-result-title">{qr.title}</span>
+                                                                      {selectedQuizSetId !== 'default' && (
+                                                                             <button className="icon-btn" onClick={() => editQuizId === qr.quiz_id ? setEditQuizId(null) : handleStartQuizEdit(qr)}>
+                                                                                    {editQuizId === qr.quiz_id ? <X size={14} /> : <Pencil size={14} />}
                                                                              </button>
                                                                       )}
                                                                </div>
 
-                                                               {editColorId === cr.color_id ? (
-                                                                      <div className="jti-color-edit">
+                                                               {editQuizId === qr.quiz_id ? (
+                                                                      <div className="jti-quiz-result-edit">
                                                                              <div className="jti-quiz-form-row">
-                                                                                    <input placeholder="標題" value={editColorData.title || ''} onChange={e => setEditColorData({ ...editColorData, title: e.target.value })} />
-                                                                                    <input placeholder="色系名稱" value={editColorData.color_name || ''} onChange={e => setEditColorData({ ...editColorData, color_name: e.target.value })} />
+                                                                                    <input placeholder="標題" value={editQuizData.title || ''} onChange={e => setEditQuizData({ ...editQuizData, title: e.target.value })} />
+                                                                                    <input placeholder="色系名稱" value={editQuizData.color_name || ''} onChange={e => setEditQuizData({ ...editQuizData, color_name: e.target.value })} />
                                                                              </div>
                                                                              <input
                                                                                     placeholder="推薦色（逗號、頓號或空白分隔）"
-                                                                                    value={(editColorData.recommended_colors || []).join(', ')}
-                                                                                    onChange={e => setEditColorData({ ...editColorData, recommended_colors: e.target.value.split(/[,、\s]+/).filter(Boolean) })}
+                                                                                    value={(editQuizData.recommended_colors || []).join(', ')}
+                                                                                    onChange={e => setEditQuizData({ ...editQuizData, recommended_colors: e.target.value.split(/[,、\s]+/).filter(Boolean) })}
                                                                              />
-                                                                             <textarea placeholder="描述" value={editColorData.description || ''} onChange={e => setEditColorData({ ...editColorData, description: e.target.value })} rows={4} />
+                                                                             <textarea placeholder="描述" value={editQuizData.description || ''} onChange={e => setEditQuizData({ ...editQuizData, description: e.target.value })} rows={4} />
                                                                              <div className="jti-quiz-form-actions">
-                                                                                    <button onClick={handleSaveColor} disabled={savingColor}><Save size={14} /> {savingColor ? '儲存中...' : '儲存'}</button>
-                                                                                    <button className="cancel" onClick={() => setEditColorId(null)}><X size={14} /> 取消</button>
+                                                                                    <button onClick={handleSaveQuizResult} disabled={savingQuizResult}><Save size={14} /> {savingQuizResult ? '儲存中...' : '儲存'}</button>
+                                                                                    <button className="cancel" onClick={() => setEditQuizId(null)}><X size={14} /> 取消</button>
                                                                              </div>
                                                                       </div>
                                                                ) : (
-                                                                      <div className="jti-color-preview">
-                                                                             <div className="jti-color-colors">
-                                                                                    {cr.recommended_colors.map(c => (<span key={c} className="jti-color-tag">{c}</span>))}
+                                                                      <div className="jti-quiz-result-preview">
+                                                                             <div className="jti-quiz-result-tags">
+                                                                                    {qr.recommended_colors.map(c => (<span key={c} className="jti-quiz-result-tag">{c}</span>))}
                                                                              </div>
-                                                                             <p className="jti-color-desc">{cr.description}</p>
+                                                                             <p className="jti-quiz-result-desc">{qr.description}</p>
                                                                       </div>
                                                                )}
                                                         </div>

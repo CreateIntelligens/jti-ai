@@ -141,7 +141,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
 
     流程設計：
     1. WELCOME/一般狀態：走 LLM（可用知識庫）
-       - 使用者說「色彩」「顏色」「測驗」「玩」→ 開始測驗
+       - 使用者說「測驗」「前蓋」「玩」→ 開始測驗
        - 其他問題 → 正常回答
 
     2. QUIZ 狀態（有當前題目）：後端完全接管
@@ -177,9 +177,9 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     session.current_question = None
                     session.current_q_index = 0
                     session.selected_questions = None
-                    session.color_scores = {}
-                    session.color_result_id = None
-                    session.color_result = None
+                    session.quiz_scores = {}
+                    session.quiz_result_id = None
+                    session.quiz_result = None
                     session.chat_history = []
                     session = session_manager.update_session(session)
                     logger.info(f"Session {request.session_id[:8]}... reset to initial state (no remaining logs)")
@@ -236,8 +236,8 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
 
                 updated_session = session_manager.get_session(request.session_id)
                 logger.info(f"[答題結果] 選項: {user_choice} | 已答: {len(updated_session.answers)}/{total_questions} 題")
-                if updated_session.color_scores:
-                    scores_str = " | ".join([f"{k}:{v}" for k, v in sorted(updated_session.color_scores.items(), key=lambda x: -x[1])])
+                if updated_session.quiz_scores:
+                    scores_str = " | ".join([f"{k}:{v}" for k, v in sorted(updated_session.quiz_scores.items(), key=lambda x: -x[1])])
                     logger.info(f"[當前分數] {scores_str}")
 
                 is_complete = tool_result.get("is_complete")
@@ -274,12 +274,12 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                 final_turn_number = log_result[1] if log_result else None
                 logger.info(f"QUIZ 作答成功: {request.message} -> {user_choice}")
 
-                color_result = tool_result.get("color_result") or {}
+                quiz_result = tool_result.get("quiz_result") or {}
                 response_payload = ChatResponse(
                     message=response_message,
                     tts_text=tts_text,
                     options=extract_option_texts(next_q),
-                    quiz_result_id=color_result.get("color_id") if is_complete else None,
+                    quiz_result_id=quiz_result.get("quiz_id") if is_complete else None,
                     session=updated_session.model_dump(),
                     tool_calls=[{k: v for k, v in call.items() if k != "result"} for call in tool_calls],
                     turn_number=final_turn_number,
@@ -324,7 +324,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
 
         # ========== 非 QUIZ 狀態 ==========
         start_keywords = [
-            '測驗', '心理測驗', '色彩測驗', '配色測驗', '開始測驗', '玩測驗', '試試測驗',
+            '測驗', '心理測驗', '前蓋測驗', '命定前蓋', '開始測驗', '玩測驗', '試試測驗',
             '再測', '重測', '重新測', '再來一次', '再測一次', '重新開始',
             '來測', '測一下', '測看看', '想測', '做測',
             '繼續測驗', '回到測驗',

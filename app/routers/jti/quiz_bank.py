@@ -2,7 +2,7 @@
 Quiz Bank CRUD API Router.
 
 Provides endpoints for managing quiz banks (multi-set, max 3), questions,
-metadata, color results, and CSV/XLSX import/export.
+metadata, quiz results, and CSV/XLSX import/export.
 """
 
 from __future__ import annotations
@@ -19,9 +19,9 @@ from pydantic import BaseModel
 
 from app.auth import verify_admin, verify_auth
 from app.services.jti.quiz_bank_store import get_quiz_bank_store, DEFAULT_BANK_ID
-from app.services.jti.color_results_store import get_color_results_store, DEFAULT_SET_ID
+from app.services.jti.quiz_results_store import get_quiz_results_store, DEFAULT_SET_ID
 from app.tools.jti.quiz import invalidate_quiz_cache
-from app.tools.jti.color_results import invalidate_color_results_cache
+from app.tools.jti.quiz_results import invalidate_quiz_results_cache
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +61,7 @@ class UpdateBankRequest(BaseModel):
     selection_rules: Optional[dict] = None
 
 
-class UpdateColorResultRequest(BaseModel):
+class UpdateQuizResultRequest(BaseModel):
     title: Optional[str] = None
     color_name: Optional[str] = None
     recommended_colors: Optional[list[str]] = None
@@ -72,7 +72,7 @@ class CreateBankRequest(BaseModel):
     name: str
 
 
-class CreateColorSetRequest(BaseModel):
+class CreateQuizSetRequest(BaseModel):
     name: str
 
 
@@ -262,95 +262,95 @@ def delete_question(
     return {"message": f"Question '{question_id}' deleted"}
 
 
-# ========== Color Set Endpoints ==========
+# ========== Quiz Result Set Endpoints ==========
 
 
-@router.get("/color-results/sets/")
-def list_color_sets(
+@router.get("/quiz-results/sets/")
+def list_quiz_sets(
     language: str = Query("zh"),
     auth: dict = Depends(verify_auth),
 ):
-    """List all color sets for a language."""
-    store = get_color_results_store()
+    """List all quiz result sets for a language."""
+    store = get_quiz_results_store()
     sets = store.list_sets(language)
     return {"sets": sets, "total": len(sets), "max": 3}
 
 
-@router.post("/color-results/sets/", status_code=201)
-def create_color_set(
-    request: CreateColorSetRequest,
+@router.post("/quiz-results/sets/", status_code=201)
+def create_quiz_set(
+    request: CreateQuizSetRequest,
     language: str = Query("zh"),
     auth: dict = Depends(verify_auth),
 ):
-    """Create a new color set (copied from default)."""
-    store = get_color_results_store()
+    """Create a new quiz result set copied from the default set."""
+    store = get_quiz_results_store()
     try:
-        color_set = store.create_set(language, request.name)
-        return color_set
+        quiz_set = store.create_set(language, request.name)
+        return quiz_set
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.delete("/color-results/sets/{set_id}")
-def delete_color_set(
+@router.delete("/quiz-results/sets/{set_id}")
+def delete_quiz_set(
     set_id: str,
     language: str = Query("zh"),
     auth: dict = Depends(verify_auth),
 ):
-    """Delete a color set."""
+    """Delete a quiz result set."""
     if set_id == DEFAULT_SET_ID:
         raise HTTPException(status_code=403, detail="Cannot delete default set")
-    store = get_color_results_store()
+    store = get_quiz_results_store()
     try:
         deleted = store.delete_set(language, set_id)
         if not deleted:
             raise HTTPException(status_code=404, detail=f"Set '{set_id}' not found")
-        invalidate_color_results_cache(language)
+        invalidate_quiz_results_cache(language)
         return {"message": f"Set '{set_id}' deleted"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/color-results/sets/{set_id}/activate")
-def activate_color_set(
+@router.post("/quiz-results/sets/{set_id}/activate")
+def activate_quiz_set(
     set_id: str,
     language: str = Query("zh"),
     auth: dict = Depends(verify_auth),
 ):
-    """Set a color set as active."""
-    store = get_color_results_store()
+    """Set a quiz result set as active."""
+    store = get_quiz_results_store()
     success = store.set_active(language, set_id)
     if not success:
         raise HTTPException(status_code=404, detail=f"Set '{set_id}' not found")
-    invalidate_color_results_cache(language)
+    invalidate_quiz_results_cache(language)
     return {"message": f"Set '{set_id}' is now active"}
 
 
-# ========== Color Results Endpoints ==========
+# ========== Quiz Results Endpoints ==========
 
 
-@router.get("/color-results/")
-def list_color_results(
+@router.get("/quiz-results/")
+def list_quiz_results(
     language: str = Query("zh"),
     set_id: Optional[str] = Query(None),
     auth: dict = Depends(verify_auth),
 ):
-    """List all color results for a set (defaults to active set)."""
-    store = get_color_results_store()
+    """List all quiz results for a set (defaults to the active set)."""
+    store = get_quiz_results_store()
     results = store.list_results(language, set_id)
     return {"results": results, "total": len(results)}
 
 
-@router.put("/color-results/{color_id}")
-def update_color_result(
-    color_id: str,
-    request: UpdateColorResultRequest,
+@router.put("/quiz-results/{quiz_id}")
+def update_quiz_result(
+    quiz_id: str,
+    request: UpdateQuizResultRequest,
     language: str = Query("zh"),
     set_id: Optional[str] = Query(None),
     auth: dict = Depends(verify_auth),
 ):
-    """Update a color result."""
-    store = get_color_results_store()
+    """Update a quiz result."""
+    store = get_quiz_results_store()
     # Resolve set_id
     resolved_set_id = set_id if set_id else store.get_active_set_id(language)
     if resolved_set_id == DEFAULT_SET_ID:
@@ -358,8 +358,8 @@ def update_color_result(
     update_data = request.model_dump(exclude_none=True)
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
-    result = store.upsert_result(language, color_id, update_data, set_id=resolved_set_id)
-    invalidate_color_results_cache(language)
+    result = store.upsert_result(language, quiz_id, update_data, set_id=resolved_set_id)
+    invalidate_quiz_results_cache(language)
     return result
 
 
@@ -437,20 +437,21 @@ def _parse_csv_rows(reader) -> list[dict]:
 @router.post("/transfer/import")
 async def import_data(
     file: UploadFile = File(...),
-    type: str = Query("questions", description="'questions' or 'colors'"),
+    type: str = Query("questions", description="'questions' or 'results'"),
     language: str = Query("zh"),
     bank_id: str = Query(DEFAULT_BANK_ID),
     replace: bool = Query(False, description="Replace all existing data"),
     auth: dict = Depends(verify_auth),
 ):
-    """Import questions or color results from CSV/XLSX file."""
-    if type not in ("questions", "colors"):
-        raise HTTPException(status_code=400, detail="type must be 'questions' or 'colors'")
+    """Import questions or quiz results from CSV/XLSX file."""
+    normalized_type = "results" if type in {"results", "colors"} else type
+    if normalized_type not in ("questions", "results"):
+        raise HTTPException(status_code=400, detail="type must be 'questions' or 'results'")
 
     data = await file.read()
     filename = (file.filename or "").lower()
 
-    if type == "questions":
+    if normalized_type == "questions":
         if bank_id == DEFAULT_BANK_ID:
             raise HTTPException(status_code=403, detail="Cannot modify default bank")
         store = get_quiz_bank_store()
@@ -487,16 +488,16 @@ async def import_data(
         invalidate_quiz_cache(language)
         return {"message": f"Imported {count} questions", "count": count}
 
-    else:  # colors
+    else:  # results
         if not filename.endswith(".csv"):
-            raise HTTPException(status_code=400, detail="Color results import only supports .csv")
+            raise HTTPException(status_code=400, detail="Quiz results import only supports .csv")
         text = data.decode("utf-8-sig")
         reader = csv.DictReader(io.StringIO(text))
-        color_store = get_color_results_store()
+        quiz_store = get_quiz_results_store()
         count = 0
         for row in reader:
-            color_id = row.get("color_id", "").strip()
-            if not color_id:
+            quiz_id = (row.get("quiz_id") or row.get("color_id") or "").strip()
+            if not quiz_id:
                 continue
             update_data: dict[str, Any] = {}
             if row.get("color_name"):
@@ -508,27 +509,28 @@ async def import_data(
             if row.get("description"):
                 update_data["description"] = row["description"].strip()
             if update_data:
-                color_store.upsert_result(language, color_id, update_data)
+                quiz_store.upsert_result(language, quiz_id, update_data)
                 count += 1
-        invalidate_color_results_cache(language)
-        return {"message": f"Imported {count} color results", "count": count}
+        invalidate_quiz_results_cache(language)
+        return {"message": f"Imported {count} quiz results", "count": count}
 
 
 @router.get("/transfer/export")
 def export_data(
-    type: str = Query("questions", description="'questions' or 'colors'"),
+    type: str = Query("questions", description="'questions' or 'results'"),
     language: str = Query("zh"),
     bank_id: str = Query(DEFAULT_BANK_ID),
     auth: dict = Depends(verify_auth),
 ):
-    """Export questions or color results as CSV."""
-    if type not in ("questions", "colors"):
-        raise HTTPException(status_code=400, detail="type must be 'questions' or 'colors'")
+    """Export questions or quiz results as CSV."""
+    normalized_type = "results" if type in {"results", "colors"} else type
+    if normalized_type not in ("questions", "results"):
+        raise HTTPException(status_code=400, detail="type must be 'questions' or 'results'")
 
     output = io.StringIO()
     output.write('\ufeff')  # UTF-8 BOM for Excel
 
-    if type == "questions":
+    if normalized_type == "questions":
         store = get_quiz_bank_store()
         questions = store.list_questions(language, bank_id)
         max_opts = max((len(q.get("options", [])) for q in questions), default=2)
@@ -557,21 +559,21 @@ def export_data(
         bank_name = meta.get("name", bank_id) if meta else bank_id
         filename = f"quiz_bank_{bank_name}_{language}.csv"
 
-    else:  # colors
-        color_store = get_color_results_store()
-        results = color_store.list_results(language)  # uses active set
-        headers_list = ["color_id", "color_name", "title", "recommended_colors", "description"]
+    else:  # results
+        quiz_store = get_quiz_results_store()
+        results = quiz_store.list_results(language)  # uses active set
+        headers_list = ["quiz_id", "color_name", "title", "recommended_colors", "description"]
         writer = csv.DictWriter(output, fieldnames=headers_list)
         writer.writeheader()
-        for cr in results:
+        for quiz_result in results:
             writer.writerow({
-                "color_id": cr.get("color_id", ""),
-                "color_name": cr.get("color_name", ""),
-                "title": cr.get("title", ""),
-                "recommended_colors": ", ".join(cr.get("recommended_colors", [])),
-                "description": cr.get("description", ""),
+                "quiz_id": quiz_result.get("quiz_id", ""),
+                "color_name": quiz_result.get("color_name", ""),
+                "title": quiz_result.get("title", ""),
+                "recommended_colors": ", ".join(quiz_result.get("recommended_colors", [])),
+                "description": quiz_result.get("description", ""),
             })
-        filename = f"color_results_{language}.csv"
+        filename = f"quiz_results_{language}.csv"
 
     output.seek(0)
     encoded_filename = urllib.parse.quote(filename)

@@ -18,7 +18,7 @@ Frontend (React + Vite)
        │
        ↓
 FastAPI Backend
-  ├── JTI Agent     (Gemini File Search + 色彩測驗流程)
+  ├── JTI Agent     (Gemini File Search + 尋找命定前蓋測驗)
   ├── HCIoT Agent   (Gemini File Search)
   ├── Session Manager (MongoDB)
   └── TTS Job Queue (背景執行緒)

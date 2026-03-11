@@ -32,9 +32,9 @@ interface SessionData {
   step: string;
   answers?: Record<string, string>;
   selected_questions?: Array<unknown>;
-  color_scores?: Record<string, number>;
-  color_result_id?: string;
-  color_result?: { color_name?: string; title?: string };
+  quiz_scores?: Record<string, number>;
+  quiz_result_id?: string;
+  quiz_result?: { color_name?: string; title?: string };
 }
 
 interface WelcomeContent {
@@ -475,7 +475,7 @@ export default function Jti() {
         const s = data.session as SessionData;
         const count = Object.keys(s.answers || {}).length;
         const totalQuestions = getQuizTotalQuestions(s);
-        const colorName = s.color_result?.color_name || s.color_result_id || '';
+        const colorName = s.quiz_result?.color_name || s.quiz_result_id || '';
         const status = s.step === 'QUIZ' ? `${t('status_quiz')} · ${count}/${totalQuestions}`
           : colorName || t('status_chatting');
         setStatusText(status);

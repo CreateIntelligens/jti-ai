@@ -179,21 +179,25 @@ class MongoDBClient:
         except Exception as e:
             logger.warning(f"Index creation for 'quiz_bank_metadata': {e}")
 
-        # ===== color_results 集合 =====
-        color_results_col = db["color_results"]
+        # ===== quiz_results 集合 =====
+        quiz_results_col = db["quiz_results"]
         try:
-            # Drop legacy index without set_id if it exists
+            # Drop legacy quiz-result indexes without set_id if they exist.
             try:
-                color_results_col.drop_index("language_1_color_id_1")
+                quiz_results_col.drop_index("language_1_color_id_1")
             except Exception:
                 pass
-            color_results_col.create_index(
-                [("language", 1), ("set_id", 1), ("color_id", 1)], unique=True
+            try:
+                quiz_results_col.drop_index("language_1_quiz_id_1")
+            except Exception:
+                pass
+            quiz_results_col.create_index(
+                [("language", 1), ("set_id", 1), ("quiz_id", 1)], unique=True
             )
-            color_results_col.create_index("language")
-            logger.info("Created indexes for 'color_results' collection")
+            quiz_results_col.create_index("language")
+            logger.info("Created indexes for 'quiz_results' collection")
         except Exception as e:
-            logger.warning(f"Index creation for 'color_results': {e}")
+            logger.warning(f"Index creation for 'quiz_results': {e}")
 
     def get_client(self) -> MongoClient:
         """取得 MongoDB 客戶端"""

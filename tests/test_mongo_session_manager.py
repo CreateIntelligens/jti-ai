@@ -42,9 +42,9 @@ class TestMongoSessionManager(unittest.TestCase):
             "current_question": None,
             "selected_questions": None,
             "chat_history": [],
-            "color_result_id": None,
-            "color_scores": {},
-            "color_result": None,
+            "quiz_result_id": None,
+            "quiz_scores": {},
+            "quiz_result": None,
             "quiz_id": "color_taste",
             "updated_at": datetime.now().isoformat(),
         }
@@ -54,15 +54,15 @@ class TestMongoSessionManager(unittest.TestCase):
     def test_create_session(self):
         """測試建立 session"""
         mock_result = MagicMock()
-        mock_result.inserted_id = "test_id"
-        self.mock_sessions.insert_one.return_value = mock_result
+        mock_result.upserted_id = "test_id"
+        self.mock_sessions.update_one.return_value = mock_result
 
         session = self.manager.create_session(language="zh")
 
         self.assertIsNotNone(session)
         self.assertEqual(session.language, "zh")
         self.assertEqual(session.step, SessionStep.WELCOME)
-        self.mock_sessions.insert_one.assert_called_once()
+        self.mock_sessions.update_one.assert_called_once()
 
     def test_get_session(self):
         """測試取得 session"""

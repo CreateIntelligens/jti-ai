@@ -3,16 +3,16 @@ import unittest
 
 from app.models.session import Session
 from app.tools.jti.quiz import generate_random_quiz, load_quiz_bank, complete_selected_questions
-from app.tools.jti.color_results import calculate_color_result
+from app.tools.jti.quiz_results import calculate_quiz_result
 
 
-class TestColorQuizSession(unittest.TestCase):
-    def test_session_defaults_for_color_quiz(self):
+class TestQuizResults(unittest.TestCase):
+    def test_session_defaults_for_quiz_results(self):
         session = Session()
         data = session.model_dump()
-        self.assertIn("color_result_id", data)
-        self.assertIsNone(data["color_result_id"])
-        self.assertEqual(data["color_scores"], {})
+        self.assertIn("quiz_result_id", data)
+        self.assertIsNone(data["quiz_result_id"])
+        self.assertEqual(data["quiz_scores"], {})
 
     def test_generate_random_quiz_selection_rules(self):
         random.seed(7)
@@ -23,11 +23,11 @@ class TestColorQuizSession(unittest.TestCase):
         self.assertEqual(rules.get("total"), 4)
         self.assertEqual(len({q["id"] for q in questions}), 4)
 
-    def test_calculate_color_result_tie_breaker(self):
-        result = calculate_color_result({"q1": "a", "q2": "b"}, language="zh")
-        self.assertEqual(result["color_id"], "analyst")
-        self.assertEqual(result["color_scores"]["analyst"], 1)
-        self.assertEqual(result["color_scores"]["diplomat"], 1)
+    def test_calculate_quiz_result_tie_breaker(self):
+        result = calculate_quiz_result({"q1": "a", "q2": "b"}, language="zh")
+        self.assertEqual(result["quiz_id"], "analyst")
+        self.assertEqual(result["quiz_scores"]["analyst"], 1)
+        self.assertEqual(result["quiz_scores"]["diplomat"], 1)
 
     def test_complete_selected_questions_fills_missing_slots(self):
         random.seed(42)

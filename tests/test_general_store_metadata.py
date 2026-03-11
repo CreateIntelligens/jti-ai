@@ -33,10 +33,11 @@ def test_list_stores_includes_managed_metadata(monkeypatch):
             SimpleNamespace(name="fileSearchStores/custom-id", display_name="Custom"),
         ]
     )
-    monkeypatch.setattr(stores, "_get_or_create_manager", lambda: fake_manager)
+    monkeypatch.setattr(stores, "_get_or_create_manager", lambda **_: fake_manager)
     monkeypatch.setenv("JTI_STORE_ID_ZH", "jti-zh-id")
 
-    result = stores.list_stores(auth={"role": "admin"})
+    request = SimpleNamespace(headers={})
+    result = stores.list_stores(request=request, auth={"role": "admin"})
 
     assert result == [
         {
@@ -44,12 +45,14 @@ def test_list_stores_includes_managed_metadata(monkeypatch):
             "display_name": "JTI",
             "managed_app": "jti",
             "managed_language": "zh",
+            "key_index": 0,
         },
         {
             "name": "fileSearchStores/custom-id",
             "display_name": "Custom",
             "managed_app": None,
             "managed_language": None,
+            "key_index": 0,
         },
     ]
 

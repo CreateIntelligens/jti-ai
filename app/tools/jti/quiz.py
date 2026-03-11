@@ -1,5 +1,5 @@
 """
-Quiz 工具：產生色彩測驗題目
+Quiz 工具：產生「尋找命定前蓋」測驗題目
 
 職責：
 1. 根據 selection_rules 隨機抽題
@@ -15,7 +15,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# 載入題庫（色彩題庫，支援中英文）
+# 載入題庫（支援中英文）
 QUIZ_BANK_PATHS = {
     "zh": Path("data/quiz_bank_color_zh.json"),
     "en": Path("data/quiz_bank_color_en.json"),

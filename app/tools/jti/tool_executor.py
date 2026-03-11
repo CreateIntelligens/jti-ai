@@ -10,11 +10,10 @@ from google.genai import types
 from app.tools.jti.quiz import (
     generate_quiz,
     get_total_questions,
-    generate_random_quiz,
     get_question_from_selected,
     complete_selected_questions,
 )
-from app.tools.jti.color_results import calculate_color_result as calc_color_result
+from app.tools.jti.quiz_results import calculate_quiz_result as calc_quiz_result
 from app.services.session.session_manager_factory import get_session_manager
 
 # 使用 factory 取得正確的 session manager（MongoDB 或記憶體版）
@@ -32,7 +31,7 @@ class ToolExecutor:
             "start_quiz": self._execute_start_quiz,
             "get_question": self._execute_get_question,
             "submit_answer": self._execute_submit_answer,
-            "calculate_color_result": self._execute_calculate_color_result,
+            "calculate_quiz_result": self._execute_calculate_quiz_result,
         }
 
     async def execute(self, tool_name: str, arguments: Dict[str, Any]) -> Dict:
@@ -137,7 +136,7 @@ class ToolExecutor:
 
             question_id = question.get("id")
 
-            # 提交答案（包含自動計算色系結果和問下一題的邏輯）
+            # 提交答案（包含自動計算測驗結果和問下一題的邏輯）
             result = await self._execute_submit_answer({
                 "session_id": session_id,
                 "question_id": question_id,
@@ -367,34 +366,34 @@ Format:
 - 評論要簡短，不要超過 10 個字"""
             session_manager.set_current_question(session_id, next_question)
         else:
-            # 完成測驗，立即計算色系結果
-            logger.info("測驗完成，自動執行 calculate_color_result")
+            # 完成測驗，立即計算測驗結果
+            logger.info("測驗完成，自動執行 calculate_quiz_result")
             session_manager.set_current_question(session_id, None)
 
-            color_result = await self._execute_calculate_color_result({"session_id": session_id})
+            quiz_result = await self._execute_calculate_quiz_result({"session_id": session_id})
 
-            if "error" in color_result:
-                result["message"] = f"測驗完成，但計算結果時發生錯誤：{color_result['error']}"
+            if "error" in quiz_result:
+                result["message"] = f"測驗完成，但計算結果時發生錯誤：{quiz_result['error']}"
             else:
-                result["message"] = color_result.get("message", "計算完成")
-                result["color_result"] = color_result
+                result["message"] = quiz_result.get("message", "計算完成")
+                result["quiz_result"] = quiz_result
                 if session.language == "en":
                     result["instruction_for_llm"] = (
-                        "User has completed the color quiz. Respond warmly with the following result:\n"
+                        "User has completed the \"Find Your Destined Front Cover\" quiz. Respond warmly with the following result:\n"
                         f"{result['message']}\n\n"
                         "DO NOT repeat any quiz questions. Only announce the result."
                     )
                 else:
                     result["instruction_for_llm"] = (
-                        "使用者已完成色彩測驗，請用親切溫柔的語氣回覆以下結果：\n"
+                        "使用者已完成「尋找命定前蓋」測驗，請用親切溫柔的語氣回覆以下結果：\n"
                         f"{result['message']}\n\n"
                         "注意：不要重複任何測驗題目，只需宣布結果。"
                     )
 
         return result
 
-    async def _execute_calculate_color_result(self, args: Dict) -> Dict:
-        """計算色系結果"""
+    async def _execute_calculate_quiz_result(self, args: Dict) -> Dict:
+        """計算測驗結果"""
         session_id = args.get("session_id")
 
         if not session_id:
@@ -408,26 +407,26 @@ Format:
         # 進入計分狀態
         session_manager.start_scoring(session_id)
 
-        # 計算色系
-        result = calc_color_result(session.answers, language=session.language)
-        color_id = result.get("color_id")
-        color_scores = result.get("color_scores", {})
-        color_info = result.get("result")
+        # 計算測驗結果
+        result = calc_quiz_result(session.answers, language=session.language)
+        quiz_id = result.get("quiz_id")
+        quiz_scores = result.get("quiz_scores", {})
+        quiz_info = result.get("result")
 
         # 更新 session
-        if color_id:
+        if quiz_id:
             session_manager.complete_scoring(
                 session_id,
-                color_result_id=color_id,
-                scores=color_scores,
-                color_result=color_info,
+                quiz_result_id=quiz_id,
+                scores=quiz_scores,
+                quiz_result=quiz_info,
             )
 
         # 組合文案（TTS 使用）
-        if color_info:
-            title = color_info.get("title", "")
-            color_name = color_info.get("color_name", color_id or "")
-            description = color_info.get("description", "")
+        if quiz_info:
+            title = quiz_info.get("title", "")
+            color_name = quiz_info.get("color_name", quiz_id or "")
+            description = quiz_info.get("description", "")
             if session.language == "en":
                 message = f"You are {color_name}, {title}. {description}".strip()
             else:
@@ -436,15 +435,15 @@ Format:
             if session.language == "en":
                 message = "The quiz is complete, but no matching result was found."
             else:
-                message = "測驗完成，但找不到對應的色系結果。"
+                message = "測驗完成，但找不到對應的測驗結果。"
 
         if len(message) > 200:
             message = message[:200]
 
         return {
-            "color_id": color_id,
-            "color_scores": color_scores,
-            "result": color_info,
+            "quiz_id": quiz_id,
+            "quiz_scores": quiz_scores,
+            "result": quiz_info,
             "message": message,
         }
 

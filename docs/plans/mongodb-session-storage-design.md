@@ -12,7 +12,7 @@
 ## 核心需求
 
 ### 1. Session 儲存
-- 持久化 Quiz Session（色彩測驗會話）
+- 持久化 Quiz Session（測驗會話）
 - 分離存儲：JTI quiz mode vs 一般對話模式
 - 支持 session 過期和清理
 
@@ -58,14 +58,14 @@
     }
   ],
 
-  // 色彩測驗結果
-  "color_result_id": String,
-  "color_scores": {                 // {"dimension": score}
+  // 測驗結果
+  "quiz_result_id": String,
+  "quiz_scores": {                 // {"dimension": score}
     "analyst": 2,
     "guardian": 2,
     "explorer": 1
   },
-  "color_result": Object,
+  "quiz_result": Object,
 
   // 中繼資料
   "metadata": {
@@ -102,7 +102,7 @@
   "session_snapshot": {
     "step": String,
     "quiz_progress": String,        // "2/4 已完成"
-    "color_scores": Object
+    "quiz_scores": Object
   },
 
   "error": String  // 如果發生錯誤
@@ -129,10 +129,10 @@
     }
   ],
 
-  "color_result": {
-    "color_id": String,
-    "color_scores": Object,
-    "color_result": Object
+  "quiz_result": {
+    "quiz_id": String,
+    "quiz_scores": Object,
+    "quiz_result": Object
   },
 
   "metadata": {

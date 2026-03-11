@@ -24,7 +24,7 @@ def build_session_state(session) -> dict:
     return {
         "step": session.step.value,
         "answers_count": len(session.answers),
-        "color_result_id": session.color_result_id,
+        "quiz_result_id": session.quiz_result_id,
         "current_question_id": session.current_question.get("id") if session.current_question else None,
         "language": session.language,
         "selected_questions": session.selected_questions,

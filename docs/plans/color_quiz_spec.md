@@ -7,10 +7,10 @@
 Source of truth:
 - `data/quiz_bank_color_zh.json`
 - `data/quiz_bank_color_en.json`
-- `data/color_results.json`
-- `data/color_results_en.json`
+- `data/quiz_results.json`
+- `data/quiz_results_en.json`
 - `app/tools/quiz.py`
-- `app/tools/color_results.py`
+- `app/tools/quiz_results.py`
 
 ## 測驗概述
 
@@ -50,5 +50,5 @@ Source of truth:
 
 ## 備註
 
-- 舊版 5 色系與 category-based 選題規則已移除
-- 若 MongoDB 中的 default quiz bank / color results 與 JSON seed 不一致，啟動時會自動同步
+- 舊版 5 種測驗結果與 category-based 選題規則已移除
+- 若 MongoDB 中的 default quiz bank / quiz results 與 JSON seed 不一致，啟動時會自動同步

@@ -1,58 +1,58 @@
 """
-色彩測驗結果計算工具
+「尋找命定前蓋」測驗結果計算工具
 
 職責：
 1. 根據答案計分
-2. 依平手優先順序決定色系
+2. 依平手優先順序決定結果
 3. 回傳結果內容（文案與推薦色）
 """
 
 import json
 import logging
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from app.tools.jti.quiz import load_quiz_bank
 
 logger = logging.getLogger(__name__)
 
-COLOR_RESULTS_PATHS = {
-    "zh": Path("data/color_results.json"),
-    "en": Path("data/color_results_en.json"),
+QUIZ_RESULTS_PATHS = {
+    "zh": Path("data/quiz_results.json"),
+    "en": Path("data/quiz_results_en.json"),
 }
-_color_results_cache: Dict[str, Dict[str, Any]] = {}
+_quiz_results_cache: Dict[str, Dict[str, Any]] = {}
 
 
-def load_color_results(language: str = "zh") -> Dict[str, Any]:
-    """載入色彩結果對照表（MongoDB-first, JSON fallback）"""
-    global _color_results_cache
-    if language not in _color_results_cache:
+def load_quiz_results(language: str = "zh") -> Dict[str, Any]:
+    """載入測驗結果對照表（MongoDB-first, JSON fallback）"""
+    global _quiz_results_cache
+    if language not in _quiz_results_cache:
         # MongoDB first
         try:
-            from app.services.jti.color_results_store import get_color_results_store
-            store = get_color_results_store()
+            from app.services.jti.quiz_results_store import get_quiz_results_store
+            store = get_quiz_results_store()
             results = store.get_all_results(language)
             if results:
-                _color_results_cache[language] = results
-                return _color_results_cache[language]
+                _quiz_results_cache[language] = results
+                return _quiz_results_cache[language]
         except Exception as e:
-            logger.warning("MongoDB color results load failed, falling back to JSON: %s", e)
+            logger.warning("MongoDB quiz results load failed, falling back to JSON: %s", e)
 
         # JSON fallback
-        path = COLOR_RESULTS_PATHS.get(language, COLOR_RESULTS_PATHS["zh"])
+        path = QUIZ_RESULTS_PATHS.get(language, QUIZ_RESULTS_PATHS["zh"])
         with open(path, "r", encoding="utf-8") as f:
-            _color_results_cache[language] = json.load(f)
-    return _color_results_cache[language]
+            _quiz_results_cache[language] = json.load(f)
+    return _quiz_results_cache[language]
 
 
-def invalidate_color_results_cache(language: str = "zh"):
-    """Clear color results cache for a language (call after CRUD operations)."""
-    _color_results_cache.pop(language, None)
+def invalidate_quiz_results_cache(language: str = "zh"):
+    """Clear quiz results cache for a language (call after CRUD operations)."""
+    _quiz_results_cache.pop(language, None)
 
 
-def calculate_color_result(answers: Dict[str, str], language: str = "zh") -> Dict[str, Any]:
+def calculate_quiz_result(answers: Dict[str, str], language: str = "zh") -> Dict[str, Any]:
     """
-    計算色系結果
+    計算測驗結果
 
     Args:
         answers: {question_id: option_id}
@@ -60,8 +60,8 @@ def calculate_color_result(answers: Dict[str, str], language: str = "zh") -> Dic
 
     Returns:
         {
-            "color_id": str,
-            "color_scores": dict,
+            "quiz_id": str,
+            "quiz_scores": dict,
             "result": dict | None,
             "tie_breaker_priority": list
         }
@@ -91,8 +91,8 @@ def calculate_color_result(answers: Dict[str, str], language: str = "zh") -> Dic
 
     if not scores:
         return {
-            "color_id": None,
-            "color_scores": {},
+            "quiz_id": None,
+            "quiz_scores": {},
             "result": None,
             "tie_breaker_priority": tie_breaker,
         }
@@ -100,21 +100,21 @@ def calculate_color_result(answers: Dict[str, str], language: str = "zh") -> Dic
     max_score = max(scores.values())
     tied = [dim for dim, value in scores.items() if value == max_score]
 
-    color_id = None
+    quiz_id = None
     for dim in tie_breaker:
         if dim in tied:
-            color_id = dim
+            quiz_id = dim
             break
-    if color_id is None and tied:
-        color_id = tied[0]
+    if quiz_id is None and tied:
+        quiz_id = tied[0]
 
-    results = load_color_results(language)
-    result = results.get(color_id)
+    results = load_quiz_results(language)
+    result = results.get(quiz_id)
 
-    logger.info("Calculated color result: %s", color_id)
+    logger.info("Calculated quiz result: %s", quiz_id)
     return {
-        "color_id": color_id,
-        "color_scores": scores,
+        "quiz_id": quiz_id,
+        "quiz_scores": scores,
         "result": result,
         "tie_breaker_priority": tie_breaker,
     }

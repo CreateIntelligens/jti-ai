@@ -61,8 +61,8 @@
   "language": "zh|en",
   "step": "initial|quiz|scoring|done",
   "answers": {"q1": "a", "q2": "b"},
-  "color_result_id": "analyst|diplomat|guardian|explorer",
-  "color_scores": {"analyst": 2, "guardian": 1},
+  "quiz_result_id": "analyst|diplomat|guardian|explorer",
+  "quiz_scores": {"analyst": 2, "guardian": 1},
   "expires_at": ISODate(),
   ...
 }
@@ -150,7 +150,7 @@ deleted = manager.delete_session(session_id)
 # 狀態轉換
 manager.start_quiz(session_id, selected_questions)
 manager.submit_answer(session_id, question_id, option_id)
-manager.complete_scoring(session_id, color_result_id, scores)
+manager.complete_scoring(session_id, quiz_result_id, scores)
 
 # 查詢和分析
 sessions = manager.get_all_sessions()

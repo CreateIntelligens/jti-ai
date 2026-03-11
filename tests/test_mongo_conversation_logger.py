@@ -39,17 +39,17 @@ class TestMongoConversationLogger(unittest.TestCase):
         mock_result.inserted_id = "log_id_1"
         self.mock_conversations.insert_one.return_value = mock_result
 
-        log_id = self.logger.log_conversation(
+        log_result = self.logger.log_conversation(
             session_id="test-123",
             mode="jti",
             user_message="開始測驗",
-            agent_response="好的，開始色彩測驗",
+            agent_response="好的，開始測驗",
             tool_calls=[],
             session_state={"step": "quiz"}
         )
 
         # 驗證
-        self.assertEqual(log_id, "log_id_1")
+        self.assertEqual(log_result, ("log_id_1", 1))
         self.mock_conversations.insert_one.assert_called_once()
 
         # 驗證記錄內容
@@ -70,7 +70,7 @@ class TestMongoConversationLogger(unittest.TestCase):
         mock_result.inserted_id = "log_id_2"
         self.mock_conversations.insert_one.return_value = mock_result
 
-        log_id = self.logger.log_conversation(
+        log_result = self.logger.log_conversation(
             session_id="test-123",
             mode="jti",
             user_message="我選擇 A",
@@ -78,7 +78,7 @@ class TestMongoConversationLogger(unittest.TestCase):
         )
 
         # 驗證
-        self.assertEqual(log_id, "log_id_2")
+        self.assertEqual(log_result, ("log_id_2", 3))
 
         # 驗證 turn_number 是遞增的
         call_args = self.mock_conversations.insert_one.call_args

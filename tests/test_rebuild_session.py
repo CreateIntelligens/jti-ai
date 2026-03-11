@@ -9,17 +9,12 @@ Tests:
 5. Empty logs returns None
 """
 
-import sys
 import unittest
 from unittest.mock import patch, MagicMock
 
-# Mock MongoDB before any app imports
 mock_db = MagicMock()
-mock_mongo_client_module = MagicMock()
-mock_mongo_client_module.get_mongo_db.return_value = mock_db
-sys.modules.setdefault("app.services.mongo_client", mock_mongo_client_module)
 
-from app.models.session import Session, SessionStep
+from app.models.session import SessionStep
 from app.services.session.mongo_session_manager import MongoSessionManager
 
 
@@ -42,7 +37,7 @@ def _make_log(
     tool_calls: list = None,
     snapshot_step: str = "WELCOME",
     answers_count: int = 0,
-    color_result_id=None,
+    quiz_result_id=None,
     current_question_id=None,
 ) -> dict:
     return {
@@ -55,7 +50,7 @@ def _make_log(
         "session_snapshot": {
             "step": snapshot_step,
             "answers_count": answers_count,
-            "color_result_id": color_result_id,
+            "quiz_result_id": quiz_result_id,
             "current_question_id": current_question_id,
         },
     }
@@ -65,6 +60,12 @@ class TestRebuildSessionFromLogs(unittest.TestCase):
     """Tests for MongoSessionManager.rebuild_session_from_logs()"""
 
     def setUp(self):
+        patcher = patch(
+            "app.services.session.mongo_session_manager.get_mongo_db",
+            return_value=mock_db,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self.mock_sessions = MagicMock()
         mock_db.__getitem__.return_value = self.mock_sessions
         self.manager = MongoSessionManager()
@@ -138,7 +139,7 @@ class TestRebuildSessionFromLogs(unittest.TestCase):
         self.mock_sessions.update_one.assert_called_once()
 
     def test_rebuild_done_state(self):
-        """Rebuild completed quiz session with color result"""
+        """Rebuild completed quiz session with quiz result"""
         sid = "test-done"
         q1 = _make_question("q1")
 
@@ -150,8 +151,8 @@ class TestRebuildSessionFromLogs(unittest.TestCase):
                           "result": {"success": True, "current_question": q1},
                       }],
                       snapshot_step="QUIZ"),
-            # Final answer with color_result
-            _make_log(sid, 2, "A", "恭喜完成！你的色系是...",
+            # Final answer with quiz_result
+            _make_log(sid, 2, "A", "恭喜完成！你的測驗結果是...",
                       tool_calls=[{
                           "tool": "submit_answer",
                           "args": {"user_choice": "A"},
@@ -160,22 +161,22 @@ class TestRebuildSessionFromLogs(unittest.TestCase):
                               "answered": "q1",
                               "selected": "q1_a",
                               "is_complete": True,
-                              "color_result": {
-                                  "color_scores": {"analyst": 3, "guardian": 2},
+                              "quiz_result": {
+                                  "quiz_scores": {"analyst": 3, "guardian": 2},
                                   "result": {"name": "分析家", "description": "..."},
                               },
                           },
                       }],
-                      snapshot_step="DONE", answers_count=1, color_result_id="analyst"),
+                      snapshot_step="DONE", answers_count=1, quiz_result_id="analyst"),
         ]
 
         session = self.manager.rebuild_session_from_logs(sid, logs)
 
         self.assertIsNotNone(session)
         self.assertEqual(session.step, SessionStep.DONE)
-        self.assertEqual(session.color_result_id, "analyst")
-        self.assertEqual(session.color_scores, {"analyst": 3, "guardian": 2})
-        self.assertIsNotNone(session.color_result)
+        self.assertEqual(session.quiz_result_id, "analyst")
+        self.assertEqual(session.quiz_scores, {"analyst": 3, "guardian": 2})
+        self.assertIsNotNone(session.quiz_result)
         self.assertIsNone(session.current_question)
 
     def test_rebuild_paused_quiz(self):

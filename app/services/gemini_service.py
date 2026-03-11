@@ -42,7 +42,7 @@ class GeminiService:
         self.client = client
 
     async def upload_knowledge_base(
-        self, file_path: str, display_name: str = "Color Quiz Knowledge Base"
+        self, file_path: str, display_name: str = "Quiz Knowledge Base"
     ) -> str:
         """
         上傳知識庫檔案到 Gemini

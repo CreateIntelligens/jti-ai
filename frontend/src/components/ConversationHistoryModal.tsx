@@ -40,7 +40,7 @@ interface ConversationEntry {
   session_snapshot?: {
     step?: string;
     quiz_progress?: string;
-    color_scores?: Record<string, number>;
+    quiz_scores?: Record<string, number>;
     language?: string;
   };
   error?: string;

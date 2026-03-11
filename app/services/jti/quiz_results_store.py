@@ -1,8 +1,8 @@
 """
-MongoDB-backed color results storage with multi-set support.
+MongoDB-backed quiz results storage with multi-set support.
 
-Stores color quiz result definitions in collection: color_results
-Stores set metadata in collection: color_results_metadata
+Stores quiz result definitions in collection: quiz_results
+Stores set metadata in collection: quiz_results_metadata
 Max 3 sets per language (including default).
 """
 
@@ -19,15 +19,15 @@ from app.services.mongo_client import get_mongo_db
 
 logger = logging.getLogger(__name__)
 
-MAX_COLOR_SETS = 3
+MAX_QUIZ_SETS = 3
 DEFAULT_SET_ID = "default"
 
 
-class ColorResultsStore:
-    """MongoDB-backed color results storage with multi-set support."""
+class QuizResultsStore:
+    """MongoDB-backed quiz results storage with multi-set support."""
 
-    COLLECTION_NAME = "color_results"
-    METADATA_COLLECTION = "color_results_metadata"
+    COLLECTION_NAME = "quiz_results"
+    METADATA_COLLECTION = "quiz_results_metadata"
 
     def __init__(self):
         self.db = get_mongo_db()
@@ -37,23 +37,23 @@ class ColorResultsStore:
     # ===================== Set Management =====================
 
     def list_sets(self, language: str) -> list[dict]:
-        """List all color sets for a language."""
+        """List all quiz result sets for a language."""
         cursor = self.metadata.find(
             {"language": language},
             {"_id": 0},
         ).sort("created_at", 1)
         sets = list(cursor)
         for s in sets:
-            s["color_count"] = self.collection.count_documents(
+            s["quiz_count"] = self.collection.count_documents(
                 {"language": language, "set_id": s.get("set_id")}
             )
         return sets
 
     def create_set(self, language: str, name: str) -> dict:
-        """Create new color set, copied from default. Raises if at max."""
+        """Create a new quiz result set by copying the default set."""
         count = self.metadata.count_documents({"language": language})
-        if count >= MAX_COLOR_SETS:
-            raise ValueError(f"Maximum {MAX_COLOR_SETS} color sets per language")
+        if count >= MAX_QUIZ_SETS:
+            raise ValueError(f"Maximum {MAX_QUIZ_SETS} quiz result sets per language")
 
         now = datetime.now(timezone.utc)
         set_id = str(uuid.uuid4())[:8]
@@ -69,23 +69,23 @@ class ColorResultsStore:
         self.metadata.insert_one(doc)
         doc.pop("_id", None)
 
-        # Copy all color entries from default set
-        default_colors = list(self.collection.find(
+        # Copy all quiz result entries from the default set.
+        default_results = list(self.collection.find(
             {"language": language, "set_id": DEFAULT_SET_ID},
         ))
-        for color in default_colors:
-            color.pop("_id", None)
-            color["set_id"] = set_id
-            color["created_at"] = now
-            color["updated_at"] = now
-        if default_colors:
-            self.collection.insert_many(default_colors)
+        for quiz_result in default_results:
+            quiz_result.pop("_id", None)
+            quiz_result["set_id"] = set_id
+            quiz_result["created_at"] = now
+            quiz_result["updated_at"] = now
+        if default_results:
+            self.collection.insert_many(default_results)
 
-        doc["color_count"] = len(default_colors)
+        doc["quiz_count"] = len(default_results)
         return doc
 
     def delete_set(self, language: str, set_id: str) -> bool:
-        """Delete a color set. Cannot delete default."""
+        """Delete a quiz result set. Cannot delete default."""
         meta = self.metadata.find_one({"language": language, "set_id": set_id})
         if not meta:
             return False
@@ -104,7 +104,7 @@ class ColorResultsStore:
         return True
 
     def set_active(self, language: str, set_id: str) -> bool:
-        """Set a color set as active, deactivate others."""
+        """Set a quiz result set as active, deactivate others."""
         meta = self.metadata.find_one({"language": language, "set_id": set_id})
         if not meta:
             return False
@@ -152,30 +152,30 @@ class ColorResultsStore:
         doc.pop("_id", None)
         return doc
 
-    # ===================== Color Results CRUD =====================
+    # ===================== Quiz Results CRUD =====================
 
     def list_results(self, language: str, set_id: str | None = None) -> list[dict]:
-        """List all color results for a language and set."""
+        """List all quiz results for a language and set."""
         if set_id is None:
             set_id = self.get_active_set_id(language)
         cursor = self.collection.find(
             {"language": language, "set_id": set_id},
             {"_id": 0, "language": 0, "set_id": 0},
-        ).sort("color_id", 1)
+        ).sort("quiz_id", 1)
         return list(cursor)
 
-    def get_result(self, language: str, color_id: str, set_id: str | None = None) -> dict | None:
-        """Get a single color result."""
+    def get_result(self, language: str, quiz_id: str, set_id: str | None = None) -> dict | None:
+        """Get a single quiz result."""
         if set_id is None:
             set_id = self.get_active_set_id(language)
         doc = self.collection.find_one(
-            {"language": language, "set_id": set_id, "color_id": color_id},
+            {"language": language, "set_id": set_id, "quiz_id": quiz_id},
             {"_id": 0, "language": 0, "set_id": 0},
         )
         return doc
 
-    def upsert_result(self, language: str, color_id: str, data: dict, set_id: str | None = None) -> dict:
-        """Upsert a color result."""
+    def upsert_result(self, language: str, quiz_id: str, data: dict, set_id: str | None = None) -> dict:
+        """Upsert a quiz result."""
         if set_id is None:
             set_id = self.get_active_set_id(language)
         now = datetime.now(timezone.utc)
@@ -183,11 +183,11 @@ class ColorResultsStore:
             **data,
             "language": language,
             "set_id": set_id,
-            "color_id": color_id,
+            "quiz_id": quiz_id,
             "updated_at": now,
         }
         doc = self.collection.find_one_and_update(
-            {"language": language, "set_id": set_id, "color_id": color_id},
+            {"language": language, "set_id": set_id, "quiz_id": quiz_id},
             {"$set": update_data, "$setOnInsert": {"created_at": now}},
             upsert=True,
             return_document=ReturnDocument.AFTER,
@@ -197,32 +197,32 @@ class ColorResultsStore:
         doc.pop("set_id", None)
         return doc
 
-    def delete_result(self, language: str, color_id: str, set_id: str | None = None) -> bool:
-        """Delete a color result."""
+    def delete_result(self, language: str, quiz_id: str, set_id: str | None = None) -> bool:
+        """Delete a quiz result."""
         if set_id is None:
             set_id = self.get_active_set_id(language)
         result = self.collection.delete_one(
-            {"language": language, "set_id": set_id, "color_id": color_id}
+            {"language": language, "set_id": set_id, "quiz_id": quiz_id}
         )
         return result.deleted_count > 0
 
     def bulk_upsert_results(self, language: str, results: dict[str, dict], set_id: str | None = None) -> int:
-        """Bulk upsert color results from {color_id: {...}} dict."""
+        """Bulk upsert quiz results from `{quiz_id: {...}}`."""
         if not results:
             return 0
         if set_id is None:
             set_id = DEFAULT_SET_ID
         now = datetime.now(timezone.utc)
         count = 0
-        for color_id, data in results.items():
+        for quiz_id, data in results.items():
             self.collection.update_one(
-                {"language": language, "set_id": set_id, "color_id": color_id},
+                {"language": language, "set_id": set_id, "quiz_id": quiz_id},
                 {
                     "$set": {
                         **data,
                         "language": language,
                         "set_id": set_id,
-                        "color_id": color_id,
+                        "quiz_id": quiz_id,
                         "updated_at": now,
                     },
                     "$setOnInsert": {"created_at": now},
@@ -240,26 +240,26 @@ class ColorResultsStore:
         return self.bulk_upsert_results(language, results, set_id)
 
     def get_all_results(self, language: str, set_id: str | None = None) -> dict[str, dict]:
-        """Return {color_id: {title, color_name, ...}} matching JSON format."""
+        """Return `{quiz_id: {...}}` matching the seed JSON format."""
         results = self.list_results(language, set_id)
         out: dict[str, dict] = {}
-        for r in results:
-            cid = r.pop("color_id", None)
-            if cid:
-                r.pop("created_at", None)
-                r.pop("updated_at", None)
-                out[cid] = r
+        for result in results:
+            qid = result.pop("quiz_id", None)
+            if qid:
+                result.pop("created_at", None)
+                result.pop("updated_at", None)
+                out[qid] = result
         return out
 
 
 # --- Singleton ---
 
-_color_results_store: Optional[ColorResultsStore] = None
+_quiz_results_store: Optional[QuizResultsStore] = None
 
 
-def get_color_results_store() -> ColorResultsStore:
-    """Return singleton color results store."""
-    global _color_results_store
-    if _color_results_store is None:
-        _color_results_store = ColorResultsStore()
-    return _color_results_store
+def get_quiz_results_store() -> QuizResultsStore:
+    """Return the singleton quiz results store."""
+    global _quiz_results_store
+    if _quiz_results_store is None:
+        _quiz_results_store = QuizResultsStore()
+    return _quiz_results_store

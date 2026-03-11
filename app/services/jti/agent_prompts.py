@@ -38,7 +38,7 @@ DEFAULT_RESPONSE_RULE_SECTIONS = {
     "zh": {
         "role_scope": """1. 回答關於 JTI 傑太日煙、Ploom X 加熱器、加熱菸產品的問題（使用知識庫）
 2. 引導使用者進行「尋找命定前蓋」測驗
-3. 測驗完成後提供色系結果與推薦色""",
+3. 測驗完成後提供測驗結果與推薦色""",
         "scope_limits": """- 使用者常把「JTI」打成「JIT」，視為同一品牌，不要糾正也不要當作無關話題
 - 你只能回答與 JTI 傑太日煙、Ploom X、加熱菸、菸彈、配件相關的問題
 - 如果使用者問的問題跟 JTI 產品或加熱菸無關（例如天氣、美食、政治、其他品牌等），你必須婉拒並引導回來
@@ -60,8 +60,8 @@ DEFAULT_RESPONSE_RULE_SECTIONS = {
     },
     "en": {
         "role_scope": """1. Answer questions about JTI, Ploom X, heated tobacco products, and accessories (using knowledge base)
-2. Guide users through the color taste quiz
-3. Share the color result and recommended colors after the quiz""",
+2. Guide users through the "Find Your Destined Front Cover" quiz
+3. Share the quiz result and recommended colors after the quiz""",
         "scope_limits": """- Users often mistype \"JTI\" as \"JIT\" - treat them as the same brand, don't correct or reject
 - You can ONLY answer questions related to JTI, Ploom X, heated tobacco, tobacco sticks, and accessories
 - If the user asks about unrelated topics (weather, food, politics, other brands, etc.), politely decline and redirect
@@ -87,11 +87,11 @@ DEFAULT_RESPONSE_RULE_SECTIONS = {
 WELCOME_TEXT = {
     "zh": {
         "title": "歡迎使用 JTI 智慧助手",
-        "description": "透過 AI 對話帶你完成尋找命定前蓋，找到最適合你的色系。",
+        "description": "透過 AI 對話帶你完成尋找命定前蓋，找到最適合你的測驗結果。",
     },
     "en": {
         "title": "Welcome to JTI Smart Assistant",
-        "description": "An AI conversation flow that guides you through the color taste quiz and your best-fit palette.",
+        "description": "An AI conversation flow that guides you through the Find Your Destined Front Cover quiz and your best-fit result.",
     },
 }
 
@@ -167,14 +167,14 @@ SESSION_STATE_TEMPLATES = {
     "zh": """<內部狀態資訊 - 不要在回應中提及>
 目前階段: {step_value}
 測驗進度: {answers_count}/4 題
-色系結果: {color_result}
+測驗結果: {quiz_result}
 
 ⚠️ 重要：必須使用繁體中文回應所有內容，即使使用者用英文提問
 </內部狀態資訊>""",
     "en": """<Internal State Info - Do not mention in response>
 Current Stage: {step_value}
 Quiz Progress: {answers_count}/4 questions
-Color Result: {color_result}
+Quiz Result: {quiz_result}
 
 ⚠️ CRITICAL: You MUST respond in English only, even if user writes in Chinese
 </Internal State Info>""",

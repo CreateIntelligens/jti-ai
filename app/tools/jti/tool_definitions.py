@@ -12,7 +12,7 @@ GENERATE_QUIZ_TOOL = {
     "type": "function",
     "function": {
         "name": "generate_quiz",
-        "description": "產生色彩測驗的完整題目。這個 tool 會回傳所有題目的結構化資料。",
+        "description": "產生「尋找命定前蓋」測驗的完整題目。這個 tool 會回傳所有題目的結構化資料。",
         "parameters": {
             "type": "object",
             "properties": {
@@ -74,11 +74,11 @@ SUBMIT_ANSWER_TOOL = {
     }
 }
 
-CALCULATE_COLOR_RESULT_TOOL = {
+CALCULATE_QUIZ_RESULT_TOOL = {
     "type": "function",
     "function": {
-        "name": "calculate_color_result",
-        "description": "根據使用者的所有答案計算色系結果。這個 tool 會回傳色系與對應文案。",
+        "name": "calculate_quiz_result",
+        "description": "根據使用者的所有答案計算測驗結果。這個 tool 會回傳結果與對應文案。",
         "parameters": {
             "type": "object",
             "properties": {
@@ -98,7 +98,7 @@ ALL_TOOLS: List[Dict] = [
     GENERATE_QUIZ_TOOL,
     GET_QUESTION_TOOL,
     SUBMIT_ANSWER_TOOL,
-    CALCULATE_COLOR_RESULT_TOOL,
+    CALCULATE_QUIZ_RESULT_TOOL,
 ]
 
 
