@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HeartPulse, History, Moon, RotateCcw, Settings, Sun } from 'lucide-react';
+import { fetchWithApiKey } from '../services/api';
 
 import ConversationHistoryModal from '../components/ConversationHistoryModal';
 import HciotSettingsModal from '../components/HciotSettingsModal';
@@ -17,9 +18,50 @@ import { useAutoResize } from '../hooks/useAutoResize';
 import { useScrollToBottom } from '../hooks/useScrollToBottom';
 import { useTheme } from '../hooks/useTheme';
 import * as api from '../services/api';
+import type { TtsState } from '../types';
 import '../styles/shared/index.css';
 import '../styles/hciot/layout.css';
 import '../styles/hciot/components.css';
+
+const TTS_MAX_ATTEMPTS = 16;
+const TTS_POLL_INTERVAL_MS = 3000;
+const TTS_STALL_TIMEOUT_MS = 12000;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+}
+
+function normalizeTtsMessageId(ttsMessageId?: string): string {
+  return (ttsMessageId || '').trim();
+}
+
+function isSameMessage(left: HciotMessage, right: HciotMessage): boolean {
+  return (
+    left.timestamp === right.timestamp &&
+    left.type === right.type &&
+    left.turnNumber === right.turnNumber &&
+    left.text === right.text
+  );
+}
+
+function attachTtsMessageId(
+  messages: HciotMessage[],
+  targetMessage: HciotMessage,
+  ttsMessageId: string,
+): HciotMessage[] {
+  let matched = false;
+
+  return messages.map((item) => {
+    if (matched || !isSameMessage(item, targetMessage)) {
+      return item;
+    }
+
+    matched = true;
+    return { ...item, ttsMessageId };
+  });
+}
 
 export default function Hciot() {
   const { t, i18n } = useTranslation();
@@ -39,13 +81,142 @@ export default function Hciot() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [editingTurn, setEditingTurn] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
+  const [ttsStateMap, setTtsStateMap] = useState<Record<string, TtsState>>({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const ttsAudioUrlMapRef = useRef<Map<string, string>>(new Map());
+  const ttsPendingMapRef = useRef<Map<string, Promise<void>>>(new Map());
+  const ttsPendingSinceRef = useRef<Map<string, number>>(new Map());
+  const currentAudioRef = useRef<HTMLAudioElement | null>(null);
+  const isUnmountedRef = useRef(false);
+  const ttsEpochRef = useRef(0);
 
   useScrollToBottom(messagesEndRef, [messages]);
   useAutoResize(inputRef, userInput);
+
+  useEffect(() => {
+    isUnmountedRef.current = false;
+    return () => { isUnmountedRef.current = true; };
+  }, []);
+
+  const setTtsState = useCallback((id: string, state: TtsState) => {
+    setTtsStateMap((prev) => ({ ...prev, [id]: state }));
+  }, []);
+
+  const markTtsError = useCallback((id: string) => {
+    ttsPendingSinceRef.current.delete(id);
+    setTtsState(id, 'error');
+  }, [setTtsState]);
+
+  const isStaleEpoch = useCallback(
+    (startEpoch: number) => isUnmountedRef.current || ttsEpochRef.current !== startEpoch,
+    [],
+  );
+
+  const warmupTtsAudio = useCallback((ttsMessageId?: string, force = false) => {
+    const id = normalizeTtsMessageId(ttsMessageId);
+    if (!id || ttsAudioUrlMapRef.current.has(id)) return;
+    if (ttsPendingMapRef.current.has(id) && !force) return;
+    if (force) ttsPendingMapRef.current.delete(id);
+    const startEpoch = ttsEpochRef.current;
+
+    const task = (async () => {
+      setTtsState(id, 'pending');
+      ttsPendingSinceRef.current.set(id, Date.now());
+      try {
+        for (let attempt = 0; attempt < TTS_MAX_ATTEMPTS; attempt += 1) {
+          if (isStaleEpoch(startEpoch)) return;
+          const res = await fetchWithApiKey(`/api/hciot/tts/${encodeURIComponent(id)}`);
+          if (res.status === 202) {
+            await sleep(Math.min(350 + attempt * 80, 1200));
+            continue;
+          }
+          if (res.status === 404) {
+            markTtsError(id);
+            return;
+          }
+          if (!res.ok) throw new Error(await res.text());
+          const blob = await res.blob();
+          const audioUrl = URL.createObjectURL(blob);
+          if (isStaleEpoch(startEpoch)) {
+            URL.revokeObjectURL(audioUrl);
+            return;
+          }
+          const oldUrl = ttsAudioUrlMapRef.current.get(id);
+          if (oldUrl) URL.revokeObjectURL(oldUrl);
+          ttsAudioUrlMapRef.current.set(id, audioUrl);
+          ttsPendingSinceRef.current.delete(id);
+          setTtsState(id, 'ready');
+          return;
+        }
+        markTtsError(id);
+      } catch {
+        if (!isStaleEpoch(startEpoch)) markTtsError(id);
+      }
+    })().finally(() => {
+      ttsPendingMapRef.current.delete(id);
+    });
+    ttsPendingMapRef.current.set(id, task);
+  }, [isStaleEpoch, markTtsError, setTtsState]);
+
+  const playAssistantTts = useCallback(async (msg: HciotMessage) => {
+    let ttsMessageId = normalizeTtsMessageId(msg.ttsMessageId);
+    if (!ttsMessageId) {
+      const sourceText = (msg.ttsText || msg.text || '').trim();
+      if (!sourceText) return;
+      const createRes = await fetchWithApiKey('/api/hciot/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: sourceText, language: currentLanguage }),
+      });
+      if (!createRes.ok) return;
+      const createData = await createRes.json();
+      ttsMessageId = normalizeTtsMessageId(String(createData?.tts_message_id || ''));
+      if (!ttsMessageId) return;
+      setMessages((prev) => attachTtsMessageId(prev, msg, ttsMessageId));
+    }
+    const audioUrl = ttsAudioUrlMapRef.current.get(ttsMessageId);
+    if (!audioUrl) {
+      warmupTtsAudio(ttsMessageId, true);
+      return;
+    }
+    currentAudioRef.current?.pause();
+    const audio = new Audio(audioUrl);
+    currentAudioRef.current = audio;
+    void audio.play().catch(() => {
+      setTtsState(ttsMessageId, 'error');
+    });
+  }, [currentLanguage, setTtsState, warmupTtsAudio]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      messages.forEach((msg) => {
+        if (msg.type !== 'assistant') return;
+        const id = normalizeTtsMessageId(msg.ttsMessageId);
+        if (!id || ttsAudioUrlMapRef.current.has(id)) return;
+        const state = ttsStateMap[id];
+        if (state === 'pending') {
+          const startedAt = ttsPendingSinceRef.current.get(id) || 0;
+          if (startedAt > 0 && now - startedAt > TTS_STALL_TIMEOUT_MS) {
+            warmupTtsAudio(id, true);
+          }
+          return;
+        }
+        if (state === 'ready' || state === 'error') return;
+        warmupTtsAudio(id);
+      });
+    }, TTS_POLL_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, [messages, ttsStateMap, warmupTtsAudio]);
+
+  const getAssistantTtsState = useCallback((ttsMessageId?: string): TtsState | undefined => {
+    const id = normalizeTtsMessageId(ttsMessageId);
+    if (!id) return undefined;
+    return ttsStateMap[id];
+  }, [ttsStateMap]);
 
   useEffect(() => {
     if (editingTurn !== null && editTextareaRef.current) {
@@ -95,6 +266,14 @@ export default function Hciot() {
     }
     setLoading(false);
     setIsTyping(false);
+    ttsEpochRef.current += 1;
+    ttsPendingMapRef.current.clear();
+    ttsPendingSinceRef.current.clear();
+    currentAudioRef.current?.pause();
+    currentAudioRef.current = null;
+    ttsAudioUrlMapRef.current.forEach(url => URL.revokeObjectURL(url));
+    ttsAudioUrlMapRef.current.clear();
+    setTtsStateMap({});
     await startSession(sessionId);
   }, [storeName, messages.length, sessionId, startSession, t]);
 
@@ -148,7 +327,13 @@ export default function Hciot() {
         turnNumber: data.turn_number,
         citations: data.citations,
         imageId: data.image_id,
+        ttsText: data.tts_text,
+        ttsMessageId: data.tts_message_id,
       };
+
+      if (data.tts_message_id) {
+        warmupTtsAudio(data.tts_message_id);
+      }
 
       setMessages((prev) => {
         let lastUserIndex = -1;
@@ -305,6 +490,8 @@ export default function Hciot() {
             setEditingTurn={setEditingTurn}
             setEditText={setEditText}
             handleEditKeyDown={handleEditKeyDown}
+            onPlayTts={playAssistantTts}
+            getTtsState={getAssistantTtsState}
             heroEyebrow={t('hciot_hero_eyebrow')}
             heroTitle={t('hciot_hero_title')}
             heroDescription={t('hciot_hero_description')}

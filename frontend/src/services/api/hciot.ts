@@ -87,6 +87,8 @@ export async function hciotSendMessage(text: string, sessionId: string, turnNumb
     turn_number: data.turn_number as number | undefined,
     citations: data.citations as Array<{ title: string; uri: string }> | undefined,
     image_id: data.image_id as string | undefined,
+    tts_text: data.tts_text as string | undefined,
+    tts_message_id: data.tts_message_id as string | undefined,
   };
 }
 
