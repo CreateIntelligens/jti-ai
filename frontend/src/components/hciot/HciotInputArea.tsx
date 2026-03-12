@@ -24,43 +24,41 @@ export default function HciotInputArea({
   inputRef,
 }: HciotInputAreaProps) {
   return (
-    <div className="hciot-input-shell">
-      <form onSubmit={handleSubmit} className="hciot-input-form">
-        <div className="hciot-input-frame">
-          <textarea
-            ref={inputRef}
-            className="hciot-chat-input"
-            value={userInput}
-            onChange={(e) => setUserInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={placeholder}
-            disabled={loading || !sessionId}
-            autoComplete="off"
-            spellCheck={false}
-          />
-          <div className="hciot-input-footer">
-            <div className="hciot-inline-status">
-              <span className="hciot-status-dot"></span>
-              <span>{statusText}</span>
-              {sessionInfo ? <span className="hciot-session-chip">{sessionInfo}</span> : null}
-            </div>
-            <button
-              type="submit"
-              className="hciot-send-button"
-              disabled={loading || !sessionId || !userInput.trim()}
-              aria-label="Send message"
-            >
-              {loading ? (
-                <span className="hciot-button-spinner"></span>
-              ) : (
-                <svg className="hciot-send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25">
-                  <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
-                </svg>
-              )}
-            </button>
+    <form onSubmit={handleSubmit} className="hciot-input-form">
+      <div className="hciot-input-frame">
+        <textarea
+          ref={inputRef}
+          className="hciot-chat-input"
+          value={userInput}
+          onChange={(e) => setUserInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          disabled={loading || !sessionId}
+          autoComplete="off"
+          spellCheck={false}
+        />
+        <div className="hciot-input-footer">
+          <div className="hciot-inline-status">
+            <span className="hciot-status-dot"></span>
+            <span>{statusText}</span>
+            {sessionInfo ? <span className="hciot-session-chip">{sessionInfo}</span> : null}
           </div>
+          <button
+            type="submit"
+            className="hciot-send-button"
+            disabled={loading || !sessionId || !userInput.trim()}
+            aria-label="Send message"
+          >
+            {loading ? (
+              <span className="hciot-button-spinner"></span>
+            ) : (
+              <svg className="hciot-send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25">
+                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+              </svg>
+            )}
+          </button>
         </div>
-      </form>
-    </div>
+      </div>
+    </form>
   );
 }

@@ -81,6 +81,7 @@ export default function Hciot() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [editingTurn, setEditingTurn] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [ttsStateMap, setTtsStateMap] = useState<Record<string, TtsState>>({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -426,8 +427,15 @@ export default function Hciot() {
 
   const handleSelectTopic = (topic: HciotTopic) => {
     if (!sessionId || loading) return;
-    void sendMessage(topic.prompts[currentLanguage]);
+    setSelectedTopicId((prev) => (prev === topic.id ? null : topic.id));
   };
+
+  const handleSelectQuestion = (question: string) => {
+    if (!sessionId || loading) return;
+    void sendMessage(question);
+  };
+
+  const selectedTopic = HCIOT_TOPICS.find((topic) => topic.id === selectedTopicId) || null;
 
   return (
     <div className="hciot-shell">
@@ -469,8 +477,15 @@ export default function Hciot() {
               language={currentLanguage}
               disabled={loading || !sessionId}
               onSelect={handleSelectTopic}
+              onSelectQuestion={handleSelectQuestion}
+              selectedTopicId={selectedTopicId}
               heading={t('hciot_topic_heading')}
               subheading={t('hciot_topic_subheading')}
+              questionHeading={
+                selectedTopic
+                  ? `${selectedTopic.labels[currentLanguage]} ${currentLanguage === 'zh' ? '常見問題' : 'Questions'}`
+                  : undefined
+              }
               disabledMessage={storeMissing ? t('hciot_store_missing_notice', { store: HCIOT_DEFAULT_STORE_NAME }) : null}
             />
           </div>

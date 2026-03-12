@@ -5,8 +5,11 @@ interface HciotTopicGridProps {
   language: HciotLanguage;
   disabled?: boolean;
   onSelect: (topic: HciotTopic) => void;
+  onSelectQuestion: (question: string) => void;
+  selectedTopicId?: string | null;
   heading: string;
   subheading: string;
+  questionHeading?: string;
   disabledMessage?: string | null;
 }
 
@@ -15,10 +18,15 @@ export default function HciotTopicGrid({
   language,
   disabled = false,
   onSelect,
+  onSelectQuestion,
+  selectedTopicId = null,
   heading,
   subheading,
+  questionHeading,
   disabledMessage,
 }: HciotTopicGridProps) {
+  const selectedTopic = topics.find((topic) => topic.id === selectedTopicId) || null;
+
   return (
     <section className="hciot-topic-section">
       <div className="hciot-topic-header">
@@ -36,7 +44,7 @@ export default function HciotTopicGrid({
           <button
             key={topic.id}
             type="button"
-            className="hciot-topic-chip"
+            className={`hciot-topic-chip${selectedTopicId === topic.id ? ' active' : ''}`}
             onClick={() => onSelect(topic)}
             disabled={disabled}
             style={{ ['--topic-accent' as string]: topic.accent }}
@@ -46,6 +54,35 @@ export default function HciotTopicGrid({
           </button>
         ))}
       </div>
+
+      {selectedTopic ? (
+        <div
+          className="hciot-topic-question-panel"
+          style={{ ['--topic-accent' as string]: selectedTopic.accent }}
+        >
+          <div className="hciot-topic-question-header">
+            <p className="hciot-topic-question-kicker">{selectedTopic.summaries[language]}</p>
+            <h4 className="hciot-topic-question-heading">
+              {questionHeading || selectedTopic.labels[language]}
+            </h4>
+          </div>
+
+          <div className="hciot-topic-question-list">
+            {selectedTopic.questions[language].map((question, index) => (
+              <button
+                key={`${selectedTopic.id}-${question}`}
+                type="button"
+                className="hciot-topic-question-chip"
+                onClick={() => onSelectQuestion(question)}
+                disabled={disabled}
+              >
+                <span className="hciot-topic-question-index">{index + 1}</span>
+                <span className="hciot-topic-question-label">{question}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

@@ -6,7 +6,118 @@ export interface HciotTopic {
   accent: string;
   labels: Record<HciotLanguage, string>;
   summaries: Record<HciotLanguage, string>;
-  prompts: Record<HciotLanguage, string>;
+  questions: Record<HciotLanguage, string[]>;
+}
+
+const HCIOT_TOPIC_QUESTIONS_ZH = {
+  prp: [
+    'PRP 治療會痛嗎？',
+    'PRP 注射後多久會見效？',
+    'PRP 有副作用嗎？',
+    'PRP 需要禁食嗎？',
+    '施打 PRP 前可以吃止痛藥嗎？',
+  ],
+  'h-pylori': [
+    '感染幽門螺旋桿菌的症狀有哪些？',
+    '感染幽門螺旋桿菌一定要治療嗎？',
+    '幽門螺旋桿菌如何治療？',
+    '治療期間可以喝酒嗎？',
+    '治療幽門螺旋桿菌會有副作用嗎？',
+  ],
+  'trigger-finger': [
+    '板機指為什麼會發生？',
+    '那些人較會有板機指？',
+    '板機指會自己好嗎？',
+    '板機指常見的治療方式有哪些？',
+    '板機指痛在哪裡？',
+  ],
+  'herniated-disc': [
+    '椎間盤突出常見的部位?',
+    '椎間盤突出和坐骨神經痛有什麼關係？',
+    '椎間盤突出會自己好嗎？',
+    '如何診斷椎間盤突出？',
+    '椎間盤突出一定要開刀嗎？',
+  ],
+  'peptic-ulcer': [
+    '如何診斷消化性潰瘍？',
+    '消化性潰瘍需要治療嗎?',
+    '消化性潰瘍要怎麼治療?',
+    '胃潰瘍和十二指腸潰瘍有什麼不同？',
+    '黑便代表什麼？',
+  ],
+  gout: [
+    '痛風發作多久會好？',
+    '為什麼會痛風？',
+    '如何檢查是否痛風？',
+    '尿酸高就一定會痛風發作嗎？',
+    '痛風發作時應該冰敷還是熱敷？',
+  ],
+  'cast-care': [
+    '石膏弄濕怎麼辦？',
+    '石膏變得很緊怎麼辦？',
+    '下肢石膏固定期間能走路嗎？',
+    '石膏內有異味怎麼辦？',
+    '石膏期間可以洗澡嗎？',
+  ],
+  diabetes: [
+    '糖尿病有哪幾種類型？',
+    '糖尿病如何診斷？',
+    '糖化血色素（HbA1c）是什麼？',
+    '糖尿病會遺傳嗎？',
+    '糖尿病患者一定要吃藥嗎？',
+  ],
+  'fatty-liver': [
+    '什麼是脂肪肝？',
+    '脂肪肝有哪幾種類型？',
+    '脂肪肝會有症狀嗎？',
+    '脂肪肝怎麼檢查？',
+    '脂肪肝嚴重嗎？',
+  ],
+  meniscus: [
+    '半月板損傷是怎麼發生的？',
+    '需要做 MRI 才能確診嗎？',
+    '半月板損傷可以走路嗎？',
+    '半月板損傷會卡住膝蓋嗎？',
+    '半月板損傷需要開刀嗎？',
+  ],
+  'ankle-sprain': [
+    '什麼是足踝扭傷？',
+    '足踝扭傷程度怎麼分類?',
+    '足踝扭傷會變慢性不穩嗎？',
+    '足踝扭傷最常傷到哪個部位？',
+    '扭傷後立刻腫起來是正常的嗎？',
+  ],
+  osteoarthritis: [
+    '什麼是退化性膝關節炎？',
+    '退化性關節炎的原因？',
+    '早上起床膝蓋僵硬是退化嗎？',
+    'X 光可以確診退化性膝關節炎嗎？',
+    '為什麼會膝蓋退化？',
+  ],
+  osteoporosis: [
+    '哪些人容易得骨質疏鬆？',
+    '骨質疏鬆最容易發生哪些骨折？',
+    '如何診斷骨質疏鬆？',
+    'T-score 是什麼？',
+    '骨質疏鬆會痛嗎？',
+  ],
+  hypertension: [
+    '高血壓會有症狀嗎？',
+    '高血壓如何診斷？',
+    '高血壓的原因？',
+    '高血壓的危險因素有哪些？',
+    '高血壓可以治癒嗎？',
+  ],
+} as const;
+
+type HciotTopicQuestionKey = keyof typeof HCIOT_TOPIC_QUESTIONS_ZH;
+
+function getTopicQuestions(key: HciotTopicQuestionKey): Record<HciotLanguage, string[]> {
+  const questions = [...HCIOT_TOPIC_QUESTIONS_ZH[key]];
+  return {
+    zh: [...questions],
+    en: [...questions],
+  };
 }
 
 export const HCIOT_DEFAULT_STORE_NAME = (
@@ -23,10 +134,7 @@ export const HCIOT_TOPICS: HciotTopic[] = [
       zh: '了解適應症、術後照護與常見疑問。',
       en: 'Learn indications, post-procedure care, and common questions.',
     },
-    prompts: {
-      zh: '請用病人容易理解的方式說明 PRP 的用途、治療後照護重點與何時需要回診。',
-      en: 'Please explain PRP therapy in patient-friendly English, including its purpose, aftercare, and when follow-up is needed.',
-    },
+    questions: getTopicQuestions('prp'),
   },
   {
     id: 'h-pylori',
@@ -37,10 +145,7 @@ export const HCIOT_TOPICS: HciotTopic[] = [
       zh: '整理感染原因、治療方式與飲食注意事項。',
       en: 'Summarize causes, treatment approach, and dietary cautions.',
     },
-    prompts: {
-      zh: '請整理幽門螺旋桿菌的感染原因、治療方式、用藥提醒與日常飲食注意事項。',
-      en: 'Please summarize H. pylori causes, treatment, medication reminders, and daily diet advice in English.',
-    },
+    questions: getTopicQuestions('h-pylori'),
   },
   {
     id: 'trigger-finger',
@@ -51,10 +156,7 @@ export const HCIOT_TOPICS: HciotTopic[] = [
       zh: '說明症狀、保守治療與就醫時機。',
       en: 'Explain symptoms, conservative care, and when to seek treatment.',
     },
-    prompts: {
-      zh: '請說明板機指的症狀、平常可以怎麼照護，以及什麼情況需要進一步治療。',
-      en: 'Please explain trigger finger symptoms, home care, and when further treatment is needed.',
-    },
+    questions: getTopicQuestions('trigger-finger'),
   },
   {
     id: 'herniated-disc',
@@ -65,10 +167,7 @@ export const HCIOT_TOPICS: HciotTopic[] = [
       zh: '整理常見症狀、姿勢調整與警訊。',
       en: 'Review common symptoms, posture advice, and warning signs.',
     },
-    prompts: {
-      zh: '請用清楚條列方式說明椎間盤突出的常見症狀、日常姿勢建議與需要立即就醫的警訊。',
-      en: 'Please explain herniated disc symptoms, posture advice, and urgent warning signs in clear bullet points.',
-    },
+    questions: getTopicQuestions('herniated-disc'),
   },
   {
     id: 'peptic-ulcer',
@@ -79,10 +178,7 @@ export const HCIOT_TOPICS: HciotTopic[] = [
       zh: '涵蓋症狀、用藥與飲食調整。',
       en: 'Cover symptoms, medication reminders, and diet changes.',
     },
-    prompts: {
-      zh: '請說明消化性潰瘍的常見症狀、用藥重點、飲食建議，以及什麼情況要回診。',
-      en: 'Please explain peptic ulcer symptoms, medication reminders, diet advice, and when follow-up is necessary.',
-    },
+    questions: getTopicQuestions('peptic-ulcer'),
   },
   {
     id: 'gout',
@@ -93,10 +189,7 @@ export const HCIOT_TOPICS: HciotTopic[] = [
       zh: '重點整理發作期照護與飲食控制。',
       en: 'Focus on flare care and diet control.',
     },
-    prompts: {
-      zh: '請用病人可以照做的方式說明痛風急性發作時怎麼處理、平常飲食要注意什麼。',
-      en: 'Please explain what patients should do during a gout flare and what diet habits to follow afterward.',
-    },
+    questions: getTopicQuestions('gout'),
   },
   {
     id: 'cast-care',
@@ -107,10 +200,7 @@ export const HCIOT_TOPICS: HciotTopic[] = [
       zh: '說明固定後照護、禁忌與危險徵象。',
       en: 'Explain aftercare, restrictions, and red-flag symptoms.',
     },
-    prompts: {
-      zh: '請說明石膏固定後的照護重點、不能做的事，以及哪些情況代表需要立即回診。',
-      en: 'Please explain cast care, things patients must avoid, and symptoms that require urgent reassessment.',
-    },
+    questions: getTopicQuestions('cast-care'),
   },
   {
     id: 'diabetes',
@@ -121,10 +211,7 @@ export const HCIOT_TOPICS: HciotTopic[] = [
       zh: '整理飲食、監測與生活型態建議。',
       en: 'Summarize diet, monitoring, and lifestyle advice.',
     },
-    prompts: {
-      zh: '請說明糖尿病病人平常在飲食、血糖監測、運動與用藥方面的重點。',
-      en: 'Please explain the key daily care points for diabetes, including diet, glucose monitoring, exercise, and medication.',
-    },
+    questions: getTopicQuestions('diabetes'),
   },
   {
     id: 'fatty-liver',
@@ -135,10 +222,7 @@ export const HCIOT_TOPICS: HciotTopic[] = [
       zh: '聚焦體重、飲食與追蹤建議。',
       en: 'Focus on weight, diet, and follow-up recommendations.',
     },
-    prompts: {
-      zh: '請說明脂肪肝的日常照護，包括飲食、體重控制、運動與追蹤檢查的重點。',
-      en: 'Please explain fatty liver self-care, including diet, weight control, exercise, and follow-up testing.',
-    },
+    questions: getTopicQuestions('fatty-liver'),
   },
   {
     id: 'meniscus',
@@ -149,10 +233,7 @@ export const HCIOT_TOPICS: HciotTopic[] = [
       zh: '整理休息、復健與活動限制。',
       en: 'Summarize rest, rehab, and activity restrictions.',
     },
-    prompts: {
-      zh: '請說明膝蓋半月板損傷時平常如何休息與復健，哪些動作需要避免。',
-      en: 'Please explain rest, rehabilitation, and movement restrictions for a meniscus injury.',
-    },
+    questions: getTopicQuestions('meniscus'),
   },
   {
     id: 'ankle-sprain',
@@ -163,10 +244,7 @@ export const HCIOT_TOPICS: HciotTopic[] = [
       zh: '重點說明急性期處置與恢復期活動。',
       en: 'Highlight acute care and return-to-activity guidance.',
     },
-    prompts: {
-      zh: '請說明足踝扭傷後前幾天怎麼處理、何時可以慢慢恢復活動，以及哪些警訊不能拖。',
-      en: 'Please explain ankle sprain care in the first few days, when activity can resume, and which warning signs need prompt care.',
-    },
+    questions: getTopicQuestions('ankle-sprain'),
   },
   {
     id: 'osteoarthritis',
@@ -177,10 +255,7 @@ export const HCIOT_TOPICS: HciotTopic[] = [
       zh: '涵蓋疼痛管理、運動與保養建議。',
       en: 'Cover pain control, exercise, and joint protection.',
     },
-    prompts: {
-      zh: '請整理退化性關節炎的疼痛管理方式、適合的活動建議，以及平常保養重點。',
-      en: 'Please summarize pain management, suitable activity, and daily joint-care advice for osteoarthritis.',
-    },
+    questions: getTopicQuestions('osteoarthritis'),
   },
   {
     id: 'osteoporosis',
@@ -191,10 +266,7 @@ export const HCIOT_TOPICS: HciotTopic[] = [
       zh: '整理補充營養、運動與跌倒預防。',
       en: 'Summarize nutrition, exercise, and fall prevention.',
     },
-    prompts: {
-      zh: '請說明骨質疏鬆病人平常應注意的營養補充、運動方式與跌倒預防重點。',
-      en: 'Please explain nutrition, exercise, and fall-prevention advice for patients with osteoporosis.',
-    },
+    questions: getTopicQuestions('osteoporosis'),
   },
   {
     id: 'hypertension',
@@ -205,10 +277,7 @@ export const HCIOT_TOPICS: HciotTopic[] = [
       zh: '快速掌握量血壓、用藥與生活習慣。',
       en: 'Quickly review blood pressure checks, medication, and habits.',
     },
-    prompts: {
-      zh: '請用病人容易理解的方式說明高血壓的日常照護，包括量血壓、用藥、飲食與生活習慣。',
-      en: 'Please explain daily hypertension care in simple English, including blood pressure checks, medication, diet, and lifestyle habits.',
-    },
+    questions: getTopicQuestions('hypertension'),
   },
 ];
 

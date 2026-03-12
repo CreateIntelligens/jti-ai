@@ -131,7 +131,7 @@
 
 .hciot-main {
   display: grid;
-  grid-template-columns: 24rem 1fr;
+  grid-template-columns: clamp(15.5rem, 22vw, 19rem) minmax(0, 1fr);
   gap: 2rem;
   flex: 1;
   min-height: 0;
