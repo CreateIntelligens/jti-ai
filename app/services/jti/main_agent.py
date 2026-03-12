@@ -113,10 +113,6 @@ class MainAgent(BaseAgent):
             quiz_result=session.quiz_result_id or not_yet,
         )
 
-    def _prepare_search_query(self, query: str, language: str) -> str:
-        prefix = "Please search the knowledge base: " if language == "en" else "請你在知識庫查："
-        return f"{prefix}{query}"
-
     def _file_search(self, query: str, language: str, session_id: str | None = None) -> tuple[str | None, list[dict] | None]:
         """JTI: 用 File Search 取 top 3 citations，再從 MongoDB 讀原始檔案內容"""
         _, citations = super()._file_search(query, language, session_id)

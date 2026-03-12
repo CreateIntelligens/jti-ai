@@ -62,8 +62,9 @@ class BaseAgent:
         return "YES"
 
     def _prepare_search_query(self, query: str, language: str) -> str:
-        """可覆寫：在送出 File Search 前對 query 加工。預設原樣回傳。"""
-        return query
+        """在送出 File Search 前加上知識庫查詢前綴。"""
+        prefix = "Please search the knowledge base: " if normalize_language(language) == "en" else "請你在知識庫查："
+        return f"{prefix}{query}"
 
     def _get_default_persona(self, language: str) -> str:
         """Return default persona text when no DB persona is configured."""

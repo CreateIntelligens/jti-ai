@@ -9,7 +9,6 @@ Gemini API 整合服務（使用新版 google-genai SDK）
 
 import time
 import logging
-from pathlib import Path
 from typing import Callable, Optional, TypeVar
 
 from google.genai import types
@@ -117,33 +116,3 @@ def gemini_with_retry(fn: Callable[[], T], retries: int = 3, base_delay: float =
 
 # 全域實例
 gemini_service = GeminiService()
-
-
-# === 初始化：上傳知識庫 ===
-
-async def initialize_knowledge_base():
-    """
-    初始化知識庫
-
-    上傳 docx 檔案
-    這個函數應該在服務啟動時呼叫一次
-    """
-    kb_file = "傑太日煙＿FAQ_draft_for 創智.docx"
-
-    if not Path(kb_file).exists():
-        logger.warning(f"Knowledge base file not found: {kb_file}")
-        return None
-
-    try:
-        # 上傳檔案
-        file_name = await gemini_service.upload_knowledge_base(
-            file_path=kb_file,
-            display_name="傑太日煙 FAQ"
-        )
-
-        logger.info(f"Knowledge base initialized: {file_name}")
-        return file_name
-
-    except Exception as e:
-        logger.error(f"Failed to initialize knowledge base: {e}")
-        return None
