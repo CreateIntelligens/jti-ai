@@ -156,4 +156,4 @@ class TtsJobManager:
 
 # Per-app singletons with fixed characters
 jti_tts_job_manager = TtsJobManager(character="hayley")
-hciot_tts_job_manager = TtsJobManager(character="healthy")
+hciot_tts_job_manager = TtsJobManager(character="healthy2")
