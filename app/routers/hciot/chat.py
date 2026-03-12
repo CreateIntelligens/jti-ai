@@ -9,6 +9,7 @@ from typing import Optional, Union
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import verify_admin, verify_auth
+from app.routers.tts_utils import attach_tts_message_id, register_tts_endpoints
 from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
@@ -21,6 +22,7 @@ from app.schemas.chat import (
     ExportConversationsResponse,
 )
 from app.services.hciot.main_agent import main_agent
+from app.services.jti.tts_text import to_tts_text
 from app.services.session.session_manager_factory import get_hciot_conversation_logger, get_hciot_session_manager
 from app.utils import group_conversations_by_session
 
@@ -33,6 +35,7 @@ session_manager = get_hciot_session_manager()
 conversation_logger = get_hciot_conversation_logger()
 logger = logging.getLogger(__name__)
 
+
 runtime_router = APIRouter(prefix="/api/hciot", tags=["HCIoT Chat"])
 compat_history_router = APIRouter(
     prefix="/api/hciot",
@@ -44,6 +47,8 @@ admin_history_router = APIRouter(
     tags=["HCIoT Conversations"],
 )
 router = runtime_router
+
+register_tts_endpoints(runtime_router)
 
 
 @runtime_router.post("/chat/start", response_model=CreateSessionResponse)
@@ -86,6 +91,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         result = await main_agent.chat(session_id=request.session_id, user_message=request.message)
 
         updated_session = session_manager.get_session(request.session_id)
+        language = updated_session.language if updated_session else "zh"
         log_result = conversation_logger.log_conversation(
             session_id=request.session_id,
             user_message=request.message,
@@ -93,14 +99,16 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             tool_calls=result.get("tool_calls", []),
             session_state={
                 "step": updated_session.step.value if updated_session else "WELCOME",
-                "language": updated_session.language if updated_session else "zh",
+                "language": language,
             },
             mode="hciot",
             citations=result.get("citations"),
             image_id=result.get("image_id"),
         )
         final_turn_number = log_result[1] if log_result else None
-        return ChatResponse(**result, turn_number=final_turn_number)
+        result["tts_text"] = to_tts_text(result["message"], language)
+        response = ChatResponse(**result, turn_number=final_turn_number)
+        return attach_tts_message_id(response, language)
     except HTTPException:
         raise
     except Exception as e:

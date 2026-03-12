@@ -2,18 +2,16 @@
 JTI Chat API — session management, chat messages, and conversation history.
 """
 
-import re
 from copy import deepcopy
 from datetime import datetime
 from typing import Optional, Union
 
 from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import JSONResponse, Response
 import logging
-from pydantic import BaseModel, Field
 
 from app.auth import verify_admin, verify_auth
 from app.models.session import SessionStep
+from app.routers.tts_utils import attach_tts_message_id, register_tts_endpoints
 from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
@@ -31,7 +29,6 @@ from app.services.jti.runtime_quiz_flow import (
     extract_option_texts,
     make_quiz_tts_text,
 )
-from app.services.jti.tts_jobs import tts_job_manager
 from app.services.jti.tts_text import to_tts_text
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 
@@ -66,51 +63,7 @@ admin_history_router = APIRouter(
 )
 router = runtime_router
 
-
-class TtsCreateRequest(BaseModel):
-    text: str = Field(..., description="Text content for TTS generation")
-    language: str = Field("zh", description="Language code, e.g. zh or en")
-
-
-def _queue_tts_generation(tts_text: Optional[str], language: str) -> Optional[str]:
-    if not tts_text:
-        return None
-    try:
-        return tts_job_manager.create_job(text=tts_text, language=language)
-    except Exception as exc:
-        logger.warning("Failed to queue TTS generation: %s", exc)
-        return None
-
-
-_EMOJI_RE = re.compile(
-    "["
-    "\U0001f300-\U0001f9ff"   # miscellaneous symbols, emoticons, supplemental
-    "\U0001fa00-\U0001faff"   # symbols extended-A
-    "\U00002600-\U000027bf"   # misc symbols & dingbats
-    "\U0000fe00-\U0000fe0f"   # variation selectors
-    "\U0000200d"              # zero width joiner
-    "\U000023cf-\U000023fa"   # misc technical
-    "\U00002b50-\U00002b55"   # stars
-    "]+",
-    flags=re.UNICODE,
-)
-
-
-def _strip_emoji(text: str) -> str:
-    """移除文字中的 emoji 符號。"""
-    return _EMOJI_RE.sub("", text).strip()
-
-
-def _attach_tts_message_id(response: ChatResponse, language: str) -> ChatResponse:
-    """Strip emoji from display/tts text and queue TTS generation."""
-    cleaned_message = _strip_emoji(response.message)
-    cleaned_tts = _strip_emoji(response.tts_text) if response.tts_text else response.tts_text
-    tts_message_id = _queue_tts_generation(cleaned_tts, language)
-    return response.model_copy(update={
-        "message": cleaned_message,
-        "tts_text": cleaned_tts,
-        "tts_message_id": tts_message_id,
-    })
+register_tts_endpoints(runtime_router)
 
 
 # === Endpoints ===
@@ -210,7 +163,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     log_user_message=request.message,
                     session=session,
                 )))
-                return _attach_tts_message_id(pause_response, session.language)
+                return attach_tts_message_id(pause_response, session.language)
 
             options_text = _format_options_text(q.get("options", []))
             logger.info(f"[測驗進度] 第 {current_q_num}/{total_questions} 題 | 題目: {q.get('text', '')[:30]}...")
@@ -224,7 +177,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     log_user_message=request.message,
                     session=session,
                 )))
-                return _attach_tts_message_id(pause_response, session.language)
+                return attach_tts_message_id(pause_response, session.language)
 
             if user_choice:
                 from app.tools.jti.tool_executor import tool_executor
@@ -284,7 +237,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     tool_calls=[{k: v for k, v in call.items() if k != "result"} for call in tool_calls],
                     turn_number=final_turn_number,
                 )
-                return _attach_tts_message_id(response_payload, updated_session.language)
+                return attach_tts_message_id(response_payload, updated_session.language)
             else:
                 # 無法判斷選項：hardcode 提示
                 if session.language == "en":
@@ -320,7 +273,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     tool_calls=[],
                     turn_number=final_turn_number
                 )
-                return _attach_tts_message_id(response_payload, session.language)
+                return attach_tts_message_id(response_payload, session.language)
 
         # ========== 非 QUIZ 狀態 ==========
         start_keywords = [
@@ -346,7 +299,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             if request.turn_number:
                 conversation_logger.delete_turns_from(request.session_id, request.turn_number)
             quiz_response = await execute_quiz_start(request.session_id, user_message=request.message)
-            return _attach_tts_message_id(quiz_response, session.language)
+            return attach_tts_message_id(quiz_response, session.language)
 
         # 一般對話：走 LLM
         result = await main_agent.chat(
@@ -374,56 +327,13 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         result["tts_text"] = to_tts_text(raw_tts, session.language)
 
         response_payload = ChatResponse(**result, turn_number=final_turn_number)
-        return _attach_tts_message_id(response_payload, session.language)
+        return attach_tts_message_id(response_payload, session.language)
 
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Chat failed: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
-
-
-@runtime_router.get("/tts/{tts_message_id}")
-async def get_tts_audio(tts_message_id: str, auth: dict = Depends(verify_auth)):
-    """Get pre-generated TTS audio by message id."""
-    job = tts_job_manager.get_job(tts_message_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="TTS audio not found")
-
-    status = job.get("status")
-    if status == "pending":
-        return JSONResponse(status_code=202, content={"status": "pending"})
-    if status == "failed":
-        raise HTTPException(status_code=500, detail=job.get("error") or "TTS generation failed")
-
-    audio_bytes = job.get("audio_bytes")
-    if not isinstance(audio_bytes, (bytes, bytearray)) or not audio_bytes:
-        raise HTTPException(status_code=500, detail="TTS audio is unavailable")
-
-    content_type = job.get("content_type")
-    if not isinstance(content_type, str) or not content_type.strip():
-        content_type = "audio/mpeg"
-
-    return Response(
-        content=audio_bytes,
-        media_type=content_type,
-        headers={"Cache-Control": "private, max-age=300"},
-    )
-
-
-@runtime_router.post("/tts")
-async def create_tts_audio(request: TtsCreateRequest, auth: dict = Depends(verify_auth)):
-    """Create a new background TTS job and return its message id."""
-    text = (request.text or "").strip()
-    if not text:
-        raise HTTPException(status_code=400, detail="TTS text is empty")
-
-    language = (request.language or "zh").strip().lower() or "zh"
-    tts_message_id = _queue_tts_generation(text, language)
-    if not tts_message_id:
-        raise HTTPException(status_code=500, detail="Failed to queue TTS generation")
-
-    return {"tts_message_id": tts_message_id}
 
 
 @compat_history_router.get(
