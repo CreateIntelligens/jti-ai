@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import verify_admin, verify_auth
 from app.routers.tts_utils import attach_tts_message_id, register_tts_endpoints
+from app.services.tts_jobs import hciot_tts_job_manager as _tts_manager
 from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
@@ -48,7 +49,7 @@ admin_history_router = APIRouter(
 )
 router = runtime_router
 
-register_tts_endpoints(runtime_router)
+register_tts_endpoints(runtime_router, _tts_manager)
 
 
 @runtime_router.post("/chat/start", response_model=CreateSessionResponse)
@@ -108,7 +109,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         final_turn_number = log_result[1] if log_result else None
         result["tts_text"] = to_tts_text(result["message"], language)
         response = ChatResponse(**result, turn_number=final_turn_number)
-        return attach_tts_message_id(response, language)
+        return attach_tts_message_id(response, language, _tts_manager)
     except HTTPException:
         raise
     except Exception as e:

@@ -12,6 +12,7 @@ import logging
 from app.auth import verify_admin, verify_auth
 from app.models.session import SessionStep
 from app.routers.tts_utils import attach_tts_message_id, register_tts_endpoints
+from app.services.tts_jobs import jti_tts_job_manager as _tts_manager
 from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
@@ -63,7 +64,7 @@ admin_history_router = APIRouter(
 )
 router = runtime_router
 
-register_tts_endpoints(runtime_router)
+register_tts_endpoints(runtime_router, _tts_manager)
 
 
 # === Endpoints ===
@@ -163,7 +164,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     log_user_message=request.message,
                     session=session,
                 )))
-                return attach_tts_message_id(pause_response, session.language)
+                return attach_tts_message_id(pause_response, session.language, _tts_manager)
 
             options_text = _format_options_text(q.get("options", []))
             logger.info(f"[測驗進度] 第 {current_q_num}/{total_questions} 題 | 題目: {q.get('text', '')[:30]}...")
@@ -177,7 +178,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     log_user_message=request.message,
                     session=session,
                 )))
-                return attach_tts_message_id(pause_response, session.language)
+                return attach_tts_message_id(pause_response, session.language, _tts_manager)
 
             if user_choice:
                 from app.tools.jti.tool_executor import tool_executor
@@ -237,7 +238,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     tool_calls=[{k: v for k, v in call.items() if k != "result"} for call in tool_calls],
                     turn_number=final_turn_number,
                 )
-                return attach_tts_message_id(response_payload, updated_session.language)
+                return attach_tts_message_id(response_payload, updated_session.language, _tts_manager)
             else:
                 # 無法判斷選項：hardcode 提示
                 if session.language == "en":
@@ -273,7 +274,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     tool_calls=[],
                     turn_number=final_turn_number
                 )
-                return attach_tts_message_id(response_payload, session.language)
+                return attach_tts_message_id(response_payload, session.language, _tts_manager)
 
         # ========== 非 QUIZ 狀態 ==========
         start_keywords = [
@@ -299,7 +300,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             if request.turn_number:
                 conversation_logger.delete_turns_from(request.session_id, request.turn_number)
             quiz_response = await execute_quiz_start(request.session_id, user_message=request.message)
-            return attach_tts_message_id(quiz_response, session.language)
+            return attach_tts_message_id(quiz_response, session.language, _tts_manager)
 
         # 一般對話：走 LLM
         result = await main_agent.chat(
@@ -327,7 +328,7 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         result["tts_text"] = to_tts_text(raw_tts, session.language)
 
         response_payload = ChatResponse(**result, turn_number=final_turn_number)
-        return attach_tts_message_id(response_payload, session.language)
+        return attach_tts_message_id(response_payload, session.language, _tts_manager)
 
     except HTTPException:
         raise

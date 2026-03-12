@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 
 from app.auth import verify_auth
 from app.schemas.chat import ChatResponse
-from app.services.jti.tts_jobs import tts_job_manager
+from app.services.tts_jobs import TtsJobManager, jti_tts_job_manager, hciot_tts_job_manager
 
 logger = logging.getLogger(__name__)
 
@@ -46,22 +46,22 @@ def strip_emoji(text: str) -> str:
 # TTS job helpers
 # ---------------------------------------------------------------------------
 
-def queue_tts_generation(tts_text: Optional[str], language: str) -> Optional[str]:
+def queue_tts_generation(tts_text: Optional[str], language: str, manager: TtsJobManager) -> Optional[str]:
     """Submit *tts_text* for background TTS generation; return the job id."""
     if not tts_text:
         return None
     try:
-        return tts_job_manager.create_job(text=tts_text, language=language)
+        return manager.create_job(text=tts_text, language=language)
     except Exception as exc:
         logger.warning("Failed to queue TTS generation: %s", exc)
         return None
 
 
-def attach_tts_message_id(response: ChatResponse, language: str) -> ChatResponse:
+def attach_tts_message_id(response: ChatResponse, language: str, manager: TtsJobManager) -> ChatResponse:
     """Strip emoji from display/tts text, queue TTS, and return an updated copy."""
     cleaned_message = strip_emoji(response.message)
     cleaned_tts = strip_emoji(response.tts_text) if response.tts_text else response.tts_text
-    tts_message_id = queue_tts_generation(cleaned_tts, language)
+    tts_message_id = queue_tts_generation(cleaned_tts, language, manager)
     return response.model_copy(update={
         "message": cleaned_message,
         "tts_text": cleaned_tts,
@@ -82,13 +82,13 @@ class TtsCreateRequest(BaseModel):
 # Endpoint factory
 # ---------------------------------------------------------------------------
 
-def register_tts_endpoints(router: APIRouter) -> None:
+def register_tts_endpoints(router: APIRouter, manager: TtsJobManager) -> None:
     """Mount GET ``/tts/{tts_message_id}`` and POST ``/tts`` on *router*."""
 
     @router.get("/tts/{tts_message_id}")
     async def get_tts_audio(tts_message_id: str, auth: dict = Depends(verify_auth)):
         """Get pre-generated TTS audio by message id."""
-        job = tts_job_manager.get_job(tts_message_id)
+        job = manager.get_job(tts_message_id)
         if not job:
             raise HTTPException(status_code=404, detail="TTS audio not found")
 
@@ -120,7 +120,7 @@ def register_tts_endpoints(router: APIRouter) -> None:
             raise HTTPException(status_code=400, detail="TTS text is empty")
 
         language = (request.language or "zh").strip().lower() or "zh"
-        tts_message_id = queue_tts_generation(text, language)
+        tts_message_id = queue_tts_generation(text, language, manager)
         if not tts_message_id:
             raise HTTPException(status_code=500, detail="Failed to queue TTS generation")
 
