@@ -1,3 +1,5 @@
+import type { ChangeEvent } from 'react';
+
 import type { HciotLanguage, HciotTopic } from '../../config/hciotTopics';
 
 interface HciotTopicGridProps {
@@ -25,7 +27,16 @@ export default function HciotTopicGrid({
   questionHeading,
   disabledMessage,
 }: HciotTopicGridProps) {
-  const selectedTopic = topics.find((topic) => topic.id === selectedTopicId) || null;
+  const findTopicById = (topicId: string) => topics.find((topic) => topic.id === topicId);
+  const selectedTopic = selectedTopicId ? findTopicById(selectedTopicId) || null : null;
+  const topicSelectPlaceholder = language === 'en' ? 'Select a topic…' : '選擇主題…';
+
+  const handleTopicChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const topic = findTopicById(event.target.value);
+    if (topic) {
+      onSelect(topic);
+    }
+  };
 
   return (
     <section className="hciot-topic-section">
@@ -39,21 +50,19 @@ export default function HciotTopicGrid({
         ) : null}
       </div>
 
-      <div className="hciot-topic-grid">
+      <select
+        className="hciot-topic-select"
+        value={selectedTopicId || ''}
+        onChange={handleTopicChange}
+        disabled={disabled}
+      >
+        <option value="" disabled>{topicSelectPlaceholder}</option>
         {topics.map((topic) => (
-          <button
-            key={topic.id}
-            type="button"
-            className={`hciot-topic-chip${selectedTopicId === topic.id ? ' active' : ''}`}
-            onClick={() => onSelect(topic)}
-            disabled={disabled}
-            style={{ ['--topic-accent' as string]: topic.accent }}
-          >
-            <span className="hciot-topic-icon" aria-hidden="true">{topic.icon}</span>
-            <span className="hciot-topic-label">{topic.labels[language]}</span>
-          </button>
+          <option key={topic.id} value={topic.id}>
+            {topic.icon} {topic.labels[language]}
+          </option>
         ))}
-      </div>
+      </select>
 
       {selectedTopic ? (
         <div
