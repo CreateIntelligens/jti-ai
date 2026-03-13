@@ -3,8 +3,10 @@ JTI Chat API — session management, chat messages, and conversation history.
 """
 
 from copy import deepcopy
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from typing import Optional, Union
+
+_TZ_TAIPEI = timezone(timedelta(hours=8))
 
 from fastapi import APIRouter, HTTPException, Depends
 import logging
@@ -42,6 +44,19 @@ from app.services.jti.quiz_helpers import (
     _judge_user_choice,
     build_session_state,
 )
+
+def _build_date_query(mode: str, date_from: Optional[str], date_to: Optional[str]) -> dict:
+    """Build a MongoDB query dict filtered by mode and optional date range."""
+    query: dict = {"mode": mode}
+    if date_from or date_to:
+        ts_filter: dict = {}
+        if date_from:
+            ts_filter["$gte"] = datetime.strptime(date_from, "%Y-%m-%d")
+        if date_to:
+            ts_filter["$lte"] = datetime.strptime(date_to + " 23:59:59", "%Y-%m-%d %H:%M:%S")
+        query["timestamp"] = ts_filter
+    return query
+
 
 _OPENING_MESSAGE: dict[str, str] = {
     "zh": "Hello，我是今天的活動大使Lady X，對我說「測驗」即可做「尋找命定前蓋」小遊戲，或想知道關於Ploom X加熱菸更多資訊，都歡迎和我聊聊，很樂意為您解答！",
@@ -362,15 +377,7 @@ async def get_conversations(
             logger.info(f"Retrieved {len(conversations)} conversations for session {session_id}")
             return {"session_id": session_id, "mode": mode, "conversations": conversations, "total": len(conversations)}
         else:
-            query: dict = {"mode": mode}
-            if date_from or date_to:
-                ts_filter: dict = {}
-                if date_from:
-                    ts_filter["$gte"] = datetime.strptime(date_from, "%Y-%m-%d")
-                if date_to:
-                    ts_filter["$lte"] = datetime.strptime(date_to + " 23:59:59", "%Y-%m-%d %H:%M:%S")
-                query["timestamp"] = ts_filter
-
+            query = _build_date_query(mode, date_from, date_to)
             session_ids, total_sessions = conversation_logger.get_paginated_session_ids(
                 query=query, page=1, page_size=100000
             )
@@ -409,7 +416,12 @@ async def delete_conversations(request: DeleteConversationRequest, auth: dict = 
     response_model=ExportConversationsResponse,
     response_model_exclude_none=True,
 )
-async def export_conversations(session_ids: Optional[str] = None, auth: dict = Depends(verify_admin)):
+async def export_conversations(
+    session_ids: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    auth: dict = Depends(verify_admin),
+):
     """匯出對話歷史為 JSON 格式"""
     mode = "jti"
     try:
@@ -429,11 +441,16 @@ async def export_conversations(session_ids: Optional[str] = None, auth: dict = D
                     })
                     total_conversations += len(conversations)
             sessions.sort(key=lambda x: x["first_message_time"] or "", reverse=True)
-            return {"exported_at": datetime.utcnow().isoformat(), "mode": mode, "sessions": sessions, "total_conversations": total_conversations, "total_sessions": len(sessions)}
+            return {"exported_at": datetime.now(_TZ_TAIPEI).isoformat(), "mode": mode, "sessions": sessions, "total_conversations": total_conversations, "total_sessions": len(sessions)}
+
+        if date_from or date_to:
+            query = _build_date_query(mode, date_from, date_to)
+            sid_list, _ = conversation_logger.get_paginated_session_ids(query=query, page=1, page_size=100000)
+            all_conversations = conversation_logger.get_logs_for_sessions(sid_list)
         else:
             all_conversations = conversation_logger.get_session_logs_by_mode(mode)
-            session_list = group_conversations_by_session(all_conversations)
-            return {"exported_at": datetime.utcnow().isoformat(), "mode": mode, "sessions": session_list, "total_conversations": len(all_conversations), "total_sessions": len(session_list)}
+        session_list = group_conversations_by_session(all_conversations)
+        return {"exported_at": datetime.now(_TZ_TAIPEI).isoformat(), "mode": mode, "sessions": session_list, "total_conversations": len(all_conversations), "total_sessions": len(session_list)}
 
     except Exception as e:
         logger.error(f"Failed to export conversations: {e}")

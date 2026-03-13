@@ -2,9 +2,11 @@
 HCIoT chat API - session management, messages, and conversation history.
 """
 
-from datetime import datetime
 import logging
-from typing import Optional, Union
+from datetime import datetime, timezone, timedelta
+from typing import Optional
+
+_TZ_TAIPEI = timezone(timedelta(hours=8))
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -14,7 +16,6 @@ from app.services.tts_jobs import hciot_tts_job_manager as _tts_manager
 from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
-    ConversationsBySessionResponse,
     ConversationsGroupedResponse,
     CreateSessionRequest,
     CreateSessionResponse,
@@ -26,6 +27,19 @@ from app.services.hciot.main_agent import main_agent
 from app.services.jti.tts_text import to_tts_text
 from app.services.session.session_manager_factory import get_hciot_conversation_logger, get_hciot_session_manager
 from app.utils import group_conversations_by_session
+
+def _build_date_query(mode: str, date_from: Optional[str], date_to: Optional[str]) -> dict:
+    """Build a MongoDB query dict filtered by mode and optional date range."""
+    query: dict = {"mode": mode}
+    if date_from or date_to:
+        ts_filter: dict = {}
+        if date_from:
+            ts_filter["$gte"] = datetime.strptime(date_from, "%Y-%m-%d")
+        if date_to:
+            ts_filter["$lte"] = datetime.strptime(date_to + " 23:59:59", "%Y-%m-%d %H:%M:%S")
+        query["timestamp"] = ts_filter
+    return query
+
 
 _OPENING_MESSAGE: dict[str, str] = {
     "zh": "您好，歡迎來到元復醫院。\n我是元復醫院的智慧AI小元。\n如果您想了解門診資訊、衛教或醫療相關問題，都可以詢問我。\n很高興為您服務。",
@@ -98,10 +112,6 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             user_message=request.message,
             agent_response=result["message"],
             tool_calls=result.get("tool_calls", []),
-            session_state={
-                "step": updated_session.step.value if updated_session else "WELCOME",
-                "language": language,
-            },
             mode="hciot",
             citations=result.get("citations"),
             image_id=result.get("image_id"),
@@ -119,47 +129,26 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
 
 @compat_history_router.get(
     "/history",
-    response_model=Union[ConversationsBySessionResponse, ConversationsGroupedResponse],
+    response_model=ConversationsGroupedResponse,
     response_model_exclude_none=True,
 )
 @admin_history_router.get(
     "",
-    response_model=Union[ConversationsBySessionResponse, ConversationsGroupedResponse],
+    response_model=ConversationsGroupedResponse,
     response_model_exclude_none=True,
 )
 async def get_conversations(
-    session_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     auth: dict = Depends(verify_admin),
 ):
     mode = "hciot"
     try:
-        if session_id:
-            conversations = conversation_logger.get_session_logs(session_id)
-            conversations = [c for c in conversations if c.get("mode") == mode]
-            return {"session_id": session_id, "mode": mode, "conversations": conversations, "total": len(conversations)}
-
-        query: dict = {"mode": mode}
-        if date_from or date_to:
-            ts_filter: dict = {}
-            if date_from:
-                ts_filter["$gte"] = datetime.strptime(date_from, "%Y-%m-%d")
-            if date_to:
-                ts_filter["$lte"] = datetime.strptime(date_to + " 23:59:59", "%Y-%m-%d %H:%M:%S")
-            query["timestamp"] = ts_filter
-
-        session_ids, total_sessions = conversation_logger.get_paginated_session_ids(
-            query=query, page=1, page_size=100000
-        )
+        query = _build_date_query(mode, date_from, date_to)
+        session_ids, total_sessions = conversation_logger.get_paginated_session_ids(query=query, page=1, page_size=100000)
         all_conversations = conversation_logger.get_logs_for_sessions(session_ids)
         session_list = group_conversations_by_session(all_conversations)
-        return {
-            "mode": mode,
-            "sessions": session_list,
-            "total_conversations": len(all_conversations),
-            "total_sessions": total_sessions,
-        }
+        return {"mode": mode, "sessions": session_list, "total_conversations": len(all_conversations), "total_sessions": total_sessions}
     except Exception as e:
         logger.error("Failed to get HCIoT conversations: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -189,7 +178,12 @@ async def delete_conversations(request: DeleteConversationRequest, auth: dict = 
     response_model=ExportConversationsResponse,
     response_model_exclude_none=True,
 )
-async def export_conversations(session_ids: Optional[str] = None, auth: dict = Depends(verify_admin)):
+async def export_conversations(
+    session_ids: Optional[str] = None,
+    date_from: Optional[str] = None,
+    date_to: Optional[str] = None,
+    auth: dict = Depends(verify_admin),
+):
     mode = "hciot"
     try:
         if session_ids:
@@ -200,33 +194,25 @@ async def export_conversations(session_ids: Optional[str] = None, auth: dict = D
                 conversations = conversation_logger.get_session_logs(session_id)
                 conversations = [c for c in conversations if c.get("mode") == mode]
                 if conversations:
-                    sessions.append(
-                        {
-                            "session_id": session_id,
-                            "conversations": conversations,
-                            "first_message_time": conversations[0].get("timestamp"),
-                            "total": len(conversations),
-                        }
-                    )
+                    sessions.append({
+                        "session_id": session_id,
+                        "conversations": conversations,
+                        "first_message_time": conversations[0].get("timestamp"),
+                        "total": len(conversations),
+                    })
                     total_conversations += len(conversations)
             sessions.sort(key=lambda x: x["first_message_time"] or "", reverse=True)
-            return {
-                "exported_at": datetime.utcnow().isoformat(),
-                "mode": mode,
-                "sessions": sessions,
-                "total_conversations": total_conversations,
-                "total_sessions": len(sessions),
-            }
+            return {"exported_at": datetime.now(_TZ_TAIPEI).isoformat(), "mode": mode, "sessions": sessions, "total_conversations": total_conversations, "total_sessions": len(sessions)}
 
-        all_conversations = conversation_logger.get_session_logs_by_mode(mode)
+        if date_from or date_to:
+            query = _build_date_query(mode, date_from, date_to)
+            sid_list, _ = conversation_logger.get_paginated_session_ids(query=query, page=1, page_size=100000)
+            all_conversations = conversation_logger.get_logs_for_sessions(sid_list)
+        else:
+            all_conversations = conversation_logger.get_session_logs_by_mode(mode)
+
         session_list = group_conversations_by_session(all_conversations)
-        return {
-            "exported_at": datetime.utcnow().isoformat(),
-            "mode": mode,
-            "sessions": session_list,
-            "total_conversations": len(all_conversations),
-            "total_sessions": len(session_list),
-        }
+        return {"exported_at": datetime.now(_TZ_TAIPEI).isoformat(), "mode": mode, "sessions": session_list, "total_conversations": len(all_conversations), "total_sessions": len(session_list)}
     except Exception as e:
         logger.error("Failed to export HCIoT conversations: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
