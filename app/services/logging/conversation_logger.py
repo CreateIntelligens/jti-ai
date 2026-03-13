@@ -9,8 +9,10 @@
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
+
+_TZ_TAIPEI = timezone(timedelta(hours=8))
 from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
@@ -52,7 +54,7 @@ class ConversationLogger:
             mode: 對話模式 (jti 或 general)
         """
         try:
-            timestamp = datetime.now()
+            timestamp = datetime.now(_TZ_TAIPEI)
 
             # 構建日誌記錄
             log_entry = {
