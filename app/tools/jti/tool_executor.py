@@ -9,6 +9,7 @@ import logging
 from google.genai import types
 from app.tools.jti.quiz import (
     generate_quiz,
+    generate_random_quiz,
     get_total_questions,
     get_question_from_selected,
     complete_selected_questions,
