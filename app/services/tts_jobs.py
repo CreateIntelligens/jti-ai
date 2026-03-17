@@ -1,4 +1,4 @@
-"""Shared background TTS job manager."""
+"""Shared background TTS job manager (file-based for multi-worker support)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,8 @@ import time
 import urllib.error
 import urllib.request
 import uuid
-from typing import Any, Dict, Optional
+from pathlib import Path
+from typing import Any
 
 from app.services.jti.tts_text import to_tts_text
 
@@ -20,10 +21,11 @@ _TTS_API_URL = os.getenv("TTS_API_URL", "http://10.9.0.35:8001/tts")
 _TIMEOUT_SECONDS = float(os.getenv("TTS_TIMEOUT_SECONDS", "20"))
 _CACHE_TTL_SECONDS = int(os.getenv("TTS_CACHE_TTL_SECONDS", "900"))
 _MAX_JOBS = int(os.getenv("TTS_MAX_JOBS", "500"))
+_CACHE_DIR = Path(os.getenv("TTS_CACHE_DIR", "/app/data/tts_cache"))
 
 
 class TtsJobManager:
-    """Manage in-memory TTS jobs and generate audio in background threads."""
+    """Manage TTS jobs on shared filesystem for multi-worker support."""
 
     def __init__(self, character: str) -> None:
         self.character = character
@@ -31,9 +33,35 @@ class TtsJobManager:
         self.timeout_seconds = _TIMEOUT_SECONDS
         self.cache_ttl_seconds = _CACHE_TTL_SECONDS
         self.max_jobs = _MAX_JOBS
+        self.cache_dir = _CACHE_DIR
 
-        self._jobs: Dict[str, Dict[str, Any]] = {}
-        self._lock = threading.Lock()
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def _meta_path(self, job_id: str) -> Path:
+        return self.cache_dir / f"{job_id}.json"
+
+    def _audio_path(self, job_id: str) -> Path:
+        return self.cache_dir / f"{job_id}.audio"
+
+    def _read_meta(self, job_id: str) -> dict[str, Any] | None:
+        path = self._meta_path(job_id)
+        try:
+            return json.loads(path.read_text())
+        except (FileNotFoundError, json.JSONDecodeError):
+            return None
+
+    def _write_meta(self, job_id: str, meta: dict[str, Any]) -> None:
+        path = self._meta_path(job_id)
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(meta))
+        tmp.rename(path)
+
+    def _remove_job_files(self, job_id: str) -> None:
+        for path in (self._meta_path(job_id), self._audio_path(job_id)):
+            try:
+                path.unlink()
+            except FileNotFoundError:
+                pass
 
     def create_job(self, *, text: str, language: str) -> str:
         raw_text = (text or "").strip()
@@ -44,16 +72,14 @@ class TtsJobManager:
         job_id = f"tts_{uuid.uuid4().hex}"
         now = time.time()
 
-        with self._lock:
-            self._prune_locked(now)
-            self._jobs[job_id] = {
-                "status": "pending",
-                "created_at": now,
-                "updated_at": now,
-                "content_type": None,
-                "audio_bytes": None,
-                "error": None,
-            }
+        self._prune(now)
+        self._write_meta(job_id, {
+            "status": "pending",
+            "created_at": now,
+            "updated_at": now,
+            "content_type": None,
+            "error": None,
+        })
         logger.info("[TTS] queued job=%s character=%s lang=%s chars=%d", job_id, self.character, language, len(prepared_text))
 
         worker = threading.Thread(
@@ -64,38 +90,55 @@ class TtsJobManager:
         worker.start()
         return job_id
 
-    def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
-        now = time.time()
-        with self._lock:
-            self._prune_locked(now)
-            job = self._jobs.get(job_id)
-            if not job:
-                return None
-            return dict(job)
+    def get_job(self, job_id: str) -> dict[str, Any] | None:
+        self._prune(time.time())
+        meta = self._read_meta(job_id)
+        if not meta:
+            return None
+
+        result = dict(meta)
+        if meta.get("status") == "ready":
+            audio_path = self._audio_path(job_id)
+            try:
+                result["audio_bytes"] = audio_path.read_bytes()
+            except FileNotFoundError:
+                result["status"] = "failed"
+                result["error"] = "Audio file missing"
+                result["audio_bytes"] = None
+        else:
+            result["audio_bytes"] = None
+
+        return result
 
     def _set_job_failed(self, job_id: str, error: str) -> None:
-        with self._lock:
-            job = self._jobs.get(job_id)
-            if not job:
-                return
-            now = time.time()
-            job["status"] = "failed"
-            job["error"] = error
-            job["updated_at"] = now
-            created_at = float(job.get("created_at", now))
+        meta = self._read_meta(job_id)
+        if not meta:
+            return
+        now = time.time()
+        created_at = float(meta.get("created_at", now))
+        meta["status"] = "failed"
+        meta["error"] = error
+        meta["updated_at"] = now
+        self._write_meta(job_id, meta)
         logger.warning("[TTS] failed job=%s elapsed_ms=%.0f error=%s", job_id, (now - created_at) * 1000, error)
 
     def _set_job_ready(self, job_id: str, audio_bytes: bytes, content_type: str) -> None:
-        with self._lock:
-            job = self._jobs.get(job_id)
-            if not job:
-                return
-            now = time.time()
-            job["status"] = "ready"
-            job["audio_bytes"] = audio_bytes
-            job["content_type"] = content_type
-            job["updated_at"] = now
-            created_at = float(job.get("created_at", now))
+        meta = self._read_meta(job_id)
+        if not meta:
+            return
+        now = time.time()
+        created_at = float(meta.get("created_at", now))
+
+        # Write audio file first
+        audio_path = self._audio_path(job_id)
+        tmp = audio_path.with_suffix(".tmp")
+        tmp.write_bytes(audio_bytes)
+        tmp.rename(audio_path)
+
+        meta["status"] = "ready"
+        meta["content_type"] = content_type
+        meta["updated_at"] = now
+        self._write_meta(job_id, meta)
         logger.info("[TTS] ready job=%s elapsed_ms=%.0f bytes=%d content_type=%s", job_id, (now - created_at) * 1000, len(audio_bytes), content_type)
 
     def _generate_job(self, job_id: str, text: str) -> None:
@@ -130,28 +173,35 @@ class TtsJobManager:
         except Exception as exc:
             self._set_job_failed(job_id, f"TTS generation failed: {exc}")
 
-    def _prune_locked(self, now: float) -> None:
-        expired_ids = [
-            job_id
-            for job_id, job in self._jobs.items()
-            if now - float(job.get("updated_at", job.get("created_at", now))) > self.cache_ttl_seconds
-        ]
-        for job_id in expired_ids:
-            self._jobs.pop(job_id, None)
-
-        if len(self._jobs) <= self.max_jobs:
+    def _prune(self, now: float) -> None:
+        try:
+            meta_files = sorted(self.cache_dir.glob("*.json"))
+        except OSError:
             return
 
-        candidates = [
-            (job_id, job)
-            for job_id, job in self._jobs.items()
-            if job.get("status") in ("ready", "failed")
-        ]
-        candidates.sort(key=lambda item: float(item[1].get("updated_at", 0)))
+        live_jobs: list[tuple[str, float]] = []
+        for meta_path in meta_files:
+            job_id = meta_path.stem
+            try:
+                meta = json.loads(meta_path.read_text())
+            except (json.JSONDecodeError, OSError):
+                self._remove_job_files(job_id)
+                continue
 
-        overflow = len(self._jobs) - self.max_jobs
-        for job_id, _ in candidates[:overflow]:
-            self._jobs.pop(job_id, None)
+            updated_at = float(meta.get("updated_at", meta.get("created_at", now)))
+            if now - updated_at > self.cache_ttl_seconds:
+                self._remove_job_files(job_id)
+                continue
+
+            live_jobs.append((job_id, updated_at))
+
+        if len(live_jobs) <= self.max_jobs:
+            return
+
+        live_jobs.sort(key=lambda x: x[1])
+        overflow = len(live_jobs) - self.max_jobs
+        for job_id, _ in live_jobs[:overflow]:
+            self._remove_job_files(job_id)
 
 
 # Per-app singletons with fixed characters

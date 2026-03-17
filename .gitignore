@@ -86,6 +86,7 @@ desktop.ini
 data/*.db
 data/*.sqlite
 data/knowledge/
+data/tts_cache/
 
 # Git worktrees
 .worktrees/
