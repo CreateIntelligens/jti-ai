@@ -15,14 +15,14 @@ from google.genai import types
 from app.models.session import Session
 from app.services.session.session_manager_factory import get_session_manager
 import app.services.gemini_service as _gemini_service
-from app.services.gemini_service import gemini_with_retry
+from app.services.gemini_service import gemini_with_retry, run_sync
 from app.services.agent_utils import (
     extract_response_text,
     normalize_language,
     strip_citations,
 )
 from app.services.base_agent import BaseAgent
-from app.tools.jti.tool_executor import tool_executor, ToolExecutor
+from app.tools.jti.tool_executor import ToolExecutor
 from app.services.jti.agent_prompts import (
     PERSONA,
     SESSION_STATE_TEMPLATES,
@@ -199,7 +199,7 @@ class MainAgent(BaseAgent):
 
             logger.info(f"使用者訊息: {user_message[:200]}...")
             t2 = time.time()
-            response = gemini_with_retry(lambda: chat_session.send_message(enriched_message))
+            response = await run_sync(gemini_with_retry, lambda: chat_session.send_message(enriched_message))
             t3 = time.time()
             logger.info(f"[計時] 主 Agent: {(t3-t2)*1000:.0f}ms | 總計: {(t3-t0)*1000:.0f}ms")
 
@@ -289,7 +289,7 @@ class MainAgent(BaseAgent):
                 thinking_config=types.ThinkingConfig(thinking_budget=0),
             )
 
-            response = gemini_with_retry(lambda: _gemini_service.client.models.generate_content(
+            response = await run_sync(gemini_with_retry, lambda: _gemini_service.client.models.generate_content(
                 model=self.model_name,
                 contents=conversation_parts,
                 config=config,

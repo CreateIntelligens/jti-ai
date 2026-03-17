@@ -26,6 +26,7 @@ from app.routers.knowledge_utils import (
     sync_to_gemini,
     write_docx_text,
 )
+from app.services.gemini_service import run_sync
 from app.services.knowledge_store import get_knowledge_store
 
 logger = logging.getLogger(__name__)
@@ -158,7 +159,7 @@ async def update_file_content(
     store_name = _store_name(language)
     if store_name:
         try:
-            sync_to_gemini(store_name, safe_name, new_bytes)
+            await run_sync(sync_to_gemini, store_name, safe_name, new_bytes)
         except Exception as e:
             return {"message": f"已更新，但 Gemini 同步失敗: {e}", "synced": False}
 
@@ -197,7 +198,7 @@ async def upload_knowledge_file(
     store_name = _store_name(language)
     if store_name:
         try:
-            gemini_synced = sync_to_gemini(store_name, saved["name"], file_bytes)
+            gemini_synced = await run_sync(sync_to_gemini, store_name, saved["name"], file_bytes)
         except Exception as e:
             logger.warning(f"[KB] Gemini sync failed for {saved['name']}: {e}")
 
@@ -213,7 +214,7 @@ async def upload_knowledge_file(
 
 
 @router.delete("/files/{filename}")
-def delete_knowledge_file(filename: str, language: str = "zh", auth: dict = Depends(verify_auth)):
+async def delete_knowledge_file(filename: str, language: str = "zh", auth: dict = Depends(verify_auth)):
     """刪除檔案 + Gemini File Search 中的對應文件"""
     safe_name = safe_filename(filename)
     store = get_knowledge_store()
@@ -225,7 +226,7 @@ def delete_knowledge_file(filename: str, language: str = "zh", auth: dict = Depe
     gemini_deleted_count = 0
     if store_name:
         try:
-            gemini_deleted_count = delete_from_gemini(store_name, safe_name)
+            gemini_deleted_count = await run_sync(delete_from_gemini, store_name, safe_name)
         except Exception as e:
             logger.warning(f"[KB] Gemini delete failed for {safe_name}: {e}")
             raise HTTPException(status_code=502, detail="Gemini 同步刪除失敗，Mongo 未刪除")

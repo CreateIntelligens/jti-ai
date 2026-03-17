@@ -5,11 +5,11 @@ Quiz helper functions extracted from app/routers/jti.py
 import os
 import re
 import logging
-from typing import Optional, Any
+from typing import Any
 
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 from app.services.jti.main_agent import main_agent
-from app.services.gemini_service import gemini_with_retry
+from app.services.gemini_service import gemini_with_retry, run_sync
 from app.services.gemini_clients import get_default_client
 from app.services.jti.tts_text import to_tts_text
 
@@ -70,7 +70,7 @@ async def _pause_quiz_and_respond(
     session_id: str,
     log_user_message: str,
     session: Any,
-    turn_number_hint: Optional[int] = None
+    turn_number_hint: int | None = None
 ):
     """暫停測驗並回應（returns dict, caller wraps in ChatResponse）"""
     updated_session = session_manager.pause_quiz(session_id)
@@ -109,7 +109,7 @@ async def _pause_quiz_and_respond(
     }
 
 
-async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]:
+async def _judge_user_choice(user_message: str, question: dict) -> str | None:
     """
     先用規則判斷，判不出時用 LLM 判斷使用者選擇哪個選項
 
@@ -189,7 +189,7 @@ async def _judge_user_choice(user_message: str, question: dict) -> Optional[str]
 只回覆：A 至 E、PAUSE 或 X"""
 
         model_name = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash-lite")
-        response = gemini_with_retry(lambda: client.models.generate_content(
+        response = await run_sync(gemini_with_retry, lambda: client.models.generate_content(
             model=model_name,
             contents=prompt
         ))

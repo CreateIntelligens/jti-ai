@@ -20,4 +20,5 @@ RUN chown -R appuser:appuser /app
 # 切換到非 root 用戶
 USER appuser
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8008"]
+ENV BACKEND_PORT=8008
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT} --workers 2

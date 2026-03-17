@@ -5,11 +5,12 @@ HCIoT main agent - patient education chat flow.
 import logging
 import os
 import re
-from typing import Dict
+from typing import Any
 from urllib.parse import urlparse
 
 from app.models.session import Session
 import app.services.gemini_service as _gemini_service
+from app.services.gemini_service import gemini_with_retry, run_sync
 from app.services.agent_utils import (
     extract_response_text,
     normalize_language,
@@ -145,7 +146,7 @@ class HciotMainAgent(BaseAgent):
 
         return localized or None
 
-    async def chat(self, session_id: str, user_message: str) -> Dict:
+    async def chat(self, session_id: str, user_message: str) -> dict[str, Any]:
         try:
             if not _gemini_service.client:
                 return {"error": "Gemini client not initialized", "message": "系統未正確初始化，請檢查 API Key 設定。"}
@@ -161,7 +162,7 @@ class HciotMainAgent(BaseAgent):
             session_state = self._get_session_state(session)
             enriched_message = self._build_enriched_message(session_state, user_message, session.language, kb_result)
             chat_session = self._get_or_create_chat_session(session)
-            response = chat_session.send_message(enriched_message)
+            response = await run_sync(gemini_with_retry, lambda: chat_session.send_message(enriched_message))
 
             if enriched_message != user_message:
                 self._clean_enriched_history(chat_session, user_message)

@@ -7,9 +7,10 @@ Gemini API 整合服務（使用新版 google-genai SDK）
 3. 提供 Main Agent 呼叫介面
 """
 
-import time
+import asyncio
 import logging
-from typing import Callable, Optional, TypeVar
+import time
+from typing import Callable, TypeVar
 
 from google.genai import types
 
@@ -37,7 +38,7 @@ class GeminiService:
 
     def __init__(self, model_name: str = "gemini-2.5-flash-lite"):
         self.model_name = model_name
-        self.file_search_store_id: Optional[str] = None
+        self.file_search_store_id: str | None = None
         self.client = client
 
     async def upload_knowledge_base(
@@ -70,7 +71,7 @@ class GeminiService:
             raise
 
     def get_model_with_tools(
-        self, tools: list[dict], store_id: Optional[str] = None
+        self, tools: list[dict], store_id: str | None = None
     ) -> str:
         """
         取得 Model 名稱（供 generate_content 使用）
@@ -86,6 +87,11 @@ class GeminiService:
         return self.model_name
 
 
+async def run_sync(fn: Callable[..., T], *args) -> T:
+    """Run a synchronous function in a thread to avoid blocking the event loop."""
+    return await asyncio.to_thread(fn, *args)
+
+
 def gemini_with_retry(fn: Callable[[], T], retries: int = 3, base_delay: float = 2.0) -> T:
     """
     呼叫 Gemini API 並在 503 UNAVAILABLE 時自動重試。
@@ -95,7 +101,6 @@ def gemini_with_retry(fn: Callable[[], T], retries: int = 3, base_delay: float =
         retries: 最多重試次數（不含第一次）
         base_delay: 第一次重試等待秒數，之後線性增加（2s, 4s, 6s...）
     """
-    last_exc: Exception | None = None
     for attempt in range(retries + 1):
         try:
             return fn()
@@ -110,8 +115,8 @@ def gemini_with_retry(fn: Callable[[], T], retries: int = 3, base_delay: float =
                 attempt + 1, retries, wait,
             )
             time.sleep(wait)
-            last_exc = e
-    raise last_exc  # type: ignore
+    # Unreachable: the loop always returns or raises
+    raise RuntimeError("gemini_with_retry: unexpected exit")
 
 
 # 全域實例
