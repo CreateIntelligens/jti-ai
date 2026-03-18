@@ -87,7 +87,7 @@ export default function HciotMessageList({
               editingTurn !== null && editingTurn === msg.turnNumber && msg.type === 'user';
             const canShowTools = !loading && msg.turnNumber;
             const canPlayTts =
-              msg.type === 'assistant' && Boolean(msg.ttsMessageId || msg.ttsText || msg.text);
+              msg.type === 'assistant' && idx > 0 && Boolean(msg.ttsMessageId || msg.ttsText || msg.text);
             const ttsState = canPlayTts ? getTtsState(msg.ttsMessageId) : undefined;
             const audioButtonClassName = `hciot-audio-btn${ttsState ? ` ${ttsState}` : ''}`;
 

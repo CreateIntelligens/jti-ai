@@ -107,7 +107,9 @@ export default function JtiMessageList({
       ) : (
         <div className="messages-container">
           {messages.map((msg, idx) => {
-            const ttsState = getTtsState(msg.ttsMessageId);
+            const canPlayTts =
+              msg.type === 'assistant' && idx > 0 && Boolean(msg.ttsMessageId || msg.ttsText || msg.text);
+            const ttsState = canPlayTts ? getTtsState(msg.ttsMessageId) : undefined;
             const audioBtnClass = `message-audio-btn${ttsState ? ` ${ttsState}` : ''}`;
 
             return (
@@ -200,7 +202,7 @@ export default function JtiMessageList({
                       <CitationsList citations={msg.citations} messageIndex={idx} />
                     )}
                   </div>
-                  {msg.type === 'assistant' && (msg.ttsMessageId || msg.ttsText || msg.text) && (
+                  {canPlayTts ? (
                     <button
                       className={audioBtnClass}
                       onClick={() => onPlayTts(msg)}
@@ -209,7 +211,7 @@ export default function JtiMessageList({
                     >
                       <span className="audio-icon">🔊</span>
                     </button>
-                  )}
+                  ) : null}
                 </div>
               </div>
             );
