@@ -730,6 +730,31 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  padding: 5px 12px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  border-radius: 8px;
+  background: rgba(61, 217, 211, 0.08);
+  border: 1px solid rgba(61, 217, 211, 0.2);
+  color: var(--crystal-teal);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.turn-detail-response .copy-btn:hover {
+  background: rgba(61, 217, 211, 0.18);
+  border-color: rgba(61, 217, 211, 0.4);
+}
+
+[data-theme="light"] .turn-detail-response .copy-btn {
+  background: rgba(15, 118, 110, 0.06);
+  border-color: rgba(15, 118, 110, 0.15);
+  color: #0f766e;
+}
+
+[data-theme="light"] .turn-detail-response .copy-btn:hover {
+  background: rgba(15, 118, 110, 0.12);
+  border-color: rgba(15, 118, 110, 0.3);
 }
 
 .turn-tool-calls-label {
