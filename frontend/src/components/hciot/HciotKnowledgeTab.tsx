@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { Upload, FileText, Trash2, Download, Pencil, X } from 'lucide-react';
 import ConfirmDialog from '../ConfirmDialog';
 import HciotTopicEditor from './HciotTopicEditor';
+import { NEW_VALUE, slugify } from './knowledgeWorkspace/shared';
 import * as api from '../../services/api';
 
 interface KBFile {
@@ -46,16 +47,6 @@ export interface TopicUploadOpts {
   categoryLabelEn?: string;
   topicLabelZh?: string;
   topicLabelEn?: string;
-}
-
-const NEW_VALUE = '__new__';
-
-function slugify(text: string): string {
-  return text
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
 }
 
 export default function HciotKnowledgeTab({

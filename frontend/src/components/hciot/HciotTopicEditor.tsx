@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Pencil, Trash2, Plus, Check, X, GripVertical
 import type { HciotLabels, HciotTopicCategory } from '../../services/api/hciot';
 import * as api from '../../services/api';
 import ConfirmDialog from '../ConfirmDialog';
+import { slugify, getErrorMessage } from './knowledgeWorkspace/shared';
 
 interface Props {
   language: 'zh' | 'en';
@@ -12,14 +13,6 @@ interface Props {
 
 type HciotTopic = HciotTopicCategory['topics'][number];
 type DeleteTarget = { type: 'category' | 'topic'; catId: string; topicId?: string };
-
-function slugify(text: string): string {
-  return text.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 function buildLabels(zh: string, en: string): HciotLabels {
   return { zh: zh || en, en: en || zh };
@@ -82,9 +75,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
   const saveEditCat = async (cat: HciotTopicCategory) => {
     if (!editCatLabels.zh.trim() && !editCatLabels.en.trim()) return;
     await runSavingAction(async () => {
-      for (const topic of cat.topics) {
-        await api.updateHciotTopic(topic.id, { category_labels: editCatLabels });
-      }
+      await Promise.all(cat.topics.map((topic) => api.updateHciotTopic(topic.id, { category_labels: editCatLabels })));
       setEditingCatId(null);
       await reload();
     });
@@ -115,9 +106,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
   const deleteCat = async (cat: HciotTopicCategory) => {
     await runSavingAction(
       async () => {
-        for (const topic of cat.topics) {
-          await api.deleteHciotTopic(topic.id);
-        }
+        await Promise.all(cat.topics.map((topic) => api.deleteHciotTopic(topic.id)));
         if (expandedCatId === cat.id) setExpandedCatId(null);
         await reload();
       },
