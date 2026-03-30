@@ -9,6 +9,13 @@ export interface HciotTopic {
   questions: Record<HciotLanguage, string[]>;
 }
 
+export interface HciotCategory {
+  id: string;
+  order: number;
+  labels: Record<HciotLanguage, string>;
+  topics: HciotTopic[];
+}
+
 const HCIOT_TOPIC_QUESTIONS_ZH = {
   prp: [
     'PRP 有哪些生長因子？',

@@ -1,14 +1,17 @@
 import type { ChangeEvent } from 'react';
 
-import type { HciotLanguage, HciotTopic } from '../../config/hciotTopics';
+import type { HciotCategory, HciotLanguage, HciotTopic } from '../../config/hciotTopics';
 
 interface HciotTopicGridProps {
   topics: HciotTopic[];
+  categories?: HciotCategory[];
   language: HciotLanguage;
   disabled?: boolean;
   onSelect: (topic: HciotTopic) => void;
   onSelectQuestion: (question: string) => void;
+  onSelectCategory?: (categoryId: string | null) => void;
   selectedTopicId?: string | null;
+  selectedCategoryId?: string | null;
   heading: string;
   subheading: string;
   questionHeading?: string;
@@ -17,11 +20,14 @@ interface HciotTopicGridProps {
 
 export default function HciotTopicGrid({
   topics,
+  categories = [],
   language,
   disabled = false,
   onSelect,
   onSelectQuestion,
+  onSelectCategory,
   selectedTopicId = null,
+  selectedCategoryId = null,
   heading,
   subheading,
   questionHeading,
@@ -30,6 +36,12 @@ export default function HciotTopicGrid({
   const findTopicById = (topicId: string) => topics.find((topic) => topic.id === topicId);
   const selectedTopic = selectedTopicId ? findTopicById(selectedTopicId) || null : null;
   const topicSelectPlaceholder = language === 'en' ? 'Select a topic…' : '選擇主題…';
+  const categorySelectPlaceholder = language === 'en' ? 'All categories' : '全部科別';
+
+  const handleCategoryChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const value = event.target.value;
+    onSelectCategory?.(value || null);
+  };
 
   const handleTopicChange = (event: ChangeEvent<HTMLSelectElement>) => {
     const topic = findTopicById(event.target.value);
@@ -49,6 +61,22 @@ export default function HciotTopicGrid({
           <div className="hciot-topic-disabled">{disabledMessage}</div>
         ) : null}
       </div>
+
+      {categories.length > 1 ? (
+        <select
+          className="hciot-topic-select"
+          value={selectedCategoryId || ''}
+          onChange={handleCategoryChange}
+          disabled={disabled}
+        >
+          <option value="">{categorySelectPlaceholder}</option>
+          {categories.map((cat) => (
+            <option key={cat.id} value={cat.id}>
+              {cat.labels[language]}
+            </option>
+          ))}
+        </select>
+      ) : null}
 
       <select
         className="hciot-topic-select"

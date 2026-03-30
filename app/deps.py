@@ -47,6 +47,9 @@ def init_managers():
         # === Module-specific startup hooks ===
         from .services.jti.startup import jti_startup
         jti_startup(prompt_manager)
+
+        from .services.hciot.startup import hciot_startup
+        hciot_startup()
     except ValueError as e:
         print(f"警告: {e}")
 

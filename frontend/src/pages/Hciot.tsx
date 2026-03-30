@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HeartPulse, History, Moon, RotateCcw, Settings, Sun } from 'lucide-react';
 import { fetchWithApiKey } from '../services/api';
@@ -10,8 +10,8 @@ import HciotMessageList, { type HciotMessage } from '../components/hciot/HciotMe
 import HciotTopicGrid from '../components/hciot/HciotTopicGrid';
 import {
   HCIOT_DEFAULT_STORE_NAME,
-  HCIOT_TOPICS,
   normalizeHciotLanguage,
+  type HciotCategory,
   type HciotTopic,
 } from '../config/hciotTopics';
 import { useAutoResize } from '../hooks/useAutoResize';
@@ -69,6 +69,7 @@ export default function Hciot() {
 
   const [storeName, setStoreName] = useState<string | null>(null);
   const [storeMissing, setStoreMissing] = useState(false);
+  const [topicsError, setTopicsError] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<HciotMessage[]>([]);
   const [userInput, setUserInput] = useState('');
@@ -82,6 +83,8 @@ export default function Hciot() {
   const [editingTurn, setEditingTurn] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [categories, setCategories] = useState<HciotCategory[]>([]);
   const [ttsStateMap, setTtsStateMap] = useState<Record<string, TtsState>>({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -256,6 +259,24 @@ export default function Hciot() {
         console.error('Failed to initialize HCIoT session:', error);
         setStoreMissing(true);
         setStatusText(t('status_failed'));
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Fetch categories from API.
+  useEffect(() => {
+    fetchWithApiKey('/api/hciot/topics')
+      .then((res) => res.ok ? res.json() : Promise.reject(res.status))
+      .then((data: { categories: HciotCategory[] }) => {
+        if (data.categories?.length) {
+          setCategories(data.categories);
+          setTopicsError(false);
+        } else {
+          setTopicsError(true);
+        }
+      })
+      .catch(() => {
+        setTopicsError(true);
       });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -435,7 +456,16 @@ export default function Hciot() {
     void sendMessage(question);
   };
 
-  const selectedTopic = HCIOT_TOPICS.find((topic) => topic.id === selectedTopicId) || null;
+  const allTopics = useMemo(() => categories.flatMap((cat) => cat.topics), [categories]);
+  const selectedTopic = useMemo(
+    () => allTopics.find((topic) => topic.id === selectedTopicId) || null,
+    [allTopics, selectedTopicId],
+  );
+  const selectedCategory = useMemo(
+    () => categories.find((cat) => cat.id === selectedCategoryId) || null,
+    [categories, selectedCategoryId],
+  );
+  const visibleTopics = selectedCategory ? selectedCategory.topics : allTopics;
 
   return (
     <div className="hciot-shell">
@@ -473,12 +503,18 @@ export default function Hciot() {
         <aside className="hciot-sidebar">
           <div className="hciot-topic-inline-panel">
             <HciotTopicGrid
-              topics={HCIOT_TOPICS}
+              topics={visibleTopics}
+              categories={categories}
               language={currentLanguage}
               disabled={loading || !sessionId}
               onSelect={handleSelectTopic}
               onSelectQuestion={handleSelectQuestion}
               selectedTopicId={selectedTopicId}
+              selectedCategoryId={selectedCategoryId}
+              onSelectCategory={(catId) => {
+                setSelectedCategoryId(catId);
+                setSelectedTopicId(null);
+              }}
               heading={t('hciot_topic_heading')}
               subheading={t('hciot_topic_subheading')}
               questionHeading={
@@ -486,7 +522,13 @@ export default function Hciot() {
                   ? `${selectedTopic.labels[currentLanguage]} ${currentLanguage === 'zh' ? '常見問題' : 'Questions'}`
                   : undefined
               }
-              disabledMessage={storeMissing ? t('hciot_store_missing_notice', { store: HCIOT_DEFAULT_STORE_NAME }) : null}
+              disabledMessage={
+                storeMissing
+                  ? t('hciot_store_missing_notice', { store: HCIOT_DEFAULT_STORE_NAME })
+                  : topicsError
+                  ? (currentLanguage === 'zh' ? '無法載入題目分類，請稍後再試。' : 'Failed to load topics. Please try again later.')
+                  : null
+              }
             />
           </div>
         </aside>
