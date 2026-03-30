@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 from bson.binary import Binary
 from pymongo import ReturnDocument
@@ -37,6 +37,43 @@ class HciotKnowledgeStore:
         return b""
 
     @staticmethod
+    def _normalize_optional_text(value: Any) -> str | None:
+        if not isinstance(value, str):
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    @classmethod
+    def _association_metadata(
+        cls,
+        *,
+        topic_id: str | None = None,
+        category_labels: dict[str, Any] | None = None,
+        topic_labels: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        normalized_topic_id = cls._normalize_optional_text(topic_id)
+
+        category_labels = category_labels or {}
+        topic_labels = topic_labels or {}
+
+        category_label_zh = (
+            cls._normalize_optional_text(category_labels.get("zh")) if normalized_topic_id else None
+        )
+        category_label_en = (
+            cls._normalize_optional_text(category_labels.get("en")) if normalized_topic_id else None
+        )
+        topic_label_zh = cls._normalize_optional_text(topic_labels.get("zh")) if normalized_topic_id else None
+        topic_label_en = cls._normalize_optional_text(topic_labels.get("en")) if normalized_topic_id else None
+
+        return {
+            "topic_id": normalized_topic_id,
+            "category_label_zh": category_label_zh,
+            "category_label_en": category_label_en,
+            "topic_label_zh": topic_label_zh,
+            "topic_label_en": topic_label_en,
+        }
+
+    @staticmethod
     def _metadata_from_doc(doc: dict[str, Any]) -> dict[str, Any]:
         return {
             "name": doc.get("filename", ""),
@@ -45,9 +82,14 @@ class HciotKnowledgeStore:
             "content_type": doc.get("content_type", "application/octet-stream"),
             "size": int(doc.get("size", 0)),
             "editable": bool(doc.get("editable", False)),
+            "topic_id": doc.get("topic_id"),
+            "category_label_zh": doc.get("category_label_zh"),
+            "category_label_en": doc.get("category_label_en"),
+            "topic_label_zh": doc.get("topic_label_zh"),
+            "topic_label_en": doc.get("topic_label_en"),
         }
 
-    def _query(self, language: str, filename: Optional[str] = None) -> dict[str, Any]:
+    def _query(self, language: str, filename: str | None = None) -> dict[str, Any]:
         query: dict[str, Any] = {
             "namespace": self.NAMESPACE,
             "language": self._normalize_language(language),
@@ -59,20 +101,24 @@ class HciotKnowledgeStore:
     def list_files(self, language: str) -> list[dict[str, Any]]:
         cursor = self.collection.find(
             self._query(language),
-            {"_id": 0, "filename": 1, "display_name": 1, "size": 1, "editable": 1},
+            {
+                "_id": 0,
+                "filename": 1,
+                "display_name": 1,
+                "content_type": 1,
+                "size": 1,
+                "editable": 1,
+                "topic_id": 1,
+                "category_label_zh": 1,
+                "category_label_en": 1,
+                "topic_label_zh": 1,
+                "topic_label_en": 1,
+            },
         ).sort("filename", 1)
 
-        return [
-            {
-                "name": doc.get("filename", ""),
-                "display_name": doc.get("display_name", doc.get("filename", "")),
-                "size": int(doc.get("size", 0)),
-                "editable": bool(doc.get("editable", False)),
-            }
-            for doc in cursor
-        ]
+        return [self._metadata_from_doc(doc) for doc in cursor]
 
-    def get_file(self, language: str, filename: str) -> Optional[dict[str, Any]]:
+    def get_file(self, language: str, filename: str) -> dict[str, Any] | None:
         doc = self.collection.find_one(self._query(language, filename))
         if not doc:
             return None
@@ -85,9 +131,12 @@ class HciotKnowledgeStore:
         language: str,
         filename: str,
         data: bytes,
-        display_name: Optional[str] = None,
+        display_name: str | None = None,
         content_type: str = "application/octet-stream",
         editable: bool = True,
+        topic_id: str | None = None,
+        category_labels: dict[str, Any] | None = None,
+        topic_labels: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         base_name = self._safe_filename(filename)
         path = Path(base_name)
@@ -112,6 +161,13 @@ class HciotKnowledgeStore:
             "created_at": now,
             "updated_at": now,
         }
+        doc.update(
+            self._association_metadata(
+                topic_id=topic_id,
+                category_labels=category_labels,
+                topic_labels=topic_labels,
+            )
+        )
         self.collection.insert_one(doc)
         doc.pop("_id", None)
         return self._metadata_from_doc(doc)
@@ -125,7 +181,7 @@ class HciotKnowledgeStore:
         language: str,
         filename: str,
         new_data: bytes,
-    ) -> Optional[dict[str, Any]]:
+    ) -> dict[str, Any] | None:
         updated = self.collection.find_one_and_update(
             self._query(language, filename),
             {
@@ -142,8 +198,40 @@ class HciotKnowledgeStore:
         updated.pop("_id", None)
         return self._metadata_from_doc(updated)
 
+    def update_file_metadata(
+        self,
+        language: str,
+        filename: str,
+        metadata: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        payload = self._association_metadata(
+            topic_id=metadata.get("topic_id"),
+            category_labels={
+                "zh": metadata.get("category_label_zh"),
+                "en": metadata.get("category_label_en"),
+            },
+            topic_labels={
+                "zh": metadata.get("topic_label_zh"),
+                "en": metadata.get("topic_label_en"),
+            },
+        )
+        updated = self.collection.find_one_and_update(
+            self._query(language, filename),
+            {
+                "$set": {
+                    **payload,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            },
+            return_document=ReturnDocument.AFTER,
+        )
+        if not updated:
+            return None
+        updated.pop("_id", None)
+        return self._metadata_from_doc(updated)
 
-_knowledge_store: Optional[HciotKnowledgeStore] = None
+
+_knowledge_store: HciotKnowledgeStore | None = None
 
 
 def get_hciot_knowledge_store() -> HciotKnowledgeStore:
@@ -151,4 +239,3 @@ def get_hciot_knowledge_store() -> HciotKnowledgeStore:
     if _knowledge_store is None:
         _knowledge_store = HciotKnowledgeStore()
     return _knowledge_store
-

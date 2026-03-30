@@ -7,7 +7,7 @@ import mimetypes
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 from urllib.parse import quote
@@ -25,7 +25,9 @@ from app.routers.knowledge_utils import (
     write_docx_text,
 )
 from app.services.gemini_service import run_sync
+from app.services.hciot.csv_utils import extract_questions_from_csv
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
+from app.services.hciot.topic_store import get_hciot_topic_store
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,57 @@ LOG_PREFIX = "HCIoT sync"
 
 def _store_name(language: str) -> str | None:
     return get_store_name(ENV_PREFIX, language)
+
+
+def _normalized_label(value: str | None, fallback: str) -> str:
+    return (value or "").strip() or fallback
+
+
+def _sync_topic_questions_from_csv(
+    *,
+    topic_id: str | None,
+    ext: str,
+    filename: str,
+    file_bytes: bytes,
+    topic_label_zh: str | None,
+    topic_label_en: str | None,
+    category_label_zh: str | None,
+    category_label_en: str | None,
+) -> bool:
+    """Extract questions from CSV and upsert into the topic store.
+
+    Skips IMG CSV files (filename contains ``_IMG_``) to avoid overwriting
+    the main CSV's question list with a single-question image CSV.
+    """
+    if ext != ".csv" or not topic_id:
+        return False
+    if "_IMG_" in filename:
+        return False
+
+    questions = extract_questions_from_csv(file_bytes)
+    if not questions:
+        return False
+
+    topic_store = get_hciot_topic_store()
+    # Derive labels from topic_id if not provided
+    prefix = topic_id.split("/", 1)[0]
+    suffix = topic_id.split("/", 1)[1] if "/" in topic_id else topic_id
+    topic_store.upsert_topic(
+        topic_id,
+        {
+            "labels": {
+                "zh": _normalized_label(topic_label_zh, suffix),
+                "en": _normalized_label(topic_label_en, suffix),
+            },
+            "category_labels": {
+                "zh": _normalized_label(category_label_zh, prefix),
+                "en": _normalized_label(category_label_en, prefix),
+            },
+            "questions": {"zh": questions, "en": questions},
+        },
+    )
+    logger.info("[HCIoT KB] Synced %d questions -> %s", len(questions), topic_id)
+    return True
 
 
 @router.get("/files/")
@@ -92,6 +145,14 @@ class UpdateContentRequest(BaseModel):
     content: str
 
 
+class UpdateFileMetadataRequest(BaseModel):
+    topic_id: str | None = None
+    category_label_zh: str | None = None
+    category_label_en: str | None = None
+    topic_label_zh: str | None = None
+    topic_label_en: str | None = None
+
+
 @router.put("/files/{filename}/content")
 async def update_file_content(
     filename: str,
@@ -122,20 +183,71 @@ async def update_file_content(
     if not updated:
         raise HTTPException(status_code=404, detail="檔案不存在")
 
+    topic_synced = _sync_topic_questions_from_csv(
+        topic_id=doc.get("topic_id"),
+        ext=ext,
+        filename=safe_name,
+        file_bytes=new_bytes,
+        topic_label_zh=doc.get("topic_label_zh"),
+        topic_label_en=doc.get("topic_label_en"),
+        category_label_zh=doc.get("category_label_zh"),
+        category_label_en=doc.get("category_label_en"),
+    )
+
     store_name = _store_name(language)
     if store_name:
         try:
             await run_sync(sync_to_gemini, store_name, safe_name, new_bytes)
         except Exception as e:
-            return {"message": f"已更新，但 Gemini 同步失敗: {e}", "synced": False}
+            return {"message": f"已更新，但 Gemini 同步失敗: {e}", "synced": False, "topic_synced": topic_synced}
 
-    return {"message": "已更新", "synced": True}
+    return {"message": "已更新", "synced": True, "topic_synced": topic_synced}
+
+
+@router.put("/files/{filename}/metadata")
+async def update_file_metadata(
+    filename: str,
+    request: UpdateFileMetadataRequest,
+    language: str = "zh",
+    auth: dict = Depends(verify_auth),
+):
+    safe_name = safe_filename(filename)
+    store = get_hciot_knowledge_store()
+    existing = store.get_file(language, safe_name)
+    if not existing:
+        raise HTTPException(status_code=404, detail="檔案不存在")
+
+    updated = store.update_file_metadata(language, safe_name, request.model_dump())
+    if not updated:
+        raise HTTPException(status_code=404, detail="檔案不存在")
+
+    topic_synced = _sync_topic_questions_from_csv(
+        topic_id=updated.get("topic_id"),
+        ext=Path(safe_name).suffix.lower(),
+        filename=safe_name,
+        file_bytes=existing.get("data", b""),
+        topic_label_zh=updated.get("topic_label_zh"),
+        topic_label_en=updated.get("topic_label_en"),
+        category_label_zh=updated.get("category_label_zh"),
+        category_label_en=updated.get("category_label_en"),
+    )
+
+    return {
+        **updated,
+        "topic_synced": topic_synced,
+    }
 
 
 @router.post("/upload/")
 async def upload_knowledge_file(
     language: str = "zh",
     file: UploadFile = File(...),
+    category_id: str | None = Form(None),
+    topic_id: str | None = Form(None),
+    category_label_zh: str | None = Form(None),
+    category_label_en: str | None = Form(None),
+    topic_label_zh: str | None = Form(None),
+    topic_label_en: str | None = Form(None),
     auth: dict = Depends(verify_auth),
 ):
     display_name = file.filename or f"file_{uuid.uuid4().hex[:8]}"
@@ -146,6 +258,13 @@ async def upload_knowledge_file(
     editable = ext in EDITABLE_EXTENSIONS
     content_type = file.content_type or mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
 
+    # Merge category_id + topic_id into single topic_id
+    merged_topic_id = None
+    if category_id and topic_id:
+        merged_topic_id = f"{category_id.strip()}/{topic_id.strip()}"
+    elif topic_id and "/" in topic_id:
+        merged_topic_id = topic_id.strip()
+
     store = get_hciot_knowledge_store()
     saved = store.insert_file(
         language=language,
@@ -154,6 +273,9 @@ async def upload_knowledge_file(
         display_name=safe_name,
         content_type=content_type,
         editable=editable,
+        topic_id=merged_topic_id,
+        category_labels={"zh": category_label_zh, "en": category_label_en},
+        topic_labels={"zh": topic_label_zh, "en": topic_label_en},
     )
 
     gemini_synced = False
@@ -164,11 +286,28 @@ async def upload_knowledge_file(
         except Exception as e:
             logger.warning(f"[HCIoT KB] Gemini sync failed for {saved['name']}: {e}")
 
+    topic_synced = _sync_topic_questions_from_csv(
+        topic_id=merged_topic_id,
+        ext=ext,
+        filename=safe_name,
+        file_bytes=file_bytes,
+        topic_label_zh=topic_label_zh,
+        topic_label_en=topic_label_en,
+        category_label_zh=category_label_zh,
+        category_label_en=category_label_en,
+    )
+
     return {
         "name": saved["name"],
         "display_name": saved["display_name"],
         "size": saved["size"],
         "synced": gemini_synced,
+        "topic_synced": topic_synced,
+        "topic_id": saved.get("topic_id"),
+        "category_label_zh": saved.get("category_label_zh"),
+        "category_label_en": saved.get("category_label_en"),
+        "topic_label_zh": saved.get("topic_label_zh"),
+        "topic_label_en": saved.get("topic_label_en"),
     }
 
 

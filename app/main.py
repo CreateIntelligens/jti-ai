@@ -68,7 +68,7 @@ from .services.agent_utils import strip_citations
 from .routers.jti import chat as jti_chat, quiz as jti_quiz, prompts as jti_prompts, knowledge as jti_knowledge, quiz_bank as jti_quiz_bank
 from .routers.general import chat, stores, prompts, api_keys, knowledge_admin
 from .routers.hciot import chat as hciot_chat, prompts as hciot_prompts, knowledge as hciot_knowledge, images as hciot_images
-from .routers.hciot import topics as hciot_topics, topics_admin as hciot_topics_admin
+from .routers.hciot import topics_admin as hciot_topics_admin
 from .services.mongo_client import get_mongo_client
 import app.deps as deps
 
@@ -298,7 +298,7 @@ app.include_router(hciot_prompts.router, prefix="/api/hciot/prompts", include_in
 app.include_router(hciot_knowledge.router, prefix="/api/hciot-admin/knowledge")
 app.include_router(hciot_knowledge.router, prefix="/api/hciot/knowledge", include_in_schema=False)
 app.include_router(hciot_images.router, prefix="/api/hciot")
-app.include_router(hciot_topics.router, prefix="/api/hciot")
+app.include_router(hciot_topics_admin.public_router, prefix="/api/hciot")
 app.include_router(hciot_topics_admin.router, prefix="/api/hciot-admin/topics")
 app.include_router(chat.router)
 app.include_router(prompts.router)  # before stores (more specific path patterns)

@@ -48,20 +48,55 @@ export interface HciotPromptListResponse {
 export interface HciotKnowledgeFile {
   name: string;
   display_name?: string;
+  content_type?: string;
   size?: number;
   created_at?: string;
+  editable?: boolean;
+  topic_id?: string | null;
+  category_label_zh?: string | null;
+  category_label_en?: string | null;
+  topic_label_zh?: string | null;
+  topic_label_en?: string | null;
 }
 
 export interface HciotKnowledgeFileContent {
   filename: string;
-  content: string;
+  content: string | null;
   editable?: boolean;
+  size?: number;
+  message?: string;
+}
+
+export interface HciotLabels {
+  zh: string;
+  en: string;
+}
+
+export interface HciotTopicQuestions {
+  zh: string[];
+  en: string[];
 }
 
 const HCIOT_ADMIN_BASE = `${API_BASE}/hciot-admin`;
+const HCIOT_TOPICS_ADMIN_BASE = `${HCIOT_ADMIN_BASE}/topics`;
+const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 function normLang(language: string): string {
   return language.toLowerCase().startsWith('en') ? 'en' : 'zh';
+}
+
+function jsonRequest(method: 'POST' | 'PUT', body: unknown): RequestInit {
+  return {
+    method,
+    headers: JSON_HEADERS,
+    body: JSON.stringify(body),
+  };
+}
+
+function appendOptionalFormValue(formData: FormData, key: string, value: string | undefined): void {
+  if (value) {
+    formData.append(key, value);
+  }
 }
 
 export async function hciotStartChat(language: string, previousSessionId?: string | null): Promise<StartChatResponse> {
@@ -175,23 +210,30 @@ export function downloadHciotKnowledgeFile(filename: string, language: string = 
   window.open(`${HCIOT_ADMIN_BASE}/knowledge/files/${encodeURIComponent(filename)}/download?${params}`, '_blank');
 }
 
-export async function updateHciotKnowledgeFileContent(filename: string, content: string, language: string = 'zh'): Promise<HciotKnowledgeFileContent> {
+export async function updateHciotKnowledgeFileContent(
+  filename: string,
+  content: string,
+  language: string = 'zh',
+): Promise<{ message: string; synced: boolean; topic_synced: boolean }> {
   const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/knowledge/files/${encodeURIComponent(filename)}/content?language=${normLang(language)}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content }),
   });
-  return handleResponse<HciotKnowledgeFileContent>(response);
+  return handleResponse(response);
 }
 
-export async function uploadHciotKnowledgeFile(language: string, file: File): Promise<{ filename: string; message: string }> {
+export async function uploadHciotKnowledgeFile(
+  language: string,
+  file: File,
+): Promise<HciotKnowledgeFile & { synced: boolean; topic_synced: boolean }> {
   const formData = new FormData();
   formData.append('file', file);
   const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/knowledge/upload/?language=${normLang(language)}`, {
     method: 'POST',
     body: formData,
   });
-  return handleResponse<{ filename: string; message: string }>(response);
+  return handleResponse(response);
 }
 
 export async function deleteHciotKnowledgeFile(fileName: string, language: string = 'zh'): Promise<void> {
@@ -204,4 +246,101 @@ export async function deleteHciotKnowledgeFile(fileName: string, language: strin
 export async function getHciotConversationDetail(sessionId: string): Promise<Record<string, unknown>> {
   const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/conversations?session_id=${encodeURIComponent(sessionId)}`);
   return handleResponse<Record<string, unknown>>(response);
+}
+
+export async function updateHciotKnowledgeFileMetadata(
+  filename: string,
+  metadata: {
+    topic_id?: string | null;
+    category_label_zh?: string | null;
+    category_label_en?: string | null;
+    topic_label_zh?: string | null;
+    topic_label_en?: string | null;
+  },
+  language: string = 'zh',
+): Promise<HciotKnowledgeFile & { topic_synced: boolean }> {
+  const response = await fetchAsAdmin(
+    `${HCIOT_ADMIN_BASE}/knowledge/files/${encodeURIComponent(filename)}/metadata?language=${normLang(language)}`,
+    jsonRequest('PUT', metadata),
+  );
+  return handleResponse<HciotKnowledgeFile & { topic_synced: boolean }>(response);
+}
+
+// ========== Topic Admin ==========
+
+export interface HciotTopicCategory {
+  id: string;
+  labels: HciotLabels;
+  topics: Array<{
+    id: string;
+    order?: number;
+    labels: HciotLabels;
+    category_labels?: HciotLabels;
+    questions: HciotTopicQuestions;
+  }>;
+}
+
+export async function listHciotTopicsAdmin(): Promise<{ categories: HciotTopicCategory[] }> {
+  const response = await fetchWithApiKey(`${API_BASE}/hciot/topics`);
+  return handleResponse<{ categories: HciotTopicCategory[] }>(response);
+}
+
+export async function updateHciotTopic(
+  topicId: string,
+  data: { labels?: HciotLabels; category_labels?: HciotLabels; questions?: HciotTopicQuestions },
+): Promise<Record<string, unknown>> {
+  // topic_id contains "/" so we can't use encodeURIComponent — pass raw
+  const response = await fetchAsAdmin(`${HCIOT_TOPICS_ADMIN_BASE}/${topicId}`, jsonRequest('PUT', data));
+  return handleResponse(response);
+}
+
+export async function deleteHciotTopic(topicId: string): Promise<void> {
+  const response = await fetchAsAdmin(`${HCIOT_TOPICS_ADMIN_BASE}/${topicId}`, { method: 'DELETE' });
+  await handleResponse<void>(response);
+}
+
+export async function createHciotTopic(
+  topicId: string,
+  labels: HciotLabels,
+  categoryLabels: HciotLabels,
+  questions: HciotTopicQuestions = { zh: [], en: [] },
+): Promise<Record<string, unknown>> {
+  const response = await fetchAsAdmin(`${HCIOT_TOPICS_ADMIN_BASE}/`, jsonRequest('POST', {
+    topic_id: topicId,
+    labels,
+    category_labels: categoryLabels,
+    questions,
+  }));
+  return handleResponse(response);
+}
+
+export interface UploadWithTopicOptions {
+  language: string;
+  file: File;
+  categoryId?: string;
+  topicId?: string;
+  categoryLabelZh?: string;
+  categoryLabelEn?: string;
+  topicLabelZh?: string;
+  topicLabelEn?: string;
+}
+
+export async function uploadHciotKnowledgeFileWithTopic(
+  opts: UploadWithTopicOptions,
+): Promise<HciotKnowledgeFile & { synced: boolean; topic_synced: boolean }> {
+  const formData = new FormData();
+  formData.append('file', opts.file);
+  // Backend still accepts category_id + topic_id as separate Form fields and merges them
+  appendOptionalFormValue(formData, 'category_id', opts.categoryId);
+  appendOptionalFormValue(formData, 'topic_id', opts.topicId);
+  appendOptionalFormValue(formData, 'category_label_zh', opts.categoryLabelZh);
+  appendOptionalFormValue(formData, 'category_label_en', opts.categoryLabelEn);
+  appendOptionalFormValue(formData, 'topic_label_zh', opts.topicLabelZh);
+  appendOptionalFormValue(formData, 'topic_label_en', opts.topicLabelEn);
+
+  const response = await fetchAsAdmin(
+    `${HCIOT_ADMIN_BASE}/knowledge/upload/?language=${normLang(opts.language)}`,
+    { method: 'POST', body: formData },
+  );
+  return handleResponse(response);
 }

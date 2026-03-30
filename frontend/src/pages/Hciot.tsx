@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { HeartPulse, History, Moon, RotateCcw, Settings, Sun } from 'lucide-react';
+import { FileText, HeartPulse, History, Moon, RotateCcw, Settings, Sun } from 'lucide-react';
 import { fetchWithApiKey } from '../services/api';
 
 import ConversationHistoryModal from '../components/ConversationHistoryModal';
 import HciotSettingsModal from '../components/HciotSettingsModal';
 import HciotInputArea from '../components/hciot/HciotInputArea';
+import HciotKnowledgeWorkspace from '../components/hciot/HciotKnowledgeWorkspace';
 import HciotMessageList, { type HciotMessage } from '../components/hciot/HciotMessageList';
 import HciotTopicGrid from '../components/hciot/HciotTopicGrid';
 import {
@@ -20,8 +21,10 @@ import { useTheme } from '../hooks/useTheme';
 import * as api from '../services/api';
 import type { TtsState } from '../types';
 import '../styles/shared/index.css';
+import '../styles/shared/settings.css';
 import '../styles/hciot/layout.css';
 import '../styles/hciot/components.css';
+import '../styles/hciot/workspace.css';
 
 const TTS_MAX_ATTEMPTS = 16;
 const TTS_POLL_INTERVAL_MS = 3000;
@@ -80,6 +83,7 @@ export default function Hciot() {
   const [currentLanguage, setCurrentLanguage] = useState(normalizeHciotLanguage(i18n.language));
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const [workspace, setWorkspace] = useState<'chat' | 'files'>('chat');
   const [editingTurn, setEditingTurn] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
@@ -270,6 +274,9 @@ export default function Hciot() {
       .then((data: { categories: HciotCategory[] }) => {
         if (data.categories?.length) {
           setCategories(data.categories);
+          setSelectedCategoryId(data.categories[0].id);
+          const firstTopic = data.categories[0].topics[0];
+          if (firstTopic) setSelectedTopicId(firstTopic.id);
           setTopicsError(false);
         } else {
           setTopicsError(true);
@@ -481,6 +488,24 @@ export default function Hciot() {
         </div>
 
         <div className="hciot-header-actions">
+          <div className="hciot-view-toggle" role="tablist" aria-label={currentLanguage === 'zh' ? '工作區切換' : 'Workspace switcher'}>
+            <button
+              type="button"
+              className={`hciot-view-button${workspace === 'chat' ? ' is-active' : ''}`}
+              onClick={() => setWorkspace('chat')}
+            >
+              <HeartPulse size={16} />
+              <span>{currentLanguage === 'zh' ? '聊天' : 'Chat'}</span>
+            </button>
+            <button
+              type="button"
+              className={`hciot-view-button${workspace === 'files' ? ' is-active' : ''}`}
+              onClick={() => setWorkspace('files')}
+            >
+              <FileText size={16} />
+              <span>{currentLanguage === 'zh' ? '檔案管理' : 'Files'}</span>
+            </button>
+          </div>
           <button className="hciot-icon-button" onClick={() => setShowSettingsModal(true)} title={t('hciot_settings')}>
             <Settings size={18} />
           </button>
@@ -500,74 +525,83 @@ export default function Hciot() {
       </header>
 
       <main className="hciot-main">
-        <aside className="hciot-sidebar">
-          <div className="hciot-topic-inline-panel">
-            <HciotTopicGrid
-              topics={visibleTopics}
-              categories={categories}
-              language={currentLanguage}
-              disabled={loading || !sessionId}
-              onSelect={handleSelectTopic}
-              onSelectQuestion={handleSelectQuestion}
-              selectedTopicId={selectedTopicId}
-              selectedCategoryId={selectedCategoryId}
-              onSelectCategory={(catId) => {
-                setSelectedCategoryId(catId);
-                setSelectedTopicId(null);
-              }}
-              heading={t('hciot_topic_heading')}
-              subheading={t('hciot_topic_subheading')}
-              questionHeading={
-                selectedTopic
-                  ? `${selectedTopic.labels[currentLanguage]} ${currentLanguage === 'zh' ? '常見問題' : 'Questions'}`
-                  : undefined
-              }
-              disabledMessage={
-                storeMissing
-                  ? t('hciot_store_missing_notice', { store: HCIOT_DEFAULT_STORE_NAME })
-                  : topicsError
-                  ? (currentLanguage === 'zh' ? '無法載入題目分類，請稍後再試。' : 'Failed to load topics. Please try again later.')
-                  : null
-              }
+        <section className={`hciot-chat-workspace${workspace === 'chat' ? ' is-active' : ''}`}>
+          <aside className="hciot-sidebar">
+            <div className="hciot-topic-inline-panel">
+              <HciotTopicGrid
+                topics={visibleTopics}
+                categories={categories}
+                language={currentLanguage}
+                disabled={loading || !sessionId}
+                onSelect={handleSelectTopic}
+                onSelectQuestion={handleSelectQuestion}
+                selectedTopicId={selectedTopicId}
+                selectedCategoryId={selectedCategoryId}
+                onSelectCategory={(catId) => {
+                  setSelectedCategoryId(catId);
+                  const cat = categories.find((c) => c.id === catId);
+                  const firstTopic = cat?.topics[0];
+                  setSelectedTopicId(firstTopic?.id || null);
+                }}
+                heading={t('hciot_topic_heading')}
+                subheading={t('hciot_topic_subheading')}
+                questionHeading={
+                  selectedTopic
+                    ? `${selectedTopic.labels[currentLanguage]} ${currentLanguage === 'zh' ? '常見問題' : 'Questions'}`
+                    : undefined
+                }
+                disabledMessage={
+                  storeMissing
+                    ? t('hciot_store_missing_notice', { store: HCIOT_DEFAULT_STORE_NAME })
+                    : topicsError
+                    ? (currentLanguage === 'zh' ? '無法載入題目分類，請稍後再試。' : 'Failed to load topics. Please try again later.')
+                    : null
+                }
+              />
+            </div>
+          </aside>
+
+          <div className="hciot-chat-container">
+            <HciotMessageList
+              messages={messages}
+              loading={loading}
+              isTyping={isTyping}
+              editingTurn={editingTurn}
+              editText={editText}
+              editTextareaRef={editTextareaRef}
+              messagesEndRef={messagesEndRef}
+              handleRegenerate={handleRegenerate}
+              handleEditAndResend={handleEditAndResend}
+              setEditingTurn={setEditingTurn}
+              setEditText={setEditText}
+              handleEditKeyDown={handleEditKeyDown}
+              onPlayTts={playAssistantTts}
+              getTtsState={getAssistantTtsState}
+              heroEyebrow={t('hciot_hero_eyebrow')}
+              heroTitle={t('hciot_hero_title')}
+              heroDescription={t('hciot_hero_description')}
+              heroNote={t('hciot_hero_note')}
+            />
+
+            <HciotInputArea
+              userInput={userInput}
+              loading={loading}
+              sessionId={sessionId}
+              statusText={statusText}
+              sessionInfo={sessionInfo}
+              placeholder={loading ? t('loading') : t('hciot_input_placeholder')}
+              setUserInput={setUserInput}
+              handleSubmit={handleSubmit}
+              handleKeyDown={handleKeyDown}
+              inputRef={inputRef}
             />
           </div>
-        </aside>
-        
-        <div className="hciot-chat-container">
-          <HciotMessageList
-            messages={messages}
-            loading={loading}
-            isTyping={isTyping}
-            editingTurn={editingTurn}
-            editText={editText}
-            editTextareaRef={editTextareaRef}
-            messagesEndRef={messagesEndRef}
-            handleRegenerate={handleRegenerate}
-            handleEditAndResend={handleEditAndResend}
-            setEditingTurn={setEditingTurn}
-            setEditText={setEditText}
-            handleEditKeyDown={handleEditKeyDown}
-            onPlayTts={playAssistantTts}
-            getTtsState={getAssistantTtsState}
-            heroEyebrow={t('hciot_hero_eyebrow')}
-            heroTitle={t('hciot_hero_title')}
-            heroDescription={t('hciot_hero_description')}
-            heroNote={t('hciot_hero_note')}
-          />
+        </section>
 
-          <HciotInputArea
-            userInput={userInput}
-            loading={loading}
-            sessionId={sessionId}
-            statusText={statusText}
-            sessionInfo={sessionInfo}
-            placeholder={loading ? t('loading') : t('hciot_input_placeholder')}
-            setUserInput={setUserInput}
-            handleSubmit={handleSubmit}
-            handleKeyDown={handleKeyDown}
-            inputRef={inputRef}
-          />
-        </div>
+        <HciotKnowledgeWorkspace
+          active={workspace === 'files'}
+          language={currentLanguage}
+        />
       </main>
 
       <HciotSettingsModal

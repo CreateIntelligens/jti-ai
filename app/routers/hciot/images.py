@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
 
-router = APIRouter()
+router = APIRouter(tags=["HCIoT Images"])
 
 _IMAGES_DIR = Path("/app/data/hciot/images")
 _EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp")

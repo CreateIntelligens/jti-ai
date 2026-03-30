@@ -35,7 +35,6 @@ export default function HciotTopicGrid({
 }: HciotTopicGridProps) {
   const findTopicById = (topicId: string) => topics.find((topic) => topic.id === topicId);
   const selectedTopic = selectedTopicId ? findTopicById(selectedTopicId) || null : null;
-  const topicSelectPlaceholder = language === 'en' ? 'Select a topic…' : '選擇主題…';
   const categorySelectPlaceholder = language === 'en' ? 'All categories' : '全部科別';
 
   const handleCategoryChange = (event: ChangeEvent<HTMLSelectElement>) => {
@@ -78,27 +77,24 @@ export default function HciotTopicGrid({
         </select>
       ) : null}
 
-      <select
-        className="hciot-topic-select"
-        value={selectedTopicId || ''}
-        onChange={handleTopicChange}
-        disabled={disabled}
-      >
-        <option value="" disabled>{topicSelectPlaceholder}</option>
-        {topics.map((topic) => (
-          <option key={topic.id} value={topic.id}>
-            {topic.icon} {topic.labels[language]}
-          </option>
-        ))}
-      </select>
+      {topics.length > 0 ? (
+        <select
+          className="hciot-topic-select"
+          value={selectedTopicId || ''}
+          onChange={handleTopicChange}
+          disabled={disabled}
+        >
+          {topics.map((topic, index) => (
+            <option key={topic.id || `topic-${index}`} value={topic.id}>
+              {topic.labels[language]}
+            </option>
+          ))}
+        </select>
+      ) : null}
 
       {selectedTopic ? (
-        <div
-          className="hciot-topic-question-panel"
-          style={{ ['--topic-accent' as string]: selectedTopic.accent }}
-        >
+        <div className="hciot-topic-question-panel">
           <div className="hciot-topic-question-header">
-            <p className="hciot-topic-question-kicker">{selectedTopic.summaries[language]}</p>
             <h4 className="hciot-topic-question-heading">
               {questionHeading || selectedTopic.labels[language]}
             </h4>

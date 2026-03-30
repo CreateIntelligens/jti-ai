@@ -12,6 +12,7 @@ import { useScrollToBottom } from '../hooks/useScrollToBottom';
 import '../styles/shared/index.css';
 import '../styles/jti/layout.css';
 import '../styles/jti/messages.css';
+import '../styles/shared/settings.css';
 import '../styles/jti/settings.css';
 import '../styles/jti/theme-overrides.css';
 import '../styles/jti/light.css';

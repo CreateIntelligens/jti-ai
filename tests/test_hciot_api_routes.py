@@ -1,12 +1,21 @@
 import sys
 import unittest
+from pathlib import Path
 from unittest.mock import MagicMock
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 
 mock_db = MagicMock()
 mock_mongo_client_module = MagicMock()
 mock_mongo_client_module.get_mongo_db.return_value = mock_db
 sys.modules.setdefault("app.services.mongo_client", mock_mongo_client_module)
+
+mock_tts_jobs_module = MagicMock()
+mock_tts_jobs_module.TtsJobManager = MagicMock()
+mock_tts_jobs_module.jti_tts_job_manager = MagicMock()
+mock_tts_jobs_module.hciot_tts_job_manager = MagicMock()
+sys.modules.setdefault("app.services.tts_jobs", mock_tts_jobs_module)
 
 from app.main import app
 
@@ -24,6 +33,7 @@ class TestHciotApiRoutes(unittest.TestCase):
             ("/api/hciot/chat/message", ("POST",)),
             ("/api/hciot-admin/prompts/", ("GET",)),
             ("/api/hciot-admin/knowledge/files/", ("GET",)),
+            ("/api/hciot-admin/knowledge/files/{filename}/metadata", ("PUT",)),
             ("/api/hciot-admin/conversations", ("GET",)),
             ("/api/hciot-admin/conversations/export", ("GET",)),
         }
