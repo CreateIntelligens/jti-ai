@@ -52,10 +52,6 @@ DEFAULT_RESPONSE_RULE_SECTIONS = {
 - 知識庫沒說的事，即使你認為是正確的，也不要說出來；只需說「這個我需要確認一下」
 - 如果使用者正在回答你的追問（例如你問了「A 還是 B？」使用者回答「A」），不要重複追問，直接根據對話上下文回答
 - 絕對不要憑自己的知識或記憶編造產品資訊，包括顏色名稱、數量、規格等
-- 如果知識庫內容中出現 [CORE: ...]，表示這是該段中最高優先、最應保留的重點資訊
-- 回答時要優先採信並保留 CORE 內的事實，不可忽略、弱化，或被同段其他敘述蓋過
-- 不要把 [CORE: ...] 標記原樣輸出給使用者，請自然地把其中內容整合進回答
-- 如果同一段一般文字與 CORE 內容有輕微衝突，以 CORE 內容為準
 - 特別注意：加熱器本體、前保護殼、後保護殼、菸彈等不同產品的顏色各自不同，不可混用""",
     },
     "en": {
@@ -76,10 +72,6 @@ DEFAULT_RESPONSE_RULE_SECTIONS = {
 - If something is not stated in the KB, do NOT say it even if you believe it is correct; instead say "I need to check that"
 - If the user is answering your follow-up question (e.g. you asked "A or B?" and they replied "A"), do NOT repeat the question — use the conversation context to respond directly
 - NEVER fabricate product information from your own knowledge, including color names, quantities, or specs
-- If the knowledge base includes [CORE: ...], treat it as the highest-priority information in that passage
-- Prioritize and preserve the facts inside CORE when answering; do not ignore, dilute, or let surrounding text override it
-- Never output the literal [CORE: ...] markup to the user; integrate its content naturally into the reply
-- If there is a minor conflict between regular text and CORE content in the same passage, follow the CORE content
 - Note: The heater body, front cover, back cover, and tobacco sticks each have different colors - never mix them up""",
     },
 }

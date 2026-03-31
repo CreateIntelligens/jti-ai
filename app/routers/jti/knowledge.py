@@ -6,6 +6,7 @@ MongoDB + Gemini File Search Store 同步管理。
 
 import logging
 import mimetypes
+import re
 import uuid
 from pathlib import Path
 
@@ -38,6 +39,7 @@ router = APIRouter(tags=["JTI Knowledge"], dependencies=[Depends(verify_admin)])
 ENV_PREFIX = "JTI"
 FALLBACK_ENV_KEY = "JTI_STORE_ID_ZH"
 LOG_PREFIX = "JTI sync"
+CORE_MARKER_PATTERN = re.compile(r"\[CORE\s*:", re.IGNORECASE)
 
 
 def _store_name(language: str) -> str | None:
@@ -45,6 +47,26 @@ def _store_name(language: str) -> str | None:
 
 
 _gemini_background = partial(gemini_background, "JTI KB")
+
+
+def _reject_core_markers(content: str) -> None:
+    if CORE_MARKER_PATTERN.search(content):
+        raise HTTPException(
+            status_code=400,
+            detail="知識庫內容不可包含 [CORE: ...] 標記，請改成明文內容。",
+        )
+
+
+def _extract_upload_text_for_validation(filename: str, file_bytes: bytes) -> str | None:
+    ext = Path(filename).suffix.lower()
+
+    if ext == ".docx":
+        return extract_docx_text(file_bytes)
+
+    if ext in TEXT_PREVIEW_EXTENSIONS:
+        return file_bytes.decode("utf-8", errors="replace")
+
+    return None
 
 
 # ========== 列出檔案 ==========
@@ -149,6 +171,8 @@ async def update_file_content(
     if not doc:
         raise HTTPException(status_code=404, detail="檔案不存在")
 
+    _reject_core_markers(req.content)
+
     old_bytes = doc.get("data", b"")
     if ext == ".docx":
         try:
@@ -187,6 +211,10 @@ async def upload_knowledge_file(
     ext = Path(safe_name).suffix.lower()
     editable = ext in EDITABLE_EXTENSIONS
     content_type = file.content_type or mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
+    text_content = _extract_upload_text_for_validation(safe_name, file_bytes)
+
+    if text_content is not None:
+        _reject_core_markers(text_content)
 
     store = get_knowledge_store()
     saved = store.insert_file(

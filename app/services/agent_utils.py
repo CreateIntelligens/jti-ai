@@ -7,6 +7,8 @@ Agent 共用工具函式
 import re
 from google.genai import types
 
+CORE_MARKER_PATTERN = re.compile(r"\[CORE:\s*([^\]]+?)\]", flags=re.IGNORECASE)
+
 
 def normalize_language(language: str) -> str:
     """將語言代碼正規化為 'en' 或 'zh'。"""
@@ -27,8 +29,15 @@ def extract_response_text(response) -> str:
 
 
 def strip_citations(text: str) -> str:
-    """移除 Gemini File Search 的 [cite:...] 標記。"""
-    return re.sub(r"\s*\[cite:\s*[^\]]*\]", "", text).strip()
+    """移除模型回覆中的檢索標記，並保留 CORE 內容本身。"""
+    text = strip_core_markup(text)
+    text = re.sub(r"\s*\[cite:\s*[^\]]*\]", "", text)
+    return text.strip()
+
+
+def strip_core_markup(text: str) -> str:
+    """移除 [CORE: ...] 外殼並保留其中內容。"""
+    return CORE_MARKER_PATTERN.sub(r"\1", text)
 
 
 def build_chat_history(chat_history: list) -> list[types.Content]:
