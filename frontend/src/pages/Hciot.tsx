@@ -83,7 +83,11 @@ export default function Hciot() {
   const [currentLanguage, setCurrentLanguage] = useState(normalizeHciotLanguage(i18n.language));
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [workspace, setWorkspace] = useState<'chat' | 'files'>('chat');
+  const WORKSPACE_KEY = 'hciot:workspace';
+  const [workspace, setWorkspace] = useState<'chat' | 'files'>(() => {
+    const saved = sessionStorage.getItem(WORKSPACE_KEY);
+    return saved === 'files' ? 'files' : 'chat';
+  });
   const [editingTurn, setEditingTurn] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
@@ -492,7 +496,7 @@ export default function Hciot() {
             <button
               type="button"
               className={`hciot-view-button${workspace === 'chat' ? ' is-active' : ''}`}
-              onClick={() => setWorkspace('chat')}
+              onClick={() => { setWorkspace('chat'); sessionStorage.setItem(WORKSPACE_KEY, 'chat'); }}
             >
               <HeartPulse size={16} />
               <span>{currentLanguage === 'zh' ? '聊天' : 'Chat'}</span>
@@ -500,7 +504,7 @@ export default function Hciot() {
             <button
               type="button"
               className={`hciot-view-button${workspace === 'files' ? ' is-active' : ''}`}
-              onClick={() => setWorkspace('files')}
+              onClick={() => { setWorkspace('files'); sessionStorage.setItem(WORKSPACE_KEY, 'files'); }}
             >
               <FileText size={16} />
               <span>{currentLanguage === 'zh' ? '檔案管理' : 'Files'}</span>

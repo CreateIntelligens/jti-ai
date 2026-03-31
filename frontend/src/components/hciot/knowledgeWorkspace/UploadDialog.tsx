@@ -444,7 +444,7 @@ export default function UploadDialog({
                   <Upload size={14} />
                   {uploading
                     ? (language === 'zh' ? '上傳中...' : 'Uploading...')
-                    : (language === 'zh' ? '產生 CSV 並上傳' : 'Generate CSV & Upload')}
+                    : (language === 'zh' ? '上傳' : 'Upload')}
                 </button>
               </div>
             </div>
