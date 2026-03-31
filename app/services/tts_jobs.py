@@ -204,6 +204,6 @@ class TtsJobManager:
             self._remove_job_files(job_id)
 
 
-# Per-app singletons with fixed characters
-jti_tts_job_manager = TtsJobManager(character="hayley")
-hciot_tts_job_manager = TtsJobManager(character="healthy2")
+# Per-app singletons — characters configurable via env vars
+jti_tts_job_manager = TtsJobManager(character=os.getenv("JTI_TTS_CHARACTER", "hayley"))
+hciot_tts_job_manager = TtsJobManager(character=os.getenv("HCIOT_TTS_CHARACTER", "healthy2"))
