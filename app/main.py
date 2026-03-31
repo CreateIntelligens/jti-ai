@@ -1,5 +1,6 @@
 """Gemini File Search FastAPI backend."""
 
+from contextlib import asynccontextmanager
 import logging
 import os
 import re
@@ -9,18 +10,6 @@ import warnings
 from datetime import datetime
 from typing import Optional
 
-# Configure app logger output
-logging.basicConfig(level=logging.INFO, format='[%(asctime)s] %(name)s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-
-# Reduce third-party log noise
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("google").setLevel(logging.WARNING)
-
-# Suppress Gemini AFC warnings (we use manual function calling)
-warnings.filterwarnings('ignore', message='.*automatic function calling.*')
-warnings.filterwarnings('ignore', message='.*AFC.*')
-
-# Configure uvicorn log format with timestamps and colored status codes
 import uvicorn.logging
 
 # ANSI color codes
@@ -28,6 +17,9 @@ GREEN = "\033[32m"
 YELLOW = "\033[33m"
 RED = "\033[31m"
 RESET = "\033[0m"
+_NOISY_LOGGERS = ("httpx", "google")
+_UVICORN_LOGGERS = ("uvicorn", "uvicorn.access", "uvicorn.error")
+_AFC_WARNING_PATTERNS = (".*automatic function calling.*", ".*AFC.*")
 
 # Status code color mapping
 _STATUS_COLORS: dict[str, str] = {
@@ -37,8 +29,10 @@ _STATUS_COLORS: dict[str, str] = {
     "500": RED, "502": RED, "503": RED,
 }
 
+
 class TimestampFormatter(uvicorn.logging.ColourizedFormatter):
     """Prepend timestamp to uvicorn's colorized format and colorize status codes."""
+
     def formatMessage(self, record):
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         msg = super().formatMessage(record)
@@ -51,11 +45,37 @@ class TimestampFormatter(uvicorn.logging.ColourizedFormatter):
 
         return f"[{timestamp}] {msg}"
 
-# Override uvicorn logger formatters
-for logger_name in ("uvicorn", "uvicorn.access", "uvicorn.error"):
-    uvicorn_logger = logging.getLogger(logger_name)
-    for handler in uvicorn_logger.handlers:
-        handler.setFormatter(TimestampFormatter("%(levelprefix)s %(message)s"))
+
+def _configure_app_logging() -> None:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="[%(asctime)s] %(name)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
+    for logger_name in _NOISY_LOGGERS:
+        logging.getLogger(logger_name).setLevel(logging.WARNING)
+
+
+def _configure_warning_filters() -> None:
+    for message in _AFC_WARNING_PATTERNS:
+        warnings.filterwarnings("ignore", message=message)
+
+
+def _configure_uvicorn_logging() -> None:
+    for logger_name in _UVICORN_LOGGERS:
+        uvicorn_logger = logging.getLogger(logger_name)
+        for handler in uvicorn_logger.handlers:
+            handler.setFormatter(TimestampFormatter("%(levelprefix)s %(message)s"))
+
+
+def _configure_runtime() -> None:
+    _configure_app_logging()
+    _configure_warning_filters()
+    _configure_uvicorn_logging()
+
+
+_configure_runtime()
 
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
@@ -72,7 +92,15 @@ from .routers.hciot import topics_admin as hciot_topics_admin
 from .services.mongo_client import get_mongo_client
 import app.deps as deps
 
-app = FastAPI(title="Gemini File Search API")
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Initialize managers on application startup."""
+    deps.init_managers()
+    yield
+
+
+app = FastAPI(title="Gemini File Search API", lifespan=lifespan)
 
 @app.exception_handler(ClientError)
 async def gemini_client_error_handler(request: Request, exc: ClientError):
@@ -98,12 +126,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.on_event("startup")
-def startup():
-    """Initialize managers on application startup."""
-    deps.init_managers()
 
 
 # ========== OpenAI Compatible API ==========

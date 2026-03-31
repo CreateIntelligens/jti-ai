@@ -1,14 +1,8 @@
-import sys
 import unittest
-from unittest.mock import MagicMock
+from tests.app_main_test_support import get_test_app
 
 
-mock_db = MagicMock()
-mock_mongo_client_module = MagicMock()
-mock_mongo_client_module.get_mongo_db.return_value = mock_db
-sys.modules.setdefault("app.services.mongo_client", mock_mongo_client_module)
-
-from app.main import app
+app = get_test_app()
 
 
 class TestJtiApiRoutes(unittest.TestCase):
