@@ -1,4 +1,4 @@
-import type { CSSProperties, RefObject } from 'react';
+import type { CSSProperties } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -7,8 +7,8 @@ import {
   FolderOpen,
   PanelLeftClose,
   PanelLeftOpen,
+  Plus,
   Search,
-  Upload,
 } from 'lucide-react';
 
 import type { HciotLanguage } from '../../../config/hciotTopics';
@@ -19,40 +19,36 @@ interface ExplorerSidebarProps {
   language: HciotLanguage;
   sidebarCollapsed: boolean;
   loadingWorkspace: boolean;
-  uploading: boolean;
   searchQuery: string;
   deferredSearchQuery: string;
   selectedFileName: string | null;
   visibleRows: ExplorerRow[];
   visibleExpandedKeys: Set<string>;
-  fileInputRef: RefObject<HTMLInputElement | null>;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
   onToggleSidebar: () => void;
   onSearchChange: (value: string) => void;
-  onUploadFiles: (files: FileList | null) => void;
   onToggleExpanded: (key: string) => void;
   onSelectFile: (fileName: string) => void;
+  onOpenUploadDialog: () => void;
 }
 
 export default function ExplorerSidebar({
   language,
   sidebarCollapsed,
   loadingWorkspace,
-  uploading,
   searchQuery,
   deferredSearchQuery,
   selectedFileName,
   visibleRows,
   visibleExpandedKeys,
-  fileInputRef,
   onMouseEnter,
   onMouseLeave,
   onToggleSidebar,
   onSearchChange,
-  onUploadFiles,
   onToggleExpanded,
   onSelectFile,
+  onOpenUploadDialog,
 }: ExplorerSidebarProps) {
   return (
     <aside
@@ -85,20 +81,11 @@ export default function ExplorerSidebar({
         <button
           type="button"
           className="hciot-explorer-icon-button"
-          onClick={() => fileInputRef.current?.click()}
-          title={language === 'zh' ? '上傳檔案' : 'Upload files'}
-          disabled={uploading}
+          onClick={onOpenUploadDialog}
+          title={language === 'zh' ? '新增知識' : 'Add knowledge'}
         >
-          <Upload size={16} />
+          <Plus size={16} />
         </button>
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          hidden
-          multiple
-          onChange={(event) => onUploadFiles(event.target.files)}
-        />
       </div>
 
       <div className="hciot-explorer-body">

@@ -30,6 +30,13 @@ export interface ExplorerRow {
   depth: number;
 }
 
+export interface TopicLabels {
+  categoryLabelZh: string;
+  categoryLabelEn: string;
+  topicLabelZh: string;
+  topicLabelEn: string;
+}
+
 export interface FileMetadataDraft {
   categoryId: string;
   topicId: string;
@@ -362,26 +369,19 @@ export function buildExplorerTree(
       filesByTopic.set(topicKey, group);
     });
 
+    const resolveTopicLabel = (topicId: string, topicFiles: HciotKnowledgeFile[]): string => {
+      if (topicId === NO_TOPIC_KEY) return getNoTopicLabel(language);
+      return category?.topics.find((item) => item.id === topicId)?.labels[language]
+        || topicFiles[0]?.[`topic_label_${language}` as const]
+        || topicId;
+    };
+
     const sortedTopicEntries = [...filesByTopic.entries()].sort(([leftId, leftFiles], [rightId, rightFiles]) => {
-      const leftLabel = leftId === NO_TOPIC_KEY
-        ? getNoTopicLabel(language)
-        : category?.topics.find((item) => item.id === leftId)?.labels[language]
-          || leftFiles[0]?.[`topic_label_${language}` as const]
-          || leftId;
-      const rightLabel = rightId === NO_TOPIC_KEY
-        ? getNoTopicLabel(language)
-        : category?.topics.find((item) => item.id === rightId)?.labels[language]
-          || rightFiles[0]?.[`topic_label_${language}` as const]
-          || rightId;
-      return sortByLabel(leftLabel, rightLabel);
+      return sortByLabel(resolveTopicLabel(leftId, leftFiles), resolveTopicLabel(rightId, rightFiles));
     });
 
     const topicNodes: ExplorerNode[] = sortedTopicEntries.map(([topicId, topicFiles]) => {
-      const topicLabel = topicId === NO_TOPIC_KEY
-        ? getNoTopicLabel(language)
-        : category?.topics.find((item) => item.id === topicId)?.labels[language]
-          || topicFiles[0]?.[`topic_label_${language}` as const]
-          || topicId;
+      const topicLabel = resolveTopicLabel(topicId, topicFiles);
       const topicKey = `topic:${topicId}`;
       const fileNodes = topicFiles
         .slice()

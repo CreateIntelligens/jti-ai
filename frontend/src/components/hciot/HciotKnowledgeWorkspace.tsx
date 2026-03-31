@@ -5,6 +5,7 @@ import type { HciotKnowledgeFile, HciotTopicCategory } from '../../services/api/
 import * as api from '../../services/api';
 import ExplorerSidebar from './knowledgeWorkspace/ExplorerSidebar';
 import FileDetailPane from './knowledgeWorkspace/FileDetailPane';
+import UploadDialog from './knowledgeWorkspace/UploadDialog';
 import {
   NEW_VALUE,
   buildExplorerTree,
@@ -22,6 +23,7 @@ import {
   readExpandedKeys,
   slugify,
   type FileMetadataDraft,
+  type TopicLabels,
   writeExpandedKeys,
 } from './knowledgeWorkspace/shared';
 
@@ -34,7 +36,6 @@ export default function HciotKnowledgeWorkspace({
   active,
   language,
 }: HciotKnowledgeWorkspaceProps) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const statusTimerRef = useRef<number | null>(null);
   const suppressHoverRef = useRef(false);
 
@@ -56,6 +57,7 @@ export default function HciotKnowledgeWorkspace({
   const [contentMessage, setContentMessage] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [draft, setDraft] = useState<FileMetadataDraft>(createEmptyDraft());
+  const [qaDialogOpen, setQaDialogOpen] = useState(false);
 
   const deferredSearchQuery = useDeferredValue(searchQuery.trim().toLowerCase());
 
@@ -255,22 +257,45 @@ export default function HciotKnowledgeWorkspace({
     setSelectedFileName(fileName);
   };
 
-  const handleUploadFiles = async (fileList: FileList | null) => {
-    const filesToUpload = fileList ? Array.from(fileList) : [];
-    if (!filesToUpload.length) {
-      return;
+  const uploadFileWithTopic = async (
+    file: File,
+    topicId: string | null,
+    labels: TopicLabels | null,
+  ) => {
+    if (!topicId) {
+      return api.uploadHciotKnowledgeFile(language, file);
     }
+    const catId = topicId.split('/')[0];
+    const topicSlug = topicId.includes('/') ? topicId.split('/').slice(1).join('/') : '';
+    return api.uploadHciotKnowledgeFileWithTopic({
+      language,
+      file,
+      categoryId: catId || undefined,
+      topicId: topicSlug || undefined,
+      categoryLabelZh: labels?.categoryLabelZh || undefined,
+      categoryLabelEn: labels?.categoryLabelEn || undefined,
+      topicLabelZh: labels?.topicLabelZh || undefined,
+      topicLabelEn: labels?.topicLabelEn || undefined,
+    });
+  };
 
+  const handleUploadFiles = async (
+    filesToUpload: File[],
+    topicId: string | null,
+    labels: TopicLabels | null,
+  ) => {
+    if (!filesToUpload.length) return;
     setUploading(true);
     try {
       let firstUploadedFileName: string | null = null;
       for (const file of filesToUpload) {
-        const response = await api.uploadHciotKnowledgeFile(language, file);
+        const response = await uploadFileWithTopic(file, topicId, labels);
         if (!firstUploadedFileName) {
           firstUploadedFileName = response.name;
         }
       }
       await refreshWorkspace(firstUploadedFileName);
+      setQaDialogOpen(false);
       showStatus(
         language === 'zh'
           ? `已上傳 ${filesToUpload.length} 個檔案`
@@ -281,9 +306,25 @@ export default function HciotKnowledgeWorkspace({
       alert(getErrorMessage(error));
     } finally {
       setUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
+    }
+  };
+
+  const handleQASubmit = async (
+    file: File,
+    topicId: string,
+    labels: TopicLabels,
+  ) => {
+    setUploading(true);
+    try {
+      const response = await uploadFileWithTopic(file, topicId, labels);
+      await refreshWorkspace(response.name);
+      setQaDialogOpen(false);
+      showStatus(language === 'zh' ? 'Q&A 已產生並上傳' : 'Q&A generated and uploaded');
+    } catch (error) {
+      console.error('Failed to upload Q&A CSV:', error);
+      alert(getErrorMessage(error));
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -511,22 +552,28 @@ export default function HciotKnowledgeWorkspace({
         language={language}
         sidebarCollapsed={sidebarCollapsed}
         loadingWorkspace={loadingWorkspace}
-        uploading={uploading}
         searchQuery={searchQuery}
         deferredSearchQuery={deferredSearchQuery}
         selectedFileName={selectedFileName}
         visibleRows={visibleRows}
         visibleExpandedKeys={visibleExpandedKeys}
-        fileInputRef={fileInputRef}
         onMouseEnter={handleSidebarMouseEnter}
         onMouseLeave={handleSidebarMouseLeave}
         onToggleSidebar={handleToggleSidebar}
         onSearchChange={setSearchQuery}
-        onUploadFiles={(fileList) => {
-          void handleUploadFiles(fileList);
-        }}
         onToggleExpanded={toggleExpanded}
         onSelectFile={handleSelectFile}
+        onOpenUploadDialog={() => setQaDialogOpen(true)}
+      />
+
+      <UploadDialog
+        open={qaDialogOpen}
+        language={language}
+        categories={categories}
+        uploading={uploading}
+        onClose={() => setQaDialogOpen(false)}
+        onUploadFiles={handleUploadFiles}
+        onSubmitQA={handleQASubmit}
       />
 
       <FileDetailPane
