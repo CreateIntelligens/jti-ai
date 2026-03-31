@@ -2,6 +2,22 @@
 共用工具函數
 """
 
+from datetime import datetime
+from typing import Optional
+
+
+def build_date_query(mode: str, date_from: Optional[str], date_to: Optional[str]) -> dict:
+    """Build a MongoDB query dict filtered by mode and optional date range."""
+    query: dict = {"mode": mode}
+    if date_from or date_to:
+        ts_filter: dict = {}
+        if date_from:
+            ts_filter["$gte"] = datetime.strptime(date_from, "%Y-%m-%d")
+        if date_to:
+            ts_filter["$lte"] = datetime.strptime(date_to + " 23:59:59", "%Y-%m-%d %H:%M:%S")
+        query["timestamp"] = ts_filter
+    return query
+
 
 def group_conversations_by_session(conversations: list) -> list:
     """

@@ -36,7 +36,7 @@ from app.services.jti.tts_text import to_tts_text
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 
 from app.tools.jti.quiz import get_total_questions
-from app.utils import group_conversations_by_session
+from app.utils import build_date_query, group_conversations_by_session
 from app.services.jti.quiz_helpers import (
     _get_or_rebuild_session,
     _format_options_text,
@@ -44,18 +44,6 @@ from app.services.jti.quiz_helpers import (
     _judge_user_choice,
     build_session_state,
 )
-
-def _build_date_query(mode: str, date_from: Optional[str], date_to: Optional[str]) -> dict:
-    """Build a MongoDB query dict filtered by mode and optional date range."""
-    query: dict = {"mode": mode}
-    if date_from or date_to:
-        ts_filter: dict = {}
-        if date_from:
-            ts_filter["$gte"] = datetime.strptime(date_from, "%Y-%m-%d")
-        if date_to:
-            ts_filter["$lte"] = datetime.strptime(date_to + " 23:59:59", "%Y-%m-%d %H:%M:%S")
-        query["timestamp"] = ts_filter
-    return query
 
 
 _OPENING_MESSAGE: dict[str, str] = {
@@ -135,7 +123,8 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         if request.turn_number is not None:
             deleted_count = conversation_logger.delete_turns_from(request.session_id, request.turn_number)
             if deleted_count > 0:
-                logs = conversation_logger.get_session_logs(request.session_id)
+                all_logs = conversation_logger.get_session_logs(request.session_id)
+                logs = [l for l in all_logs if l.get("mode") == "jti"]
                 if logs:
                     session = session_manager.rebuild_session_from_logs(request.session_id, logs)
                     if not session:
@@ -163,7 +152,11 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
                     session = session_manager.update_session(session)
 
                 main_agent.remove_session(request.session_id)
-                logger.info(f"Session {request.session_id[:8]}... rolled back to before turn {request.turn_number}")
+                logger.info(
+                    f"Session {request.session_id[:8]}... rolled back to before turn {request.turn_number} "
+                    f"(all_logs={len(all_logs)}, jti_logs={len(logs)}, step={session.step.value}, "
+                    f"current_question={'yes' if session.current_question else 'no'})"
+                )
             else:
                 logger.warning(f"Failed to delete logs from turn {request.turn_number}")
 
@@ -378,7 +371,7 @@ async def get_conversations(
             logger.info(f"Retrieved {len(conversations)} conversations for session {session_id}")
             return {"session_id": session_id, "mode": mode, "conversations": conversations, "total": len(conversations)}
         else:
-            query = _build_date_query(mode, date_from, date_to)
+            query = build_date_query(mode, date_from, date_to)
             session_ids, total_sessions = conversation_logger.get_paginated_session_ids(
                 query=query, page=1, page_size=100000
             )
@@ -445,7 +438,7 @@ async def export_conversations(
             return {"exported_at": datetime.now(_TZ_TAIPEI).isoformat(), "mode": mode, "sessions": sessions, "total_conversations": total_conversations, "total_sessions": len(sessions)}
 
         if date_from or date_to:
-            query = _build_date_query(mode, date_from, date_to)
+            query = build_date_query(mode, date_from, date_to)
             sid_list, _ = conversation_logger.get_paginated_session_ids(query=query, page=1, page_size=100000)
             all_conversations = conversation_logger.get_logs_for_sessions(sid_list)
         else:
