@@ -48,7 +48,7 @@ from app.services.jti.quiz_helpers import (
 
 _OPENING_MESSAGE: dict[str, str] = {
     "zh": "Hello，我是今天的活動大使Lady X，對我說「測驗」即可做「尋找命定前蓋」小遊戲，或想知道關於Ploom X加熱菸更多資訊，都歡迎和我聊聊，很樂意為您解答！",
-    "en": "Hi! I'm LULU. Got any questions, or want to take a quiz?",
+    "en": "Hi! I'm Lady X. Got any questions, or want to take a quiz?",
 }
 
 session_manager = get_session_manager()
