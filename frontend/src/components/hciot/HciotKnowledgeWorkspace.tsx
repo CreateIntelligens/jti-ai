@@ -314,18 +314,7 @@ export default function HciotKnowledgeWorkspace({
     topicId: string,
     labels: TopicLabels,
   ) => {
-    setUploading(true);
-    try {
-      const response = await uploadFileWithTopic(file, topicId, labels);
-      await refreshWorkspace(response.name);
-      setQaDialogOpen(false);
-      showStatus(language === 'zh' ? 'Q&A 已產生並上傳' : 'Q&A generated and uploaded');
-    } catch (error) {
-      console.error('Failed to upload Q&A CSV:', error);
-      alert(getErrorMessage(error));
-    } finally {
-      setUploading(false);
-    }
+    await handleUploadFiles([file], topicId, labels);
   };
 
   const handleDeleteFile = async () => {

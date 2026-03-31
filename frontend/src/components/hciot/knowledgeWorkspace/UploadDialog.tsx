@@ -158,7 +158,6 @@ export default function UploadDialog({
       setTab('file');
       setRows([createEmptyRow()]);
       setSelectedFiles([]);
-      setDragOver(false);
     }
   }, [open]);
 
@@ -255,7 +254,6 @@ export default function UploadDialog({
           </button>
         </div>
 
-        {/* Shared: topic selector */}
         <div className="hciot-qa-topic-section">
           <label className="hciot-qa-topic-label">
             {language === 'zh' ? '指定科別 / 主題（可選）' : 'Category / Topic (optional)'}
@@ -326,7 +324,6 @@ export default function UploadDialog({
           ) : null}
         </div>
 
-        {/* Tab: Upload Files */}
         {tab === 'file' ? (
           <div className="hciot-upload-file-body">
             <div
@@ -392,7 +389,6 @@ export default function UploadDialog({
           </div>
         ) : null}
 
-        {/* Tab: Manual Q&A */}
         {tab === 'qa' ? (
           <div className="hciot-upload-qa-body">
             <div className="hciot-qa-rows">
