@@ -12,10 +12,14 @@ import threading
 import time
 import zipfile
 import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
 from app.deps import _get_or_create_manager
+
+# Recently uploaded files may not yet appear in Gemini; skip deletion during sync.
+_GEMINI_SYNC_GRACE_SECONDS = 120
 
 logger = logging.getLogger(__name__)
 
@@ -168,8 +172,16 @@ def sync_gemini_db_background(
         db_files = store.list_files(language)
         db_names = {f["display_name"] for f in db_files}
 
+        now = datetime.now(timezone.utc)
         for f in db_files:
             if f["display_name"] not in gemini_names:
+                # Skip recently created files — Gemini sync may still be in progress
+                created = f.get("created_at")
+                if isinstance(created, datetime):
+                    age = (now - created).total_seconds()
+                    if age < _GEMINI_SYNC_GRACE_SECONDS:
+                        logger.info(f"[{log_prefix}] DB-only but recent ({age:.0f}s), skipping: {f['display_name']}")
+                        continue
                 logger.info(f"[{log_prefix}] DB-only, removing: {f['display_name']}")
                 store.delete_file(language, f["name"])
 

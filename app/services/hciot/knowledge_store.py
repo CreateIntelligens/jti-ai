@@ -75,7 +75,7 @@ class HciotKnowledgeStore:
 
     @staticmethod
     def _metadata_from_doc(doc: dict[str, Any]) -> dict[str, Any]:
-        return {
+        meta = {
             "name": doc.get("filename", ""),
             "filename": doc.get("filename", ""),
             "display_name": doc.get("display_name", doc.get("filename", "")),
@@ -88,6 +88,9 @@ class HciotKnowledgeStore:
             "topic_label_zh": doc.get("topic_label_zh"),
             "topic_label_en": doc.get("topic_label_en"),
         }
+        if "created_at" in doc:
+            meta["created_at"] = doc["created_at"]
+        return meta
 
     def _query(self, language: str, filename: str | None = None) -> dict[str, Any]:
         query: dict[str, Any] = {
@@ -113,6 +116,7 @@ class HciotKnowledgeStore:
                 "category_label_en": 1,
                 "topic_label_zh": 1,
                 "topic_label_en": 1,
+                "created_at": 1,
             },
         ).sort("filename", 1)
 

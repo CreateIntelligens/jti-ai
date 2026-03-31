@@ -7,7 +7,7 @@ import mimetypes
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 from urllib.parse import quote
@@ -24,7 +24,6 @@ from app.routers.knowledge_utils import (
     sync_to_gemini,
     write_docx_text,
 )
-from app.services.gemini_service import run_sync
 from app.services.hciot.csv_utils import extract_questions_from_csv
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.hciot.topic_store import get_hciot_topic_store
@@ -39,6 +38,16 @@ LOG_PREFIX = "HCIoT sync"
 
 def _store_name(language: str) -> str | None:
     return get_store_name(ENV_PREFIX, language)
+
+
+def _gemini_background(operation, store_name: str, filename: str, *args):
+    """Background task: run a Gemini operation (non-blocking)."""
+    label = getattr(operation, "__name__", "operation")
+    try:
+        operation(store_name, filename, *args)
+        logger.info(f"[HCIoT KB] Gemini {label} OK: {filename}")
+    except Exception as e:
+        logger.warning(f"[HCIoT KB] Gemini {label} failed for {filename}: {e}")
 
 
 def _normalized_label(value: str | None, fallback: str) -> str:
@@ -61,7 +70,7 @@ def _sync_topic_questions_from_csv(
     Skips IMG CSV files (filename contains ``_IMG_``) to avoid overwriting
     the main CSV's question list with a single-question image CSV.
     """
-    if ext != ".csv" or not topic_id:
+    if ext != ".csv" or not topic_id or "/" not in topic_id:
         return False
     if "_IMG_" in filename:
         return False
@@ -71,23 +80,26 @@ def _sync_topic_questions_from_csv(
         return False
 
     topic_store = get_hciot_topic_store()
-    # Derive labels from topic_id if not provided
-    prefix = topic_id.split("/", 1)[0]
-    suffix = topic_id.split("/", 1)[1] if "/" in topic_id else topic_id
-    topic_store.upsert_topic(
-        topic_id,
-        {
-            "labels": {
-                "zh": _normalized_label(topic_label_zh, suffix),
-                "en": _normalized_label(topic_label_en, suffix),
+    prefix, suffix = topic_id.split("/", 1)
+
+    existing = topic_store.get_topic(topic_id)
+    if existing:
+        topic_store.update_topic(topic_id, {"questions": {"zh": questions, "en": questions}})
+    else:
+        topic_store.upsert_topic(
+            topic_id,
+            {
+                "labels": {
+                    "zh": _normalized_label(topic_label_zh, suffix),
+                    "en": _normalized_label(topic_label_en, suffix),
+                },
+                "category_labels": {
+                    "zh": _normalized_label(category_label_zh, prefix),
+                    "en": _normalized_label(category_label_en, prefix),
+                },
+                "questions": {"zh": questions, "en": questions},
             },
-            "category_labels": {
-                "zh": _normalized_label(category_label_zh, prefix),
-                "en": _normalized_label(category_label_en, prefix),
-            },
-            "questions": {"zh": questions, "en": questions},
-        },
-    )
+        )
     logger.info("[HCIoT KB] Synced %d questions -> %s", len(questions), topic_id)
     return True
 
@@ -157,6 +169,7 @@ class UpdateFileMetadataRequest(BaseModel):
 async def update_file_content(
     filename: str,
     req: UpdateContentRequest,
+    background_tasks: BackgroundTasks,
     language: str = "zh",
     auth: dict = Depends(verify_auth),
 ):
@@ -196,12 +209,9 @@ async def update_file_content(
 
     store_name = _store_name(language)
     if store_name:
-        try:
-            await run_sync(sync_to_gemini, store_name, safe_name, new_bytes)
-        except Exception as e:
-            return {"message": f"已更新，但 Gemini 同步失敗: {e}", "synced": False, "topic_synced": topic_synced}
+        background_tasks.add_task(_gemini_background, sync_to_gemini, store_name, safe_name, new_bytes)
 
-    return {"message": "已更新", "synced": True, "topic_synced": topic_synced}
+    return {"message": "已更新", "synced": False, "topic_synced": topic_synced}
 
 
 @router.put("/files/{filename}/metadata")
@@ -240,6 +250,7 @@ async def update_file_metadata(
 
 @router.post("/upload/")
 async def upload_knowledge_file(
+    background_tasks: BackgroundTasks,
     language: str = "zh",
     file: UploadFile = File(...),
     category_id: str | None = Form(None),
@@ -264,6 +275,8 @@ async def upload_knowledge_file(
         merged_topic_id = f"{category_id.strip()}/{topic_id.strip()}"
     elif topic_id and "/" in topic_id:
         merged_topic_id = topic_id.strip()
+    elif category_id:
+        merged_topic_id = category_id.strip()
 
     store = get_hciot_knowledge_store()
     saved = store.insert_file(
@@ -278,13 +291,9 @@ async def upload_knowledge_file(
         topic_labels={"zh": topic_label_zh, "en": topic_label_en},
     )
 
-    gemini_synced = False
     store_name = _store_name(language)
     if store_name:
-        try:
-            gemini_synced = await run_sync(sync_to_gemini, store_name, saved["name"], file_bytes)
-        except Exception as e:
-            logger.warning(f"[HCIoT KB] Gemini sync failed for {saved['name']}: {e}")
+        background_tasks.add_task(_gemini_background, sync_to_gemini, store_name, saved["name"], file_bytes)
 
     topic_synced = _sync_topic_questions_from_csv(
         topic_id=merged_topic_id,
@@ -301,7 +310,7 @@ async def upload_knowledge_file(
         "name": saved["name"],
         "display_name": saved["display_name"],
         "size": saved["size"],
-        "synced": gemini_synced,
+        "synced": False,
         "topic_synced": topic_synced,
         "topic_id": saved.get("topic_id"),
         "category_label_zh": saved.get("category_label_zh"),
@@ -312,28 +321,24 @@ async def upload_knowledge_file(
 
 
 @router.delete("/files/{filename}")
-async def delete_knowledge_file(filename: str, language: str = "zh", auth: dict = Depends(verify_auth)):
+async def delete_knowledge_file(
+    filename: str, background_tasks: BackgroundTasks, language: str = "zh", auth: dict = Depends(verify_auth),
+):
     safe_name = safe_filename(filename)
     store = get_hciot_knowledge_store()
     doc = store.get_file(language, safe_name)
     if not doc:
         raise HTTPException(status_code=404, detail="檔案不存在")
 
-    store_name = _store_name(language)
-    gemini_deleted_count = 0
-    if store_name:
-        try:
-            gemini_deleted_count = await run_sync(delete_from_gemini, store_name, safe_name)
-        except Exception as e:
-            logger.warning(f"[HCIoT KB] Gemini delete failed for {safe_name}: {e}")
-            raise HTTPException(status_code=502, detail="Gemini 同步刪除失敗，Mongo 未刪除")
-
     deleted = store.delete_file(language, safe_name)
     if not deleted:
         raise HTTPException(status_code=404, detail="檔案不存在")
+
+    store_name = _store_name(language)
+    if store_name:
+        background_tasks.add_task(_gemini_background, delete_from_gemini, store_name, safe_name)
+
     return {
         "message": "已刪除",
-        "synced": True,
         "mongo_deleted": True,
-        "gemini_deleted_count": gemini_deleted_count,
     }
