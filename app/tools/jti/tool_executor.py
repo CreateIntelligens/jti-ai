@@ -425,13 +425,12 @@ Format:
 
         # 組合文案（TTS 使用）
         if quiz_info:
-            title = quiz_info.get("title", "")
             color_name = quiz_info.get("color_name", quiz_id or "")
             description = quiz_info.get("description", "")
             if session.language == "en":
-                message = f"You are {color_name}, {title}. {description}".strip()
+                message = f"You are {color_name}. {description}".strip()
             else:
-                message = f"你是{color_name}，{title}。{description}".strip()
+                message = f"你是{color_name}。{description}".strip()
         else:
             if session.language == "en":
                 message = "The quiz is complete, but no matching result was found."
@@ -446,6 +445,7 @@ Format:
             "quiz_scores": quiz_scores,
             "result": quiz_info,
             "message": message,
+            "tts_text": message,
         }
 
 # 全域實例

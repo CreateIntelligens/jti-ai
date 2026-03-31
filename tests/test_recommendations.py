@@ -45,3 +45,4 @@ class QuizResultFlowTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(result.get("quiz_id"), "analyst")
         self.assertIn("You are Analyst", result.get("message", ""))
+        self.assertNotIn("Maximize Every Moment", result.get("message", ""))

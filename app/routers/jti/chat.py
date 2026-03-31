@@ -214,7 +214,8 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
 
                 if is_complete:
                     response_message = tool_result.get("message", "")
-                    tts_text = to_tts_text(response_message, updated_session.language)
+                    raw_tts_text = tool_result.get("tts_text") or response_message
+                    tts_text = to_tts_text(raw_tts_text, updated_session.language)
 
                     # 把測驗結果注入 chat_history，讓後續 LLM 對話能看到
                     main_agent.remove_session(request.session_id)
