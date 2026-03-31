@@ -27,6 +27,16 @@ EDITABLE_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".yaml", ".yml", ".docx"}
 TEXT_PREVIEW_EXTENSIONS = EDITABLE_EXTENSIONS | {".log", ".py", ".js", ".html"}
 
 
+def gemini_background(log_prefix: str, operation: Callable, store_name: str, filename: str, *args: Any) -> None:
+    """Background task: run a Gemini operation (non-blocking)."""
+    label = getattr(operation, "__name__", "operation")
+    try:
+        operation(store_name, filename, *args)
+        logger.info(f"[{log_prefix}] Gemini {label} OK: {filename}")
+    except Exception as e:
+        logger.warning(f"[{log_prefix}] Gemini {label} failed for {filename}: {e}")
+
+
 class KnowledgeStoreProtocol(Protocol):
     """Minimal interface shared by JTI and HCIoT knowledge stores."""
 

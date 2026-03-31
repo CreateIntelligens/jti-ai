@@ -9,24 +9,26 @@ import mimetypes
 import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, HTTPException, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel
 from urllib.parse import quote
 
 from app.auth import verify_admin, verify_auth
+from functools import partial
+
 from app.routers.knowledge_utils import (
     EDITABLE_EXTENSIONS,
     TEXT_PREVIEW_EXTENSIONS,
     delete_from_gemini,
     extract_docx_text,
+    gemini_background,
     get_store_name,
     safe_filename,
     start_background_sync,
     sync_to_gemini,
     write_docx_text,
 )
-from app.services.gemini_service import run_sync
 from app.services.knowledge_store import get_knowledge_store
 
 logger = logging.getLogger(__name__)
@@ -40,6 +42,9 @@ LOG_PREFIX = "JTI sync"
 
 def _store_name(language: str) -> str | None:
     return get_store_name(ENV_PREFIX, language, fallback_env_key=FALLBACK_ENV_KEY)
+
+
+_gemini_background = partial(gemini_background, "JTI KB")
 
 
 # ========== 列出檔案 ==========
@@ -129,6 +134,7 @@ class UpdateContentRequest(BaseModel):
 async def update_file_content(
     filename: str,
     req: UpdateContentRequest,
+    background_tasks: BackgroundTasks,
     language: str = "zh",
     auth: dict = Depends(verify_auth),
 ):
@@ -158,12 +164,9 @@ async def update_file_content(
 
     store_name = _store_name(language)
     if store_name:
-        try:
-            await run_sync(sync_to_gemini, store_name, safe_name, new_bytes)
-        except Exception as e:
-            return {"message": f"已更新，但 Gemini 同步失敗: {e}", "synced": False}
+        background_tasks.add_task(_gemini_background, sync_to_gemini, store_name, safe_name, new_bytes)
 
-    return {"message": "已更新", "synced": True}
+    return {"message": "已更新", "synced": False}
 
 
 # ========== 上傳檔案 ==========
@@ -171,6 +174,7 @@ async def update_file_content(
 
 @router.post("/upload/")
 async def upload_knowledge_file(
+    background_tasks: BackgroundTasks,
     language: str = "zh",
     file: UploadFile = File(...),
     auth: dict = Depends(verify_auth),
@@ -194,19 +198,15 @@ async def upload_knowledge_file(
         editable=editable,
     )
 
-    gemini_synced = False
     store_name = _store_name(language)
     if store_name:
-        try:
-            gemini_synced = await run_sync(sync_to_gemini, store_name, saved["name"], file_bytes)
-        except Exception as e:
-            logger.warning(f"[KB] Gemini sync failed for {saved['name']}: {e}")
+        background_tasks.add_task(_gemini_background, sync_to_gemini, store_name, saved["name"], file_bytes)
 
     return {
         "name": saved["name"],
         "display_name": saved["display_name"],
         "size": saved["size"],
-        "synced": gemini_synced,
+        "synced": False,
     }
 
 
@@ -214,29 +214,21 @@ async def upload_knowledge_file(
 
 
 @router.delete("/files/{filename}")
-async def delete_knowledge_file(filename: str, language: str = "zh", auth: dict = Depends(verify_auth)):
+async def delete_knowledge_file(
+    filename: str, background_tasks: BackgroundTasks, language: str = "zh", auth: dict = Depends(verify_auth),
+):
     """刪除檔案 + Gemini File Search 中的對應文件"""
     safe_name = safe_filename(filename)
     store = get_knowledge_store()
-    doc = store.get_file(language, safe_name)
-    if not doc:
-        raise HTTPException(status_code=404, detail="檔案不存在")
-
-    store_name = _store_name(language)
-    gemini_deleted_count = 0
-    if store_name:
-        try:
-            gemini_deleted_count = await run_sync(delete_from_gemini, store_name, safe_name)
-        except Exception as e:
-            logger.warning(f"[KB] Gemini delete failed for {safe_name}: {e}")
-            raise HTTPException(status_code=502, detail="Gemini 同步刪除失敗，Mongo 未刪除")
-
     deleted = store.delete_file(language, safe_name)
     if not deleted:
         raise HTTPException(status_code=404, detail="檔案不存在")
+
+    store_name = _store_name(language)
+    if store_name:
+        background_tasks.add_task(_gemini_background, delete_from_gemini, store_name, safe_name)
+
     return {
         "message": "已刪除",
-        "synced": True,
         "mongo_deleted": True,
-        "gemini_deleted_count": gemini_deleted_count,
     }

@@ -12,12 +12,15 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from urllib.parse import quote
 
+from functools import partial
+
 from app.auth import verify_admin, verify_auth
 from app.routers.knowledge_utils import (
     EDITABLE_EXTENSIONS,
     TEXT_PREVIEW_EXTENSIONS,
     delete_from_gemini,
     extract_docx_text,
+    gemini_background,
     get_store_name,
     safe_filename,
     start_background_sync,
@@ -40,14 +43,7 @@ def _store_name(language: str) -> str | None:
     return get_store_name(ENV_PREFIX, language)
 
 
-def _gemini_background(operation, store_name: str, filename: str, *args):
-    """Background task: run a Gemini operation (non-blocking)."""
-    label = getattr(operation, "__name__", "operation")
-    try:
-        operation(store_name, filename, *args)
-        logger.info(f"[HCIoT KB] Gemini {label} OK: {filename}")
-    except Exception as e:
-        logger.warning(f"[HCIoT KB] Gemini {label} failed for {filename}: {e}")
+_gemini_background = partial(gemini_background, "HCIoT KB")
 
 
 def _normalized_label(value: str | None, fallback: str) -> str:
@@ -326,10 +322,6 @@ async def delete_knowledge_file(
 ):
     safe_name = safe_filename(filename)
     store = get_hciot_knowledge_store()
-    doc = store.get_file(language, safe_name)
-    if not doc:
-        raise HTTPException(status_code=404, detail="檔案不存在")
-
     deleted = store.delete_file(language, safe_name)
     if not deleted:
         raise HTTPException(status_code=404, detail="檔案不存在")

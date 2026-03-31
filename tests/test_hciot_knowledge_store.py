@@ -1,9 +1,8 @@
 import sys
 import unittest
-from pathlib import Path
 from unittest.mock import MagicMock
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from tests.app_main_test_support import install_app_import_mocks
 
 
 class FakeInsertResult:
@@ -79,9 +78,10 @@ class FakeCollection:
 
 fake_collection = FakeCollection()
 fake_db = {"knowledge_files": fake_collection}
-fake_mongo_client_module = MagicMock()
-fake_mongo_client_module.get_mongo_db.return_value = fake_db
-sys.modules["app.services.mongo_client"] = fake_mongo_client_module
+
+# Override the mock db with our fake collection
+install_app_import_mocks()
+sys.modules["app.services.mongo_client"].get_mongo_db.return_value = fake_db
 
 from app.services.hciot.knowledge_store import HciotKnowledgeStore
 
@@ -99,23 +99,20 @@ class TestHciotKnowledgeStore(unittest.TestCase):
             display_name="Guide",
             content_type="text/csv",
             editable=True,
-            category_id="general-medicine",
-            topic_id="diet",
+            topic_id="general-medicine/diet",
             category_labels={"zh": "一般醫學", "en": "General Medicine"},
             topic_labels={"zh": "飲食", "en": "Diet"},
         )
 
-        self.assertEqual(created["category_id"], "general-medicine")
-        self.assertEqual(created["topic_id"], "diet")
+        self.assertEqual(created["topic_id"], "general-medicine/diet")
         self.assertEqual(created["category_label_zh"], "一般醫學")
         self.assertEqual(created["topic_label_en"], "Diet")
 
         listed = self.store.list_files("zh")
         self.assertEqual(len(listed), 1)
-        self.assertEqual(listed[0]["category_id"], "general-medicine")
-        self.assertEqual(listed[0]["topic_id"], "diet")
+        self.assertEqual(listed[0]["topic_id"], "general-medicine/diet")
 
-    def test_update_file_metadata_persists_category_topic_assignment(self):
+    def test_update_file_metadata_persists_topic_assignment(self):
         self.store.insert_file(
             language="zh",
             filename="guide.txt",
@@ -129,8 +126,7 @@ class TestHciotKnowledgeStore(unittest.TestCase):
             language="zh",
             filename="guide.txt",
             metadata={
-                "category_id": "general-medicine",
-                "topic_id": "diet",
+                "topic_id": "general-medicine/diet",
                 "category_label_zh": "一般醫學",
                 "category_label_en": "General Medicine",
                 "topic_label_zh": "飲食",
@@ -140,14 +136,13 @@ class TestHciotKnowledgeStore(unittest.TestCase):
 
         self.assertIsNotNone(updated)
         assert updated is not None
-        self.assertEqual(updated["category_id"], "general-medicine")
+        self.assertEqual(updated["topic_id"], "general-medicine/diet")
         self.assertEqual(updated["topic_label_zh"], "飲食")
 
         fetched = self.store.get_file("zh", "guide.txt")
         self.assertIsNotNone(fetched)
         assert fetched is not None
-        self.assertEqual(fetched["category_id"], "general-medicine")
-        self.assertEqual(fetched["topic_id"], "diet")
+        self.assertEqual(fetched["topic_id"], "general-medicine/diet")
 
 
 if __name__ == "__main__":

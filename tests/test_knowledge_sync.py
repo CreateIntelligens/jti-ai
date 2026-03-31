@@ -1,18 +1,12 @@
-import sys
 import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, call, patch
 
-from fastapi import HTTPException
+from tests.app_main_test_support import install_app_import_mocks
 
-
-mock_db = MagicMock()
-mock_mongo_client_module = MagicMock()
-mock_mongo_client_module.get_mongo_db.return_value = mock_db
-sys.modules.setdefault("app.services.mongo_client", mock_mongo_client_module)
+install_app_import_mocks()
 
 from app.routers.knowledge_utils import delete_from_gemini, sync_to_gemini
-from app.routers.jti import knowledge as jti_knowledge
 
 
 class TestKnowledgeSync(unittest.TestCase):
@@ -54,46 +48,6 @@ class TestKnowledgeSync(unittest.TestCase):
         args = mgr.upload_file.call_args.args
         self.assertEqual(args[0], "fileSearchStores/test")
         self.assertEqual(args[2], "faq.csv")
-
-    @patch("app.routers.jti.knowledge.delete_from_gemini", side_effect=RuntimeError("boom"))
-    @patch("app.routers.jti.knowledge._store_name", return_value="fileSearchStores/test")
-    @patch("app.routers.jti.knowledge.get_knowledge_store")
-    def test_jti_delete_does_not_remove_mongo_when_gemini_delete_fails(
-        self,
-        mock_get_store,
-        _mock_store_name,
-        _mock_delete_from_gemini,
-    ):
-        store = MagicMock()
-        store.get_file.return_value = {"filename": "faq.csv"}
-        mock_get_store.return_value = store
-
-        with self.assertRaises(HTTPException) as ctx:
-            jti_knowledge.delete_knowledge_file("faq.csv", "zh", {"role": "admin"})
-
-        self.assertEqual(ctx.exception.status_code, 502)
-        store.delete_file.assert_not_called()
-
-    @patch("app.routers.jti.knowledge.delete_from_gemini", return_value=2)
-    @patch("app.routers.jti.knowledge._store_name", return_value="fileSearchStores/test")
-    @patch("app.routers.jti.knowledge.get_knowledge_store")
-    def test_jti_delete_returns_duplicate_cleanup_count(
-        self,
-        mock_get_store,
-        _mock_store_name,
-        _mock_delete_from_gemini,
-    ):
-        store = MagicMock()
-        store.get_file.return_value = {"filename": "faq.csv"}
-        store.delete_file.return_value = True
-        mock_get_store.return_value = store
-
-        result = jti_knowledge.delete_knowledge_file("faq.csv", "zh", {"role": "admin"})
-
-        self.assertEqual(result["message"], "已刪除")
-        self.assertEqual(result["gemini_deleted_count"], 2)
-        self.assertTrue(result["mongo_deleted"])
-        store.delete_file.assert_called_once_with("zh", "faq.csv")
 
 
 if __name__ == "__main__":

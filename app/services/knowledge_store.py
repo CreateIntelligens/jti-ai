@@ -99,6 +99,7 @@ class KnowledgeStore:
             "content_type": doc.get("content_type", "application/octet-stream"),
             "size": int(doc.get("size", 0)),
             "editable": bool(doc.get("editable", False)),
+            "created_at": doc.get("created_at"),
         }
 
     def list_files(self, language: str, namespace: str = "jti") -> list[dict[str, Any]]:
@@ -106,14 +107,14 @@ class KnowledgeStore:
         docs = list(
             self.collection.find(
                 self._query(language, namespace=namespace),
-                {"_id": 0, "filename": 1, "display_name": 1, "size": 1, "editable": 1},
+                {"_id": 0, "filename": 1, "display_name": 1, "size": 1, "editable": 1, "created_at": 1},
             ).sort("filename", 1)
         )
 
         if self._supports_legacy_fallback(namespace):
             legacy_docs = self.collection.find(
                 self._legacy_query(language),
-                {"_id": 0, "filename": 1, "display_name": 1, "size": 1, "editable": 1},
+                {"_id": 0, "filename": 1, "display_name": 1, "size": 1, "editable": 1, "created_at": 1},
             ).sort("filename", 1)
             seen = {doc.get("filename", "") for doc in docs}
             for doc in legacy_docs:
@@ -124,15 +125,7 @@ class KnowledgeStore:
 
         docs.sort(key=lambda doc: doc.get("filename", ""))
 
-        return [
-            {
-                "name": doc.get("filename", ""),
-                "display_name": doc.get("display_name", doc.get("filename", "")),
-                "size": int(doc.get("size", 0)),
-                "editable": bool(doc.get("editable", False)),
-            }
-            for doc in docs
-        ]
+        return [self._metadata_from_doc(doc) for doc in docs]
 
     def get_file(self, language: str, filename: str, namespace: str = "jti") -> Optional[dict[str, Any]]:
         """Get full file document including binary data."""
