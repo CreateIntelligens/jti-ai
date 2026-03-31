@@ -56,6 +56,19 @@ class UpdateTopicRequest(BaseModel):
 # ========== Admin Endpoints ==========
 
 
+@router.get("/")
+def list_topics_admin():
+    """列出所有主題（層級結構）"""
+    store = get_hciot_topic_store()
+    categories = store.list_categories()
+    for cat in categories:
+        cat["topics"] = [
+            {k: v for k, v in t.items() if k not in _STRIP_FIELDS}
+            for t in cat.get("topics", [])
+        ]
+    return {"categories": categories}
+
+
 @router.post("/", status_code=201)
 def create_topic(request: CreateTopicRequest):
     store = get_hciot_topic_store()
