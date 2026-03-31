@@ -64,6 +64,31 @@ class ToolExecutor:
             for i, opt in enumerate(options)
         )
 
+    @staticmethod
+    def _truncate_text(text: str, limit: int = 200) -> str:
+        return text[:limit] if len(text) > limit else text
+
+    @staticmethod
+    def _build_quiz_result_message(
+        language: str,
+        quiz_id: Optional[str],
+        quiz_info: Optional[Dict[str, Any]],
+    ) -> str:
+        if not quiz_info:
+            if language == "en":
+                return "The quiz is complete, but no matching result was found."
+            return "測驗完成，但找不到對應的測驗結果。"
+
+        color_name = quiz_info.get("color_name", quiz_id or "")
+        description = quiz_info.get("description", "")
+
+        if language == "en":
+            prefix = f"You are {color_name}."
+        else:
+            prefix = f"你是{color_name}。"
+
+        return f"{prefix} {description}".strip()
+
     def _map_user_choice_to_option_id(self, user_choice: str, options: list) -> Optional[str]:
         if not user_choice or not options:
             return None
@@ -423,22 +448,9 @@ Format:
                 quiz_result=quiz_info,
             )
 
-        # 組合文案（TTS 使用）
-        if quiz_info:
-            color_name = quiz_info.get("color_name", quiz_id or "")
-            description = quiz_info.get("description", "")
-            if session.language == "en":
-                message = f"You are {color_name}. {description}".strip()
-            else:
-                message = f"你是{color_name}。{description}".strip()
-        else:
-            if session.language == "en":
-                message = "The quiz is complete, but no matching result was found."
-            else:
-                message = "測驗完成，但找不到對應的測驗結果。"
-
-        if len(message) > 200:
-            message = message[:200]
+        message = self._truncate_text(
+            self._build_quiz_result_message(session.language, quiz_id, quiz_info)
+        )
 
         return {
             "quiz_id": quiz_id,
