@@ -139,32 +139,30 @@ export default function JtiPersonaTab({
     setNewContent('');
   };
 
+  const updateRuntimeDraft = (updater: (current: RuntimeSettings) => RuntimeSettings) => {
+    setRuntimeDraft(prev => (prev ? updater(prev) : prev));
+  };
+
   const updateRuleSection = (field: keyof RuntimeRuleSections, value: string) => {
-    setRuntimeDraft(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        response_rule_sections: {
-          ...prev.response_rule_sections,
-          [currentLang]: {
-            ...prev.response_rule_sections[currentLang],
-            [field]: value,
-          },
+    updateRuntimeDraft(prev => ({
+      ...prev,
+      response_rule_sections: {
+        ...prev.response_rule_sections,
+        [currentLang]: {
+          ...prev.response_rule_sections[currentLang],
+          [field]: value,
         },
-      };
-    });
+      },
+    }));
   };
 
   const updateLengthLimit = (value: string) => {
     const parsed = parseInt(value, 10);
     if (Number.isNaN(parsed)) return;
-    setRuntimeDraft(prev => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        max_response_chars: parsed,
-      };
-    });
+    updateRuntimeDraft(prev => ({
+      ...prev,
+      max_response_chars: parsed,
+    }));
   };
 
   const renderReadonlyRuntimeSettings = (settings: RuntimeSettings | null) => {

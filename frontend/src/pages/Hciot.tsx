@@ -29,6 +29,8 @@ import '../styles/hciot/workspace.css';
 const TTS_MAX_ATTEMPTS = 16;
 const TTS_POLL_INTERVAL_MS = 3000;
 const TTS_STALL_TIMEOUT_MS = 12000;
+const TTS_CHARACTER_STORAGE_KEY = 'hciot:tts-character';
+const WORKSPACE_STORAGE_KEY = 'hciot:workspace';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -38,6 +40,28 @@ function sleep(ms: number): Promise<void> {
 
 function normalizeTtsMessageId(ttsMessageId?: string): string {
   return (ttsMessageId || '').trim();
+}
+
+function readStoredTtsCharacter(): string {
+  return localStorage.getItem(TTS_CHARACTER_STORAGE_KEY) || '';
+}
+
+function writeStoredTtsCharacter(value: string): void {
+  if (value) {
+    localStorage.setItem(TTS_CHARACTER_STORAGE_KEY, value);
+    return;
+  }
+
+  localStorage.removeItem(TTS_CHARACTER_STORAGE_KEY);
+}
+
+function resolveTtsCharacter(characters: string[], preferredValue?: string): string {
+  const nextValue = (preferredValue || readStoredTtsCharacter()).trim();
+  if (characters.includes(nextValue)) {
+    return nextValue;
+  }
+
+  return characters[0] || '';
 }
 
 function isSameMessage(left: HciotMessage, right: HciotMessage): boolean {
@@ -83,9 +107,8 @@ export default function Hciot() {
   const [currentLanguage, setCurrentLanguage] = useState(normalizeHciotLanguage(i18n.language));
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const WORKSPACE_KEY = 'hciot:workspace';
   const [workspace, setWorkspace] = useState<'chat' | 'files'>(() => {
-    const saved = sessionStorage.getItem(WORKSPACE_KEY);
+    const saved = sessionStorage.getItem(WORKSPACE_STORAGE_KEY);
     return saved === 'files' ? 'files' : 'chat';
   });
   const [editingTurn, setEditingTurn] = useState<number | null>(null);
@@ -94,6 +117,10 @@ export default function Hciot() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [categories, setCategories] = useState<HciotCategory[]>([]);
   const [ttsStateMap, setTtsStateMap] = useState<Record<string, TtsState>>({});
+  const [ttsCharacters, setTtsCharacters] = useState<string[]>([]);
+  const [selectedTtsCharacter, setSelectedTtsCharacter] = useState<string>(
+    () => readStoredTtsCharacter(),
+  );
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -112,6 +139,30 @@ export default function Hciot() {
     isUnmountedRef.current = false;
     return () => { isUnmountedRef.current = true; };
   }, []);
+
+  useEffect(() => {
+    const loadTtsCharacters = async () => {
+      try {
+        const data = await api.getHciotTtsCharacters();
+        const availableCharacters = data.characters ?? [];
+        setTtsCharacters(availableCharacters);
+        setSelectedTtsCharacter((currentValue) => {
+          const nextValue = resolveTtsCharacter(availableCharacters, currentValue);
+          writeStoredTtsCharacter(nextValue);
+          return nextValue;
+        });
+      } catch (error) {
+        console.error('Failed to load HCIoT TTS characters:', error);
+        setTtsCharacters([]);
+      }
+    };
+
+    void loadTtsCharacters();
+  }, []);
+
+  useEffect(() => {
+    writeStoredTtsCharacter(selectedTtsCharacter);
+  }, [selectedTtsCharacter]);
 
   const setTtsState = useCallback((id: string, state: TtsState) => {
     setTtsStateMap((prev) => ({ ...prev, [id]: state }));
@@ -181,7 +232,11 @@ export default function Hciot() {
       const createRes = await fetchWithApiKey('/api/hciot/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: sourceText, language: currentLanguage }),
+        body: JSON.stringify({
+          text: sourceText,
+          language: currentLanguage,
+          character: selectedTtsCharacter || undefined,
+        }),
       });
       if (!createRes.ok) return;
       const createData = await createRes.json();
@@ -200,7 +255,7 @@ export default function Hciot() {
     void audio.play().catch(() => {
       setTtsState(ttsMessageId, 'error');
     });
-  }, [currentLanguage, setTtsState, warmupTtsAudio]);
+  }, [currentLanguage, selectedTtsCharacter, setTtsState, warmupTtsAudio]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -237,6 +292,19 @@ export default function Hciot() {
       editTextareaRef.current.setSelectionRange(end, end);
     }
   }, [editingTurn]);
+
+  const resetConversationState = useCallback(() => {
+    setLoading(false);
+    setIsTyping(false);
+    ttsEpochRef.current += 1;
+    ttsPendingMapRef.current.clear();
+    ttsPendingSinceRef.current.clear();
+    currentAudioRef.current?.pause();
+    currentAudioRef.current = null;
+    ttsAudioUrlMapRef.current.forEach(url => URL.revokeObjectURL(url));
+    ttsAudioUrlMapRef.current.clear();
+    setTtsStateMap({});
+  }, []);
 
   const startSession = useCallback(async (previousSessionId?: string | null, targetLanguage?: string) => {
     const lang = normalizeHciotLanguage(targetLanguage || currentLanguage);
@@ -297,18 +365,15 @@ export default function Hciot() {
     if (messages.length > 0 && !window.confirm(t('restart_confirm'))) {
       return;
     }
-    setLoading(false);
-    setIsTyping(false);
-    ttsEpochRef.current += 1;
-    ttsPendingMapRef.current.clear();
-    ttsPendingSinceRef.current.clear();
-    currentAudioRef.current?.pause();
-    currentAudioRef.current = null;
-    ttsAudioUrlMapRef.current.forEach(url => URL.revokeObjectURL(url));
-    ttsAudioUrlMapRef.current.clear();
-    setTtsStateMap({});
+    resetConversationState();
     await startSession(sessionId);
-  }, [storeName, messages.length, sessionId, startSession, t]);
+  }, [messages.length, resetConversationState, sessionId, startSession, storeName, t]);
+
+  const silentRestartConversation = useCallback(async () => {
+    if (!storeName) return;
+    resetConversationState();
+    await startSession(sessionId);
+  }, [resetConversationState, sessionId, startSession, storeName]);
 
   const toggleLanguage = useCallback(async () => {
     if (messages.length > 0) {
@@ -349,7 +414,12 @@ export default function Hciot() {
       }
       if (!activeSessionId) throw new Error('Failed to create session');
 
-      const data = await api.hciotSendMessage(message, activeSessionId, turnNumber);
+      const data = await api.hciotSendMessage(
+        message,
+        activeSessionId,
+        turnNumber,
+        selectedTtsCharacter,
+      );
       await new Promise((resolve) => setTimeout(resolve, 240));
       setIsTyping(false);
 
@@ -396,7 +466,7 @@ export default function Hciot() {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [loading, sessionId, startSession, t]);
+  }, [loading, selectedTtsCharacter, sessionId, startSession, t]);
 
   const handleRegenerate = async (turnNumber: number) => {
     if (!sessionId || loading) return;
@@ -496,7 +566,7 @@ export default function Hciot() {
             <button
               type="button"
               className={`hciot-view-button${workspace === 'chat' ? ' is-active' : ''}`}
-              onClick={() => { setWorkspace('chat'); sessionStorage.setItem(WORKSPACE_KEY, 'chat'); }}
+              onClick={() => { setWorkspace('chat'); sessionStorage.setItem(WORKSPACE_STORAGE_KEY, 'chat'); }}
             >
               <HeartPulse size={16} />
               <span>{currentLanguage === 'zh' ? '聊天' : 'Chat'}</span>
@@ -504,12 +574,28 @@ export default function Hciot() {
             <button
               type="button"
               className={`hciot-view-button${workspace === 'files' ? ' is-active' : ''}`}
-              onClick={() => { setWorkspace('files'); sessionStorage.setItem(WORKSPACE_KEY, 'files'); }}
+              onClick={() => { setWorkspace('files'); sessionStorage.setItem(WORKSPACE_STORAGE_KEY, 'files'); }}
             >
               <FileText size={16} />
               <span>{currentLanguage === 'zh' ? '檔案管理' : 'Files'}</span>
             </button>
           </div>
+          {ttsCharacters.length > 0 && (
+            <label className="hciot-voice-select-wrap">
+              <span className="hciot-voice-select-label">
+                {currentLanguage === 'zh' ? '聲音' : 'Voice'}
+              </span>
+              <select
+                className="hciot-voice-select"
+                value={selectedTtsCharacter}
+                onChange={(event) => setSelectedTtsCharacter(event.target.value)}
+              >
+                {ttsCharacters.map((character) => (
+                  <option key={character} value={character}>{character}</option>
+                ))}
+              </select>
+            </label>
+          )}
           <button className="hciot-icon-button" onClick={() => setShowSettingsModal(true)} title={t('hciot_settings')}>
             <Settings size={18} />
           </button>
@@ -611,7 +697,7 @@ export default function Hciot() {
       <HciotSettingsModal
         isOpen={showSettingsModal}
         onClose={() => setShowSettingsModal(false)}
-        onPromptChange={restartConversation}
+        onPromptChange={silentRestartConversation}
         language={currentLanguage}
       />
 

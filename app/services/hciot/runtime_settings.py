@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, Field
@@ -14,6 +15,18 @@ from app.services.hciot.agent_prompts import (
 
 HCIOT_STORE_NAME = "__hciot__"
 SYSTEM_DEFAULT_PROMPT_ID = "system_default"
+_TTS_CHARACTER_ENV = "HCIOT_TTS_CHARACTER"
+_TTS_CHARACTER_FALLBACK = "healthy2"
+
+
+def _parse_tts_characters(raw: Optional[str]) -> list[str]:
+    source = raw or _TTS_CHARACTER_FALLBACK
+    characters = [character.strip() for character in source.split(",") if character.strip()]
+    return characters or [_TTS_CHARACTER_FALLBACK]
+
+
+def get_available_tts_characters() -> list[str]:
+    return _parse_tts_characters(os.getenv(_TTS_CHARACTER_ENV, _TTS_CHARACTER_FALLBACK))
 
 
 class RuleSections(BaseModel):
@@ -144,4 +157,3 @@ def save_runtime_settings_to_prompt_manager(
     store_prompts.hciot_runtime_settings_by_prompt = runtime_map
     prompt_manager._save_store_prompts(store_prompts)
     return runtime_prompt_id
-

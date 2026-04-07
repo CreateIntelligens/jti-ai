@@ -22,6 +22,10 @@ class CreateSessionResponse(BaseModel):
 class ChatRequest(BaseModel):
     session_id: str = Field(..., description="Session ID")
     message: str = Field(..., description="使用者訊息")
+    tts_character: Optional[str] = Field(
+        default=None,
+        description="Optional TTS character override for this request",
+    )
     turn_number: Optional[int] = Field(
         None,
         description="若是重新生成，則指定該訊息的 turn_number（之後的記錄會被刪除）",

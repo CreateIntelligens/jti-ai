@@ -46,22 +46,32 @@ def strip_emoji(text: str) -> str:
 # TTS job helpers
 # ---------------------------------------------------------------------------
 
-def queue_tts_generation(tts_text: Optional[str], language: str, manager: TtsJobManager) -> Optional[str]:
+def queue_tts_generation(
+    tts_text: Optional[str],
+    language: str,
+    manager: TtsJobManager,
+    character: Optional[str] = None,
+) -> Optional[str]:
     """Submit *tts_text* for background TTS generation; return the job id."""
     if not tts_text:
         return None
     try:
-        return manager.create_job(text=tts_text, language=language)
+        return manager.create_job(text=tts_text, language=language, character=character)
     except Exception as exc:
         logger.warning("Failed to queue TTS generation: %s", exc)
         return None
 
 
-def attach_tts_message_id(response: ChatResponse, language: str, manager: TtsJobManager) -> ChatResponse:
+def attach_tts_message_id(
+    response: ChatResponse,
+    language: str,
+    manager: TtsJobManager,
+    character: Optional[str] = None,
+) -> ChatResponse:
     """Strip emoji from display/tts text, queue TTS, and return an updated copy."""
     cleaned_message = strip_emoji(response.message)
     cleaned_tts = strip_emoji(response.tts_text) if response.tts_text else response.tts_text
-    tts_message_id = queue_tts_generation(cleaned_tts, language, manager)
+    tts_message_id = queue_tts_generation(cleaned_tts, language, manager, character=character)
     return response.model_copy(update={
         "message": cleaned_message,
         "tts_text": cleaned_tts,
@@ -76,6 +86,7 @@ def attach_tts_message_id(response: ChatResponse, language: str, manager: TtsJob
 class TtsCreateRequest(BaseModel):
     text: str = Field(..., description="Text content for TTS generation")
     language: str = Field("zh", description="Language code, e.g. zh or en")
+    character: Optional[str] = Field(None, description="TTS character voice override")
 
 
 # ---------------------------------------------------------------------------
@@ -120,7 +131,8 @@ def register_tts_endpoints(router: APIRouter, manager: TtsJobManager) -> None:
             raise HTTPException(status_code=400, detail="TTS text is empty")
 
         language = (request.language or "zh").strip().lower() or "zh"
-        tts_message_id = queue_tts_generation(text, language, manager)
+        character = (request.character or "").strip() or None
+        tts_message_id = queue_tts_generation(text, language, manager, character=character)
         if not tts_message_id:
             raise HTTPException(status_code=500, detail="Failed to queue TTS generation")
 

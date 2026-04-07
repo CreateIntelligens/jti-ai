@@ -78,6 +78,7 @@ export interface HciotTopicQuestions {
 }
 
 const HCIOT_ADMIN_BASE = `${API_BASE}/hciot-admin`;
+const HCIOT_API_BASE = `${API_BASE}/hciot`;
 const HCIOT_TOPICS_ADMIN_BASE = `${HCIOT_ADMIN_BASE}/topics`;
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
@@ -99,6 +100,11 @@ function appendOptionalFormValue(formData: FormData, key: string, value: string 
   }
 }
 
+export async function getHciotTtsCharacters(): Promise<{ characters: string[] }> {
+  const response = await fetchWithApiKey(`${HCIOT_API_BASE}/tts/characters`);
+  return handleResponse<{ characters: string[] }>(response);
+}
+
 export async function hciotStartChat(language: string, previousSessionId?: string | null): Promise<StartChatResponse> {
   const response = await fetchWithApiKey('/api/hciot/chat/start', {
     method: 'POST',
@@ -108,9 +114,15 @@ export async function hciotStartChat(language: string, previousSessionId?: strin
   return handleResponse<StartChatResponse>(response);
 }
 
-export async function hciotSendMessage(text: string, sessionId: string, turnNumber?: number): Promise<ChatResponse> {
+export async function hciotSendMessage(
+  text: string,
+  sessionId: string,
+  turnNumber?: number,
+  ttsCharacter?: string,
+): Promise<ChatResponse> {
   const payload: Record<string, unknown> = { message: text, session_id: sessionId };
   if (turnNumber !== undefined) payload.turn_number = turnNumber;
+  if (ttsCharacter) payload.tts_character = ttsCharacter;
   const response = await fetchWithApiKey('/api/hciot/chat/message', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

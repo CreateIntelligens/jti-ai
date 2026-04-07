@@ -137,6 +137,41 @@
   color: var(--hciot-accent-strong);
 }
 
+.hciot-voice-select-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0 0.2rem 0 0.45rem;
+  height: 2.5rem;
+  border: 1px solid var(--hciot-border);
+  border-radius: 0.7rem;
+  background: rgba(148, 163, 184, 0.08);
+}
+
+.hciot-voice-select-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--hciot-ink-soft);
+  white-space: nowrap;
+}
+
+.hciot-voice-select {
+  min-width: 7rem;
+  height: 2rem;
+  padding: 0 2rem 0 0.75rem;
+  border: 1px solid transparent;
+  border-radius: 0.55rem;
+  background: var(--hciot-panel);
+  color: var(--hciot-ink);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.hciot-voice-select:focus {
+  outline: none;
+  border-color: var(--hciot-accent);
+}
+
 .hciot-icon-button {
   display: inline-flex;
   align-items: center;

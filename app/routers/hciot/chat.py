@@ -12,7 +12,6 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.auth import verify_admin, verify_auth
 from app.routers.tts_utils import attach_tts_message_id, register_tts_endpoints
-from app.services.tts_jobs import hciot_tts_job_manager as _tts_manager
 from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
@@ -24,8 +23,10 @@ from app.schemas.chat import (
     ExportConversationsResponse,
 )
 from app.services.hciot.main_agent import main_agent
+from app.services.hciot.runtime_settings import get_available_tts_characters
 from app.services.jti.tts_text import to_tts_text
 from app.services.session.session_manager_factory import get_hciot_conversation_logger, get_hciot_session_manager
+from app.services.tts_jobs import hciot_tts_job_manager as _tts_manager
 from app.utils import build_date_query, group_conversations_by_session
 
 
@@ -50,6 +51,12 @@ admin_history_router = APIRouter(
     tags=["HCIoT Conversations"],
 )
 router = runtime_router
+
+@runtime_router.get("/tts/characters")
+async def get_tts_characters(auth: dict = Depends(verify_auth)):
+    """Return available TTS character voices."""
+    return {"characters": get_available_tts_characters()}
+
 
 register_tts_endpoints(runtime_router, _tts_manager)
 
@@ -108,7 +115,8 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         final_turn_number = log_result[1] if log_result else None
         result["tts_text"] = to_tts_text(result["message"], language)
         response = ChatResponse(**result, turn_number=final_turn_number)
-        return attach_tts_message_id(response, language, _tts_manager)
+        tts_character = request.tts_character.strip() if request.tts_character else None
+        return attach_tts_message_id(response, language, _tts_manager, character=tts_character)
     except HTTPException:
         raise
     except Exception as e:

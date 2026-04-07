@@ -63,11 +63,12 @@ class TtsJobManager:
             except FileNotFoundError:
                 pass
 
-    def create_job(self, *, text: str, language: str) -> str:
+    def create_job(self, *, text: str, language: str, character: str | None = None) -> str:
         raw_text = (text or "").strip()
         if not raw_text:
             raise ValueError("TTS text is empty")
 
+        effective_character = character or self.character
         prepared_text = to_tts_text(raw_text, language) or raw_text
         job_id = f"tts_{uuid.uuid4().hex}"
         now = time.time()
@@ -80,11 +81,11 @@ class TtsJobManager:
             "content_type": None,
             "error": None,
         })
-        logger.info("[TTS] queued job=%s character=%s lang=%s chars=%d", job_id, self.character, language, len(prepared_text))
+        logger.info("[TTS] queued job=%s character=%s lang=%s chars=%d", job_id, effective_character, language, len(prepared_text))
 
         worker = threading.Thread(
             target=self._generate_job,
-            args=(job_id, prepared_text),
+            args=(job_id, prepared_text, effective_character),
             daemon=True,
         )
         worker.start()
@@ -141,8 +142,8 @@ class TtsJobManager:
         self._write_meta(job_id, meta)
         logger.info("[TTS] ready job=%s elapsed_ms=%.0f bytes=%d content_type=%s", job_id, (now - created_at) * 1000, len(audio_bytes), content_type)
 
-    def _generate_job(self, job_id: str, text: str) -> None:
-        payload = json.dumps({"text": text, "character": self.character}).encode("utf-8")
+    def _generate_job(self, job_id: str, text: str, character: str | None = None) -> None:
+        payload = json.dumps({"text": text, "character": character or self.character}).encode("utf-8")
         request = urllib.request.Request(
             self.tts_api_url,
             data=payload,
@@ -206,4 +207,4 @@ class TtsJobManager:
 
 # Per-app singletons — characters configurable via env vars
 jti_tts_job_manager = TtsJobManager(character=os.getenv("JTI_TTS_CHARACTER", "hayley"))
-hciot_tts_job_manager = TtsJobManager(character=os.getenv("HCIOT_TTS_CHARACTER", "healthy2"))
+hciot_tts_job_manager = TtsJobManager(character=(os.getenv("HCIOT_TTS_CHARACTER", "healthy2").split(",")[0]).strip() or "healthy2")

@@ -22,6 +22,7 @@ export interface JtiRuntimeSettings {
     en: { title: string; description: string };
   };
   max_response_chars: number;
+  tts_character?: string;
 }
 
 export interface JtiRuntimeSettingsResponse {
