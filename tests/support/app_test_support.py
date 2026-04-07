@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock
 
-PROJECT_ROOT = str(Path(__file__).resolve().parents[1])
+PROJECT_ROOT = str(Path(__file__).resolve().parents[2])
 
 
 def _ensure_project_root_on_path() -> None:

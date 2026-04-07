@@ -1,5 +1,5 @@
 import unittest
-from tests.app_main_test_support import get_test_app
+from tests.support.app_test_support import get_test_app
 
 
 app = get_test_app()

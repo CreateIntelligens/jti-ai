@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
-from tests.app_main_test_support import get_test_app
+from tests.support.app_test_support import get_test_app
 
 
 app = get_test_app()

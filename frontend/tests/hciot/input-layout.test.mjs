@@ -4,8 +4,8 @@ import { readFile } from 'node:fs/promises';
 
 test('uses a flexible sidebar width and a wrapping input footer for HCIoT chat', async () => {
   const [layoutCss, componentsCss] = await Promise.all([
-    readFile(new URL('../src/styles/hciot/layout.css', import.meta.url), 'utf8'),
-    readFile(new URL('../src/styles/hciot/components.css', import.meta.url), 'utf8'),
+    readFile(new URL('../../src/styles/hciot/layout.css', import.meta.url), 'utf8'),
+    readFile(new URL('../../src/styles/hciot/components.css', import.meta.url), 'utf8'),
   ]);
 
   assert.match(

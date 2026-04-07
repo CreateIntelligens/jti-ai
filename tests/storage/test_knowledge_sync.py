@@ -2,7 +2,7 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import MagicMock, call, patch
 
-from tests.app_main_test_support import install_app_import_mocks
+from tests.support.app_test_support import install_app_import_mocks
 
 install_app_import_mocks()
 

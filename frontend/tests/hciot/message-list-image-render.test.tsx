@@ -3,7 +3,7 @@ import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import HciotMessageList, { type HciotMessage } from '../src/components/hciot/HciotMessageList';
+import HciotMessageList, { type HciotMessage } from '../../src/components/hciot/HciotMessageList';
 
 function renderMessages(messages: HciotMessage[]) {
   return renderToStaticMarkup(

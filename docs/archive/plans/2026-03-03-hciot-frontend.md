@@ -79,7 +79,7 @@ Expected: HCIoT uses the general chat/store API and does not depend on quiz UI s
 - Modify: `frontend/src/pages/Hciot.tsx`
 - Reuse: `frontend/src/components/PromptManagementModal.tsx`
 - Verify: `frontend`
-- Verify: `tests/test_jti_api_routes.py`
+- Verify: `tests/hciot/test_api_routes.py`
 
 **Step 1: Write the failing verification target**
 
@@ -101,7 +101,7 @@ Expected: `1`
 Run:
 - `npx tsc --noEmit`
 - `npm run build`
-- `PYTHONPATH=. pytest tests/test_jti_api_routes.py -q`
+- `PYTHONPATH=. pytest tests/hciot/test_api_routes.py -q`
 
 Expected:
 - frontend typecheck passes

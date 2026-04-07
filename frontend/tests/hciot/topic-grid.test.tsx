@@ -3,7 +3,7 @@ import test from 'node:test';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import HciotTopicGrid from '../src/components/hciot/HciotTopicGrid';
+import HciotTopicGrid from '../../src/components/hciot/HciotTopicGrid';
 
 test('renders a second-level question list for the selected topic', () => {
   const topics = [

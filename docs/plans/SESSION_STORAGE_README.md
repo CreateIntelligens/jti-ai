@@ -41,8 +41,9 @@
 │   └── MIGRATION_GUIDE.md                 # 遷移指南
 │
 ├── tests/
-│   ├── test_mongo_session_manager.py      # SessionManager 單元測試
-│   └── test_mongo_conversation_logger.py  # ConversationLogger 單元測試
+│   └── storage/
+│       ├── test_mongo_session_manager.py      # SessionManager 單元測試
+│       └── test_mongo_conversation_logger.py  # ConversationLogger 單元測試
 │
 └── SESSION_STORAGE_README.md              # 本文件
 ```
@@ -114,8 +115,8 @@ python -c "from app.services.mongo_client import get_mongo_client; get_mongo_cli
 ### 4. 運行單元測試
 
 ```bash
-python -m pytest tests/test_mongo_session_manager.py -v
-python -m pytest tests/test_mongo_conversation_logger.py -v
+python -m pytest tests/storage/test_mongo_session_manager.py -v
+python -m pytest tests/storage/test_mongo_conversation_logger.py -v
 ```
 
 ### 5. 在應用中使用
@@ -244,7 +245,7 @@ deleted = logger.delete_old_logs(days=30)
 python -m pytest tests/ -v
 
 # 特定測試
-python -m pytest tests/test_mongo_session_manager.py::TestMongoSessionManager::test_create_session -v
+python -m pytest tests/storage/test_mongo_session_manager.py::TestMongoSessionManager::test_create_session -v
 
 # 覆蓋率報告
 python -m pytest tests/ --cov=app --cov-report=html

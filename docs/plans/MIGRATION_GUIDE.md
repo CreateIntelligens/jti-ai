@@ -106,7 +106,7 @@ docker logs -f <container_id>
 
 運行測試：
 ```bash
-python -m pytest tests/test_mongo_session_manager.py -v
+python -m pytest tests/storage/test_mongo_session_manager.py -v
 ```
 
 ### 步驟 4: 進行負載測試

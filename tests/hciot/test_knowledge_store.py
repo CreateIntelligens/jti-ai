@@ -2,7 +2,7 @@ import sys
 import unittest
 from unittest.mock import MagicMock
 
-from tests.app_main_test_support import install_app_import_mocks
+from tests.support.app_test_support import install_app_import_mocks
 
 
 class FakeInsertResult:
