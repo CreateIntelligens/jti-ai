@@ -87,6 +87,7 @@ data/*.db
 data/*.sqlite
 data/knowledge/
 data/tts_cache/
+data/hciot/images/
 
 # Git worktrees
 .worktrees/
