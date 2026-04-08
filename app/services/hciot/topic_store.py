@@ -10,21 +10,16 @@ Each document in `hciot_topics` represents a single topic:
     "category_labels": { "zh": "骨科＋復健科", "en": "Orthopedics & Rehab" },
     "questions": { "zh": [...], "en": [...] }
   }
-
-The category prefix is derived from topic_id.split("/", 1)[0].
-list_categories() groups topics by this prefix into a hierarchy for the API.
 """
 
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from typing import Any
 
 from app.services.mongo_client import get_mongo_db
 
-
-def _category_prefix(topic_id: str) -> str:
-    """Extract the category portion from a topic_id like 'cat/topic'."""
-    return topic_id.split("/", 1)[0]
+Topic = dict[str, Any]
 
 
 class HciotTopicStore:
@@ -36,39 +31,37 @@ class HciotTopicStore:
         self.db = get_mongo_db()
         self.collection = self.db[self.COLLECTION]
 
+    def _prepare_payload(self, data: dict, topic_id: str | None = None) -> dict:
+        """Strip _id and add updated_at timestamp."""
+        payload = {k: v for k, v in data.items() if k != "_id"}
+        if topic_id:
+            payload["topic_id"] = topic_id
+        payload["updated_at"] = datetime.now(timezone.utc)
+        return payload
+
     # ===================== Read =====================
 
-    def list_topics(self) -> list[dict]:
+    def list_topics(self) -> list[Topic]:
         """Return all topics sorted by order, without MongoDB _id."""
-        cursor = self.collection.find({}, {"_id": 0}).sort("order", 1)
-        return list(cursor)
+        return list(self.collection.find({}, {"_id": 0}).sort("order", 1))
 
-    def get_topic(self, topic_id: str) -> dict | None:
+    def get_topic(self, topic_id: str) -> Topic | None:
         return self.collection.find_one({"topic_id": topic_id}, {"_id": 0})
 
-    def list_categories(self) -> list[dict]:
-        """Group topics by category prefix into a hierarchical structure.
-
-        Returns:
-            [{ "id": "ortho-rehab",
-               "labels": { "zh": "...", "en": "..." },
-               "topics": [{ "id": "ortho-rehab/prp", ... }, ...] }]
-        """
-        topics = self.list_topics()
-        groups: dict[str, dict] = {}
-        for topic in topics:
+    def list_categories(self) -> list[dict[str, Any]]:
+        """Group topics by category prefix into a hierarchical structure."""
+        groups: dict[str, dict[str, Any]] = {}
+        for topic in self.list_topics():
             tid = topic.get("topic_id", "")
-            prefix = _category_prefix(tid)
+            prefix = tid.split("/", 1)[0]
             if prefix not in groups:
-                cat_labels = topic.get("category_labels", {"zh": prefix, "en": prefix})
                 groups[prefix] = {
                     "id": prefix,
-                    "labels": cat_labels,
+                    "labels": topic.get("category_labels", {"zh": prefix, "en": prefix}),
                     "topics": [],
                 }
-            # Expose as "id" for frontend compatibility
-            entry = {**topic, "id": tid}
-            groups[prefix]["topics"].append(entry)
+            groups[prefix]["topics"].append({**topic, "id": tid})
+
         # Sort categories by the minimum order of their topics
         return sorted(groups.values(), key=lambda g: min((t.get("order", 0) for t in g["topics"]), default=0))
 
@@ -77,17 +70,13 @@ class HciotTopicStore:
     def upsert_topic(self, topic_id: str, data: dict) -> None:
         """Create or fully replace a topic document."""
         now = datetime.now(timezone.utc)
-        payload = {k: v for k, v in data.items() if k != "_id"}
-        payload["topic_id"] = topic_id
-        payload["updated_at"] = now
-        # Preserve order on update if not provided
+        payload = self._prepare_payload(data, topic_id)
+
+        # Preserve order if not provided
         if "order" not in payload:
             existing = self.get_topic(topic_id)
-            if existing:
-                payload["order"] = existing.get("order", 0)
-            else:
-                max_order = self.collection.count_documents({})
-                payload["order"] = max_order
+            payload["order"] = existing.get("order", 0) if existing else self.collection.count_documents({})
+
         self.collection.update_one(
             {"topic_id": topic_id},
             {"$set": payload, "$setOnInsert": {"created_at": now}},
@@ -96,36 +85,29 @@ class HciotTopicStore:
 
     def update_topic(self, topic_id: str, data: dict) -> bool:
         """Partially update a topic's fields."""
-        now = datetime.now(timezone.utc)
-        payload = {k: v for k, v in data.items() if k not in ("_id", "topic_id")}
+        payload = self._prepare_payload({k: v for k, v in data.items() if k != "topic_id"})
         if not payload:
             return False
-        payload["updated_at"] = now
-        result = self.collection.update_one(
-            {"topic_id": topic_id},
-            {"$set": payload},
-        )
+
+        result = self.collection.update_one({"topic_id": topic_id}, {"$set": payload})
         return result.matched_count > 0
 
     def delete_topic(self, topic_id: str) -> bool:
-        result = self.collection.delete_one({"topic_id": topic_id})
-        return result.deleted_count > 0
+        return self.collection.delete_one({"topic_id": topic_id}).deleted_count > 0
 
     # ===================== Convenience =====================
 
     def ensure_topic(self, topic_id: str, labels: dict, category_labels: dict) -> None:
         """Create topic if it doesn't exist yet."""
-        if self.get_topic(topic_id) is not None:
-            return
-        self.upsert_topic(topic_id, {
-            "labels": labels,
-            "category_labels": category_labels,
-            "questions": {"zh": [], "en": []},
-        })
+        if self.get_topic(topic_id) is None:
+            self.upsert_topic(topic_id, {
+                "labels": labels,
+                "category_labels": category_labels,
+                "questions": {"zh": [], "en": []},
+            })
 
 
 # --- Singleton ---
-
 _hciot_topic_store: HciotTopicStore | None = None
 
 

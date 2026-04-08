@@ -356,3 +356,61 @@ export async function uploadHciotKnowledgeFileWithTopic(
   );
   return handleResponse(response);
 }
+
+// ========== Image Admin ==========
+
+export interface HciotImage {
+  filename: string;
+  size_bytes: number;
+  image_id: string;
+  url: string;
+}
+
+export async function listHciotImages(): Promise<{ images: HciotImage[] }> {
+  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/images/`);
+  return handleResponse<{ images: HciotImage[] }>(response);
+}
+
+export async function uploadHciotImage(file: File, imageId?: string): Promise<HciotImage> {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (imageId) {
+    formData.append('image_id', imageId);
+  }
+  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/images/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+  return handleResponse<HciotImage>(response);
+}
+
+export async function deleteHciotImage(filename: string): Promise<void> {
+  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/images/${encodeURIComponent(filename)}`, {
+    method: 'DELETE',
+  });
+  await handleResponse<void>(response);
+}
+
+// ========== Merged CSV ==========
+
+export interface HciotMergedCsvRow {
+  index: string;
+  q: string;
+  a: string;
+  img: string;
+  source_file?: string;
+}
+
+export interface HciotMergedCsvResponse {
+  rows: HciotMergedCsvRow[];
+  source_files: string[];
+}
+
+export async function getHciotTopicMergedCsv(topicId: string, language: string = 'zh'): Promise<HciotMergedCsvResponse> {
+  const query = new URLSearchParams({ 
+    topic_id: topicId,
+    language: normLang(language) 
+  });
+  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/knowledge/topic-csv-merged?${query}`);
+  return handleResponse<HciotMergedCsvResponse>(response);
+}

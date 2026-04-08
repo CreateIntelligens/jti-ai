@@ -10,8 +10,7 @@ import {
   type TopicOption,
 } from './shared';
 
-interface FileDetailPaneProps {
-  language: HciotLanguage;
+export interface FileDetailPaneState {
   selectedFile: HciotKnowledgeFile | null;
   currentPathLabel: string;
   statusMessage: string | null;
@@ -20,12 +19,13 @@ interface FileDetailPaneProps {
   uploading: boolean;
   hasUnsavedChanges: boolean;
   draft: FileMetadataDraft;
-  categoryOptions: HciotTopicCategory[];
-  topicOptions: TopicOption[];
   fileEditable: boolean;
   loadingContent: boolean;
   contentMessage: string | null;
   editorText: string;
+}
+
+export interface FileDetailPaneActions {
   onDownload: () => void;
   onDelete: () => void;
   onSave: () => void;
@@ -35,30 +35,45 @@ interface FileDetailPaneProps {
   onEditorTextChange: (value: string) => void;
 }
 
+interface FileDetailPaneProps {
+  language: HciotLanguage;
+  state: FileDetailPaneState;
+  actions: FileDetailPaneActions;
+  categoryOptions: HciotTopicCategory[];
+  topicOptions: TopicOption[];
+}
+
 export default function FileDetailPane({
   language,
-  selectedFile,
-  currentPathLabel,
-  statusMessage,
-  deleting,
-  saving,
-  uploading,
-  hasUnsavedChanges,
-  draft,
+  state,
+  actions,
   categoryOptions,
   topicOptions,
-  fileEditable,
-  loadingContent,
-  contentMessage,
-  editorText,
-  onDownload,
-  onDelete,
-  onSave,
-  onCategoryChange,
-  onTopicChange,
-  onDraftChange,
-  onEditorTextChange,
 }: FileDetailPaneProps) {
+  const {
+    selectedFile,
+    currentPathLabel,
+    statusMessage,
+    deleting,
+    saving,
+    uploading,
+    hasUnsavedChanges,
+    draft,
+    fileEditable,
+    loadingContent,
+    contentMessage,
+    editorText,
+  } = state;
+
+  const {
+    onDownload,
+    onDelete,
+    onSave,
+    onCategoryChange,
+    onTopicChange,
+    onDraftChange,
+    onEditorTextChange,
+  } = actions;
   return (
     <div className="hciot-file-editor">
       <div className="hciot-file-header">

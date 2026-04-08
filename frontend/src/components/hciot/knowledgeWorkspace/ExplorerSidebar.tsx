@@ -5,10 +5,10 @@ import {
   FileText,
   Folder,
   FolderOpen,
-  PanelLeftClose,
-  PanelLeftOpen,
   Plus,
   Search,
+  Image as ImageIcon,
+  Table as TableIcon,
 } from 'lucide-react';
 
 import type { HciotLanguage } from '../../../config/hciotTopics';
@@ -22,6 +22,7 @@ interface ExplorerSidebarProps {
   searchQuery: string;
   deferredSearchQuery: string;
   selectedFileName: string | null;
+  selectedImageName: string | null;
   visibleRows: ExplorerRow[];
   visibleExpandedKeys: Set<string>;
   onMouseEnter: () => void;
@@ -29,7 +30,10 @@ interface ExplorerSidebarProps {
   onToggleSidebar: () => void;
   onSearchChange: (value: string) => void;
   onToggleExpanded: (key: string) => void;
+  selectedMergedTopicId: string | null;
   onSelectFile: (fileName: string) => void;
+  onSelectImage: (fileName: string) => void;
+  onSelectMergedCsv: (topicId: string) => void;
   onOpenUploadDialog: () => void;
 }
 
@@ -40,14 +44,17 @@ export default function ExplorerSidebar({
   searchQuery,
   deferredSearchQuery,
   selectedFileName,
+  selectedImageName,
   visibleRows,
   visibleExpandedKeys,
   onMouseEnter,
   onMouseLeave,
-  onToggleSidebar,
   onSearchChange,
   onToggleExpanded,
+  selectedMergedTopicId,
   onSelectFile,
+  onSelectImage,
+  onSelectMergedCsv,
   onOpenUploadDialog,
 }: ExplorerSidebarProps) {
   return (
@@ -57,17 +64,6 @@ export default function ExplorerSidebar({
       onMouseLeave={onMouseLeave}
     >
       <div className="hciot-explorer-toolbar">
-        <button
-          type="button"
-          className="hciot-explorer-icon-button"
-          onClick={onToggleSidebar}
-          title={sidebarCollapsed
-            ? (language === 'zh' ? '展開側欄' : 'Expand sidebar')
-            : (language === 'zh' ? '收合側欄' : 'Collapse sidebar')}
-        >
-          {sidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-        </button>
-
         <div className="hciot-explorer-search">
           <Search size={15} />
           <input
@@ -82,7 +78,7 @@ export default function ExplorerSidebar({
           type="button"
           className="hciot-explorer-icon-button"
           onClick={onOpenUploadDialog}
-          title={language === 'zh' ? '新增知識' : 'Add knowledge'}
+          title={language === 'zh' ? '新增內容' : 'Add Content'}
         >
           <Plus size={16} />
         </button>
@@ -94,7 +90,10 @@ export default function ExplorerSidebar({
         ) : visibleRows.length > 0 ? (
           <div className="hciot-explorer-tree" role="tree">
             {visibleRows.map(({ node, depth }) => {
-              const isSelected = node.kind === 'file' && node.file.name === selectedFileName;
+              const isSelected =
+                (node.kind === 'file' && node.file.name === selectedFileName) ||
+                (node.kind === 'image' && node.image.filename === selectedImageName) ||
+                (node.kind === 'merged-csv' && node.topicId === selectedMergedTopicId);
               const isExpanded = isFolderNode(node) && (
                 Boolean(deferredSearchQuery) || visibleExpandedKeys.has(node.key)
               );
@@ -106,11 +105,10 @@ export default function ExplorerSidebar({
                   className={`hciot-explorer-row${isSelected ? ' is-selected' : ''}`}
                   style={{ '--row-depth': depth } as CSSProperties}
                   onClick={() => {
-                    if (node.kind === 'file') {
-                      onSelectFile(node.file.name);
-                      return;
-                    }
-                    onToggleExpanded(node.key);
+                    if (node.kind === 'file') onSelectFile(node.file.name);
+                    else if (node.kind === 'image') onSelectImage(node.image.filename);
+                    else if (node.kind === 'merged-csv') onSelectMergedCsv(node.topicId);
+                    else onToggleExpanded(node.key);
                   }}
                   role="treeitem"
                   aria-expanded={isFolderNode(node) ? isExpanded : undefined}
@@ -121,10 +119,11 @@ export default function ExplorerSidebar({
                       isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
                     ) : null}
                   </span>
-                  <span className={`hciot-explorer-row-icon tone-${isFolderNode(node) ? node.tone || 'category' : 'file'}`}>
+                  <span className={`hciot-explorer-row-icon tone-${isFolderNode(node) ? node.tone || 'category' : node.kind === 'merged-csv' ? 'merged' : 'file'}`}>
                     {isFolderNode(node)
                       ? (isExpanded ? <FolderOpen size={15} /> : <Folder size={15} />)
-                      : <FileText size={15} />}
+                      : node.kind === 'merged-csv' ? <TableIcon size={15} />
+                        : node.kind === 'image' ? <ImageIcon size={15} /> : <FileText size={15} />}
                   </span>
                   <span className="hciot-explorer-row-label">{node.label}</span>
                 </button>

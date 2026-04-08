@@ -205,6 +205,10 @@
   color: var(--hciot-ink-soft);
 }
 
+.hciot-explorer-row-icon.tone-merged {
+  color: #0d9488;
+}
+
 .hciot-explorer-row-label {
   min-width: 0;
   overflow: hidden;
@@ -812,4 +816,154 @@
 .hciot-qa-footer-actions {
   display: flex;
   gap: 0.5rem;
+}
+
+/* ==========================================================================
+   Merged CSV and Tabs
+   ========================================================================== */
+.hciot-file-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--hciot-border);
+  margin-bottom: 16px;
+}
+
+.hciot-file-tab {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--hciot-ink-soft);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-size: 0.88rem;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.hciot-file-tab:hover {
+  color: var(--hciot-ink);
+}
+
+.hciot-file-tab.active {
+  color: var(--hciot-accent);
+  border-bottom-color: var(--hciot-accent);
+}
+
+.hciot-merged-panel {
+  padding: 0 16px;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.hciot-merged-csv-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.hciot-merged-csv-meta {
+  font-size: 0.82rem;
+  color: var(--hciot-ink-soft);
+  margin-bottom: 12px;
+}
+
+.hciot-merged-csv-table-wrapper {
+  flex: 1;
+  overflow: auto;
+  border: 1px solid var(--hciot-border);
+  border-radius: 8px;
+}
+
+.hciot-merged-csv-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.88rem;
+}
+
+.hciot-merged-csv-table th,
+.hciot-merged-csv-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--hciot-border);
+  text-align: left;
+  vertical-align: top;
+  color: var(--hciot-ink);
+}
+
+.hciot-merged-csv-table th {
+  background-color: var(--hciot-panel-strong);
+  font-weight: 600;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.hciot-merged-csv-img-wrapper {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 6px;
+  overflow: hidden;
+  background-color: var(--hciot-hover);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hciot-merged-csv-thumbnail {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: cover;
+}
+
+.hciot-merged-csv-img-text {
+  font-size: 0.75rem;
+  color: var(--hciot-ink-soft);
+  word-break: break-all;
+}
+
+/* ==========================================================================
+   Image Management
+   ========================================================================== */
+.hciot-image-detail-pane .hciot-file-editor-meta {
+  display: flex;
+  gap: 16px;
+  font-size: 0.88rem;
+  color: var(--hciot-ink-soft);
+  padding: 12px 16px;
+  background-color: var(--hciot-panel);
+  border-bottom: 1px solid var(--hciot-border);
+}
+
+.hciot-image-upload-dialog {
+  max-width: 600px;
+  width: 90vw;
+}
+
+.hciot-explorer-row-icon.tone-image {
+  color: #22c55e;
+}
+
+/* ==========================================================================
+   Upload Dialog Enhancements
+   ========================================================================== */
+.hciot-file-type-icon {
+  flex-shrink: 0;
+}
+
+.hciot-file-status-icon {
+  flex-shrink: 0;
+}
+
+.hciot-status-uploading {
+  animation: spin 1s linear infinite;
+}
+
+.hciot-file-warning {
+  flex-shrink: 0;
 }

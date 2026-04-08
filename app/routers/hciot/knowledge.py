@@ -27,7 +27,7 @@ from app.routers.knowledge_utils import (
     sync_to_gemini,
     write_docx_text,
 )
-from app.services.hciot.csv_utils import extract_questions_from_csv
+from app.services.hciot.csv_utils import extract_questions_from_csv, merge_csv_files
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.hciot.topic_store import get_hciot_topic_store
 
@@ -334,3 +334,15 @@ async def delete_knowledge_file(
         "message": "已刪除",
         "mongo_deleted": True,
     }
+
+
+@router.get("/topic-csv-merged")
+def get_topic_csv_merged(topic_id: str, language: str = "zh", auth: dict = Depends(verify_auth)):
+    store = get_hciot_knowledge_store()
+    docs = store.get_topic_csv_files(language, topic_id)
+
+    csv_contents = [d["data"] for d in docs if d.get("data")]
+    source_files = [d["filename"] for d in docs if d.get("data")]
+
+    rows = merge_csv_files(csv_contents, source_filenames=source_files)
+    return {"rows": rows, "source_files": source_files}

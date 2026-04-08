@@ -5,7 +5,9 @@ import type { HciotKnowledgeFile, HciotTopicCategory } from '../../services/api/
 import * as api from '../../services/api';
 import ExplorerSidebar from './knowledgeWorkspace/ExplorerSidebar';
 import FileDetailPane from './knowledgeWorkspace/FileDetailPane';
+import MergedCsvPane from './knowledgeWorkspace/MergedCsvPane';
 import UploadDialog from './knowledgeWorkspace/UploadDialog';
+import ImageDetailPane from './knowledgeWorkspace/ImageDetailPane';
 import {
   NEW_VALUE,
   buildExplorerTree,
@@ -19,7 +21,6 @@ import {
   getCurrentPathLabel,
   getErrorMessage,
   getDraftMetadataPayload,
-  getFileMetadataPayload,
   readExpandedKeys,
   slugify,
   type FileMetadataDraft,
@@ -41,7 +42,10 @@ export default function HciotKnowledgeWorkspace({
 
   const [files, setFiles] = useState<HciotKnowledgeFile[]>([]);
   const [categories, setCategories] = useState<HciotTopicCategory[]>([]);
+  const [images, setImages] = useState<api.HciotImage[]>([]);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const [selectedImageName, setSelectedImageName] = useState<string | null>(null);
+  const [selectedMergedTopicId, setSelectedMergedTopicId] = useState<string | null>(null);
   const [expandedKeys, setExpandedKeys] = useState<string[]>(() => readExpandedKeys(language));
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarHoverExpanded, setSidebarHoverExpanded] = useState(false);
@@ -95,6 +99,19 @@ export default function HciotKnowledgeWorkspace({
     [files, selectedFileName],
   );
 
+  const selectedImage = useMemo(
+    () => images.find((img) => img.filename === selectedImageName) || null,
+    [images, selectedImageName],
+  );
+
+  const selectedMergedLabel = useMemo(() => {
+    if (!selectedMergedTopicId) return null;
+    const prefix = selectedMergedTopicId.split('/')[0];
+    const cat = categories.find((c) => c.id === prefix);
+    return cat?.topics.find((t) => t.id === selectedMergedTopicId)?.labels[language]
+      ?? selectedMergedTopicId;
+  }, [categories, language, selectedMergedTopicId]);
+
   const metadataDirty = useMemo(() => {
     if (!selectedFile) {
       return false;
@@ -103,17 +120,16 @@ export default function HciotKnowledgeWorkspace({
       return true;
     }
 
-    const currentPayload = getFileMetadataPayload(selectedFile);
-    const draftPayload = getDraftMetadataPayload(draft);
-    return JSON.stringify(currentPayload) !== JSON.stringify(draftPayload);
-  }, [draft, selectedFile]);
+    const cleanDraft = draftFromFile(selectedFile, categories);
+    return JSON.stringify(cleanDraft) !== JSON.stringify(draft);
+  }, [categories, draft, selectedFile]);
 
   const contentDirty = fileEditable && editorText !== originalText;
   const hasUnsavedChanges = metadataDirty || contentDirty;
 
   const { roots, filePathKeys } = useMemo(
-    () => buildExplorerTree(files, categories, language),
-    [categories, files, language],
+    () => buildExplorerTree(files, categories, language, images),
+    [categories, files, language, images],
   );
 
   const filteredRoots = useMemo(
@@ -131,20 +147,23 @@ export default function HciotKnowledgeWorkspace({
   const refreshWorkspace = async (preferredFileName?: string | null) => {
     setLoadingWorkspace(true);
     try {
-      const [knowledgeResponse, topicsResponse] = await Promise.all([
+      const [knowledgeResponse, topicsResponse, imagesResponse] = await Promise.all([
         api.listHciotKnowledgeFiles(language),
         api.listHciotTopicsAdmin(),
+        api.listHciotImages(),
       ]);
 
       const nextFiles = knowledgeResponse.files || [];
       setFiles(nextFiles);
       setCategories(topicsResponse.categories || []);
+      setImages(imagesResponse.images || []);
       setSelectedFileName((current) => {
+        if (selectedImageName || selectedMergedTopicId) return null;
         const candidate = preferredFileName ?? current;
         if (candidate && nextFiles.some((file) => file.name === candidate)) {
           return candidate;
         }
-        return nextFiles[0]?.name || null;
+        return null;
       });
     } catch (error) {
       console.error('Failed to load HCIoT knowledge workspace:', error);
@@ -237,24 +256,35 @@ export default function HciotKnowledgeWorkspace({
     });
   };
 
+  const discardChanges = () => {
+    if (!hasUnsavedChanges) return true;
+    return window.confirm(
+      language === 'zh'
+        ? '目前檔案有尚未儲存的變更，確定要切換嗎？'
+        : 'You have unsaved changes. Switch anyway?',
+    );
+  };
+
   const handleSelectFile = (fileName: string) => {
-    if (fileName === selectedFileName) {
-      return;
-    }
-
-    if (hasUnsavedChanges) {
-      const shouldDiscard = window.confirm(
-        language === 'zh'
-          ? '目前檔案有尚未儲存的變更，確定要切換嗎？'
-          : 'You have unsaved changes. Switch files anyway?',
-      );
-      if (!shouldDiscard) {
-        return;
-      }
-    }
-
+    if (fileName === selectedFileName || !discardChanges()) return;
     ensureSelectedPathExpanded(fileName);
     setSelectedFileName(fileName);
+    setSelectedImageName(null);
+    setSelectedMergedTopicId(null);
+  };
+
+  const handleSelectImage = (fileName: string) => {
+    if (!discardChanges()) return;
+    setSelectedImageName(fileName);
+    setSelectedFileName(null);
+    setSelectedMergedTopicId(null);
+  };
+
+  const handleSelectMergedCsv = (topicId: string) => {
+    if (!discardChanges()) return;
+    setSelectedMergedTopicId(topicId);
+    setSelectedFileName(null);
+    setSelectedImageName(null);
   };
 
   const uploadFileWithTopic = async (
@@ -279,34 +309,22 @@ export default function HciotKnowledgeWorkspace({
     });
   };
 
-  const handleUploadFiles = async (
-    filesToUpload: File[],
+  const handleUploadFile = async (
+    file: File,
     topicId: string | null,
     labels: TopicLabels | null,
   ) => {
-    if (!filesToUpload.length) return;
-    setUploading(true);
-    try {
-      let firstUploadedFileName: string | null = null;
-      for (const file of filesToUpload) {
-        const response = await uploadFileWithTopic(file, topicId, labels);
-        if (!firstUploadedFileName) {
-          firstUploadedFileName = response.name;
-        }
-      }
-      await refreshWorkspace(firstUploadedFileName);
-      setQaDialogOpen(false);
-      showStatus(
-        language === 'zh'
-          ? `已上傳 ${filesToUpload.length} 個檔案`
-          : `Uploaded ${filesToUpload.length} file(s)`,
-      );
-    } catch (error) {
-      console.error('Failed to upload HCIoT files:', error);
-      alert(getErrorMessage(error));
-    } finally {
-      setUploading(false);
-    }
+    return uploadFileWithTopic(file, topicId, labels);
+  };
+
+  const handleUploadComplete = async (firstUploadedFileName: string | null, count: number) => {
+    await refreshWorkspace(firstUploadedFileName);
+    setQaDialogOpen(false);
+    showStatus(
+      language === 'zh'
+        ? `已上傳 ${count} 個檔案`
+        : `Uploaded ${count} file(s)`,
+    );
   };
 
   const handleQASubmit = async (
@@ -314,7 +332,16 @@ export default function HciotKnowledgeWorkspace({
     topicId: string,
     labels: TopicLabels,
   ) => {
-    await handleUploadFiles([file], topicId, labels);
+    setUploading(true);
+    try {
+      const response = await uploadFileWithTopic(file, topicId, labels);
+      await handleUploadComplete(response.name, 1);
+    } catch (error) {
+      console.error('Failed to upload HCIoT files:', error);
+      alert(getErrorMessage(error));
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleDeleteFile = async () => {
@@ -342,6 +369,34 @@ export default function HciotKnowledgeWorkspace({
     } finally {
       setDeleting(false);
     }
+  };
+
+  const handleDeleteImage = async () => {
+    if (!selectedImage) return;
+    const confirmed = window.confirm(
+      language === 'zh'
+        ? `確定要刪除圖片 ${selectedImage.filename}？`
+        : `Delete image ${selectedImage.filename}?`,
+    );
+    if (!confirmed) return;
+    setDeleting(true);
+    try {
+      await api.deleteHciotImage(selectedImage.filename);
+      await refreshWorkspace();
+      setSelectedImageName(null);
+      showStatus(language === 'zh' ? '圖片已刪除' : 'Image deleted');
+    } catch (error: any) {
+      console.error('Failed to delete HCIoT image:', error);
+      alert(getErrorMessage(error));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleUploadImageComplete = async (count: number) => {
+    await refreshWorkspace();
+    setQaDialogOpen(false);
+    showStatus(language === 'zh' ? `已上傳 ${count} 張圖片` : `Uploaded ${count} image(s)`);
   };
 
   const currentCategory = useMemo(() => {
@@ -544,6 +599,7 @@ export default function HciotKnowledgeWorkspace({
         searchQuery={searchQuery}
         deferredSearchQuery={deferredSearchQuery}
         selectedFileName={selectedFileName}
+        selectedImageName={selectedImageName}
         visibleRows={visibleRows}
         visibleExpandedKeys={visibleExpandedKeys}
         onMouseEnter={handleSidebarMouseEnter}
@@ -551,7 +607,10 @@ export default function HciotKnowledgeWorkspace({
         onToggleSidebar={handleToggleSidebar}
         onSearchChange={setSearchQuery}
         onToggleExpanded={toggleExpanded}
+        selectedMergedTopicId={selectedMergedTopicId}
         onSelectFile={handleSelectFile}
+        onSelectImage={handleSelectImage}
+        onSelectMergedCsv={handleSelectMergedCsv}
         onOpenUploadDialog={() => setQaDialogOpen(true)}
       />
 
@@ -561,42 +620,59 @@ export default function HciotKnowledgeWorkspace({
         categories={categories}
         uploading={uploading}
         onClose={() => setQaDialogOpen(false)}
-        onUploadFiles={handleUploadFiles}
+        onUploadFile={handleUploadFile}
+        onUploadComplete={handleUploadComplete}
         onSubmitQA={handleQASubmit}
+        onUploadImage={api.uploadHciotImage}
+        onUploadImageComplete={handleUploadImageComplete}
       />
 
-      <FileDetailPane
-        language={language}
-        selectedFile={selectedFile}
-        currentPathLabel={currentPathLabel}
-        statusMessage={statusMessage}
-        deleting={deleting}
-        saving={saving}
-        uploading={uploading}
-        hasUnsavedChanges={hasUnsavedChanges}
-        draft={draft}
-        categoryOptions={categoryOptions}
-        topicOptions={topicOptions}
-        fileEditable={fileEditable}
-        loadingContent={loadingContent}
-        contentMessage={contentMessage}
-        editorText={editorText}
-        onDownload={() => {
-          if (selectedFile) {
-            api.downloadHciotKnowledgeFile(selectedFile.name, language);
-          }
-        }}
-        onDelete={() => {
-          void handleDeleteFile();
-        }}
-        onSave={() => {
-          void handleSave();
-        }}
-        onCategoryChange={handleCategoryChange}
-        onTopicChange={handleTopicChange}
-        onDraftChange={patchDraft}
-        onEditorTextChange={setEditorText}
-      />
+      {selectedImageName ? (
+        <ImageDetailPane
+          language={language}
+          selectedImage={selectedImage}
+          deleting={deleting}
+          onDelete={() => void handleDeleteImage()}
+        />
+      ) : selectedMergedTopicId ? (
+        <MergedCsvPane
+          topicId={selectedMergedTopicId}
+          topicLabel={selectedMergedLabel}
+          language={language}
+          statusMessage={statusMessage}
+        />
+      ) : (
+        <FileDetailPane
+          language={language}
+          state={{
+            selectedFile,
+            currentPathLabel,
+            statusMessage,
+            deleting,
+            saving,
+            uploading,
+            hasUnsavedChanges,
+            draft,
+            fileEditable,
+            loadingContent,
+            contentMessage,
+            editorText,
+          }}
+          actions={{
+            onDownload: () => {
+              if (selectedFile) api.downloadHciotKnowledgeFile(selectedFile.name, language);
+            },
+            onDelete: () => { void handleDeleteFile(); },
+            onSave: () => { void handleSave(); },
+            onCategoryChange: handleCategoryChange,
+            onTopicChange: handleTopicChange,
+            onDraftChange: patchDraft,
+            onEditorTextChange: setEditorText,
+          }}
+          categoryOptions={categoryOptions}
+          topicOptions={topicOptions}
+        />
+      )}
     </section>
   );
 }

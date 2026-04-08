@@ -320,6 +320,7 @@ app.include_router(hciot_prompts.router, prefix="/api/hciot/prompts", include_in
 app.include_router(hciot_knowledge.router, prefix="/api/hciot-admin/knowledge")
 app.include_router(hciot_knowledge.router, prefix="/api/hciot/knowledge", include_in_schema=False)
 app.include_router(hciot_images.router, prefix="/api/hciot")
+app.include_router(hciot_images.admin_router, prefix="/api/hciot-admin/images")
 app.include_router(hciot_topics_admin.public_router, prefix="/api/hciot")
 app.include_router(hciot_topics_admin.router, prefix="/api/hciot-admin/topics")
 app.include_router(chat.router)

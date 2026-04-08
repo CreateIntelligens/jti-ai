@@ -99,6 +99,20 @@ class HciotKnowledgeStore:
             query["filename"] = self._safe_filename(filename)
         return query
 
+    def get_topic_csv_files(self, language: str, topic_id: str) -> list[dict[str, Any]]:
+        query = self._query(language)
+        query["topic_id"] = topic_id
+        query["filename"] = {"$regex": r"\.csv$", "$options": "i"}
+        
+        cursor = self.collection.find(query, {"filename": 1, "data": 1}).sort("filename", 1)
+        results = []
+        for doc in cursor:
+            results.append({
+                "filename": doc.get("filename"),
+                "data": self._to_bytes(doc.get("data"))
+            })
+        return results
+
     def list_files(self, language: str) -> list[dict[str, Any]]:
         cursor = self.collection.find(
             self._query(language),
