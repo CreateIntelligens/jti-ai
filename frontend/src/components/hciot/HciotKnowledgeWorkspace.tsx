@@ -100,7 +100,7 @@ export default function HciotKnowledgeWorkspace({
   );
 
   const selectedImage = useMemo(
-    () => images.find((img) => img.filename === selectedImageName) || null,
+    () => images.find((img) => img.image_id === selectedImageName) || null,
     [images, selectedImageName],
   );
 
@@ -375,13 +375,13 @@ export default function HciotKnowledgeWorkspace({
     if (!selectedImage) return;
     const confirmed = window.confirm(
       language === 'zh'
-        ? `確定要刪除圖片 ${selectedImage.filename}？`
-        : `Delete image ${selectedImage.filename}?`,
+        ? `確定要刪除圖片 ${selectedImage.image_id}？`
+        : `Delete image ${selectedImage.image_id}?`,
     );
     if (!confirmed) return;
     setDeleting(true);
     try {
-      await api.deleteHciotImage(selectedImage.filename);
+      await api.deleteHciotImage(selectedImage.image_id);
       await refreshWorkspace();
       setSelectedImageName(null);
       showStatus(language === 'zh' ? '圖片已刪除' : 'Image deleted');
@@ -640,6 +640,8 @@ export default function HciotKnowledgeWorkspace({
           topicLabel={selectedMergedLabel}
           language={language}
           statusMessage={statusMessage}
+          onRefreshWorkspace={() => void refreshWorkspace()}
+          onUploadImage={api.uploadHciotImage}
         />
       ) : (
         <FileDetailPane

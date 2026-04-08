@@ -360,9 +360,8 @@ export async function uploadHciotKnowledgeFileWithTopic(
 // ========== Image Admin ==========
 
 export interface HciotImage {
-  filename: string;
-  size_bytes: number;
   image_id: string;
+  size_bytes: number;
   url: string;
 }
 
@@ -384,8 +383,8 @@ export async function uploadHciotImage(file: File, imageId?: string): Promise<Hc
   return handleResponse<HciotImage>(response);
 }
 
-export async function deleteHciotImage(filename: string): Promise<void> {
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/images/${encodeURIComponent(filename)}`, {
+export async function deleteHciotImage(imageId: string): Promise<void> {
+  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/images/${encodeURIComponent(imageId)}`, {
     method: 'DELETE',
   });
   await handleResponse<void>(response);
@@ -407,9 +406,9 @@ export interface HciotMergedCsvResponse {
 }
 
 export async function getHciotTopicMergedCsv(topicId: string, language: string = 'zh'): Promise<HciotMergedCsvResponse> {
-  const query = new URLSearchParams({ 
+  const query = new URLSearchParams({
     topic_id: topicId,
-    language: normLang(language) 
+    language: normLang(language)
   });
   const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/knowledge/topic-csv-merged?${query}`);
   return handleResponse<HciotMergedCsvResponse>(response);

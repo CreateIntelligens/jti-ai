@@ -209,7 +209,7 @@ function matchesSearch(node: ExplorerNode, query: string): boolean {
   }
 
   if (node.kind === 'image') {
-    return node.image.filename.toLowerCase().includes(normalizedQuery);
+    return node.image.image_id.toLowerCase().includes(normalizedQuery);
   }
 
   return false;
@@ -477,11 +477,11 @@ export function buildExplorerTree(
   if (images.length > 0) {
     const imageNodes: ExplorerNode[] = images
       .slice()
-      .sort((a, b) => sortByLabel(a.filename, b.filename))
+      .sort((a, b) => sortByLabel(a.image_id, b.image_id))
       .map((img) => ({
-        key: `image:${img.filename}`,
+        key: `image:${img.image_id}`,
         kind: 'image',
-        label: img.filename,
+        label: img.image_id,
         image: img,
       }));
 

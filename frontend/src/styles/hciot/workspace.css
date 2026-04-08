@@ -927,6 +927,68 @@
   word-break: break-all;
 }
 
+.hciot-merged-csv-img-text.hidden {
+  display: none;
+}
+
+.hciot-merged-csv-img-cell {
+  position: relative;
+  min-width: 100px;
+}
+
+.hciot-merged-csv-img-wrapper.edit-mode {
+  border: 1px dashed var(--hciot-border-strong);
+  background: rgba(148, 163, 184, 0.05);
+  cursor: default;
+}
+
+.hciot-merged-csv-remove-img {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(185, 28, 28, 0.85);
+  color: white;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 2;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.hciot-merged-csv-remove-img:hover {
+  transform: scale(1.1);
+  background: rgb(185, 28, 28);
+}
+
+.hciot-merged-csv-upload-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  width: 100%;
+  height: 100%;
+  color: var(--hciot-ink-soft);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s ease, background 0.15s ease;
+}
+
+.hciot-merged-csv-upload-btn:hover {
+  color: var(--hciot-accent);
+  background: rgba(2, 132, 199, 0.05);
+}
+
+.hciot-merged-csv-upload-btn.is-uploading {
+  cursor: wait;
+}
+
 /* ==========================================================================
    Image Management
    ========================================================================== */

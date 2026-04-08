@@ -92,7 +92,7 @@ export default function ExplorerSidebar({
             {visibleRows.map(({ node, depth }) => {
               const isSelected =
                 (node.kind === 'file' && node.file.name === selectedFileName) ||
-                (node.kind === 'image' && node.image.filename === selectedImageName) ||
+                (node.kind === 'image' && node.image.image_id === selectedImageName) ||
                 (node.kind === 'merged-csv' && node.topicId === selectedMergedTopicId);
               const isExpanded = isFolderNode(node) && (
                 Boolean(deferredSearchQuery) || visibleExpandedKeys.has(node.key)
@@ -106,7 +106,7 @@ export default function ExplorerSidebar({
                   style={{ '--row-depth': depth } as CSSProperties}
                   onClick={() => {
                     if (node.kind === 'file') onSelectFile(node.file.name);
-                    else if (node.kind === 'image') onSelectImage(node.image.filename);
+                    else if (node.kind === 'image') onSelectImage(node.image.image_id);
                     else if (node.kind === 'merged-csv') onSelectMergedCsv(node.topicId);
                     else onToggleExpanded(node.key);
                   }}

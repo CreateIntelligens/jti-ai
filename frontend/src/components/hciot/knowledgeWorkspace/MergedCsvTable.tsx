@@ -1,6 +1,8 @@
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Upload, X } from 'lucide-react';
 import type { HciotMergedCsvRow } from '../../../services/api/hciot';
 import type { HciotLanguage } from '../../../config/hciotTopics';
+import { getHciotImageUrl, normalizeImageId } from '../../../utils/hciotImage';
+import { useState } from 'react';
 
 interface MergedCsvTableProps {
   topicId: string;
@@ -13,6 +15,7 @@ interface MergedCsvTableProps {
   onUpdateRow: (index: number, updated: Partial<HciotMergedCsvRow>) => void;
   onDeleteRow: (index: number) => void;
   onAddRow: () => void;
+  onUploadImage?: (file: File) => Promise<{ image_id: string }>;
 }
 
 export default function MergedCsvTable({
@@ -25,7 +28,10 @@ export default function MergedCsvTable({
   onUpdateRow,
   onDeleteRow,
   onAddRow,
+  onUploadImage,
 }: MergedCsvTableProps) {
+  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
+
   if (loading) {
     return <div className="hciot-merged-csv-loading">{language === 'zh' ? '載入整合資料中...' : 'Loading merged data...'}</div>;
   }
@@ -37,6 +43,20 @@ export default function MergedCsvTable({
   if (rows.length === 0 && !isEditing) {
     return <div className="hciot-merged-csv-empty">{language === 'zh' ? '此主題目前沒有 CSV 檔案。' : 'No CSV files found for this topic.'}</div>;
   }
+
+  const handleFileChange = async (index: number, file: File | null) => {
+    if (!file || !onUploadImage) return;
+    setUploadingIndex(index);
+    try {
+      const res = await onUploadImage(file);
+      onUpdateRow(index, { img: res.image_id });
+    } catch (err) {
+      console.error('Failed to upload image:', err);
+      alert(language === 'zh' ? '圖片上傳失敗' : 'Failed to upload image');
+    } finally {
+      setUploadingIndex(null);
+    }
+  };
 
   return (
     <div className="hciot-merged-csv-container">
@@ -55,72 +75,101 @@ export default function MergedCsvTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, i) => (
-              <tr key={`${row.index}-${i}`}>
-                <td>{i + 1}</td>
-                <td>
-                  {isEditing ? (
-                    <textarea
-                      className="hciot-file-textarea"
-                      style={{ minHeight: '60px', padding: '4px' }}
-                      value={row.q}
-                      onChange={(e) => onUpdateRow(i, { q: e.target.value })}
-                    />
-                  ) : (
-                    row.q
-                  )}
-                </td>
-                <td style={{ whiteSpace: 'pre-wrap' }}>
-                  {isEditing ? (
-                    <textarea
-                      className="hciot-file-textarea"
-                      style={{ minHeight: '60px', padding: '4px' }}
-                      value={row.a}
-                      onChange={(e) => onUpdateRow(i, { a: e.target.value })}
-                    />
-                  ) : (
-                    row.a
-                  )}
-                </td>
-                <td>
-                  {isEditing ? (
-                    <input
-                      className="hciot-file-input"
-                      value={row.img || ''}
-                      placeholder="image.jpg"
-                      onChange={(e) => onUpdateRow(i, { img: e.target.value })}
-                    />
-                  ) : row.img ? (
-                    <div className="hciot-merged-csv-img-wrapper">
-                      <img
-                        src={`/api/hciot/images/${row.img.replace(/\.[^.]+$/, '')}`}
-                        alt={row.img}
-                        className="hciot-merged-csv-thumbnail"
-                        title={row.img}
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                          const next = (e.target as HTMLImageElement).nextElementSibling;
-                          if (next) next.classList.remove('hidden');
-                        }}
+            {rows.map((row, i) => {
+              const imageUrl = getHciotImageUrl(row.img);
+              return (
+                <tr key={`${row.index}-${i}`}>
+                  <td>{i + 1}</td>
+                  <td>
+                    {isEditing ? (
+                      <textarea
+                        className="hciot-file-textarea"
+                        style={{ minHeight: '60px', padding: '4px' }}
+                        value={row.q}
+                        onChange={(e) => onUpdateRow(i, { q: e.target.value })}
                       />
-                      <span className="hciot-merged-csv-img-text hidden">{row.img}</span>
-                    </div>
-                  ) : null}
-                </td>
-                {isEditing && (
-                  <td style={{ textAlign: 'center' }}>
-                    <button
-                      type="button"
-                      className="hciot-explorer-icon-button danger"
-                      onClick={() => onDeleteRow(i)}
-                      title={language === 'zh' ? '刪除此列' : 'Delete row'}
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    ) : (
+                      row.q
+                    )}
                   </td>
-                )}
-              </tr>
-            ))}
+                  <td style={{ whiteSpace: 'pre-wrap' }}>
+                    {isEditing ? (
+                      <textarea
+                        className="hciot-file-textarea"
+                        style={{ minHeight: '60px', padding: '4px' }}
+                        value={row.a}
+                        onChange={(e) => onUpdateRow(i, { a: e.target.value })}
+                      />
+                    ) : (
+                      row.a
+                    )}
+                  </td>
+                  <td>
+                    {isEditing ? (
+                      <div className="hciot-merged-csv-img-cell">
+                        {row.img ? (
+                          <div className="hciot-merged-csv-img-wrapper edit-mode">
+                            {imageUrl && (
+                              <img src={imageUrl} alt={row.img} className="hciot-merged-csv-thumbnail" />
+                            )}
+                            <button
+                              type="button"
+                              className="hciot-merged-csv-remove-img"
+                              onClick={() => onUpdateRow(i, { img: '' })}
+                              title={language === 'zh' ? '移除圖片' : 'Remove image'}
+                            >
+                              <X size={12} />
+                            </button>
+                            <span className="hciot-merged-csv-img-text">{normalizeImageId(row.img)}</span>
+                          </div>
+                        ) : (
+                          <label className={`hciot-merged-csv-upload-btn${uploadingIndex === i ? ' is-uploading' : ''}`}>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              style={{ display: 'none' }}
+                              onChange={(e) => handleFileChange(i, e.target.files?.[0] || null)}
+                              disabled={uploadingIndex === i}
+                            />
+                            <Upload size={14} />
+                            <span>{uploadingIndex === i ? '...' : (language === 'zh' ? '上傳' : 'Upload')}</span>
+                          </label>
+                        )}
+                      </div>
+                    ) : row.img ? (
+                      <div className="hciot-merged-csv-img-wrapper">
+                        {imageUrl && (
+                          <img
+                            src={imageUrl}
+                            alt={row.img}
+                            className="hciot-merged-csv-thumbnail"
+                            title={row.img}
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).style.display = 'none';
+                              const next = (e.target as HTMLImageElement).nextElementSibling;
+                              if (next) next.classList.remove('hidden');
+                            }}
+                          />
+                        )}
+                        <span className="hciot-merged-csv-img-text hidden">{row.img}</span>
+                      </div>
+                    ) : null}
+                  </td>
+                  {isEditing && (
+                    <td style={{ textAlign: 'center' }}>
+                      <button
+                        type="button"
+                        className="hciot-explorer-icon-button danger"
+                        onClick={() => onDeleteRow(i)}
+                        title={language === 'zh' ? '刪除此列' : 'Delete row'}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
         {isEditing && (

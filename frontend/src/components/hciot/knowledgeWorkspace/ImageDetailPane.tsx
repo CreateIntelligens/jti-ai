@@ -34,7 +34,7 @@ export default function ImageDetailPane({
       <div className="hciot-file-header">
         <div>
           <p className="hciot-file-kicker">Knowledge Explorer</p>
-          <h2 className="hciot-file-title">{selectedImage.filename}</h2>
+          <h2 className="hciot-file-title">{selectedImage.image_id}</h2>
           <p className="hciot-file-path">{language === 'zh' ? '圖片目錄' : 'Images'}</p>
         </div>
 
@@ -57,10 +57,10 @@ export default function ImageDetailPane({
           <span>{selectedImage.size_bytes ? `${Math.max(1, Math.round(selectedImage.size_bytes / 1024))} KB` : '0 KB'}</span>
         </div>
         <div className="hciot-image-preview-container" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6', borderRadius: '8px', overflow: 'hidden', width: '100%', minHeight: '300px' }}>
-          <img 
-            src={selectedImage.url} 
-            alt={selectedImage.filename} 
-            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} 
+          <img
+            src={selectedImage.url}
+            alt={selectedImage.image_id}
+            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
           />
         </div>
       </section>

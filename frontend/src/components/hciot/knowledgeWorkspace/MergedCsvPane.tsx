@@ -12,6 +12,7 @@ interface MergedCsvPaneProps {
   language: HciotLanguage;
   statusMessage: string | null;
   onRefreshWorkspace?: () => void;
+  onUploadImage?: (file: File) => Promise<{ image_id: string }>;
 }
 
 function toCsvString(rows: HciotMergedCsvRow[]): string {
@@ -37,6 +38,7 @@ export default function MergedCsvPane({
   language,
   statusMessage,
   onRefreshWorkspace,
+  onUploadImage,
 }: MergedCsvPaneProps) {
   const topicSlug = topicId.includes('/') ? topicId.split('/').pop() : topicId;
 
@@ -201,6 +203,7 @@ export default function MergedCsvPane({
           onUpdateRow={handleUpdateRow}
           onDeleteRow={handleDeleteRow}
           onAddRow={handleAddRow}
+          onUploadImage={onUploadImage}
         />
       </section>
     </div>
