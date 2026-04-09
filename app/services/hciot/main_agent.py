@@ -98,15 +98,62 @@ class HciotMainAgent(BaseAgent):
         cls,
         citations: list[dict] | None,
     ) -> str | None:
-        """Return IMG_ token from the top citation's filename, or None."""
+        """Return image_id from the top citation.
+
+        1. IMG_ token in citation title (dedicated IMG CSV filename)
+        2. IMG_ token in citation chunk text
+        3. Fallback: read CSV from DB → return raw ``img`` field value as image_id
+        """
         if not isinstance(citations, list) or not citations:
             return None
         first = citations[0]
         if not isinstance(first, dict):
             return None
+
         title = first.get("title") or ""
-        match = cls.IMAGE_TOKEN_PATTERN.search(title)
-        return match.group(0) if match else None
+        text = first.get("text") or ""
+
+        for value in (title, text):
+            match = cls.IMAGE_TOKEN_PATTERN.search(value)
+            if match:
+                return match.group(0)
+
+        # Fallback: read CSV from knowledge store and extract img field
+        return cls._extract_image_id_from_csv(title)
+
+    @classmethod
+    def _extract_image_id_from_csv(cls, filename: str) -> str | None:
+        """Read a CSV from knowledge store and return the first non-empty img value as image_id."""
+        if not filename:
+            return None
+        try:
+            import csv
+            import io
+            store = get_hciot_knowledge_store()
+            doc = store.get_file("zh", filename) or store.get_file("en", filename)
+            if not doc or not doc.get("data"):
+                return None
+            text = doc["data"].decode("utf-8-sig")
+            reader = csv.DictReader(io.StringIO(text))
+            if not reader.fieldnames or "img" not in reader.fieldnames:
+                return None
+            for row in reader:
+                raw = (row.get("img") or "").strip()
+                if not raw:
+                    continue
+                # Clean "IMG_T02_001=images/..." → take left side
+                if "=" in raw:
+                    raw = raw.split("=", 1)[0].strip()
+                # Strip path and extension for legacy format
+                if "/" in raw:
+                    raw = raw.split("/")[-1]
+                if "." in raw:
+                    raw = raw.rsplit(".", 1)[0]
+                if raw:
+                    return raw
+        except Exception as e:
+            logger.debug("Failed to extract image_id from CSV %s: %s", filename, e)
+        return None
 
     @staticmethod
     def _citation_filename(value: str | None) -> str:

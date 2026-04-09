@@ -42,6 +42,17 @@ def test_hciot_agent_uses_flash_lite_for_chat_and_file_search():
     assert FILE_SEARCH_MODEL == "gemini-2.5-flash-lite"
 
 
+def test_extract_top_citation_image_id_does_not_fallback_to_other_csv_rows():
+    citations = [
+        {
+            "title": "helicobacter_pylori.csv",
+            "text": "最相關問題\n最相關答案",
+        }
+    ]
+
+    assert HciotMainAgent._extract_top_citation_image_id(citations) is None
+
+
 async def _fake_concurrent_result(user_message, language, session_id=None):
     return "PRP 是使用自體血液的治療方式", None
 
