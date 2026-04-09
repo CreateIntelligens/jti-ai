@@ -3,8 +3,9 @@ import { Table as TableIcon, Edit, Save, X } from 'lucide-react';
 
 import type { HciotLanguage } from '../../../config/hciotTopics';
 import { getHciotTopicMergedCsv, deleteHciotKnowledgeFile, updateHciotKnowledgeFileContent, type HciotMergedCsvRow } from '../../../services/api/hciot';
+import { extractUploadedImageId, rollbackUploadedImages, type DeleteImageHandler, type UploadedImageResult } from './imageUpload';
 import { getErrorMessage } from './shared';
-import MergedCsvTable from './MergedCsvTable';
+import MergedCsvTable, { type EditableMergedCsvRow } from './MergedCsvTable';
 
 interface MergedCsvPaneProps {
   topicId: string;
@@ -12,7 +13,8 @@ interface MergedCsvPaneProps {
   language: HciotLanguage;
   statusMessage: string | null;
   onRefreshWorkspace?: () => void;
-  onUploadImage?: (file: File) => Promise<{ image_id: string }>;
+  onUploadImage?: (file: File) => Promise<UploadedImageResult>;
+  onDeleteImage?: DeleteImageHandler;
 }
 
 function toCsvString(rows: HciotMergedCsvRow[]): string {
@@ -39,11 +41,12 @@ export default function MergedCsvPane({
   statusMessage,
   onRefreshWorkspace,
   onUploadImage,
+  onDeleteImage,
 }: MergedCsvPaneProps) {
   const topicSlug = topicId.includes('/') ? topicId.split('/').pop() : topicId;
 
   const [loading, setLoading] = useState(true);
-  const [rows, setRows] = useState<HciotMergedCsvRow[]>([]);
+  const [rows, setRows] = useState<EditableMergedCsvRow[]>([]);
   const [sourceFiles, setSourceFiles] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -92,11 +95,52 @@ export default function MergedCsvPane({
   const handleSave = async () => {
     if (!sourceFiles.length) return;
     setSaving(true);
+    const originalRows = rows.map((row) => ({ ...row }));
+    const uploadedImageIds: string[] = [];
+    let imageUploadFailedIndex: number | null = null;
+    let imageUploadFailedMessage: string | undefined;
+    let stage: 'images' | 'save' = 'images';
+
     try {
       const mainFile = sourceFiles.find((f) => !f.includes('_IMG_')) ?? sourceFiles[0];
+      const preparedRows = [...originalRows];
+
+      for (const [index, row] of preparedRows.entries()) {
+        if (!row.pendingImageFile) continue;
+        if (!onUploadImage) {
+          throw new Error(language === 'zh' ? '缺少圖片上傳功能' : 'Image upload is unavailable');
+        }
+
+        preparedRows[index] = {
+          ...row,
+          imgStatus: 'uploading',
+          imgError: undefined,
+        };
+        setRows([...preparedRows]);
+
+        try {
+          const imageId = extractUploadedImageId(await onUploadImage(row.pendingImageFile));
+          uploadedImageIds.push(imageId);
+          preparedRows[index] = {
+            ...preparedRows[index],
+            img: imageId,
+            pendingImageFile: undefined,
+            pendingImageName: undefined,
+            imgStatus: 'done',
+            imgError: undefined,
+          };
+          setRows([...preparedRows]);
+        } catch (err: any) {
+          imageUploadFailedIndex = index;
+          imageUploadFailedMessage = err?.message || String(err);
+          throw err;
+        }
+      }
+
+      stage = 'save';
       const grouped = new Map<string, HciotMergedCsvRow[]>();
 
-      for (const row of rows) {
+      for (const row of preparedRows) {
         const file = row.source_file ?? mainFile;
         const group = grouped.get(file) ?? [];
         group.push(row);
@@ -115,6 +159,14 @@ export default function MergedCsvPane({
       setIsEditing(false);
       onRefreshWorkspace ? onRefreshWorkspace() : fetchCsv();
     } catch (err) {
+      if (stage === 'images') {
+        await rollbackUploadedImages(uploadedImageIds, onDeleteImage);
+        setRows(originalRows.map((row, index) => index === imageUploadFailedIndex ? {
+          ...row,
+          imgStatus: 'error',
+          imgError: imageUploadFailedMessage,
+        } : row));
+      }
       console.error('Failed to save merged CSV:', err);
       alert(getErrorMessage(err));
     } finally {
@@ -122,7 +174,7 @@ export default function MergedCsvPane({
     }
   };
 
-  const handleUpdateRow = (index: number, updated: Partial<HciotMergedCsvRow>) => {
+  const handleUpdateRow = (index: number, updated: Partial<EditableMergedCsvRow>) => {
     setRows(prev => prev.map((r, i) => i === index ? { ...r, ...updated } : r));
   };
 
@@ -193,7 +245,6 @@ export default function MergedCsvPane({
 
       <section className="hciot-file-editor-panel hciot-merged-panel">
         <MergedCsvTable
-          topicId={topicId}
           language={language}
           rows={rows}
           sourceFiles={sourceFiles}
@@ -203,7 +254,6 @@ export default function MergedCsvPane({
           onUpdateRow={handleUpdateRow}
           onDeleteRow={handleDeleteRow}
           onAddRow={handleAddRow}
-          onUploadImage={onUploadImage}
         />
       </section>
     </div>

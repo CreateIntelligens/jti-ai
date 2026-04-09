@@ -3,6 +3,7 @@ import { Plus, Trash2, Upload, X, Table, FileText, FileType, Image as ImageIcon,
 
 import type { HciotLanguage } from '../../../config/hciotTopics';
 import type { HciotTopicCategory } from '../../../services/api/hciot';
+import { extractUploadedImageId, rollbackUploadedImages, type DeleteImageHandler, type UploadedImageResult } from './imageUpload';
 import { NEW_VALUE, slugify, sortByLabel, type TopicLabels } from './shared';
 
 type Tab = 'file' | 'qa' | 'image';
@@ -12,6 +13,8 @@ interface QARow {
   q: string;
   a: string;
   img?: string;
+  pendingImageFile?: File | null;
+  pendingImageName?: string;
   imgStatus?: FileStatus;
   imgError?: string;
 }
@@ -39,7 +42,8 @@ interface UploadDialogProps {
   onUploadFile: (file: File, topicId: string | null, labels: TopicLabels | null) => Promise<{ name: string }>;
   onUploadComplete: (firstUploadedFileName: string | null, count: number) => Promise<void>;
   onSubmitQA: (file: File, topicId: string, labels: TopicLabels) => Promise<void>;
-  onUploadImage: (file: File, imageId?: string) => Promise<any>;
+  onUploadImage: (file: File, imageId?: string) => Promise<UploadedImageResult>;
+  onDeleteImage?: DeleteImageHandler;
   onUploadImageComplete: (count: number) => Promise<void>;
 }
 
@@ -254,6 +258,7 @@ export default function UploadDialog({
   onUploadComplete,
   onSubmitQA,
   onUploadImage,
+  onDeleteImage,
   onUploadImageComplete,
 }: UploadDialogProps) {
   const [tab, setTab] = useState<Tab>('file');
@@ -277,6 +282,7 @@ export default function UploadDialog({
       setSelectedFiles([]);
       setSelectedImages([]);
       setUploadingLocal(false);
+      setPendingRowImageIndex(null);
     }
   }, [open]);
 
@@ -329,7 +335,7 @@ export default function UploadDialog({
     if (imageInputRef.current) imageInputRef.current.value = '';
   };
 
-  const handleRowImageSelect = async (fileList: FileList | null) => {
+  const handleRowImageSelect = (fileList: FileList | null) => {
     if (!fileList?.length || pendingRowImageIndex === null) return;
     const file = fileList[0];
     if (!file.type.startsWith('image/')) return;
@@ -337,14 +343,14 @@ export default function UploadDialog({
     const index = pendingRowImageIndex;
     setPendingRowImageIndex(null);
 
-    setRows(prev => prev.map((r, i) => i === index ? { ...r, imgStatus: 'uploading' } : r));
-    try {
-      const res = await onUploadImage(file);
-      const imageId = res.image_id || res.id || res.name; // Backend returns image_id
-      setRows(prev => prev.map((r, i) => i === index ? { ...r, img: imageId, imgStatus: 'done', imgError: undefined } : r));
-    } catch (err: any) {
-      setRows(prev => prev.map((r, i) => i === index ? { ...r, imgStatus: 'error', imgError: err.message || String(err) } : r));
-    }
+    setRows(prev => prev.map((r, i) => i === index ? {
+      ...r,
+      img: '',
+      pendingImageFile: file,
+      pendingImageName: file.name,
+      imgStatus: 'pending',
+      imgError: undefined,
+    } : r));
     if (rowImageInputRef.current) rowImageInputRef.current.value = '';
   };
 
@@ -379,11 +385,58 @@ export default function UploadDialog({
     if (!validRows.length || !resolved) return;
 
     setUploadingLocal(true);
+    const originalRows = rows.map((row) => ({ ...row }));
+    const uploadedImageIds: string[] = [];
+    let imageUploadFailedIndex: number | null = null;
+    let imageUploadFailedMessage: string | undefined;
+    let stage: 'images' | 'submit' = 'images';
+
     try {
+      const preparedRows = [...originalRows];
+      for (const [index, row] of preparedRows.entries()) {
+        if (!row.q.trim() || !row.pendingImageFile) continue;
+
+        setRows(prev => prev.map((item, itemIndex) => itemIndex === index ? {
+          ...item,
+          imgStatus: 'uploading',
+          imgError: undefined,
+        } : item));
+
+        try {
+          const imageId = extractUploadedImageId(await onUploadImage(row.pendingImageFile));
+          uploadedImageIds.push(imageId);
+          preparedRows[index] = {
+            ...row,
+            img: imageId,
+            pendingImageFile: undefined,
+            pendingImageName: undefined,
+            imgStatus: 'done',
+            imgError: undefined,
+          };
+          setRows(prev => prev.map((item, itemIndex) => itemIndex === index ? preparedRows[index] : item));
+        } catch (err: any) {
+          imageUploadFailedIndex = index;
+          imageUploadFailedMessage = err?.message || String(err);
+          throw err;
+        }
+      }
+
+      stage = 'submit';
       const prefix = (resolved.fullTopicId.split('/').pop() || resolved.fullTopicId).toUpperCase().replace(/-/g, '_');
-      const blob = buildCsvBlob(validRows, prefix);
+      const blob = buildCsvBlob(preparedRows.filter((row) => row.q.trim()), prefix);
       const file = new File([blob], `${prefix.toLowerCase()}_qa_${Date.now()}.csv`, { type: 'text/csv' });
       await onSubmitQA(file, resolved.fullTopicId, resolved.labels);
+    } catch (err) {
+      if (stage === 'images') {
+        await rollbackUploadedImages(uploadedImageIds, onDeleteImage);
+        setRows(originalRows.map((row, index) => index === imageUploadFailedIndex ? {
+          ...row,
+          imgStatus: 'error',
+          imgError: imageUploadFailedMessage,
+        } : row));
+      }
+      console.error('Failed to submit HCIoT Q&A:', err);
+      alert(err instanceof Error ? err.message : String(err));
     } finally {
       setUploadingLocal(false);
     }
@@ -636,64 +689,76 @@ export default function UploadDialog({
         {tab === 'qa' && (
           <div className="hciot-upload-qa-body">
             <div className="hciot-qa-rows">
-              {rows.map((row, index) => (
-                <div key={index} className="hciot-qa-row">
-                  <span className="hciot-qa-row-number">{index + 1}</span>
-                  <div className="hciot-qa-row-fields">
-                    <input
-                      className="hciot-qa-input"
-                      placeholder={language === 'zh' ? '問題 (Q)' : 'Question (Q)'}
-                      value={row.q}
-                      onChange={(e) => updateRow(index, 'q', e.target.value)}
-                    />
-                    <textarea
-                      className="hciot-qa-textarea"
-                      placeholder={language === 'zh' ? '回答 (A)' : 'Answer (A)'}
-                      value={row.a}
-                      onChange={(e) => updateRow(index, 'a', e.target.value)}
-                      rows={2}
-                    />
-                  </div>
-                  <div className="hciot-qa-row-image">
-                    <button
-                      type="button"
-                      className={`hciot-qa-image-btn ${row.imgStatus}`}
-                      onClick={() => {
-                        setPendingRowImageIndex(index);
-                        rowImageInputRef.current?.click();
-                      }}
-                      title={row.img ? (row.img) : (language === 'zh' ? '上傳圖片' : 'Upload Image')}
-                    >
-                      {row.imgStatus === 'uploading' ? (
-                        <Loader2 size={14} className="animate-spin" />
-                      ) : row.img ? (
-                        <CheckCircle2 size={14} className="text-green-500" />
-                      ) : row.imgStatus === 'error' ? (
-                        <span title={row.imgError} className="flex"><XCircle size={14} className="text-red-500" /></span>
-                      ) : (
-                        <ImageIcon size={14} />
-                      )}
-                    </button>
-                    {row.img && (
+              {rows.map((row, index) => {
+                const imageLabel = row.pendingImageName || row.img;
+                const hasImage = Boolean(imageLabel);
+
+                return (
+                  <div key={index} className="hciot-qa-row">
+                    <span className="hciot-qa-row-number">{index + 1}</span>
+                    <div className="hciot-qa-row-fields">
+                      <input
+                        className="hciot-qa-input"
+                        placeholder={language === 'zh' ? '問題 (Q)' : 'Question (Q)'}
+                        value={row.q}
+                        onChange={(e) => updateRow(index, 'q', e.target.value)}
+                      />
+                      <textarea
+                        className="hciot-qa-textarea"
+                        placeholder={language === 'zh' ? '回答 (A)' : 'Answer (A)'}
+                        value={row.a}
+                        onChange={(e) => updateRow(index, 'a', e.target.value)}
+                        rows={2}
+                      />
+                    </div>
+                    <div className="hciot-qa-row-image">
                       <button
                         type="button"
-                        className="hciot-qa-image-clear"
-                        onClick={() => setRows(prev => prev.map((r, i) => i === index ? { ...r, img: '', imgStatus: 'pending' } : r))}
+                        className={`hciot-qa-image-btn ${row.imgStatus}`}
+                        onClick={() => {
+                          setPendingRowImageIndex(index);
+                          rowImageInputRef.current?.click();
+                        }}
+                        title={imageLabel || (language === 'zh' ? '上傳圖片' : 'Upload Image')}
                       >
-                        <X size={10} />
+                        {row.imgStatus === 'uploading' ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : row.imgStatus === 'error' ? (
+                          <span title={row.imgError} className="flex"><XCircle size={14} className="text-red-500" /></span>
+                        ) : hasImage ? (
+                          <CheckCircle2 size={14} className="text-green-500" />
+                        ) : (
+                          <ImageIcon size={14} />
+                        )}
                       </button>
-                    )}
+                      {hasImage && (
+                        <button
+                          type="button"
+                          className="hciot-qa-image-clear"
+                          onClick={() => setRows(prev => prev.map((r, i) => i === index ? {
+                            ...r,
+                            img: '',
+                            pendingImageFile: undefined,
+                            pendingImageName: undefined,
+                            imgStatus: 'pending',
+                            imgError: undefined,
+                          } : r))}
+                        >
+                          <X size={10} />
+                        </button>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      className="hciot-qa-row-delete"
+                      onClick={() => removeRow(index)}
+                      title={language === 'zh' ? '移除' : 'Remove'}
+                    >
+                      <Trash2 size={14} />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className="hciot-qa-row-delete"
-                    onClick={() => removeRow(index)}
-                    title={language === 'zh' ? '移除' : 'Remove'}
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
+                );
+              })}
             </div>
             <input
               ref={rowImageInputRef}

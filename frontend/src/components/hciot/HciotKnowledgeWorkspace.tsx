@@ -624,6 +624,7 @@ export default function HciotKnowledgeWorkspace({
         onUploadComplete={handleUploadComplete}
         onSubmitQA={handleQASubmit}
         onUploadImage={api.uploadHciotImage}
+        onDeleteImage={api.deleteHciotImage}
         onUploadImageComplete={handleUploadImageComplete}
       />
 
@@ -642,6 +643,7 @@ export default function HciotKnowledgeWorkspace({
           statusMessage={statusMessage}
           onRefreshWorkspace={() => void refreshWorkspace()}
           onUploadImage={api.uploadHciotImage}
+          onDeleteImage={api.deleteHciotImage}
         />
       ) : (
         <FileDetailPane

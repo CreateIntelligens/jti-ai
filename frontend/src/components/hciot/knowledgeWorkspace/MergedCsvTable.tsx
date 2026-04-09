@@ -1,21 +1,27 @@
-import { Plus, Trash2, Upload, X } from 'lucide-react';
+import { Loader2, Plus, Trash2, Upload, X } from 'lucide-react';
 import type { HciotMergedCsvRow } from '../../../services/api/hciot';
 import type { HciotLanguage } from '../../../config/hciotTopics';
 import { getHciotImageUrl, normalizeImageId } from '../../../utils/hciotImage';
-import { useState } from 'react';
+
+export type RowImageStatus = 'pending' | 'uploading' | 'done' | 'error';
+
+export interface EditableMergedCsvRow extends HciotMergedCsvRow {
+  pendingImageFile?: File | null;
+  pendingImageName?: string;
+  imgStatus?: RowImageStatus;
+  imgError?: string;
+}
 
 interface MergedCsvTableProps {
-  topicId: string;
   language: HciotLanguage;
-  rows: HciotMergedCsvRow[];
+  rows: EditableMergedCsvRow[];
   sourceFiles: string[];
   loading: boolean;
   error: string | null;
   isEditing: boolean;
-  onUpdateRow: (index: number, updated: Partial<HciotMergedCsvRow>) => void;
+  onUpdateRow: (index: number, updated: Partial<EditableMergedCsvRow>) => void;
   onDeleteRow: (index: number) => void;
   onAddRow: () => void;
-  onUploadImage?: (file: File) => Promise<{ image_id: string }>;
 }
 
 export default function MergedCsvTable({
@@ -28,10 +34,7 @@ export default function MergedCsvTable({
   onUpdateRow,
   onDeleteRow,
   onAddRow,
-  onUploadImage,
 }: MergedCsvTableProps) {
-  const [uploadingIndex, setUploadingIndex] = useState<number | null>(null);
-
   if (loading) {
     return <div className="hciot-merged-csv-loading">{language === 'zh' ? '載入整合資料中...' : 'Loading merged data...'}</div>;
   }
@@ -44,18 +47,15 @@ export default function MergedCsvTable({
     return <div className="hciot-merged-csv-empty">{language === 'zh' ? '此主題目前沒有 CSV 檔案。' : 'No CSV files found for this topic.'}</div>;
   }
 
-  const handleFileChange = async (index: number, file: File | null) => {
-    if (!file || !onUploadImage) return;
-    setUploadingIndex(index);
-    try {
-      const res = await onUploadImage(file);
-      onUpdateRow(index, { img: res.image_id });
-    } catch (err) {
-      console.error('Failed to upload image:', err);
-      alert(language === 'zh' ? '圖片上傳失敗' : 'Failed to upload image');
-    } finally {
-      setUploadingIndex(null);
-    }
+  const handleFileChange = (index: number, file: File | null) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    onUpdateRow(index, {
+      img: '',
+      pendingImageFile: file,
+      pendingImageName: file.name,
+      imgStatus: 'pending',
+      imgError: undefined,
+    });
   };
 
   return (
@@ -76,7 +76,10 @@ export default function MergedCsvTable({
           </thead>
           <tbody>
             {rows.map((row, i) => {
-              const imageUrl = getHciotImageUrl(row.img);
+              const hasPendingImage = Boolean(row.pendingImageFile);
+              const hasImage = Boolean(row.img || hasPendingImage);
+              const imageUrl = hasPendingImage ? '' : getHciotImageUrl(row.img);
+              const imageLabel = row.pendingImageName || normalizeImageId(row.img) || row.img;
               return (
                 <tr key={`${row.index}-${i}`}>
                   <td>{i + 1}</td>
@@ -107,32 +110,41 @@ export default function MergedCsvTable({
                   <td>
                     {isEditing ? (
                       <div className="hciot-merged-csv-img-cell">
-                        {row.img ? (
+                        {hasImage ? (
                           <div className="hciot-merged-csv-img-wrapper edit-mode">
                             {imageUrl && (
                               <img src={imageUrl} alt={row.img} className="hciot-merged-csv-thumbnail" />
                             )}
+                            {row.imgStatus === 'uploading' ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : null}
                             <button
                               type="button"
                               className="hciot-merged-csv-remove-img"
-                              onClick={() => onUpdateRow(i, { img: '' })}
+                              onClick={() => onUpdateRow(i, {
+                                img: '',
+                                pendingImageFile: undefined,
+                                pendingImageName: undefined,
+                                imgStatus: 'pending',
+                                imgError: undefined,
+                              })}
                               title={language === 'zh' ? '移除圖片' : 'Remove image'}
                             >
                               <X size={12} />
                             </button>
-                            <span className="hciot-merged-csv-img-text">{normalizeImageId(row.img)}</span>
+                            <span className="hciot-merged-csv-img-text" title={row.imgError || imageLabel}>{imageLabel}</span>
                           </div>
                         ) : (
-                          <label className={`hciot-merged-csv-upload-btn${uploadingIndex === i ? ' is-uploading' : ''}`}>
+                          <label className={`hciot-merged-csv-upload-btn${row.imgStatus === 'uploading' ? ' is-uploading' : ''}`}>
                             <input
                               type="file"
                               accept="image/*"
                               style={{ display: 'none' }}
                               onChange={(e) => handleFileChange(i, e.target.files?.[0] || null)}
-                              disabled={uploadingIndex === i}
+                              disabled={row.imgStatus === 'uploading'}
                             />
                             <Upload size={14} />
-                            <span>{uploadingIndex === i ? '...' : (language === 'zh' ? '上傳' : 'Upload')}</span>
+                            <span>{row.imgStatus === 'uploading' ? '...' : (language === 'zh' ? '上傳' : 'Upload')}</span>
                           </label>
                         )}
                       </div>
