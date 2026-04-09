@@ -50,10 +50,5 @@ export async function rollbackUploadedImages(
 ): Promise<void> {
   if (!imageIds.length || !onDeleteImage) return;
 
-  const results = await Promise.allSettled(imageIds.map((imageId) => onDeleteImage(imageId)));
-  results.forEach((result, index) => {
-    if (result.status === 'rejected') {
-      console.error('Failed to rollback uploaded image:', imageIds[index], result.reason);
-    }
-  });
+  await Promise.allSettled(imageIds.map((imageId) => onDeleteImage(imageId)));
 }

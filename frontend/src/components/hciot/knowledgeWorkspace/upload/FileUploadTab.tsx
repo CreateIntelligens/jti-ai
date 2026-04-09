@@ -165,7 +165,7 @@ export default function FileUploadTab({
           <span className="hciot-upload-file-size" style={{ minWidth: '60px', textAlign: 'right' }}>
             {item.file.size > 1024 ? `${(item.file.size / 1024).toFixed(1)} KB` : `${item.file.size} B`}
           </span>
-          <div className="hciot-file-actions" style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: '40px', justifyContent: 'flex-end' }}>
+          <div className="hciot-file-actions">
             <UploadStatusIcon status={item.status} error={item.error} />
             {item.status !== 'uploading' && item.status !== 'done' && (
               <button

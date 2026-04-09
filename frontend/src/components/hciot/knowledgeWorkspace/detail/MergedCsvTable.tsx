@@ -5,13 +5,12 @@ import type { HciotLanguage } from '../../../../config/hciotTopics';
 import { getHciotImageUrl, normalizeImageId } from '../../../../utils/hciotImage';
 import ExistingImagePicker from '../explorer/ExistingImagePicker';
 import { usePendingImageUrls } from '../imageUpload';
-
-export type RowImageStatus = 'pending' | 'uploading' | 'done' | 'error';
+import type { FileStatus } from '../upload/types';
 
 export interface EditableMergedCsvRow extends HciotMergedCsvRow {
   pendingImageFile?: File | null;
   pendingImageName?: string;
-  imgStatus?: RowImageStatus;
+  imgStatus?: FileStatus;
   imgError?: string;
 }
 

@@ -83,7 +83,7 @@ function useTopicSelection(categories: HciotTopicCategory[], language: HciotLang
     }
   };
 
-  const resolveIds = (): ResolvedUploadTopic | null => {
+  const resolvedTopic = useMemo((): ResolvedUploadTopic | null => {
     const newCategoryLabels = singleFieldLabels(newCategoryZh);
     const newTopicLabels = singleFieldLabels(newTopicZh);
     const isNewCategory = categoryId === NEW_VALUE;
@@ -122,7 +122,7 @@ function useTopicSelection(categories: HciotTopicCategory[], language: HciotLang
         topicLabelEn: resolvedTopicLabels.en,
       },
     };
-  };
+  }, [categoryId, topicId, newCategoryZh, newTopicZh, currentCategory]);
 
   return {
     categoryId,
@@ -135,7 +135,7 @@ function useTopicSelection(categories: HciotTopicCategory[], language: HciotLang
     sortedTopics,
     handleCategoryChange,
     handleTopicChange,
-    resolveIds,
+    resolvedTopic,
   };
 }
 
@@ -155,7 +155,7 @@ export default function UploadDialog({
 }: UploadDialogProps) {
   const [tab, setTab] = useState<Tab>('file');
   const topic = useTopicSelection(categories, language, open);
-  const resolvedTopic = topic.resolveIds();
+  const resolvedTopic = topic.resolvedTopic;
 
   useEffect(() => {
     if (open) {

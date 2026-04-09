@@ -189,7 +189,6 @@ export default function MergedCsvPane({
           imgError: imageUploadFailedMessage,
         } : row));
       }
-      console.error('Failed to save merged CSV:', err);
       alert(getErrorMessage(err));
     } finally {
       setSaving(false);

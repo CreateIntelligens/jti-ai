@@ -336,11 +336,6 @@
 /* ==========================================================================
    QA Row Image Controls (Upload Dialog)
    ========================================================================== */
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
 .hciot-qa-row-image {
   display: flex;
   align-items: center;
@@ -449,14 +444,6 @@
   font-size: 0.75rem;
   padding: 2px 8px;
   height: 26px;
-}
-
-.hciot-file-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 40px;
-  justify-content: flex-end;
 }
 
 /* ==========================================================================

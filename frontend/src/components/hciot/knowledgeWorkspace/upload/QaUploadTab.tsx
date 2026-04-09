@@ -147,7 +147,7 @@ export default function QaUploadTab({
             imgStatus: 'done',
             imgError: undefined,
           };
-          Object.assign(preparedRows[index], updates);
+          preparedRows[index] = { ...preparedRows[index], ...updates };
           updateRow(index, updates);
         } catch (error: any) {
           imageUploadFailedIndex = index;
@@ -172,7 +172,6 @@ export default function QaUploadTab({
           imgError: imageUploadFailedMessage,
         } : row));
       }
-      console.error('Failed to submit HCIoT Q&A:', error);
       alert(error instanceof Error ? error.message : String(error));
     } finally {
       setUploadingLocal(false);
