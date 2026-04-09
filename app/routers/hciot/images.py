@@ -16,10 +16,23 @@ MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
 _EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp")
 
 
+def _candidate_image_ids(image_id: str) -> list[str]:
+    normalized = PurePosixPath(image_id).stem
+    candidate_ids = [normalized]
+    if normalized.upper().startswith("IMG_") and len(normalized) > 4:
+        candidate_ids.append(normalized[4:])
+    return candidate_ids
+
+
 @router.get("/images/{image_id}")
 def get_image(image_id: str):
     store = get_hciot_image_store()
-    image = store.get_image(image_id)
+    image = None
+    for candidate_id in _candidate_image_ids(image_id):
+        image = store.get_image(candidate_id)
+        if image:
+            break
+
     if not image:
         raise HTTPException(status_code=404, detail=f"Image not found: {image_id}")
 

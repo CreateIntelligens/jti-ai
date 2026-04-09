@@ -181,6 +181,78 @@ class UpdateFileMetadataRequest(BaseModel):
     topic_label_en: str | None = None
 
 
+def _rewrite_csv_file_with_split_uploads(
+    *,
+    store,
+    language: str,
+    safe_name: str,
+    doc: dict,
+    new_bytes: bytes,
+    background_tasks: BackgroundTasks,
+) -> None:
+    uploads = split_qa_csv_by_image(new_bytes, safe_name)
+    if not uploads:
+        updated = store.update_file_content(language, safe_name, new_bytes)
+        if not updated:
+            raise HTTPException(status_code=404, detail="檔案不存在")
+
+        store_name = _store_name(language)
+        if store_name:
+            background_tasks.add_task(_gemini_background, sync_to_gemini, store_name, safe_name, new_bytes)
+        return
+
+    upload_map = {name: data for name, data in uploads}
+    target_names = set(upload_map)
+    store_name = _store_name(language)
+
+    if safe_name in target_names:
+        safe_name_bytes = upload_map.pop(safe_name)
+        updated = store.update_file_content(language, safe_name, safe_name_bytes)
+        if not updated:
+            raise HTTPException(status_code=404, detail="檔案不存在")
+        if store_name:
+            background_tasks.add_task(
+                _gemini_background,
+                sync_to_gemini,
+                store_name,
+                safe_name,
+                safe_name_bytes,
+            )
+    else:
+        deleted = store.delete_file(language, safe_name)
+        if not deleted:
+            raise HTTPException(status_code=404, detail="檔案不存在")
+        if store_name:
+            background_tasks.add_task(_gemini_background, delete_from_gemini, store_name, safe_name)
+
+    for upload_name, upload_bytes in upload_map.items():
+        saved = store.insert_file(
+            language=language,
+            filename=upload_name,
+            data=upload_bytes,
+            display_name=upload_name,
+            content_type=doc.get("content_type") or "application/octet-stream",
+            editable=bool(doc.get("editable", False)),
+            topic_id=doc.get("topic_id"),
+            category_labels={
+                "zh": doc.get("category_label_zh"),
+                "en": doc.get("category_label_en"),
+            },
+            topic_labels={
+                "zh": doc.get("topic_label_zh"),
+                "en": doc.get("topic_label_en"),
+            },
+        )
+        if store_name:
+            background_tasks.add_task(
+                _gemini_background,
+                sync_to_gemini,
+                store_name,
+                saved["name"],
+                upload_bytes,
+            )
+
+
 @router.put("/files/{filename}/content")
 async def update_file_content(
     filename: str,
@@ -208,15 +280,25 @@ async def update_file_content(
     else:
         new_bytes = req.content.encode("utf-8")
 
-    updated = store.update_file_content(language, safe_name, new_bytes)
-    if not updated:
-        raise HTTPException(status_code=404, detail="檔案不存在")
+    if ext == ".csv":
+        _rewrite_csv_file_with_split_uploads(
+            store=store,
+            language=language,
+            safe_name=safe_name,
+            doc=doc,
+            new_bytes=new_bytes,
+            background_tasks=background_tasks,
+        )
+    else:
+        updated = store.update_file_content(language, safe_name, new_bytes)
+        if not updated:
+            raise HTTPException(status_code=404, detail="檔案不存在")
+
+        store_name = _store_name(language)
+        if store_name:
+            background_tasks.add_task(_gemini_background, sync_to_gemini, store_name, safe_name, new_bytes)
 
     topic_synced = _sync_topic_questions_for_doc(language, doc)
-
-    store_name = _store_name(language)
-    if store_name:
-        background_tasks.add_task(_gemini_background, sync_to_gemini, store_name, safe_name, new_bytes)
 
     return {"message": "已更新", "synced": False, "topic_synced": topic_synced}
 

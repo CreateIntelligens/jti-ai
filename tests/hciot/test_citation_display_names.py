@@ -53,6 +53,34 @@ def test_extract_top_citation_image_id_does_not_fallback_to_other_csv_rows():
     assert HciotMainAgent._extract_top_citation_image_id(citations) is None
 
 
+def test_extract_top_citation_image_id_prefers_dedicated_img_csv_row_value(monkeypatch):
+    fake_store = type(
+        "FakeStore",
+        (),
+        {
+            "get_file": lambda self, language, filename: {
+                "data": b"index,q,a,img\n4,\xe7\x9b\xb8\xe9\x97\x9c\xe6\xa5\xad\xe5\x8b\x99,\xe5\x9b\x9e\xe7\xad\x94,1\n"
+            }
+            if filename == "topic_IMG_1.csv"
+            else None
+        },
+    )()
+
+    monkeypatch.setattr(
+        "app.services.hciot.main_agent.get_hciot_knowledge_store",
+        lambda: fake_store,
+    )
+
+    citations = [
+        {
+            "title": "topic_IMG_1.csv",
+            "text": "index,q,a,img\n4,相關業務,回答,1",
+        }
+    ]
+
+    assert HciotMainAgent._extract_top_citation_image_id(citations) == "1"
+
+
 async def _fake_concurrent_result(user_message, language, session_id=None):
     return "PRP 是使用自體血液的治療方式", None
 

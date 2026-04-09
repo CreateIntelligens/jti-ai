@@ -48,6 +48,11 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def get_topic_id(topic: Topic) -> str:
+    """Extract a cleaned topic ID from common fields."""
+    return str(topic.get("id") or topic.get("topic_id") or "").strip()
+
+
 def parse_gemini_keys(raw: str) -> list[GeminiKey]:
     """Parse comma-separated strings like 'key1,name:key2' into GeminiKey objects."""
     parts = [p.strip() for p in raw.split(",") if p.strip()]
@@ -62,18 +67,19 @@ def parse_gemini_keys(raw: str) -> list[GeminiKey]:
 
 
 def select_gemini_key(keys: list[GeminiKey], preferred_name: str) -> GeminiKey:
+    """Select a Gemini key, optionally based on a preferred name hint."""
     if not keys:
         raise ValueError("GEMINI_API_KEYS is empty")
     
     hint = preferred_name.strip().lower()
     if hint:
-        for key in keys:
-            if hint in key.name.lower():
-                return key
+        # Return first key containing hint in its name, otherwise fallback to first key.
+        return next((k for k in keys if hint in k.name.lower()), keys[0])
     return keys[0]
 
 
 def request_json(url: str, method: str = "GET", headers: dict[str, str] | None = None, payload: Any = None) -> Any:
+    """Make an HTTP JSON request and return the parsed response."""
     request_headers = (headers or {}).copy()
     data = None
     if payload is not None:
@@ -86,18 +92,21 @@ def request_json(url: str, method: str = "GET", headers: dict[str, str] | None =
 
 
 def fetch_topics(base_url: str) -> list[Topic]:
+    """Fetch all HCIoT topics from the target API."""
     url = f"{base_url.rstrip('/')}/api/hciot/topics"
     payload = request_json(url)
     return [t for cat in payload.get("categories", []) for t in cat.get("topics", [])]
 
 
 def get_non_empty_en_questions(topic: Topic) -> list[str]:
+    """Extract trimmed, non-empty English questions from a topic."""
     questions = topic.get("questions", {}).get("en", [])
     return [str(q).strip() for q in questions if str(q).strip()]
 
 
 def should_translate(topic: Topic, overwrite: bool, allowed_ids: set[str]) -> bool:
-    topic_id = str(topic.get("id") or topic.get("topic_id") or "").strip()
+    """Check if a topic needs translation based on filtering/overwrite rules."""
+    topic_id = get_topic_id(topic)
     if not topic_id:
         return False
     if allowed_ids and topic_id not in allowed_ids:
@@ -108,9 +117,15 @@ def should_translate(topic: Topic, overwrite: bool, allowed_ids: set[str]) -> bo
 
 
 def translate_questions(client: genai.Client, model: str, topic: Topic) -> list[str]:
-    topic_id = str(topic.get("id") or topic.get("topic_id") or "").strip()
+    """Use Gemini to translate Traditional Chinese questions into English."""
+    topic_id = get_topic_id(topic)
     zh_qs = topic.get("questions", {}).get("zh", [])
-    
+    if not zh_qs:
+        return []
+
+    cat_labels = topic.get("category_labels", {})
+    labels = topic.get("labels", {})
+
     prompt = (
         "Translate the following Traditional Chinese hospital FAQ questions into natural, patient-friendly English.\n"
         "Return JSON only with this shape: {\"en\": [\"...\", \"...\"]}\n"
@@ -120,8 +135,8 @@ def translate_questions(client: genai.Client, model: str, topic: Topic) -> list[
         "- Preserve medical meaning accurately.\n"
         "- Use concise, natural hospital FAQ wording.\n"
         "- Do not add numbering, markdown, or commentary.\n\n"
-        f"Category: {topic.get('category_labels', {}).get('zh', '')} / {topic.get('category_labels', {}).get('en', '')}\n"
-        f"Topic: {topic.get('labels', {}).get('zh', '')} / {topic.get('labels', {}).get('en', '')}\n"
+        f"Category: {cat_labels.get('zh', '')} / {cat_labels.get('en', '')}\n"
+        f"Topic: {labels.get('zh', '')} / {labels.get('en', '')}\n"
         f"topic_id: {topic_id}\n\n"
         f"Questions zh:\n{json.dumps(zh_qs, ensure_ascii=False, indent=2)}"
     )
@@ -156,6 +171,7 @@ def main() -> int:
     load_dotenv()
     args = parse_args()
 
+    # Initialize external clients and configurations
     admin_key = (os.getenv("ADMIN_API_KEY") or "").strip()
     if args.apply and not admin_key:
         print("error: ADMIN_API_KEY required for --apply", file=sys.stderr)
@@ -165,6 +181,7 @@ def main() -> int:
     selected = select_gemini_key(keys, args.key_name)
     client = genai.Client(api_key=selected.api_key)
 
+    # Load source data
     topics = fetch_topics(args.base_url)
     if args.backup_path:
         Path(args.backup_path).write_text(json.dumps(topics, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -174,12 +191,12 @@ def main() -> int:
     count = 0
 
     for topic in topics:
-        if not should_translate(topic, args.overwrite, allowed_ids):
-            continue
         if args.limit and count >= args.limit:
             break
+        if not should_translate(topic, args.overwrite, allowed_ids):
+            continue
 
-        topic_id = str(topic.get("id") or topic.get("topic_id") or "").strip()
+        topic_id = get_topic_id(topic)
         zh_qs = topic.get("questions", {}).get("zh", [])
         
         print(f"[translate] {topic_id} ({len(zh_qs)} questions)")
@@ -195,7 +212,12 @@ def main() -> int:
 
         if args.apply:
             url = f"{args.base_url.rstrip('/')}/api/hciot-admin/topics/{quote(topic_id, safe='/')}"
-            request_json(url, method="PUT", headers={"API-Token": admin_key}, payload={"questions": {"zh": zh_qs, "en": en_qs}})
+            request_json(
+                url, 
+                method="PUT", 
+                headers={"API-Token": admin_key}, 
+                payload={"questions": {"zh": zh_qs, "en": en_qs}}
+            )
             print(f"[updated] {topic_id}")
 
         count += 1

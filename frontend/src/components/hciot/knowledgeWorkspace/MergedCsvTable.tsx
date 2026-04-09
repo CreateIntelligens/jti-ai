@@ -2,6 +2,7 @@ import { Loader2, Plus, Trash2, Upload, X } from 'lucide-react';
 import type { HciotMergedCsvRow } from '../../../services/api/hciot';
 import type { HciotLanguage } from '../../../config/hciotTopics';
 import { getHciotImageUrl, normalizeImageId } from '../../../utils/hciotImage';
+import { usePendingImageUrls } from './imageUpload';
 
 export type RowImageStatus = 'pending' | 'uploading' | 'done' | 'error';
 
@@ -35,6 +36,8 @@ export default function MergedCsvTable({
   onDeleteRow,
   onAddRow,
 }: MergedCsvTableProps) {
+  const pendingUrls = usePendingImageUrls(rows);
+
   if (loading) {
     return <div className="hciot-merged-csv-loading">{language === 'zh' ? '載入整合資料中...' : 'Loading merged data...'}</div>;
   }
@@ -78,7 +81,9 @@ export default function MergedCsvTable({
             {rows.map((row, i) => {
               const hasPendingImage = Boolean(row.pendingImageFile);
               const hasImage = Boolean(row.img || hasPendingImage);
-              const imageUrl = hasPendingImage ? '' : getHciotImageUrl(row.img);
+              const imageUrl = hasPendingImage
+                ? (row.pendingImageFile ? pendingUrls.get(row.pendingImageFile) || '' : '')
+                : getHciotImageUrl(row.img);
               const imageLabel = row.pendingImageName || normalizeImageId(row.img) || row.img;
               return (
                 <tr key={`${row.index}-${i}`}>

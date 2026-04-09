@@ -100,9 +100,9 @@ class HciotMainAgent(BaseAgent):
     ) -> str | None:
         """Return image_id from the top citation.
 
-        1. IMG_ token in citation title (dedicated IMG CSV filename)
-        2. IMG_ token in citation chunk text
-        3. Fallback: read CSV from DB → return raw ``img`` field value as image_id
+        1. Dedicated ``_IMG_`` CSV → read the row's raw ``img`` value
+        2. IMG_ token in citation title
+        3. IMG_ token in citation chunk text
         """
         if not isinstance(citations, list) or not citations:
             return None
@@ -112,14 +112,30 @@ class HciotMainAgent(BaseAgent):
 
         title = first.get("title") or ""
         text = first.get("text") or ""
+        image_id = cls._extract_image_id_from_dedicated_img_csv(first)
+        if image_id:
+            return image_id
 
         for value in (title, text):
             match = cls.IMAGE_TOKEN_PATTERN.search(value)
             if match:
                 return match.group(0)
+        return None
 
-        # Fallback: read CSV from knowledge store and extract img field
-        return cls._extract_image_id_from_csv(title)
+    @classmethod
+    def _extract_image_id_from_dedicated_img_csv(cls, citation: dict[str, Any]) -> str | None:
+        filenames = [
+            cls._citation_filename(citation.get("title")),
+            cls._citation_filename(citation.get("uri")),
+        ]
+        if not any(filename and "_img_" in filename.lower() for filename in filenames):
+            return None
+
+        for filename in filenames:
+            image_id = cls._extract_image_id_from_csv(filename)
+            if image_id:
+                return image_id
+        return None
 
     @classmethod
     def _extract_image_id_from_csv(cls, filename: str) -> str | None:

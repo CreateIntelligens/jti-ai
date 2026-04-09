@@ -52,6 +52,40 @@ class FakeKnowledgeStore:
             "topic_label_en": record["topic_label_en"],
         }
 
+    def get_file(self, language: str, filename: str) -> dict | None:
+        for item in self.files:
+            if item["language"] == language and item["filename"] == filename:
+                return {
+                    **item,
+                    "name": item["filename"],
+                    "size": len(item["data"]),
+                }
+        return None
+
+    def update_file_content(self, language: str, filename: str, new_data: bytes) -> dict | None:
+        for item in self.files:
+            if item["language"] == language and item["filename"] == filename:
+                item["data"] = new_data
+                return {
+                    "name": item["filename"],
+                    "display_name": item["display_name"],
+                    "size": len(new_data),
+                    "topic_id": item["topic_id"],
+                    "category_label_zh": item["category_label_zh"],
+                    "category_label_en": item["category_label_en"],
+                    "topic_label_zh": item["topic_label_zh"],
+                    "topic_label_en": item["topic_label_en"],
+                }
+        return None
+
+    def delete_file(self, language: str, filename: str) -> bool:
+        original_len = len(self.files)
+        self.files = [
+            item for item in self.files
+            if not (item["language"] == language and item["filename"] == filename)
+        ]
+        return len(self.files) != original_len
+
     def get_topic_csv_files(self, language: str, topic_id: str) -> list[dict]:
         return [
             {"filename": item["filename"], "data": item["data"]}
@@ -169,3 +203,45 @@ def test_upload_knowledge_file_preserves_image_extension_in_split_filename():
     assert [item["filename"] for item in fake_store.files] == [
         "prp_IMG_T02_001.jpeg.csv",
     ]
+
+
+def test_update_file_content_splits_legacy_single_csv_with_image_rows():
+    client, fake_store, fake_topic_store = _make_upload_context()
+    fake_topic_store.get_topic.return_value = None
+    fake_store.insert_file(
+        language="zh",
+        filename="legacy.csv",
+        data=b"index,q,a,img\n1,\xe8\x88\x8a\xe9\xa1\x8c,\xe8\x88\x8a\xe7\xad\x94,\n",
+        display_name="legacy.csv",
+        content_type="text/csv",
+        editable=True,
+        topic_id="ortho/legacy",
+        category_labels={"zh": "骨科", "en": "Orthopedics"},
+        topic_labels={"zh": "舊題庫", "en": "Legacy"},
+    )
+
+    with mock.patch("app.routers.hciot.knowledge.get_hciot_knowledge_store", return_value=fake_store), \
+         mock.patch("app.routers.hciot.knowledge.get_hciot_topic_store", return_value=fake_topic_store), \
+         mock.patch("app.routers.hciot.knowledge._store_name", return_value=None):
+        response = client.put(
+            "/api/hciot-admin/knowledge/files/legacy.csv/content?language=zh",
+            json={
+                "content": (
+                    "index,q,a,img\n"
+                    "1,第一題,第一答,IMG_T02_001\n"
+                    "2,第二題,第二答,IMG_T02_002\n"
+                )
+            },
+        )
+
+    assert response.status_code == 200
+    assert sorted(item["filename"] for item in fake_store.files) == [
+        "legacy_IMG_T02_001.csv",
+        "legacy_IMG_T02_002.csv",
+    ]
+    fake_topic_store.upsert_topic.assert_called_once()
+    _, topic_payload = fake_topic_store.upsert_topic.call_args.args
+    assert topic_payload["questions"] == {
+        "zh": ["第一題", "第二題"],
+        "en": ["第一題", "第二題"],
+    }

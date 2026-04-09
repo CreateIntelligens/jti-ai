@@ -3,7 +3,7 @@ import { Plus, Trash2, Upload, X, Table, FileText, FileType, Image as ImageIcon,
 
 import type { HciotLanguage } from '../../../config/hciotTopics';
 import type { HciotTopicCategory } from '../../../services/api/hciot';
-import { extractUploadedImageId, rollbackUploadedImages, type DeleteImageHandler, type UploadedImageResult } from './imageUpload';
+import { extractUploadedImageId, rollbackUploadedImages, usePendingImageUrls, type DeleteImageHandler, type UploadedImageResult } from './imageUpload';
 import { NEW_VALUE, slugify, sortByLabel, type TopicLabels } from './shared';
 
 type Tab = 'file' | 'qa' | 'image';
@@ -272,6 +272,7 @@ export default function UploadDialog({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const rowImageInputRef = useRef<HTMLInputElement>(null);
   const [pendingRowImageIndex, setPendingRowImageIndex] = useState<number | null>(null);
+  const pendingUrls = usePendingImageUrls(rows);
 
   const topic = useTopicSelection(categories, language, open);
 
@@ -692,6 +693,7 @@ export default function UploadDialog({
               {rows.map((row, index) => {
                 const imageLabel = row.pendingImageName || row.img;
                 const hasImage = Boolean(imageLabel);
+                const previewUrl = row.pendingImageFile ? pendingUrls.get(row.pendingImageFile) || '' : '';
 
                 return (
                   <div key={index} className="hciot-qa-row">
@@ -712,39 +714,45 @@ export default function UploadDialog({
                       />
                     </div>
                     <div className="hciot-qa-row-image">
-                      <button
-                        type="button"
-                        className={`hciot-qa-image-btn ${row.imgStatus}`}
-                        onClick={() => {
-                          setPendingRowImageIndex(index);
-                          rowImageInputRef.current?.click();
-                        }}
-                        title={imageLabel || (language === 'zh' ? '上傳圖片' : 'Upload Image')}
-                      >
-                        {row.imgStatus === 'uploading' ? (
-                          <Loader2 size={14} className="animate-spin" />
-                        ) : row.imgStatus === 'error' ? (
-                          <span title={row.imgError} className="flex"><XCircle size={14} className="text-red-500" /></span>
-                        ) : hasImage ? (
-                          <CheckCircle2 size={14} className="text-green-500" />
-                        ) : (
-                          <ImageIcon size={14} />
-                        )}
-                      </button>
-                      {hasImage && (
+                      {hasImage ? (
+                        <div className="hciot-qa-image-preview">
+                          {previewUrl ? (
+                            <img src={previewUrl} alt={imageLabel} className="hciot-qa-image-thumb" />
+                          ) : (
+                            <span className="hciot-qa-image-name" title={imageLabel}>{imageLabel}</span>
+                          )}
+                          {row.imgStatus === 'uploading' && (
+                            <Loader2 size={14} className="animate-spin" />
+                          )}
+                          {row.imgStatus === 'error' && (
+                            <span title={row.imgError}><XCircle size={14} className="text-red-500" /></span>
+                          )}
+                          <button
+                            type="button"
+                            className="hciot-qa-image-clear"
+                            onClick={() => setRows(prev => prev.map((r, i) => i === index ? {
+                              ...r,
+                              img: '',
+                              pendingImageFile: undefined,
+                              pendingImageName: undefined,
+                              imgStatus: 'pending',
+                              imgError: undefined,
+                            } : r))}
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
+                      ) : (
                         <button
                           type="button"
-                          className="hciot-qa-image-clear"
-                          onClick={() => setRows(prev => prev.map((r, i) => i === index ? {
-                            ...r,
-                            img: '',
-                            pendingImageFile: undefined,
-                            pendingImageName: undefined,
-                            imgStatus: 'pending',
-                            imgError: undefined,
-                          } : r))}
+                          className="hciot-qa-image-btn"
+                          onClick={() => {
+                            setPendingRowImageIndex(index);
+                            rowImageInputRef.current?.click();
+                          }}
+                          title={language === 'zh' ? '上傳圖片' : 'Upload Image'}
                         >
-                          <X size={10} />
+                          <ImageIcon size={14} />
                         </button>
                       )}
                     </div>
@@ -825,15 +833,30 @@ export default function UploadDialog({
             background: #f3f4f6;
             border-color: #d1d5db;
           }
-          .hciot-qa-image-btn.done {
-            border-color: #22c55e;
-            background: #f0fdf4;
-            color: #22c55e;
+          .hciot-qa-image-preview {
+            position: relative;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px;
+            border: 1px solid #d1d5db;
+            border-radius: 4px;
+            background: #f9fafb;
+            max-width: 80px;
           }
-          .hciot-qa-image-btn.error {
-            border-color: #ef4444;
-            background: #fef2f2;
-            color: #ef4444;
+          .hciot-qa-image-thumb {
+            width: 48px;
+            height: 48px;
+            object-fit: cover;
+            border-radius: 3px;
+          }
+          .hciot-qa-image-name {
+            font-size: 10px;
+            color: #6b7280;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 60px;
           }
           .hciot-qa-image-clear {
             position: absolute;

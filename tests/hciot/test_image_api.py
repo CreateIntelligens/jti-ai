@@ -1,9 +1,9 @@
 import sys
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
-from tests.support.app_test_support import get_test_app, install_app_import_mocks
+from tests.support.app_test_support import install_app_import_mocks
 
 # Setup mocks before importing app
 install_app_import_mocks()
@@ -20,10 +20,13 @@ app.dependency_overrides[verify_admin] = lambda: {"role": "admin"}
 app.include_router(router, prefix="/api/hciot")
 app.include_router(admin_router, prefix="/api/hciot-admin/images")
 
+
 class TestImageApi(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
         mock_store.reset_mock()
+        mock_store.get_image.side_effect = None
+        mock_store.get_image.return_value = None
 
     def test_get_image_success(self):
         mock_store.get_image.return_value = {
@@ -40,6 +43,23 @@ class TestImageApi(unittest.TestCase):
         mock_store.get_image.return_value = None
         res = self.client.get("/api/hciot/images/missing")
         self.assertEqual(res.status_code, 404)
+
+    def test_get_image_falls_back_from_img_prefixed_id(self):
+        mock_store.get_image.side_effect = [
+            None,
+            {
+                "image_id": "1",
+                "data": b"fake-data",
+                "content_type": "image/png",
+            },
+        ]
+
+        res = self.client.get("/api/hciot/images/IMG_1")
+
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.content, b"fake-data")
+        self.assertEqual(mock_store.get_image.call_args_list[0].args, ("IMG_1",))
+        self.assertEqual(mock_store.get_image.call_args_list[1].args, ("1",))
 
     def test_list_images(self):
         mock_store.list_images.return_value = [
