@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Image as ImageIcon, Loader2, Plus, Trash2, Upload, X } from 'lucide-react';
-import type { HciotImage, HciotMergedCsvRow } from '../../../services/api/hciot';
-import type { HciotLanguage } from '../../../config/hciotTopics';
-import { getHciotImageUrl, normalizeImageId } from '../../../utils/hciotImage';
-import ExistingImagePicker from './ExistingImagePicker';
-import { usePendingImageUrls } from './imageUpload';
+import type { HciotImage, HciotMergedCsvRow } from '../../../../services/api/hciot';
+import type { HciotLanguage } from '../../../../config/hciotTopics';
+import { getHciotImageUrl, normalizeImageId } from '../../../../utils/hciotImage';
+import ExistingImagePicker from '../explorer/ExistingImagePicker';
+import { usePendingImageUrls } from '../imageUpload';
 
 export type RowImageStatus = 'pending' | 'uploading' | 'done' | 'error';
 

@@ -1,6 +1,6 @@
 import { Trash2, Image as ImageIcon } from 'lucide-react';
-import type { HciotLanguage } from '../../../config/hciotTopics';
-import type { HciotImage } from '../../../services/api/hciot';
+import type { HciotLanguage } from '../../../../config/hciotTopics';
+import type { HciotImage } from '../../../../services/api/hciot';
 
 interface ImageDetailPaneProps {
   language: HciotLanguage;

@@ -3,30 +3,13 @@ import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import type { HciotLanguage } from '../../config/hciotTopics';
 import type { HciotKnowledgeFile, HciotTopicCategory } from '../../services/api/hciot';
 import * as api from '../../services/api';
-import ExplorerSidebar from './knowledgeWorkspace/ExplorerSidebar';
-import FileDetailPane from './knowledgeWorkspace/FileDetailPane';
-import MergedCsvPane from './knowledgeWorkspace/MergedCsvPane';
-import UploadDialog from './knowledgeWorkspace/UploadDialog';
-import ImageDetailPane from './knowledgeWorkspace/ImageDetailPane';
-import {
-  NEW_VALUE,
-  buildExplorerTree,
-  buildLabels,
-  buildCategoryOptions,
-  buildTopicOptions,
-  createEmptyDraft,
-  draftFromFile,
-  filterExplorerNodes,
-  flattenExplorerNodes,
-  getCurrentPathLabel,
-  getErrorMessage,
-  getDraftMetadataPayload,
-  readExpandedKeys,
-  slugify,
-  type FileMetadataDraft,
-  type TopicLabels,
-  writeExpandedKeys,
-} from './knowledgeWorkspace/shared';
+import ExplorerSidebar from './knowledgeWorkspace/explorer/ExplorerSidebar';
+import FileDetailPane from './knowledgeWorkspace/detail/FileDetailPane';
+import MergedCsvPane from './knowledgeWorkspace/detail/MergedCsvPane';
+import UploadDialog from './knowledgeWorkspace/upload/UploadDialog';
+import ImageDetailPane from './knowledgeWorkspace/detail/ImageDetailPane';
+import { NEW_VALUE, buildLabels, buildCategoryOptions, buildTopicOptions, createEmptyDraft, draftFromFile, getErrorMessage, getDraftMetadataPayload, slugify, type FileMetadataDraft, type TopicLabels } from './knowledgeWorkspace/topicUtils';
+import { buildExplorerTree, filterExplorerNodes, flattenExplorerNodes, getCurrentPathLabel, readExpandedKeys, writeExpandedKeys } from './knowledgeWorkspace/explorer/explorerTree';
 
 interface HciotKnowledgeWorkspaceProps {
   active: boolean;

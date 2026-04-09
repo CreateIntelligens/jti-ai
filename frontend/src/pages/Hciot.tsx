@@ -24,7 +24,12 @@ import '../styles/shared/index.css';
 import '../styles/shared/settings.css';
 import '../styles/hciot/layout.css';
 import '../styles/hciot/components.css';
+import '../styles/hciot/components-chat.css';
+import '../styles/hciot/components-topic.css';
 import '../styles/hciot/workspace.css';
+import '../styles/hciot/workspace-upload.css';
+import '../styles/hciot/workspace-table.css';
+import '../styles/hciot/workspace-images.css';
 
 const TTS_MAX_ATTEMPTS = 16;
 const TTS_POLL_INTERVAL_MS = 3000;
@@ -336,7 +341,7 @@ export default function Hciot() {
         setStoreMissing(true);
         setStatusText(t('status_failed'));
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Fetch categories from API.
@@ -357,7 +362,7 @@ export default function Hciot() {
       .catch(() => {
         setTopicsError(true);
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const restartConversation = useCallback(async () => {
@@ -644,8 +649,8 @@ export default function Hciot() {
                   storeMissing
                     ? t('hciot_store_missing_notice', { store: HCIOT_DEFAULT_STORE_NAME })
                     : topicsError
-                    ? (currentLanguage === 'zh' ? '無法載入題目分類，請稍後再試。' : 'Failed to load topics. Please try again later.')
-                    : null
+                      ? (currentLanguage === 'zh' ? '無法載入題目分類，請稍後再試。' : 'Failed to load topics. Please try again later.')
+                      : null
                 }
               />
             </div>

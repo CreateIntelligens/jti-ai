@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Image as ImageIcon, Search, X } from 'lucide-react';
 
-import type { HciotLanguage } from '../../../config/hciotTopics';
-import type { HciotImage } from '../../../services/api/hciot';
+import type { HciotLanguage } from '../../../../config/hciotTopics';
+import type { HciotImage } from '../../../../services/api/hciot';
 
 interface ExistingImagePickerProps {
   open: boolean;

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Table as TableIcon, Edit, Save, X } from 'lucide-react';
 
-import type { HciotLanguage } from '../../../config/hciotTopics';
-import { getHciotTopicMergedCsv, deleteHciotKnowledgeFile, updateHciotKnowledgeFileContent, type HciotImage, type HciotMergedCsvRow } from '../../../services/api/hciot';
-import { extractUploadedImageId, rollbackUploadedImages, type DeleteImageHandler, type UploadedImageResult } from './imageUpload';
-import { getErrorMessage } from './shared';
+import type { HciotLanguage } from '../../../../config/hciotTopics';
+import { getHciotTopicMergedCsv, deleteHciotKnowledgeFile, updateHciotKnowledgeFileContent, type HciotImage, type HciotMergedCsvRow } from '../../../../services/api/hciot';
+import { extractUploadedImageId, rollbackUploadedImages, type DeleteImageHandler, type UploadedImageResult } from '../imageUpload';
+import { getErrorMessage } from '../topicUtils';
 import MergedCsvTable, { type EditableMergedCsvRow } from './MergedCsvTable';
 
 interface MergedCsvPaneProps {

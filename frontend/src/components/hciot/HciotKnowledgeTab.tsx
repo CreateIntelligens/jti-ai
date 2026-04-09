@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { Upload, FileText, Trash2, Download, Pencil, X } from 'lucide-react';
 import ConfirmDialog from '../ConfirmDialog';
 import HciotTopicEditor from './HciotTopicEditor';
-import { NEW_VALUE, slugify } from './knowledgeWorkspace/shared';
+import { NEW_VALUE, slugify } from './knowledgeWorkspace/topicUtils';
 import * as api from '../../services/api';
 
 interface KBFile {

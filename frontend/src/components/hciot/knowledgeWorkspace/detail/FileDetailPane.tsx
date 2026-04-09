@@ -1,14 +1,9 @@
 import { Download, FileText, Save, Trash2 } from 'lucide-react';
 
-import type { HciotLanguage } from '../../../config/hciotTopics';
-import type { HciotKnowledgeFile, HciotTopicCategory } from '../../../services/api/hciot';
-import {
-  getFileLabel,
-  getNoTopicLabel,
-  NEW_VALUE,
-  type FileMetadataDraft,
-  type TopicOption,
-} from './shared';
+import type { HciotLanguage } from '../../../../config/hciotTopics';
+import type { HciotKnowledgeFile, HciotTopicCategory } from '../../../../services/api/hciot';
+import { getFileLabel, NEW_VALUE, type FileMetadataDraft, type TopicOption } from '../topicUtils';
+import { getNoTopicLabel } from '../explorer/explorerTree';
 
 export interface FileDetailPaneState {
   selectedFile: HciotKnowledgeFile | null;

@@ -11,9 +11,9 @@ import {
   Table as TableIcon,
 } from 'lucide-react';
 
-import type { HciotLanguage } from '../../../config/hciotTopics';
-import type { ExplorerRow } from './shared';
-import { isFolderNode } from './shared';
+import type { HciotLanguage } from '../../../../config/hciotTopics';
+import type { ExplorerRow } from './explorerTree';
+import { isFolderNode } from './explorerTree';
 
 interface ExplorerSidebarProps {
   language: HciotLanguage;

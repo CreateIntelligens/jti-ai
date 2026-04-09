@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight, Pencil, Trash2, Plus, Check, X, GripVertical
 import type { HciotLabels, HciotTopicCategory } from '../../services/api/hciot';
 import * as api from '../../services/api';
 import ConfirmDialog from '../ConfirmDialog';
-import { slugify, getErrorMessage } from './knowledgeWorkspace/shared';
+import { slugify, getErrorMessage } from './knowledgeWorkspace/topicUtils';
 
 interface Props {
   language: 'zh' | 'en';
