@@ -37,6 +37,12 @@ export default function HciotKnowledgeWorkspace({
   active,
   language,
 }: HciotKnowledgeWorkspaceProps) {
+  const emptyTopicDraft = (): Pick<FileMetadataDraft, 'topicId' | 'topicLabelZh' | 'topicLabelEn'> => ({
+    topicId: '',
+    topicLabelZh: '',
+    topicLabelEn: '',
+  });
+
   const statusTimerRef = useRef<number | null>(null);
   const suppressHoverRef = useRef(false);
 
@@ -425,9 +431,9 @@ export default function HciotKnowledgeWorkspace({
     if (value === NEW_VALUE) {
       patchDraft({
         categoryId: NEW_VALUE,
-        topicId: '',
-        topicLabelZh: '',
-        topicLabelEn: '',
+        categoryLabelZh: '',
+        categoryLabelEn: '',
+        ...emptyTopicDraft(),
       });
       return;
     }
@@ -435,11 +441,9 @@ export default function HciotKnowledgeWorkspace({
     const category = categoryOptions.find((item) => item.id === value);
     setDraft({
       categoryId: value,
-      topicId: '',
       categoryLabelZh: category?.labels.zh || '',
       categoryLabelEn: category?.labels.en || '',
-      topicLabelZh: '',
-      topicLabelEn: '',
+      ...emptyTopicDraft(),
     });
   };
 
@@ -447,9 +451,7 @@ export default function HciotKnowledgeWorkspace({
     if (!value) {
       setDraft((previous) => ({
         ...previous,
-        topicId: '',
-        topicLabelZh: '',
-        topicLabelEn: '',
+        ...emptyTopicDraft(),
       }));
       return;
     }
@@ -458,6 +460,8 @@ export default function HciotKnowledgeWorkspace({
       setDraft((previous) => ({
         ...previous,
         topicId: NEW_VALUE,
+        topicLabelZh: '',
+        topicLabelEn: '',
       }));
       return;
     }
@@ -499,9 +503,7 @@ export default function HciotKnowledgeWorkspace({
       if (!nextDraft.categoryId) {
         nextDraft = {
           ...nextDraft,
-          topicId: '',
-          topicLabelZh: '',
-          topicLabelEn: '',
+          ...emptyTopicDraft(),
         };
       } else if (nextDraft.topicId === NEW_VALUE) {
         const labels = buildLabels(nextDraft.topicLabelZh, nextDraft.topicLabelEn);
@@ -641,7 +643,7 @@ export default function HciotKnowledgeWorkspace({
           topicLabel={selectedMergedLabel}
           language={language}
           statusMessage={statusMessage}
-          onRefreshWorkspace={() => void refreshWorkspace()}
+          onRefreshWorkspace={() => refreshWorkspace()}
           onUploadImage={api.uploadHciotImage}
           onDeleteImage={api.deleteHciotImage}
         />

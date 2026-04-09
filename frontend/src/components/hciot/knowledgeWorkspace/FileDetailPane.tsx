@@ -175,15 +175,9 @@ export default function FileDetailPane({
               <div className="hciot-file-inline-create">
                 <input
                   className="hciot-file-input"
-                  placeholder={language === 'zh' ? '新科別中文名稱' : 'New category (zh)'}
+                  placeholder={language === 'zh' ? '新科別名稱' : 'New category name'}
                   value={draft.categoryLabelZh}
                   onChange={(event) => onDraftChange({ categoryLabelZh: event.target.value })}
-                />
-                <input
-                  className="hciot-file-input"
-                  placeholder={language === 'zh' ? '新科別英文名稱' : 'New category (en)'}
-                  value={draft.categoryLabelEn}
-                  onChange={(event) => onDraftChange({ categoryLabelEn: event.target.value })}
                 />
               </div>
             ) : null}
@@ -192,15 +186,9 @@ export default function FileDetailPane({
               <div className="hciot-file-inline-create">
                 <input
                   className="hciot-file-input"
-                  placeholder={language === 'zh' ? '新主題中文名稱' : 'New topic (zh)'}
+                  placeholder={language === 'zh' ? '新主題名稱' : 'New topic name'}
                   value={draft.topicLabelZh}
                   onChange={(event) => onDraftChange({ topicLabelZh: event.target.value })}
-                />
-                <input
-                  className="hciot-file-input"
-                  placeholder={language === 'zh' ? '新主題英文名稱' : 'New topic (en)'}
-                  value={draft.topicLabelEn}
-                  onChange={(event) => onDraftChange({ topicLabelEn: event.target.value })}
                 />
               </div>
             ) : null}

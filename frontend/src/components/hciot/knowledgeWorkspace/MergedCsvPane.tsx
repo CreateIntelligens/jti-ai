@@ -12,7 +12,7 @@ interface MergedCsvPaneProps {
   topicLabel?: string | null;
   language: HciotLanguage;
   statusMessage: string | null;
-  onRefreshWorkspace?: () => void;
+  onRefreshWorkspace?: () => Promise<void> | void;
   onUploadImage?: (file: File) => Promise<UploadedImageResult>;
   onDeleteImage?: DeleteImageHandler;
 }
@@ -34,6 +34,10 @@ function toCsvString(rows: HciotMergedCsvRow[]): string {
   return lines.join('\n');
 }
 
+function hasMeaningfulRowContent(row: Pick<HciotMergedCsvRow, 'q' | 'a' | 'img'>): boolean {
+  return Boolean(row.q.trim() || row.a.trim() || row.img?.trim());
+}
+
 export default function MergedCsvPane({
   topicId,
   topicLabel,
@@ -53,29 +57,42 @@ export default function MergedCsvPane({
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const fetchCsv = () => {
-    let active = true;
+  const applyMergedCsvResponse = (response: { rows: EditableMergedCsvRow[]; source_files: string[] }) => {
+    setRows(response.rows);
+    setSourceFiles(response.source_files);
+    setError(null);
+  };
+
+  const fetchCsv = async () => {
     setLoading(true);
-    getHciotTopicMergedCsv(topicId, language)
-      .then(res => {
-        if (active) {
-          setRows(res.rows);
-          setSourceFiles(res.source_files);
-          setLoading(false);
-        }
-      })
-      .catch(err => {
-        if (active) {
-          setError(getErrorMessage(err));
-          setLoading(false);
-        }
-      });
-    return () => { active = false; };
+    try {
+      const response = await getHciotTopicMergedCsv(topicId, language);
+      applyMergedCsvResponse(response);
+    } catch (err) {
+      setError(getErrorMessage(err));
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     setIsEditing(false);
-    return fetchCsv();
+    let active = true;
+    setLoading(true);
+    getHciotTopicMergedCsv(topicId, language)
+      .then((response) => {
+        if (!active) return;
+        applyMergedCsvResponse(response);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(getErrorMessage(err));
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => { active = false; };
   }, [topicId, language]);
 
   useEffect(() => {
@@ -140,7 +157,7 @@ export default function MergedCsvPane({
       stage = 'save';
       const grouped = new Map<string, HciotMergedCsvRow[]>();
 
-      for (const row of preparedRows) {
+      for (const row of preparedRows.filter(hasMeaningfulRowContent)) {
         const file = row.source_file ?? mainFile;
         const group = grouped.get(file) ?? [];
         group.push(row);
@@ -157,7 +174,10 @@ export default function MergedCsvPane({
       ]);
 
       setIsEditing(false);
-      onRefreshWorkspace ? onRefreshWorkspace() : fetchCsv();
+      if (onRefreshWorkspace) {
+        await onRefreshWorkspace();
+      }
+      await fetchCsv();
     } catch (err) {
       if (stage === 'images') {
         await rollbackUploadedImages(uploadedImageIds, onDeleteImage);
@@ -208,7 +228,7 @@ export default function MergedCsvPane({
                 className="hciot-file-action-button"
                 onClick={() => {
                   setIsEditing(false);
-                  fetchCsv(); // revert modifications
+                  void fetchCsv(); // revert modifications
                 }}
                 disabled={saving}
               >

@@ -4,7 +4,7 @@ import { Plus, Trash2, Upload, X, Table, FileText, FileType, Image as ImageIcon,
 import type { HciotLanguage } from '../../../config/hciotTopics';
 import type { HciotTopicCategory } from '../../../services/api/hciot';
 import { extractUploadedImageId, rollbackUploadedImages, usePendingImageUrls, type DeleteImageHandler, type UploadedImageResult } from './imageUpload';
-import { NEW_VALUE, slugify, sortByLabel, type TopicLabels } from './shared';
+import { buildLabels, NEW_VALUE, slugify, sortByLabel, type TopicLabels } from './shared';
 
 type Tab = 'file' | 'qa' | 'image';
 type FileStatus = 'pending' | 'uploading' | 'done' | 'error';
@@ -65,22 +65,22 @@ function buildCsvBlob(rows: QARow[], topicPrefix: string): Blob {
 
 const DEFAULT_CATEGORY = 'other';
 
+function singleFieldLabels(value: string) {
+  return buildLabels(value, '');
+}
+
 function useTopicSelection(categories: HciotTopicCategory[], language: HciotLanguage, open: boolean) {
   const [categoryId, setCategoryId] = useState(DEFAULT_CATEGORY);
   const [topicId, setTopicId] = useState('');
   const [newCategoryZh, setNewCategoryZh] = useState('');
-  const [newCategoryEn, setNewCategoryEn] = useState('');
   const [newTopicZh, setNewTopicZh] = useState('');
-  const [newTopicEn, setNewTopicEn] = useState('');
 
   useEffect(() => {
     if (open) {
       setCategoryId(DEFAULT_CATEGORY);
       setTopicId('');
       setNewCategoryZh('');
-      setNewCategoryEn('');
       setNewTopicZh('');
-      setNewTopicEn('');
     }
   }, [open]);
 
@@ -103,10 +103,8 @@ function useTopicSelection(categories: HciotTopicCategory[], language: HciotLang
     setCategoryId(value);
     setTopicId('');
     setNewTopicZh('');
-    setNewTopicEn('');
     if (value !== NEW_VALUE) {
       setNewCategoryZh('');
-      setNewCategoryEn('');
     }
   };
 
@@ -114,18 +112,19 @@ function useTopicSelection(categories: HciotTopicCategory[], language: HciotLang
     setTopicId(value);
     if (value !== NEW_VALUE) {
       setNewTopicZh('');
-      setNewTopicEn('');
     }
   };
 
   const resolveIds = (): { fullTopicId: string; labels: TopicLabels } | null => {
+    const newCategoryLabels = singleFieldLabels(newCategoryZh);
+    const newTopicLabels = singleFieldLabels(newTopicZh);
     const effectiveCatId = categoryId === NEW_VALUE
-      ? slugify(newCategoryEn || newCategoryZh)
+      ? slugify(newCategoryLabels?.en || '')
       : categoryId;
     if (!effectiveCatId) return null;
 
     const effectiveTopicSlug = topicId === NEW_VALUE
-      ? slugify(newTopicEn || newTopicZh)
+      ? slugify(newTopicLabels?.en || '')
       : (topicId ? topicId.split('/').pop() || topicId : '');
 
     const fullTopicId = effectiveTopicSlug
@@ -133,29 +132,39 @@ function useTopicSelection(categories: HciotTopicCategory[], language: HciotLang
       : effectiveCatId;
 
     const catLabels = categoryId === NEW_VALUE
-      ? { zh: newCategoryZh.trim(), en: newCategoryEn.trim() }
+      ? newCategoryLabels
       : { zh: currentCategory?.labels.zh || '', en: currentCategory?.labels.en || '' };
 
     const existingTopic = currentCategory?.topics.find((item) => item.id === topicId);
     const topicMatch = topicId === NEW_VALUE
-      ? { zh: newTopicZh.trim(), en: newTopicEn.trim() }
+      ? newTopicLabels
       : { zh: existingTopic?.labels.zh || '', en: existingTopic?.labels.en || '' };
+
+    if (!catLabels) {
+      return null;
+    }
+
+    if (topicId === NEW_VALUE && !topicMatch) {
+      return null;
+    }
+
+    const resolvedTopicLabels = topicMatch || { zh: '', en: '' };
 
     return {
       fullTopicId,
       labels: {
         categoryLabelZh: catLabels.zh,
         categoryLabelEn: catLabels.en,
-        topicLabelZh: topicMatch.zh,
-        topicLabelEn: topicMatch.en,
+        topicLabelZh: resolvedTopicLabels.zh,
+        topicLabelEn: resolvedTopicLabels.en,
       },
     };
   };
 
   return {
     categoryId, topicId,
-    newCategoryZh, newCategoryEn, newTopicZh, newTopicEn,
-    setNewCategoryZh, setNewCategoryEn, setNewTopicZh, setNewTopicEn,
+    newCategoryZh, newTopicZh,
+    setNewCategoryZh, setNewTopicZh,
     sortedCategories, sortedTopics,
     handleCategoryChange, handleTopicChange,
     resolveIds,
@@ -273,6 +282,9 @@ export default function UploadDialog({
   const rowImageInputRef = useRef<HTMLInputElement>(null);
   const [pendingRowImageIndex, setPendingRowImageIndex] = useState<number | null>(null);
   const pendingUrls = usePendingImageUrls(rows);
+  const selectedImageUrls = usePendingImageUrls(
+    selectedImages.map((item) => ({ pendingImageFile: item.file })),
+  );
 
   const topic = useTopicSelection(categories, language, open);
 
@@ -298,7 +310,7 @@ export default function UploadDialog({
 
   const validRows = rows.filter((r) => r.q.trim());
   const canSubmitFile = selectedFiles.some(f => f.status === 'pending' || f.status === 'error') && !uploadingLocal && !uploading;
-  const canSubmitQA = validRows.length > 0 && (topic.categoryId || topic.newCategoryZh || topic.newCategoryEn) && !uploadingLocal && !uploading;
+  const canSubmitQA = validRows.length > 0 && (topic.categoryId || topic.newCategoryZh) && !uploadingLocal && !uploading;
   const canSubmitImage = selectedImages.some(f => f.status === 'pending' || f.status === 'error') && !uploadingLocal;
 
   const updateRow = (index: number, field: keyof QARow, value: string) => {
@@ -550,15 +562,9 @@ export default function UploadDialog({
               <div className="hciot-qa-new-fields">
                 <input
                   className="hciot-file-input"
-                  placeholder={language === 'zh' ? '新科別中文名稱' : 'New category (zh)'}
+                  placeholder={language === 'zh' ? '新科別名稱' : 'New category name'}
                   value={topic.newCategoryZh}
                   onChange={(e) => topic.setNewCategoryZh(e.target.value)}
-                />
-                <input
-                  className="hciot-file-input"
-                  placeholder={language === 'zh' ? '新科別英文名稱' : 'New category (en)'}
-                  value={topic.newCategoryEn}
-                  onChange={(e) => topic.setNewCategoryEn(e.target.value)}
                 />
               </div>
             )}
@@ -567,15 +573,9 @@ export default function UploadDialog({
               <div className="hciot-qa-new-fields">
                 <input
                   className="hciot-file-input"
-                  placeholder={language === 'zh' ? '新主題中文名稱' : 'New topic (zh)'}
+                  placeholder={language === 'zh' ? '新主題名稱' : 'New topic name'}
                   value={topic.newTopicZh}
                   onChange={(e) => topic.setNewTopicZh(e.target.value)}
-                />
-                <input
-                  className="hciot-file-input"
-                  placeholder={language === 'zh' ? '新主題英文名稱' : 'New topic (en)'}
-                  value={topic.newTopicEn}
-                  onChange={(e) => topic.setNewTopicEn(e.target.value)}
                 />
               </div>
             )}
@@ -656,9 +656,20 @@ export default function UploadDialog({
             onSelect={handleImageSelect}
             onUpload={() => void handleUploadImages()}
             onClose={onClose}
-            renderItem={(item, i) => (
+            renderItem={(item, i) => {
+              const previewUrl = selectedImageUrls.get(item.file) || '';
+
+              return (
               <div key={`${item.file.name}-${i}`} className="hciot-upload-file-item" style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '8px' }}>
-                <ImageIcon size={16} className="text-green-500" />
+                {previewUrl ? (
+                  <img
+                    src={previewUrl}
+                    alt={item.imageId.trim() || item.file.name}
+                    style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px', flexShrink: 0 }}
+                  />
+                ) : (
+                  <ImageIcon size={16} className="text-green-500" />
+                )}
                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1, gap: '4px', minWidth: 0 }}>
                   <span className="hciot-upload-file-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.file.name}</span>
                   <input
@@ -683,7 +694,7 @@ export default function UploadDialog({
                   )}
                 </div>
               </div>
-            )}
+            )}}
           />
         )}
 
