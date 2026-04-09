@@ -27,7 +27,7 @@ from app.routers.knowledge_utils import (
     sync_to_gemini,
     write_docx_text,
 )
-from app.services.hciot.csv_utils import extract_questions_from_csv, merge_csv_files, split_qa_csv_by_image
+from app.services.hciot.csv_utils import extract_questions_from_csv, merge_csv_files, normalize_qa_csv_rows, split_qa_csv_by_image
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.hciot.topic_store import get_hciot_topic_store
 
@@ -48,6 +48,38 @@ _gemini_background = partial(gemini_background, "HCIoT KB")
 
 def _normalized_label(value: str | None, fallback: str) -> str:
     return (value or "").strip() or fallback
+
+
+def _last_image_filename_fragment(stem: str) -> str | None:
+    upper_stem = stem.upper()
+    index = upper_stem.rfind("IMG_")
+    if index < 0:
+        return None
+    return stem[index:]
+
+
+def _strip_repeated_trailing_fragment(stem: str, fragment: str) -> str:
+    suffix = f"_{fragment}"
+    normalized_suffix = suffix.lower()
+    while stem.lower().endswith(normalized_suffix):
+        stem = stem[:-len(suffix)]
+    return stem
+
+
+def _canonicalize_split_upload_name(current_name: str, upload_name: str) -> str:
+    current_path = Path(current_name)
+    upload_path = Path(upload_name)
+    current_fragment = _last_image_filename_fragment(current_path.stem)
+    new_fragment = _last_image_filename_fragment(upload_path.stem)
+    if not current_fragment or not new_fragment:
+        return upload_name
+
+    base_stem = _strip_repeated_trailing_fragment(current_path.stem, current_fragment)
+    if not base_stem:
+        return upload_name
+
+    suffix = upload_path.suffix or current_path.suffix or ".csv"
+    return f"{base_stem}_{new_fragment}{suffix}"
 
 
 def _sync_topic_questions_for_doc(language: str, doc: dict | None) -> bool:
@@ -191,6 +223,12 @@ def _rewrite_csv_file_with_split_uploads(
     background_tasks: BackgroundTasks,
 ) -> None:
     uploads = split_qa_csv_by_image(new_bytes, safe_name)
+    if uploads and "_img_" in safe_name.lower():
+        uploads = [
+            (_canonicalize_split_upload_name(safe_name, upload_name), upload_bytes)
+            for upload_name, upload_bytes in uploads
+        ]
+
     if not uploads:
         updated = store.update_file_content(language, safe_name, new_bytes)
         if not updated:
@@ -281,6 +319,9 @@ async def update_file_content(
         new_bytes = req.content.encode("utf-8")
 
     if ext == ".csv":
+        new_bytes = normalize_qa_csv_rows(new_bytes) or new_bytes
+
+    if ext == ".csv":
         _rewrite_csv_file_with_split_uploads(
             store=store,
             language=language,
@@ -353,6 +394,8 @@ async def upload_knowledge_file(
     ext = Path(safe_name).suffix.lower()
     editable = ext in EDITABLE_EXTENSIONS
     content_type = file.content_type or mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
+    if ext == ".csv":
+        file_bytes = normalize_qa_csv_rows(file_bytes) or file_bytes
 
     # Merge category_id + topic_id into single topic_id
     merged_topic_id = None

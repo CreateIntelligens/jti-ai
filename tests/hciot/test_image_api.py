@@ -1,6 +1,6 @@
 import sys
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 from tests.support.app_test_support import install_app_import_mocks
@@ -24,9 +24,14 @@ app.include_router(admin_router, prefix="/api/hciot-admin/images")
 class TestImageApi(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
+        self.store_patcher = patch("app.routers.hciot.images.get_hciot_image_store", return_value=mock_store)
+        self.store_patcher.start()
         mock_store.reset_mock()
         mock_store.get_image.side_effect = None
         mock_store.get_image.return_value = None
+
+    def tearDown(self):
+        self.store_patcher.stop()
 
     def test_get_image_success(self):
         mock_store.get_image.return_value = {

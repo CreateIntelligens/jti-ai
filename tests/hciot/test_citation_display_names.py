@@ -81,6 +81,38 @@ def test_extract_top_citation_image_id_prefers_dedicated_img_csv_row_value(monke
     assert HciotMainAgent._extract_top_citation_image_id(citations) == "1"
 
 
+def test_extract_top_citation_image_id_returns_none_for_malformed_dedicated_img_csv(monkeypatch):
+    fake_store = type(
+        "FakeStore",
+        (),
+        {
+            "get_file": lambda self, language, filename: {
+                "data": (
+                    b"index,q,a,img\n"
+                    b"1,\xe7\xac\xac\xe4\xb8\x80\xe9\xa1\x8c,\xe7\xac\xac\xe4\xb8\x80\xe7\xad\x94,4\n"
+                    b"2,\xe7\xac\xac\xe4\xba\x8c\xe9\xa1\x8c,\xe7\xac\xac\xe4\xba\x8c\xe7\xad\x94,\n"
+                )
+            }
+            if filename == "topic_IMG_4_IMG_4.csv"
+            else None
+        },
+    )()
+
+    monkeypatch.setattr(
+        "app.services.hciot.main_agent.get_hciot_knowledge_store",
+        lambda: fake_store,
+    )
+
+    citations = [
+        {
+            "title": "topic_IMG_4_IMG_4.csv",
+            "text": "index,q,a,img\n1,第一題,第一答,4\n2,第二題,第二答,",
+        }
+    ]
+
+    assert HciotMainAgent._extract_top_citation_image_id(citations) is None
+
+
 async def _fake_concurrent_result(user_message, language, session_id=None):
     return "PRP 是使用自體血液的治療方式", None
 

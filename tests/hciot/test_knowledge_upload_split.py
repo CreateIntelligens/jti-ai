@@ -245,3 +245,59 @@ def test_update_file_content_splits_legacy_single_csv_with_image_rows():
         "zh": ["第一題", "第二題"],
         "en": ["第一題", "第二題"],
     }
+
+
+def test_update_file_content_keeps_canonical_name_for_existing_img_csv():
+    client, fake_store, fake_topic_store = _make_upload_context()
+    fake_topic_store.get_topic.return_value = None
+    fake_store.insert_file(
+        language="zh",
+        filename="legacy_IMG_T02_001.csv",
+        data=b"index,q,a,img\n1,\xe7\xac\xac\xe4\xb8\x80\xe9\xa1\x8c,\xe7\xac\xac\xe4\xb8\x80\xe7\xad\x94,IMG_T02_001\n",
+        display_name="legacy_IMG_T02_001.csv",
+        content_type="text/csv",
+        editable=True,
+        topic_id="ortho/legacy",
+        category_labels={"zh": "骨科", "en": "Orthopedics"},
+        topic_labels={"zh": "舊題庫", "en": "Legacy"},
+    )
+
+    with mock.patch("app.routers.hciot.knowledge.get_hciot_knowledge_store", return_value=fake_store), \
+         mock.patch("app.routers.hciot.knowledge.get_hciot_topic_store", return_value=fake_topic_store), \
+         mock.patch("app.routers.hciot.knowledge._store_name", return_value=None):
+        response = client.put(
+            "/api/hciot-admin/knowledge/files/legacy_IMG_T02_001.csv/content?language=zh",
+            json={"content": "index,q,a,img\n1,第一題,第一答,IMG_T02_001\n"},
+        )
+
+    assert response.status_code == 200
+    assert [item["filename"] for item in fake_store.files] == ["legacy_IMG_T02_001.csv"]
+
+
+def test_update_file_content_drops_blank_rows_from_csv_save():
+    client, fake_store, fake_topic_store = _make_upload_context()
+    fake_topic_store.get_topic.return_value = None
+    fake_store.insert_file(
+        language="zh",
+        filename="legacy.csv",
+        data=b"index,q,a,img\n1,\xe8\x88\x8a\xe9\xa1\x8c,\xe8\x88\x8a\xe7\xad\x94,\n",
+        display_name="legacy.csv",
+        content_type="text/csv",
+        editable=True,
+        topic_id="ortho/legacy",
+        category_labels={"zh": "骨科", "en": "Orthopedics"},
+        topic_labels={"zh": "舊題庫", "en": "Legacy"},
+    )
+
+    with mock.patch("app.routers.hciot.knowledge.get_hciot_knowledge_store", return_value=fake_store), \
+         mock.patch("app.routers.hciot.knowledge.get_hciot_topic_store", return_value=fake_topic_store), \
+         mock.patch("app.routers.hciot.knowledge._store_name", return_value=None):
+        response = client.put(
+            "/api/hciot-admin/knowledge/files/legacy.csv/content?language=zh",
+            json={"content": "index,q,a,img\n1,第一題,第一答,\n2,,,\n"},
+        )
+
+    assert response.status_code == 200
+    saved = fake_store.get_file("zh", "legacy.csv")
+    assert saved is not None
+    assert saved["data"].decode("utf-8-sig") == "index,q,a,img\n1,第一題,第一答,\n"

@@ -112,9 +112,12 @@ class HciotMainAgent(BaseAgent):
 
         title = first.get("title") or ""
         text = first.get("text") or ""
-        image_id = cls._extract_image_id_from_dedicated_img_csv(first)
-        if image_id:
-            return image_id
+        filenames = [
+            cls._citation_filename(title),
+            cls._citation_filename(first.get("uri")),
+        ]
+        if any(filename and "_img_" in filename.lower() for filename in filenames):
+            return cls._extract_image_id_from_dedicated_img_csv(filenames)
 
         for value in (title, text):
             match = cls.IMAGE_TOKEN_PATTERN.search(value)
@@ -123,23 +126,34 @@ class HciotMainAgent(BaseAgent):
         return None
 
     @classmethod
-    def _extract_image_id_from_dedicated_img_csv(cls, citation: dict[str, Any]) -> str | None:
-        filenames = [
-            cls._citation_filename(citation.get("title")),
-            cls._citation_filename(citation.get("uri")),
-        ]
-        if not any(filename and "_img_" in filename.lower() for filename in filenames):
-            return None
-
+    def _extract_image_id_from_dedicated_img_csv(cls, filenames: list[str]) -> str | None:
         for filename in filenames:
-            image_id = cls._extract_image_id_from_csv(filename)
+            image_id = cls._extract_image_id_from_csv(filename, require_single_meaningful_row=True)
             if image_id:
                 return image_id
         return None
 
     @classmethod
-    def _extract_image_id_from_csv(cls, filename: str) -> str | None:
-        """Read a CSV from knowledge store and return the first non-empty img value as image_id."""
+    def _clean_image_id(cls, raw: str) -> str | None:
+        raw = (raw or "").strip()
+        if not raw:
+            return None
+        if "=" in raw:
+            raw = raw.split("=", 1)[0].strip()
+        if "/" in raw:
+            raw = raw.split("/")[-1]
+        if "." in raw:
+            raw = raw.rsplit(".", 1)[0]
+        return raw or None
+
+    @classmethod
+    def _extract_image_id_from_csv(
+        cls,
+        filename: str,
+        *,
+        require_single_meaningful_row: bool = False,
+    ) -> str | None:
+        """Read a CSV from knowledge store and return the row img value as image_id."""
         if not filename:
             return None
         try:
@@ -153,20 +167,20 @@ class HciotMainAgent(BaseAgent):
             reader = csv.DictReader(io.StringIO(text))
             if not reader.fieldnames or "img" not in reader.fieldnames:
                 return None
-            for row in reader:
-                raw = (row.get("img") or "").strip()
-                if not raw:
-                    continue
-                # Clean "IMG_T02_001=images/..." → take left side
-                if "=" in raw:
-                    raw = raw.split("=", 1)[0].strip()
-                # Strip path and extension for legacy format
-                if "/" in raw:
-                    raw = raw.split("/")[-1]
-                if "." in raw:
-                    raw = raw.rsplit(".", 1)[0]
-                if raw:
-                    return raw
+            rows = list(reader)
+            if require_single_meaningful_row:
+                meaningful_rows = [
+                    row for row in rows
+                    if any((row.get(key) or "").strip() for key in ("q", "a", "img"))
+                ]
+                if len(meaningful_rows) != 1:
+                    return None
+                return cls._clean_image_id(meaningful_rows[0].get("img") or "")
+
+            for row in rows:
+                image_id = cls._clean_image_id(row.get("img") or "")
+                if image_id:
+                    return image_id
         except Exception as e:
             logger.debug("Failed to extract image_id from CSV %s: %s", filename, e)
         return None

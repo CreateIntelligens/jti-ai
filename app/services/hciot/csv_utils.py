@@ -61,6 +61,10 @@ def _rows_to_csv_bytes(fieldnames: list[str], rows: list[dict[str, str]]) -> byt
     return buffer.getvalue().encode("utf-8")
 
 
+def _has_meaningful_qa_content(row: dict[str, str]) -> bool:
+    return any((row.get(key) or "").strip() for key in ("q", "a", "img"))
+
+
 def _split_image_name_and_suffix(raw: str) -> tuple[str, str]:
     value = raw.replace("\\", "/").split("/")[-1]
     if "." not in value:
@@ -81,6 +85,20 @@ def _image_filename_fragment(raw: str, fallback_index: int) -> str:
     return f"{value}{suffix}"
 
 
+def normalize_qa_csv_rows(file_bytes: bytes) -> bytes | None:
+    """Remove fully blank QA rows while preserving the original columns."""
+    parsed = _parse_csv_rows(file_bytes)
+    if parsed is None:
+        return None
+
+    fieldnames, rows = parsed
+    if "q" not in fieldnames:
+        return None
+
+    meaningful_rows = [row for row in rows if _has_meaningful_qa_content(row)]
+    return _rows_to_csv_bytes(fieldnames, meaningful_rows)
+
+
 def split_qa_csv_by_image(file_bytes: bytes, filename: str) -> list[tuple[str, bytes]] | None:
     """Split a QA CSV into a main file plus one-image-per-file CSVs.
 
@@ -98,6 +116,9 @@ def split_qa_csv_by_image(file_bytes: bytes, filename: str) -> list[tuple[str, b
     main_rows: list[dict[str, str]] = []
     image_rows: list[tuple[dict[str, str], str]] = []
     for row in rows:
+        if not _has_meaningful_qa_content(row):
+            continue
+
         img_value = (row.get("img") or "").strip()
         if img_value:
             image_rows.append((row, img_value))
