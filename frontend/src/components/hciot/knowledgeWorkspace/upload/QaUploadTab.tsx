@@ -208,61 +208,63 @@ export default function QaUploadTab({
                     value={row.q}
                     onChange={(event) => updateRow(index, { q: event.target.value })}
                   />
-                  <textarea
-                    className="hciot-qa-textarea"
-                    placeholder={language === 'zh' ? '回答 (A)' : 'Answer (A)'}
-                    value={row.a}
-                    onChange={(event) => updateRow(index, { a: event.target.value })}
-                    rows={2}
-                  />
-                </div>
-                <div className="hciot-qa-row-image">
-                  {hasImage && (
-                    <div className="hciot-qa-image-preview">
-                      {previewUrl ? (
-                        <img src={previewUrl} alt={imageLabel} className="hciot-qa-image-thumb" />
-                      ) : (
-                        <span className="hciot-qa-image-name" title={imageLabel}>{imageLabel}</span>
+                  <div className="hciot-qa-row-fields-inner">
+                    <textarea
+                      className="hciot-qa-textarea hciot-qa-textarea-flexible"
+                      placeholder={language === 'zh' ? '回答 (A)' : 'Answer (A)'}
+                      value={row.a}
+                      onChange={(event) => updateRow(index, { a: event.target.value })}
+                      rows={2}
+                    />
+                    <div className="hciot-qa-row-image">
+                      {hasImage && (
+                        <div className="hciot-qa-image-preview">
+                          {previewUrl ? (
+                            <img src={previewUrl} alt={imageLabel} className="hciot-qa-image-thumb" />
+                          ) : (
+                            <span className="hciot-qa-image-name" title={imageLabel}>{imageLabel}</span>
+                          )}
+                          {row.imgStatus === 'uploading' && (
+                            <Loader2 size={14} className="animate-spin" />
+                          )}
+                          {row.imgStatus === 'error' && (
+                            <span title={row.imgError}><XCircle size={14} className="text-red-500" /></span>
+                          )}
+                          <button
+                            type="button"
+                            className="hciot-qa-image-clear"
+                            onClick={() => setRows((previous) => previous.map((item, itemIndex) => (
+                              itemIndex === index ? clearRowImageState(item) : item
+                            )))}
+                          >
+                            <X size={10} />
+                          </button>
+                        </div>
                       )}
-                      {row.imgStatus === 'uploading' && (
-                        <Loader2 size={14} className="animate-spin" />
-                      )}
-                      {row.imgStatus === 'error' && (
-                        <span title={row.imgError}><XCircle size={14} className="text-red-500" /></span>
-                      )}
-                      <button
-                        type="button"
-                        className="hciot-qa-image-clear"
-                        onClick={() => setRows((previous) => previous.map((item, itemIndex) => (
-                          itemIndex === index ? clearRowImageState(item) : item
-                        )))}
-                      >
-                        <X size={10} />
-                      </button>
+                      <div style={{ display: 'flex', gap: '6px', marginTop: hasImage ? '4px' : 0 }}>
+                        <button
+                          type="button"
+                          className="hciot-qa-image-btn"
+                          onClick={() => {
+                            setPendingRowImageIndex(index);
+                            rowImageInputRef.current?.click();
+                          }}
+                          title={language === 'zh' ? '上傳圖片' : 'Upload Image'}
+                        >
+                          <ImageIcon size={14} />
+                          {!hasImage ? (language === 'zh' ? '上傳' : 'Upload') : null}
+                        </button>
+                        <button
+                          type="button"
+                          className="hciot-qa-image-btn"
+                          onClick={() => setPickerRowIndex(index)}
+                          title={language === 'zh' ? '選擇既有圖片' : 'Choose Existing Image'}
+                        >
+                          <Table size={14} />
+                          {!hasImage ? (language === 'zh' ? '既有' : 'Existing') : null}
+                        </button>
+                      </div>
                     </div>
-                  )}
-                  <div style={{ display: 'flex', gap: '6px', marginTop: hasImage ? '4px' : 0 }}>
-                    <button
-                      type="button"
-                      className="hciot-qa-image-btn"
-                      onClick={() => {
-                        setPendingRowImageIndex(index);
-                        rowImageInputRef.current?.click();
-                      }}
-                      title={language === 'zh' ? '上傳圖片' : 'Upload Image'}
-                    >
-                      <ImageIcon size={14} />
-                      {!hasImage ? (language === 'zh' ? '上傳' : 'Upload') : null}
-                    </button>
-                    <button
-                      type="button"
-                      className="hciot-qa-image-btn"
-                      onClick={() => setPickerRowIndex(index)}
-                      title={language === 'zh' ? '選擇既有圖片' : 'Choose Existing Image'}
-                    >
-                      <Table size={14} />
-                      {!hasImage ? (language === 'zh' ? '既有' : 'Existing') : null}
-                    </button>
                   </div>
                 </div>
                 <button

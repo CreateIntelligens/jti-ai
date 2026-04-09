@@ -126,7 +126,7 @@ export default function ImageUploadTab({
             {previewUrl ? (
               <img src={previewUrl} alt={item.imageId.trim() || item.file.name} className="hciot-upload-image-thumb" />
             ) : (
-              <ImageIcon size={16} className="text-green-500" />
+              <ImageIcon size={16} className="hciot-icon-green" />
             )}
             <div className="hciot-upload-image-info">
               <span className="hciot-upload-file-name">{item.file.name}</span>

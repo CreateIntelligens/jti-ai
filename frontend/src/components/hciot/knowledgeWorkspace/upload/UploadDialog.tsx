@@ -29,10 +29,6 @@ interface UploadDialogProps {
 
 const DEFAULT_CATEGORY = 'other';
 
-function singleFieldLabels(value: string) {
-  return buildLabels(value, '');
-}
-
 function useTopicSelection(categories: HciotTopicCategory[], language: HciotLanguage, open: boolean) {
   const [categoryId, setCategoryId] = useState(DEFAULT_CATEGORY);
   const [topicId, setTopicId] = useState('');
@@ -84,42 +80,53 @@ function useTopicSelection(categories: HciotTopicCategory[], language: HciotLang
   };
 
   const resolvedTopic = useMemo((): ResolvedUploadTopic | null => {
-    const newCategoryLabels = singleFieldLabels(newCategoryZh);
-    const newTopicLabels = singleFieldLabels(newTopicZh);
     const isNewCategory = categoryId === NEW_VALUE;
     const isNewTopic = topicId === NEW_VALUE;
 
-    const effectiveCategoryId = isNewCategory ? slugify(newCategoryLabels?.en || '') : categoryId;
-    if (!effectiveCategoryId) return null;
+    // 1. Resolve Category
+    let catId = categoryId;
+    let catLabels = { zh: '', en: '' };
 
-    const effectiveTopicSlug = isNewTopic
-      ? slugify(newTopicLabels?.en || '')
-      : (topicId ? topicId.split('/').pop() || topicId : '');
+    if (isNewCategory) {
+      const b = buildLabels(newCategoryZh, '');
+      if (!b) return null;
+      catLabels = b;
+      catId = slugify(catLabels.en);
+    } else if (categoryId) {
+      if (!currentCategory) return null;
+      catId = categoryId;
+      catLabels = { zh: currentCategory.labels.zh, en: currentCategory.labels.en };
+    } else {
+      return null;
+    }
 
-    const fullTopicId = effectiveTopicSlug
-      ? `${effectiveCategoryId}/${effectiveTopicSlug}`
-      : effectiveCategoryId;
+    // 2. Resolve Topic
+    let topSlug = '';
+    let topLabels = { zh: '', en: '' };
 
-    const categoryLabels = isNewCategory
-      ? newCategoryLabels
-      : { zh: currentCategory?.labels.zh || '', en: currentCategory?.labels.en || '' };
-    if (!categoryLabels) return null;
+    if (isNewTopic) {
+      const b = buildLabels(newTopicZh, '');
+      if (b) {
+        topLabels = b;
+        topSlug = slugify(topLabels.en);
+      }
+    } else if (topicId) {
+      const existingTopic = currentCategory?.topics.find((item) => item.id === topicId);
+      if (existingTopic) {
+        topSlug = topicId.split('/').pop() || topicId;
+        topLabels = { zh: existingTopic.labels.zh, en: existingTopic.labels.en };
+      }
+    }
 
-    const existingTopic = currentCategory?.topics.find((item) => item.id === topicId);
-    const topicMatch = isNewTopic
-      ? newTopicLabels
-      : { zh: existingTopic?.labels.zh || '', en: existingTopic?.labels.en || '' };
-    if (isNewTopic && !topicMatch) return null;
-
-    const resolvedTopicLabels = topicMatch || { zh: '', en: '' };
+    const fullTopicId = topSlug ? `${catId}/${topSlug}` : catId;
 
     return {
       fullTopicId,
       labels: {
-        categoryLabelZh: categoryLabels.zh,
-        categoryLabelEn: categoryLabels.en,
-        topicLabelZh: resolvedTopicLabels.zh,
-        topicLabelEn: resolvedTopicLabels.en,
+        categoryLabelZh: catLabels.zh,
+        categoryLabelEn: catLabels.en,
+        topicLabelZh: topLabels.zh,
+        topicLabelEn: topLabels.en,
       },
     };
   }, [categoryId, topicId, newCategoryZh, newTopicZh, currentCategory]);

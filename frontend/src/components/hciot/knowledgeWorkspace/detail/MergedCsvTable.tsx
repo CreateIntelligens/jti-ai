@@ -113,7 +113,7 @@ export default function MergedCsvTable({
               <th style={{ width: '60px' }}>{language === 'zh' ? '編號' : 'Index'}</th>
               <th>{language === 'zh' ? '問題 (Q)' : 'Question (Q)'}</th>
               <th>{language === 'zh' ? '回答 (A)' : 'Answer (A)'}</th>
-              <th style={{ width: '120px' }}>{language === 'zh' ? '圖片 (IMG)' : 'Image (IMG)'}</th>
+              <th style={{ width: '180px' }}>{language === 'zh' ? '圖片 (IMG)' : 'Image (IMG)'}</th>
               {isEditing && <th style={{ width: '60px', textAlign: 'center' }}>-</th>}
             </tr>
           </thead>

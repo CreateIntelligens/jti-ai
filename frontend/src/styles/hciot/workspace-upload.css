@@ -13,7 +13,7 @@
 
 .hciot-qa-dialog {
   width: min(680px, 92vw);
-  max-height: 85vh;
+  height: min(600px, 85vh);
   display: flex;
   flex-direction: column;
   border-radius: 14px;
@@ -40,6 +40,7 @@
 
 .hciot-upload-tabs {
   display: flex;
+  justify-content: center;
   border-bottom: 1px solid var(--hciot-border);
   padding: 0 1.25rem;
   gap: 0;
@@ -463,4 +464,64 @@
 
 .hciot-file-warning {
   flex-shrink: 0;
+}
+
+/* Icons & Layout Utilities */
+.hciot-icon-blue {
+  color: #3b82f6;
+}
+
+.hciot-icon-red {
+  color: #ef4444;
+}
+
+.hciot-icon-dark-blue {
+  color: #1d4ed8;
+}
+
+.hciot-icon-green {
+  color: #22c55e;
+}
+
+.hciot-icon-muted {
+  color: #6b7280;
+}
+
+.hciot-icon-warning {
+  color: #f59e0b;
+}
+
+.hciot-qa-row-fields-inner {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.hciot-qa-textarea-flexible {
+  flex: 1;
+}
+
+.hciot-upload-item-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hciot-upload-name-text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hciot-upload-size-text {
+  min-width: 60px;
+  text-align: right;
+}
+
+.hciot-file-warning-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
 }

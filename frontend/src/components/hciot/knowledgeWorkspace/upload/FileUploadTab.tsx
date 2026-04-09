@@ -19,11 +19,11 @@ interface FileUploadTabProps {
 
 function getFileIcon(filename: string) {
   const ext = filename.split('.').pop()?.toLowerCase();
-  if (ext === 'csv') return <Table size={16} style={{ color: '#3b82f6' }} />;
-  if (ext === 'pdf') return <FileText size={16} style={{ color: '#ef4444' }} />;
-  if (ext === 'docx' || ext === 'doc') return <FileType size={16} style={{ color: '#1d4ed8' }} />;
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) return <ImageIcon size={16} style={{ color: '#22c55e' }} />;
-  return <FileIcon size={16} style={{ color: '#6b7280' }} />;
+  if (ext === 'csv') return <Table size={16} className="hciot-icon-blue" />;
+  if (ext === 'pdf') return <FileText size={16} className="hciot-icon-red" />;
+  if (ext === 'docx' || ext === 'doc') return <FileType size={16} className="hciot-icon-dark-blue" />;
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) return <ImageIcon size={16} className="hciot-icon-green" />;
+  return <FileIcon size={16} className="hciot-icon-muted" />;
 }
 
 export default function FileUploadTab({
@@ -147,22 +147,21 @@ export default function FileUploadTab({
       onUpload={() => { void handleUploadFiles(); }}
       onClose={onClose}
       renderItem={(item, index) => (
-        <div key={`${item.file.name}-${index}`} className="hciot-upload-file-item" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div key={`${item.file.name}-${index}`} className="hciot-upload-file-item hciot-upload-item-content">
           {getFileIcon(item.file.name)}
-          <span className="hciot-upload-file-name" style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <span className="hciot-upload-file-name hciot-upload-name-text">
             {item.file.name}
           </span>
           {item.isDuplicate && (
             <span
-              className="hciot-file-warning"
+              className="hciot-file-warning hciot-file-warning-badge hciot-icon-warning"
               title={language === 'zh' ? '重複檔名' : 'Duplicate filename'}
-              style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '12px', color: '#f59e0b' }}
             >
               <AlertCircle size={12} />
               {language === 'zh' ? '(重複)' : '(Dup)'}
             </span>
           )}
-          <span className="hciot-upload-file-size" style={{ minWidth: '60px', textAlign: 'right' }}>
+          <span className="hciot-upload-file-size hciot-upload-size-text">
             {item.file.size > 1024 ? `${(item.file.size / 1024).toFixed(1)} KB` : `${item.file.size} B`}
           </span>
           <div className="hciot-file-actions">
