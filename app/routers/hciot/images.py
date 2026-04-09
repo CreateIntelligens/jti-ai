@@ -1,5 +1,7 @@
 """HCIoT image serving from MongoDB."""
 
+import csv
+import io
 import mimetypes
 from pathlib import PurePosixPath
 
@@ -8,12 +10,14 @@ from fastapi.responses import Response
 
 from app.auth import verify_admin
 from app.services.hciot.image_store import get_hciot_image_store
+from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 
 router = APIRouter(tags=["HCIoT Images"])
 admin_router = APIRouter(tags=["HCIoT Admin Images"], dependencies=[Depends(verify_admin)])
 
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
 _EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp")
+_KNOWLEDGE_LANGUAGES = ("zh", "en")
 
 
 def _candidate_image_ids(image_id: str) -> list[str]:
@@ -22,6 +26,74 @@ def _candidate_image_ids(image_id: str) -> list[str]:
     if normalized.upper().startswith("IMG_") and len(normalized) > 4:
         candidate_ids.append(normalized[4:])
     return candidate_ids
+
+
+def _normalize_csv_image_reference(raw: str) -> str | None:
+    value = (raw or "").strip()
+    if not value:
+        return None
+    if "=" in value:
+        value = value.split("=", 1)[-1].strip()
+    value = PurePosixPath(value).name
+    normalized = PurePosixPath(value).stem.strip()
+    return normalized or None
+
+
+def _build_image_reference_counts(image_ids: set[str]) -> dict[str, int]:
+    if not image_ids:
+        return {}
+
+    counts = {image_id: 0 for image_id in image_ids}
+    store = get_hciot_knowledge_store()
+
+    for language in _KNOWLEDGE_LANGUAGES:
+        for file_meta in store.list_files(language):
+            filename = file_meta.get("name") or file_meta.get("filename") or ""
+            if not filename.lower().endswith(".csv"):
+                continue
+
+            doc = store.get_file(language, filename)
+            if not doc or not doc.get("data"):
+                continue
+
+            try:
+                text = doc["data"].decode("utf-8-sig")
+            except UnicodeDecodeError:
+                continue
+
+            reader = csv.DictReader(io.StringIO(text))
+            if not reader.fieldnames or "img" not in reader.fieldnames:
+                continue
+
+            for row in reader:
+                reference = _normalize_csv_image_reference(row.get("img") or "")
+                if not reference:
+                    continue
+                if reference in counts:
+                    counts[reference] += 1
+                    continue
+                if reference.upper().startswith("IMG_"):
+                    fallback_reference = reference[4:]
+                    if fallback_reference in counts:
+                        counts[fallback_reference] += 1
+
+    return counts
+
+
+def _reference_count_for(image_id: str, reference_counts: dict[str, int]) -> int:
+    return reference_counts.get(image_id, 0)
+
+
+def _enrich_images_with_reference_counts(images: list[dict], reference_counts: dict[str, int]) -> list[dict]:
+    enriched: list[dict] = []
+    for image in images:
+        reference_count = _reference_count_for(image["image_id"], reference_counts)
+        enriched.append({
+            **image,
+            "reference_count": reference_count,
+            "is_referenced": reference_count > 0,
+        })
+    return enriched
 
 
 @router.get("/images/{image_id}")
@@ -44,7 +116,8 @@ def get_image(image_id: str):
 def list_images():
     store = get_hciot_image_store()
     images = store.list_images()
-    return {"images": images}
+    reference_counts = _build_image_reference_counts({image["image_id"] for image in images})
+    return {"images": _enrich_images_with_reference_counts(images, reference_counts)}
 
 
 @admin_router.post("/upload", status_code=status.HTTP_201_CREATED)
@@ -83,6 +156,26 @@ async def upload_image(
         "filename": file.filename,
         "image_id": actual_image_id,
         "url": f"/api/hciot/images/{actual_image_id}"
+    }
+
+
+@admin_router.delete("/cleanup-unused")
+def delete_unused_images():
+    store = get_hciot_image_store()
+    images = store.list_images()
+    reference_counts = _build_image_reference_counts({image["image_id"] for image in images})
+
+    deleted_image_ids: list[str] = []
+    for image in images:
+        image_id = image["image_id"]
+        if _reference_count_for(image_id, reference_counts) > 0:
+            continue
+        if store.delete_image(image_id):
+            deleted_image_ids.append(image_id)
+
+    return {
+        "deleted_count": len(deleted_image_ids),
+        "deleted_image_ids": deleted_image_ids,
     }
 
 

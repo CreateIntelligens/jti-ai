@@ -363,6 +363,8 @@ export interface HciotImage {
   image_id: string;
   size_bytes: number;
   url: string;
+  reference_count?: number;
+  is_referenced?: boolean;
 }
 
 export async function listHciotImages(): Promise<{ images: HciotImage[] }> {
@@ -388,6 +390,13 @@ export async function deleteHciotImage(imageId: string): Promise<void> {
     method: 'DELETE',
   });
   await handleResponse<void>(response);
+}
+
+export async function deleteUnusedHciotImages(): Promise<{ deleted_count: number; deleted_image_ids: string[] }> {
+  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/images/cleanup-unused`, {
+    method: 'DELETE',
+  });
+  return handleResponse<{ deleted_count: number; deleted_image_ids: string[] }>(response);
 }
 
 // ========== Merged CSV ==========

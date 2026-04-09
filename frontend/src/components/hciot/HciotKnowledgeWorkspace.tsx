@@ -61,6 +61,7 @@ export default function HciotKnowledgeWorkspace({
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [cleaningUnusedImages, setCleaningUnusedImages] = useState(false);
   const [editorText, setEditorText] = useState('');
   const [originalText, setOriginalText] = useState('');
   const [fileEditable, setFileEditable] = useState(false);
@@ -108,6 +109,10 @@ export default function HciotKnowledgeWorkspace({
   const selectedImage = useMemo(
     () => images.find((img) => img.image_id === selectedImageName) || null,
     [images, selectedImageName],
+  );
+  const unusedImageCount = useMemo(
+    () => images.filter((image) => (image.reference_count ?? 0) === 0).length,
+    [images],
   );
 
   const selectedMergedLabel = useMemo(() => {
@@ -379,11 +384,16 @@ export default function HciotKnowledgeWorkspace({
 
   const handleDeleteImage = async () => {
     if (!selectedImage) return;
-    const confirmed = window.confirm(
-      language === 'zh'
-        ? `確定要刪除圖片 ${selectedImage.image_id}？`
-        : `Delete image ${selectedImage.image_id}?`,
-    );
+    const referenceCount = selectedImage.reference_count ?? 0;
+    let confirmMessage = language === 'zh'
+      ? `確定要刪除圖片 ${selectedImage.image_id}？`
+      : `Delete image ${selectedImage.image_id}?`;
+    if (referenceCount > 0) {
+      confirmMessage = language === 'zh'
+        ? `圖片 ${selectedImage.image_id} 目前被 ${referenceCount} 題引用，刪除後相關回答將無法顯示圖片。確定要刪除嗎？`
+        : `Image ${selectedImage.image_id} is still referenced by ${referenceCount} item(s). Delete it anyway?`;
+    }
+    const confirmed = window.confirm(confirmMessage);
     if (!confirmed) return;
     setDeleting(true);
     try {
@@ -396,6 +406,40 @@ export default function HciotKnowledgeWorkspace({
       alert(getErrorMessage(error));
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleCleanupUnusedImages = async () => {
+    if (unusedImageCount === 0) {
+      return;
+    }
+
+    const confirmed = window.confirm(
+      language === 'zh'
+        ? `確定要刪除 ${unusedImageCount} 張未被任何題目引用的圖片？`
+        : `Delete ${unusedImageCount} unused image(s)?`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    setCleaningUnusedImages(true);
+    try {
+      const response = await api.deleteUnusedHciotImages();
+      await refreshWorkspace();
+      if (selectedImageName && response.deleted_image_ids.includes(selectedImageName)) {
+        setSelectedImageName(null);
+      }
+      showStatus(
+        language === 'zh'
+          ? `已刪除 ${response.deleted_count} 張未引用圖片`
+          : `Deleted ${response.deleted_count} unused image(s)`,
+      );
+    } catch (error) {
+      console.error('Failed to clean unused HCIoT images:', error);
+      alert(getErrorMessage(error));
+    } finally {
+      setCleaningUnusedImages(false);
     }
   };
 
@@ -620,6 +664,7 @@ export default function HciotKnowledgeWorkspace({
         open={qaDialogOpen}
         language={language}
         categories={categories}
+        availableImages={images}
         uploading={uploading}
         onClose={() => setQaDialogOpen(false)}
         onUploadFile={handleUploadFile}
@@ -635,13 +680,17 @@ export default function HciotKnowledgeWorkspace({
           language={language}
           selectedImage={selectedImage}
           deleting={deleting}
+          cleaningUnused={cleaningUnusedImages}
+          unusedImageCount={unusedImageCount}
           onDelete={() => void handleDeleteImage()}
+          onCleanupUnused={() => void handleCleanupUnusedImages()}
         />
       ) : selectedMergedTopicId ? (
         <MergedCsvPane
           topicId={selectedMergedTopicId}
           topicLabel={selectedMergedLabel}
           language={language}
+          availableImages={images}
           statusMessage={statusMessage}
           onRefreshWorkspace={() => refreshWorkspace()}
           onUploadImage={api.uploadHciotImage}

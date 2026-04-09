@@ -6,14 +6,20 @@ interface ImageDetailPaneProps {
   language: HciotLanguage;
   selectedImage: HciotImage | null;
   deleting: boolean;
+  cleaningUnused: boolean;
+  unusedImageCount: number;
   onDelete: () => void;
+  onCleanupUnused: () => void;
 }
 
 export default function ImageDetailPane({
   language,
   selectedImage,
   deleting,
+  cleaningUnused,
+  unusedImageCount,
   onDelete,
+  onCleanupUnused,
 }: ImageDetailPaneProps) {
   if (!selectedImage) {
     return (
@@ -29,6 +35,13 @@ export default function ImageDetailPane({
     );
   }
 
+  const referenceCount = selectedImage.reference_count ?? 0;
+  const isReferenced = referenceCount > 0;
+  const referenceLabel = isReferenced
+    ? (language === 'zh' ? `被 ${referenceCount} 題引用` : `Referenced by ${referenceCount} item(s)`)
+    : (language === 'zh' ? '未被任何題目引用' : 'Unused');
+  const referenceColor = isReferenced ? '#166534' : '#b45309';
+
   return (
     <div className="hciot-file-editor hciot-image-detail-pane">
       <div className="hciot-file-header">
@@ -39,6 +52,18 @@ export default function ImageDetailPane({
         </div>
 
         <div className="hciot-file-actions">
+          <button
+            type="button"
+            className="hciot-file-action-button"
+            onClick={onCleanupUnused}
+            disabled={cleaningUnused || unusedImageCount === 0}
+          >
+            <span>
+              {cleaningUnused
+                ? (language === 'zh' ? '清理中...' : 'Cleaning...')
+                : (language === 'zh' ? `清理未引用圖片 (${unusedImageCount})` : `Clean Unused (${unusedImageCount})`)}
+            </span>
+          </button>
           <button
             type="button"
             className="hciot-file-action-button danger"
@@ -55,6 +80,7 @@ export default function ImageDetailPane({
         <div className="hciot-file-editor-meta" style={{ width: '100%' }}>
           <span>ID: {selectedImage.image_id}</span>
           <span>{selectedImage.size_bytes ? `${Math.max(1, Math.round(selectedImage.size_bytes / 1024))} KB` : '0 KB'}</span>
+          <span style={{ color: referenceColor, fontWeight: 600 }}>{referenceLabel}</span>
         </div>
         <div className="hciot-image-preview-container" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6', borderRadius: '8px', overflow: 'hidden', width: '100%', minHeight: '300px' }}>
           <img

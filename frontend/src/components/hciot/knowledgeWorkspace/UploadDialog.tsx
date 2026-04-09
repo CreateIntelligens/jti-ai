@@ -2,7 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Trash2, Upload, X, Table, FileText, FileType, Image as ImageIcon, File as FileIcon, Loader2, CheckCircle2, XCircle, AlertCircle } from 'lucide-react';
 
 import type { HciotLanguage } from '../../../config/hciotTopics';
-import type { HciotTopicCategory } from '../../../services/api/hciot';
+import type { HciotImage, HciotTopicCategory } from '../../../services/api/hciot';
+import { getHciotImageUrl } from '../../../utils/hciotImage';
+import ExistingImagePicker from './ExistingImagePicker';
 import { extractUploadedImageId, rollbackUploadedImages, usePendingImageUrls, type DeleteImageHandler, type UploadedImageResult } from './imageUpload';
 import { buildLabels, NEW_VALUE, slugify, sortByLabel, type TopicLabels } from './shared';
 
@@ -37,6 +39,7 @@ interface UploadDialogProps {
   open: boolean;
   language: HciotLanguage;
   categories: HciotTopicCategory[];
+  availableImages: HciotImage[];
   uploading: boolean;
   onClose: () => void;
   onUploadFile: (file: File, topicId: string | null, labels: TopicLabels | null) => Promise<{ name: string }>;
@@ -49,6 +52,25 @@ interface UploadDialogProps {
 
 function createEmptyRow(): QARow {
   return { q: '', a: '', img: '', imgStatus: 'pending' };
+}
+
+function clearRowImageState(row: QARow): QARow {
+  return {
+    ...row,
+    img: '',
+    pendingImageFile: undefined,
+    pendingImageName: undefined,
+    imgStatus: 'pending',
+    imgError: undefined,
+  };
+}
+
+function applyExistingRowImage(row: QARow, imageId: string): QARow {
+  return {
+    ...clearRowImageState(row),
+    img: imageId,
+    imgStatus: 'done',
+  };
 }
 
 function buildCsvBlob(rows: QARow[], topicPrefix: string): Blob {
@@ -261,6 +283,7 @@ export default function UploadDialog({
   open,
   language,
   categories,
+  availableImages,
   uploading,
   onClose,
   onUploadFile,
@@ -281,6 +304,7 @@ export default function UploadDialog({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const rowImageInputRef = useRef<HTMLInputElement>(null);
   const [pendingRowImageIndex, setPendingRowImageIndex] = useState<number | null>(null);
+  const [pickerRowIndex, setPickerRowIndex] = useState<number | null>(null);
   const pendingUrls = usePendingImageUrls(rows);
   const selectedImageUrls = usePendingImageUrls(
     selectedImages.map((item) => ({ pendingImageFile: item.file })),
@@ -296,6 +320,7 @@ export default function UploadDialog({
       setSelectedImages([]);
       setUploadingLocal(false);
       setPendingRowImageIndex(null);
+      setPickerRowIndex(null);
     }
   }, [open]);
 
@@ -365,6 +390,16 @@ export default function UploadDialog({
       imgError: undefined,
     } : r));
     if (rowImageInputRef.current) rowImageInputRef.current.value = '';
+  };
+
+  const handleSelectExistingImage = (imageId: string) => {
+    if (pickerRowIndex === null) {
+      return;
+    }
+
+    const rowIndex = pickerRowIndex;
+    setPickerRowIndex(null);
+    setRows((prev) => prev.map((row, index) => index === rowIndex ? applyExistingRowImage(row, imageId) : row));
   };
 
   const handleUploadFiles = async () => {
@@ -497,6 +532,14 @@ export default function UploadDialog({
   return (
     <div className="hciot-qa-overlay" onClick={onClose}>
       <div className="hciot-qa-dialog" onClick={(e) => e.stopPropagation()}>
+        <ExistingImagePicker
+          open={pickerRowIndex !== null}
+          language={language}
+          images={availableImages}
+          selectedImageId={pickerRowIndex === null ? null : (rows[pickerRowIndex]?.img || null)}
+          onClose={() => setPickerRowIndex(null)}
+          onSelect={handleSelectExistingImage}
+        />
         <div className="hciot-qa-header">
           <h3>{language === 'zh' ? '新增內容' : 'Add Content'}</h3>
           <button type="button" className="hciot-qa-close" onClick={onClose}>
@@ -593,8 +636,8 @@ export default function UploadDialog({
             disabled={!canSubmitFile}
             dropLabelZh="點擊或拖放檔案"
             dropLabelEn="Click or drop files here"
-            dropSubZh="支援 CSV、PDF、TXT、Word 等"
-            dropSubEn="CSV, PDF, TXT, Word, etc."
+            dropSubZh="只支援 CSV"
+            dropSubEn="CSV only"
             countZh="個檔案"
             countEn="file(s)"
             onDrop={(e) => {
@@ -704,7 +747,9 @@ export default function UploadDialog({
               {rows.map((row, index) => {
                 const imageLabel = row.pendingImageName || row.img;
                 const hasImage = Boolean(imageLabel);
-                const previewUrl = row.pendingImageFile ? pendingUrls.get(row.pendingImageFile) || '' : '';
+                const previewUrl = row.pendingImageFile
+                  ? pendingUrls.get(row.pendingImageFile) || ''
+                  : getHciotImageUrl(row.img) || '';
 
                 return (
                   <div key={index} className="hciot-qa-row">
@@ -725,7 +770,7 @@ export default function UploadDialog({
                       />
                     </div>
                     <div className="hciot-qa-row-image">
-                      {hasImage ? (
+                      {hasImage && (
                         <div className="hciot-qa-image-preview">
                           {previewUrl ? (
                             <img src={previewUrl} alt={imageLabel} className="hciot-qa-image-thumb" />
@@ -741,19 +786,13 @@ export default function UploadDialog({
                           <button
                             type="button"
                             className="hciot-qa-image-clear"
-                            onClick={() => setRows(prev => prev.map((r, i) => i === index ? {
-                              ...r,
-                              img: '',
-                              pendingImageFile: undefined,
-                              pendingImageName: undefined,
-                              imgStatus: 'pending',
-                              imgError: undefined,
-                            } : r))}
+                            onClick={() => setRows(prev => prev.map((r, i) => i === index ? clearRowImageState(r) : r))}
                           >
                             <X size={10} />
                           </button>
                         </div>
-                      ) : (
+                      )}
+                      <div style={{ display: 'flex', gap: '6px' }}>
                         <button
                           type="button"
                           className="hciot-qa-image-btn"
@@ -764,8 +803,18 @@ export default function UploadDialog({
                           title={language === 'zh' ? '上傳圖片' : 'Upload Image'}
                         >
                           <ImageIcon size={14} />
+                          {!hasImage ? (language === 'zh' ? '上傳' : 'Upload') : null}
                         </button>
-                      )}
+                        <button
+                          type="button"
+                          className="hciot-qa-image-btn"
+                          onClick={() => setPickerRowIndex(index)}
+                          title={language === 'zh' ? '選擇既有圖片' : 'Choose Existing Image'}
+                        >
+                          <Table size={14} />
+                          {!hasImage ? (language === 'zh' ? '既有' : 'Existing') : null}
+                        </button>
+                      </div>
                     </div>
                     <button
                       type="button"

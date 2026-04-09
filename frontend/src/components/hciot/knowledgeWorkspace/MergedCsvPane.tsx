@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Table as TableIcon, Edit, Save, X } from 'lucide-react';
 
 import type { HciotLanguage } from '../../../config/hciotTopics';
-import { getHciotTopicMergedCsv, deleteHciotKnowledgeFile, updateHciotKnowledgeFileContent, type HciotMergedCsvRow } from '../../../services/api/hciot';
+import { getHciotTopicMergedCsv, deleteHciotKnowledgeFile, updateHciotKnowledgeFileContent, type HciotImage, type HciotMergedCsvRow } from '../../../services/api/hciot';
 import { extractUploadedImageId, rollbackUploadedImages, type DeleteImageHandler, type UploadedImageResult } from './imageUpload';
 import { getErrorMessage } from './shared';
 import MergedCsvTable, { type EditableMergedCsvRow } from './MergedCsvTable';
@@ -11,6 +11,7 @@ interface MergedCsvPaneProps {
   topicId: string;
   topicLabel?: string | null;
   language: HciotLanguage;
+  availableImages: HciotImage[];
   statusMessage: string | null;
   onRefreshWorkspace?: () => Promise<void> | void;
   onUploadImage?: (file: File) => Promise<UploadedImageResult>;
@@ -42,6 +43,7 @@ export default function MergedCsvPane({
   topicId,
   topicLabel,
   language,
+  availableImages,
   statusMessage,
   onRefreshWorkspace,
   onUploadImage,
@@ -264,13 +266,14 @@ export default function MergedCsvPane({
       ) : null}
 
       <section className="hciot-file-editor-panel hciot-merged-panel">
-        <MergedCsvTable
-          language={language}
-          rows={rows}
-          sourceFiles={sourceFiles}
-          loading={loading}
-          error={error}
-          isEditing={isEditing}
+      <MergedCsvTable
+        language={language}
+        rows={rows}
+        sourceFiles={sourceFiles}
+        availableImages={availableImages}
+        loading={loading}
+        error={error}
+        isEditing={isEditing}
           onUpdateRow={handleUpdateRow}
           onDeleteRow={handleDeleteRow}
           onAddRow={handleAddRow}

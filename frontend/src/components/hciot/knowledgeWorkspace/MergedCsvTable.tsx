@@ -1,7 +1,9 @@
-import { Loader2, Plus, Trash2, Upload, X } from 'lucide-react';
-import type { HciotMergedCsvRow } from '../../../services/api/hciot';
+import { useState } from 'react';
+import { Image as ImageIcon, Loader2, Plus, Trash2, Upload, X } from 'lucide-react';
+import type { HciotImage, HciotMergedCsvRow } from '../../../services/api/hciot';
 import type { HciotLanguage } from '../../../config/hciotTopics';
 import { getHciotImageUrl, normalizeImageId } from '../../../utils/hciotImage';
+import ExistingImagePicker from './ExistingImagePicker';
 import { usePendingImageUrls } from './imageUpload';
 
 export type RowImageStatus = 'pending' | 'uploading' | 'done' | 'error';
@@ -13,10 +15,29 @@ export interface EditableMergedCsvRow extends HciotMergedCsvRow {
   imgError?: string;
 }
 
+function clearRowImageState(): Partial<EditableMergedCsvRow> {
+  return {
+    img: '',
+    pendingImageFile: undefined,
+    pendingImageName: undefined,
+    imgStatus: 'pending',
+    imgError: undefined,
+  };
+}
+
+function applyExistingRowImage(imageId: string): Partial<EditableMergedCsvRow> {
+  return {
+    ...clearRowImageState(),
+    img: imageId,
+    imgStatus: 'done',
+  };
+}
+
 interface MergedCsvTableProps {
   language: HciotLanguage;
   rows: EditableMergedCsvRow[];
   sourceFiles: string[];
+  availableImages: HciotImage[];
   loading: boolean;
   error: string | null;
   isEditing: boolean;
@@ -29,6 +50,7 @@ export default function MergedCsvTable({
   language,
   rows,
   sourceFiles,
+  availableImages,
   loading,
   error,
   isEditing,
@@ -37,6 +59,7 @@ export default function MergedCsvTable({
   onAddRow,
 }: MergedCsvTableProps) {
   const pendingUrls = usePendingImageUrls(rows);
+  const [pickerIndex, setPickerIndex] = useState<number | null>(null);
 
   if (loading) {
     return <div className="hciot-merged-csv-loading">{language === 'zh' ? '載入整合資料中...' : 'Loading merged data...'}</div>;
@@ -61,8 +84,26 @@ export default function MergedCsvTable({
     });
   };
 
+  const handleSelectExistingImage = (imageId: string) => {
+    if (pickerIndex === null) {
+      return;
+    }
+
+    const rowIndex = pickerIndex;
+    setPickerIndex(null);
+    onUpdateRow(rowIndex, applyExistingRowImage(imageId));
+  };
+
   return (
     <div className="hciot-merged-csv-container">
+      <ExistingImagePicker
+        open={pickerIndex !== null}
+        language={language}
+        images={availableImages}
+        selectedImageId={pickerIndex === null ? null : (rows[pickerIndex]?.img || null)}
+        onClose={() => setPickerIndex(null)}
+        onSelect={handleSelectExistingImage}
+      />
       <div className="hciot-merged-csv-meta">
         {language === 'zh' ? `已合併 ${sourceFiles.length} 個檔案` : `Merged ${sourceFiles.length} files`}
       </div>
@@ -116,41 +157,66 @@ export default function MergedCsvTable({
                     {isEditing ? (
                       <div className="hciot-merged-csv-img-cell">
                         {hasImage ? (
-                          <div className="hciot-merged-csv-img-wrapper edit-mode">
-                            {imageUrl && (
-                              <img src={imageUrl} alt={row.img} className="hciot-merged-csv-thumbnail" />
-                            )}
-                            {row.imgStatus === 'uploading' ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : null}
-                            <button
-                              type="button"
-                              className="hciot-merged-csv-remove-img"
-                              onClick={() => onUpdateRow(i, {
-                                img: '',
-                                pendingImageFile: undefined,
-                                pendingImageName: undefined,
-                                imgStatus: 'pending',
-                                imgError: undefined,
-                              })}
-                              title={language === 'zh' ? '移除圖片' : 'Remove image'}
-                            >
-                              <X size={12} />
-                            </button>
-                            <span className="hciot-merged-csv-img-text" title={row.imgError || imageLabel}>{imageLabel}</span>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            <div className="hciot-merged-csv-img-wrapper edit-mode">
+                              {imageUrl && (
+                                <img src={imageUrl} alt={row.img} className="hciot-merged-csv-thumbnail" />
+                              )}
+                              {row.imgStatus === 'uploading' ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : null}
+                              <button
+                                type="button"
+                                className="hciot-merged-csv-remove-img"
+                                onClick={() => onUpdateRow(i, clearRowImageState())}
+                                title={language === 'zh' ? '移除圖片' : 'Remove image'}
+                              >
+                                <X size={12} />
+                              </button>
+                              <span className="hciot-merged-csv-img-text" title={row.imgError || imageLabel}>{imageLabel}</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: 6 }}>
+                              <label className={`hciot-merged-csv-upload-btn${row.imgStatus === 'uploading' ? ' is-uploading' : ''}`}>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  style={{ display: 'none' }}
+                                  onChange={(e) => handleFileChange(i, e.target.files?.[0] || null)}
+                                  disabled={row.imgStatus === 'uploading'}
+                                />
+                                <Upload size={14} />
+                              </label>
+                              <button
+                                type="button"
+                                className="hciot-merged-csv-upload-btn"
+                                onClick={() => setPickerIndex(i)}
+                              >
+                                <ImageIcon size={14} />
+                              </button>
+                            </div>
                           </div>
                         ) : (
-                          <label className={`hciot-merged-csv-upload-btn${row.imgStatus === 'uploading' ? ' is-uploading' : ''}`}>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              style={{ display: 'none' }}
-                              onChange={(e) => handleFileChange(i, e.target.files?.[0] || null)}
-                              disabled={row.imgStatus === 'uploading'}
-                            />
-                            <Upload size={14} />
-                            <span>{row.imgStatus === 'uploading' ? '...' : (language === 'zh' ? '上傳' : 'Upload')}</span>
-                          </label>
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <label className={`hciot-merged-csv-upload-btn${row.imgStatus === 'uploading' ? ' is-uploading' : ''}`}>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                style={{ display: 'none' }}
+                                onChange={(e) => handleFileChange(i, e.target.files?.[0] || null)}
+                                disabled={row.imgStatus === 'uploading'}
+                              />
+                              <Upload size={14} />
+                              <span>{row.imgStatus === 'uploading' ? '...' : (language === 'zh' ? '上傳' : 'Upload')}</span>
+                            </label>
+                            <button
+                              type="button"
+                              className="hciot-merged-csv-upload-btn"
+                              onClick={() => setPickerIndex(i)}
+                            >
+                              <ImageIcon size={14} />
+                              <span>{language === 'zh' ? '既有' : 'Existing'}</span>
+                            </button>
+                          </div>
                         )}
                       </div>
                     ) : row.img ? (
