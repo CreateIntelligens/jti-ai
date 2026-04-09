@@ -160,6 +160,7 @@ def sync_gemini_db_background(
     language: str,
     log_prefix: str,
     insert_kwargs: dict[str, Any] | None = None,
+    register_gemini_only: bool = True,
 ) -> None:
     """Background sync: remove DB-only entries, register Gemini-only entries.
 
@@ -169,6 +170,7 @@ def sync_gemini_db_background(
         language: Language partition key.
         log_prefix: Label for log messages (e.g. "JTI sync", "HCIoT sync").
         insert_kwargs: Extra keyword arguments passed to store.insert_file for new entries.
+        register_gemini_only: Whether Gemini-only files should be registered back into DB.
     """
     extra_kwargs = insert_kwargs or {}
     try:
@@ -196,7 +198,7 @@ def sync_gemini_db_background(
                 store.delete_file(language, f["name"])
 
         for doc in gemini_docs:
-            if doc.display_name not in db_names:
+            if doc.display_name not in db_names and register_gemini_only:
                 logger.info(f"[{log_prefix}] Gemini-only, registering: {doc.display_name}")
                 store.insert_file(language, doc.display_name, b"", editable=False, **extra_kwargs)
                 db_names.add(doc.display_name)
@@ -211,6 +213,7 @@ def start_background_sync(
     log_prefix: str,
     insert_kwargs: dict[str, Any] | None = None,
     fallback_env_key: str | None = None,
+    register_gemini_only: bool = True,
 ) -> None:
     """Fire-and-forget background Gemini/DB sync in a daemon thread.
 
@@ -221,6 +224,7 @@ def start_background_sync(
         log_prefix: Label for log messages.
         insert_kwargs: Extra keyword arguments for store.insert_file.
         fallback_env_key: Override fallback env var for store name resolution.
+        register_gemini_only: Whether Gemini-only files should be registered back into DB.
     """
     store_name = get_store_name(env_prefix, language, fallback_env_key=fallback_env_key)
     if not store_name:
@@ -228,7 +232,14 @@ def start_background_sync(
 
     def _run() -> None:
         store = get_store()
-        sync_gemini_db_background(store_name, store, language, log_prefix, insert_kwargs)
+        sync_gemini_db_background(
+            store_name,
+            store,
+            language,
+            log_prefix,
+            insert_kwargs,
+            register_gemini_only=register_gemini_only,
+        )
 
     threading.Thread(target=_run, daemon=True).start()
 

@@ -156,7 +156,13 @@ def _sync_topic_questions_from_store(
 def list_knowledge_files(language: str = "zh", auth: dict = Depends(verify_auth)):
     store = get_hciot_knowledge_store()
     files = store.list_files(language)
-    start_background_sync(ENV_PREFIX, get_hciot_knowledge_store, language, LOG_PREFIX)
+    start_background_sync(
+        ENV_PREFIX,
+        get_hciot_knowledge_store,
+        language,
+        LOG_PREFIX,
+        register_gemini_only=False,
+    )
     return {"files": files, "language": language}
 
 
