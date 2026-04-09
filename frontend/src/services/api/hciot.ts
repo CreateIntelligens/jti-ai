@@ -238,7 +238,7 @@ export async function updateHciotKnowledgeFileContent(
 export async function uploadHciotKnowledgeFile(
   language: string,
   file: File,
-): Promise<HciotKnowledgeFile & { synced: boolean; topic_synced: boolean }> {
+): Promise<HciotKnowledgeFile & { synced: boolean; topic_synced: boolean; uploaded_count?: number; uploaded_files?: string[] }> {
   const formData = new FormData();
   formData.append('file', file);
   const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/knowledge/upload/?language=${normLang(language)}`, {
@@ -339,7 +339,7 @@ export interface UploadWithTopicOptions {
 
 export async function uploadHciotKnowledgeFileWithTopic(
   opts: UploadWithTopicOptions,
-): Promise<HciotKnowledgeFile & { synced: boolean; topic_synced: boolean }> {
+): Promise<HciotKnowledgeFile & { synced: boolean; topic_synced: boolean; uploaded_count?: number; uploaded_files?: string[] }> {
   const formData = new FormData();
   formData.append('file', opts.file);
   // Backend still accepts category_id + topic_id as separate Form fields and merges them

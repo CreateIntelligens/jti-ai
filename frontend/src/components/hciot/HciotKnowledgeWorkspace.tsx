@@ -335,7 +335,7 @@ export default function HciotKnowledgeWorkspace({
     setUploading(true);
     try {
       const response = await uploadFileWithTopic(file, topicId, labels);
-      await handleUploadComplete(response.name, 1);
+      await handleUploadComplete(response.name, response.uploaded_count ?? 1);
     } catch (error) {
       console.error('Failed to upload HCIoT files:', error);
       alert(getErrorMessage(error));
