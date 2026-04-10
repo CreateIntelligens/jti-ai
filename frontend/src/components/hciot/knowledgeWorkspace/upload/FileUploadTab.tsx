@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, File as FileIcon, FileText, FileType, Image as ImageIcon, Table, X } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronRight, File as FileIcon, FileText, FileType, Image as ImageIcon, Table, X } from 'lucide-react';
 
 import type { HciotLanguage } from '../../../../config/hciotTopics';
 import type { TopicLabels } from '../topicUtils';
@@ -24,6 +24,65 @@ function getFileIcon(filename: string) {
   if (ext === 'docx' || ext === 'doc') return <FileType size={16} className="hciot-icon-dark-blue" />;
   if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) return <ImageIcon size={16} className="hciot-icon-green" />;
   return <FileIcon size={16} className="hciot-icon-muted" />;
+}
+
+function CsvFormatHint({ language }: { language: HciotLanguage }) {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <div className="hciot-csv-hint">
+      <button
+        type="button"
+        className="hciot-csv-hint-toggle"
+        onClick={() => setExpanded((prev) => !prev)}
+      >
+        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        {language === 'zh' ? 'CSV 格式範例' : 'CSV Format Example'}
+      </button>
+      {expanded && (
+        <div className="hciot-csv-hint-content">
+          <table className="hciot-csv-hint-table">
+            <thead>
+              <tr>
+                <th>index</th>
+                <th>q</th>
+                <th>a</th>
+                <th>img</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>TOPIC_001</td>
+                <td>{language === 'zh' ? '什麼是高血壓？' : 'What is hypertension?'}</td>
+                <td>{language === 'zh' ? '血壓持續偏高的狀態...' : 'A condition where blood pressure is consistently elevated...'}</td>
+                <td></td>
+              </tr>
+              <tr>
+                <td>TOPIC_002</td>
+                <td>{language === 'zh' ? '如何量血壓？' : 'How to measure blood pressure?'}</td>
+                <td>{language === 'zh' ? '請先靜坐5分鐘...' : 'Please sit quietly for 5 minutes...'}</td>
+                <td>IMG_BP_001</td>
+              </tr>
+            </tbody>
+          </table>
+          <ul className="hciot-csv-hint-notes">
+            <li>
+              <strong>index</strong> — {language === 'zh' ? '編號（如 TOPIC_001）' : 'Row ID (e.g. TOPIC_001)'}
+            </li>
+            <li>
+              <strong>q</strong> — {language === 'zh' ? '問題（必填）' : 'Question (required)'}
+            </li>
+            <li>
+              <strong>a</strong> — {language === 'zh' ? '回答' : 'Answer'}
+            </li>
+            <li>
+              <strong>img</strong> — {language === 'zh' ? '圖片 ID（選填，需先上傳圖片）' : 'Image ID (optional, upload image first)'}
+            </li>
+          </ul>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function FileUploadTab({
@@ -136,6 +195,7 @@ export default function FileUploadTab({
       dropSubEn="CSV only"
       countZh="個檔案"
       countEn="file(s)"
+      hint={<CsvFormatHint language={language} />}
       onDrop={(event) => {
         event.preventDefault();
         setDragOver(false);

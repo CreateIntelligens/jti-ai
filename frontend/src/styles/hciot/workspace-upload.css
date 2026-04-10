@@ -525,3 +525,81 @@
   gap: 4px;
   font-size: 12px;
 }
+
+/* ==========================================================================
+   CSV Format Hint (File Upload Tab)
+   ========================================================================== */
+.hciot-csv-hint {
+  margin: 0 1.25rem 0.5rem;
+}
+
+.hciot-csv-hint-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--hciot-text-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.hciot-csv-hint-toggle:hover {
+  color: var(--hciot-accent, #6366f1);
+}
+
+.hciot-csv-hint-content {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid var(--hciot-border);
+  border-radius: 8px;
+  background: var(--hciot-hover);
+}
+
+.hciot-csv-hint-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.hciot-csv-hint-table th,
+.hciot-csv-hint-table td {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--hciot-border);
+  text-align: left;
+}
+
+.hciot-csv-hint-table th {
+  background: var(--hciot-panel-strong, rgba(148, 163, 184, 0.15));
+  color: var(--hciot-text);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.hciot-csv-hint-table td {
+  color: var(--hciot-text);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.72rem;
+}
+
+.hciot-csv-hint-notes {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  font-size: 0.72rem;
+  color: var(--hciot-text-muted);
+  list-style: disc;
+}
+
+.hciot-csv-hint-notes li {
+  margin-bottom: 0.2rem;
+}
+
+.hciot-csv-hint-notes strong {
+  color: var(--hciot-text);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}

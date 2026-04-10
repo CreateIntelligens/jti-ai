@@ -24,6 +24,7 @@ interface UploadTabBodyProps<T> {
   countZh: string;
   countEn: string;
   listStyle?: CSSProperties;
+  hint?: ReactNode;
 }
 
 export default function UploadTabBody<T>({
@@ -47,6 +48,7 @@ export default function UploadTabBody<T>({
   countZh,
   countEn,
   listStyle,
+  hint,
 }: UploadTabBodyProps<T>) {
   return (
     <div className="hciot-upload-file-body">
@@ -72,6 +74,8 @@ export default function UploadTabBody<T>({
         accept={accept}
         onChange={(event) => onSelect(event.target.files)}
       />
+
+      {hint}
 
       {items.length > 0 && (
         <div className="hciot-upload-file-list" style={listStyle}>
