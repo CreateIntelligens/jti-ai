@@ -286,7 +286,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
                         ) : (
                           <>
                             {qs.length > 0 ? (
-                              <ul className="hciot-te-qs-list">
+                              <ul className="hciot-te-qs-list custom-scrollbar">
                                 {qs.map((q, i) => (
                                   <li key={i} className="hciot-te-q-item">
                                     <span className="hciot-te-q-index">{i + 1}</span>

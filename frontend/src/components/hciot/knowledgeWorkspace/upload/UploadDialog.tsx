@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Image as ImageIcon, Plus, Upload, X } from 'lucide-react';
+import HciotSelect from '../../HciotSelect';
 
 import type { HciotLanguage } from '../../../../config/hciotTopics';
 import type { HciotImage, HciotTopicCategory } from '../../../../services/api/hciot';
@@ -11,6 +12,12 @@ import type { DeleteImageHandler, UploadedImageResult } from '../imageUpload';
 import type { ResolvedUploadTopic } from './types';
 
 type Tab = 'file' | 'qa' | 'image';
+
+const TABS = [
+  { id: 'file' as Tab, labelZh: '上傳知識檔', labelEn: 'Upload Files', icon: Upload },
+  { id: 'qa' as Tab, labelZh: '手動輸入 Q&A', labelEn: 'Manual Q&A', icon: Plus },
+  { id: 'image' as Tab, labelZh: '上傳圖片', labelEn: 'Upload Images', icon: ImageIcon },
+];
 
 interface UploadDialogProps {
   open: boolean;
@@ -200,11 +207,7 @@ export default function UploadDialog({
         </div>
 
         <div className="hciot-upload-tabs" role="tablist">
-          {[
-            { id: 'file', labelZh: '上傳知識檔', labelEn: 'Upload Files', icon: Upload },
-            { id: 'qa', labelZh: '手動輸入 Q&A', labelEn: 'Manual Q&A', icon: Plus },
-            { id: 'image', labelZh: '上傳圖片', labelEn: 'Upload Images', icon: ImageIcon },
-          ].map((item) => (
+          {TABS.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -225,32 +228,30 @@ export default function UploadDialog({
               {language === 'zh' ? '指定科別 / 主題（可選）' : 'Category / Topic (optional)'}
             </label>
             <div className="hciot-qa-selectors">
-              <select
+              <HciotSelect
                 className="hciot-file-select"
                 value={topic.categoryId}
-                onChange={(event) => topic.handleCategoryChange(event.target.value)}
-              >
-                <option value="">{language === 'zh' ? '— 不指定 —' : '— None —'}</option>
-                {topic.sortedCategories.map((category) => (
-                  <option key={category.id} value={category.id}>{category.labels[language]}</option>
-                ))}
-                <option value={NEW_VALUE}>{language === 'zh' ? '＋ 新增科別' : '+ New category'}</option>
-              </select>
+                onChange={topic.handleCategoryChange}
+                options={[
+                  { value: '', label: language === 'zh' ? '— 不指定 —' : '— None —' },
+                  ...topic.sortedCategories.map((category) => ({ value: category.id, label: category.labels[language] })),
+                  { value: NEW_VALUE, label: language === 'zh' ? '＋ 新增科別' : '+ New category' },
+                ]}
+              />
               <span className="hciot-file-path-separator">/</span>
-              <select
+              <HciotSelect
                 className="hciot-file-select"
                 value={topic.topicId}
-                onChange={(event) => topic.handleTopicChange(event.target.value)}
+                onChange={topic.handleTopicChange}
                 disabled={!topic.categoryId || topic.categoryId === NEW_VALUE}
-              >
-                <option value="">{language === 'zh' ? '— 不指定 —' : '— None —'}</option>
-                {topic.sortedTopics.map((item) => (
-                  <option key={item.id} value={item.id}>{item.labels[language]}</option>
-                ))}
-                {topic.categoryId && topic.categoryId !== NEW_VALUE ? (
-                  <option value={NEW_VALUE}>{language === 'zh' ? '＋ 新增主題' : '+ New topic'}</option>
-                ) : null}
-              </select>
+                options={[
+                  { value: '', label: language === 'zh' ? '— 不指定 —' : '— None —' },
+                  ...topic.sortedTopics.map((item) => ({ value: item.id, label: item.labels[language] })),
+                  ...(topic.categoryId && topic.categoryId !== NEW_VALUE
+                    ? [{ value: NEW_VALUE, label: language === 'zh' ? '＋ 新增主題' : '+ New topic' }]
+                    : []),
+                ]}
+              />
             </div>
 
             {topic.categoryId === NEW_VALUE && (

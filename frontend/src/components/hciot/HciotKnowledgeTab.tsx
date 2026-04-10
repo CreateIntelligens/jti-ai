@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { Upload, FileText, Trash2, Download, Pencil, X } from 'lucide-react';
+import HciotSelect from './HciotSelect';
 import ConfirmDialog from '../ConfirmDialog';
 import HciotTopicEditor from './HciotTopicEditor';
 import { NEW_VALUE, slugify } from './knowledgeWorkspace/topicUtils';
@@ -163,23 +164,16 @@ export default function HciotKnowledgeTab({
             <label className="hciot-kb-label">
               {lang === 'zh' ? '科別' : 'Category'}
             </label>
-            <select
+            <HciotSelect
               className="hciot-kb-select"
               value={selectedCategoryId}
-              onChange={(e) => setSelectedCategoryId(e.target.value)}
-            >
-              <option value="">
-                {lang === 'zh' ? '— 不指定 —' : '— None —'}
-              </option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.labels[lang]}
-                </option>
-              ))}
-              <option value={NEW_VALUE}>
-                {lang === 'zh' ? '＋ 新增科別' : '+ New category'}
-              </option>
-            </select>
+              onChange={setSelectedCategoryId}
+              options={[
+                { value: '', label: lang === 'zh' ? '— 不指定 —' : '— None —' },
+                ...categories.map((cat) => ({ value: cat.id, label: cat.labels[lang] })),
+                { value: NEW_VALUE, label: lang === 'zh' ? '＋ 新增科別' : '+ New category' },
+              ]}
+            />
           </div>
 
           {/* Topic dropdown (only when a category is selected) */}
@@ -188,24 +182,17 @@ export default function HciotKnowledgeTab({
               <label className="hciot-kb-label">
                 {lang === 'zh' ? '主題' : 'Topic'}
               </label>
-              <select
+              <HciotSelect
                 className="hciot-kb-select"
                 value={selectedTopicId}
-                onChange={(e) => setSelectedTopicId(e.target.value)}
+                onChange={setSelectedTopicId}
                 disabled={isNewCategory && !effectiveCategoryId}
-              >
-                <option value="">
-                  {lang === 'zh' ? '— 不指定 —' : '— None —'}
-                </option>
-                {!isNewCategory && topicsInCategory.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.labels[lang]}
-                  </option>
-                ))}
-                <option value={NEW_VALUE}>
-                  {lang === 'zh' ? '＋ 新增主題' : '+ New topic'}
-                </option>
-              </select>
+                options={[
+                  { value: '', label: lang === 'zh' ? '— 不指定 —' : '— None —' },
+                  ...(!isNewCategory ? topicsInCategory.map((t) => ({ value: t.id, label: t.labels[lang] })) : []),
+                  { value: NEW_VALUE, label: lang === 'zh' ? '＋ 新增主題' : '+ New topic' },
+                ]}
+              />
             </div>
           )}
         </div>

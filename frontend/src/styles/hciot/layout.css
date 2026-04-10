@@ -1,5 +1,40 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Noto+Sans+TC:wght@400;500;600;700&display=swap');
 
+/* Expose hciot variables at :root so Radix portals (rendered at body level) can access them */
+:root {
+  --hciot-bg: #f4f9f9;
+  --hciot-panel: rgba(255, 255, 255, 0.85);
+  --hciot-panel-strong: #ffffff;
+  --hciot-border: rgba(2, 132, 199, 0.12);
+  --hciot-border-strong: rgba(2, 132, 199, 0.25);
+  --hciot-ink: #0f172a;
+  --hciot-ink-soft: #64748b;
+  --hciot-hover: rgba(2, 132, 199, 0.06);
+  --hciot-text: #0f172a;
+  --hciot-text-muted: #64748b;
+  --hciot-accent: #0284c7;
+  --hciot-accent-strong: #0369a1;
+  --hciot-secondary: #0d9488;
+  --hciot-shadow: 0 10px 40px -10px rgba(2, 132, 199, 0.1);
+}
+
+[data-theme="dark"] {
+  --hciot-bg: #0f172a;
+  --hciot-panel: rgba(30, 41, 59, 0.75);
+  --hciot-panel-strong: #1e293b;
+  --hciot-border: rgba(56, 189, 248, 0.15);
+  --hciot-border-strong: rgba(56, 189, 248, 0.3);
+  --hciot-ink: #f8fafc;
+  --hciot-ink-soft: #94a3b8;
+  --hciot-hover: rgba(56, 189, 248, 0.08);
+  --hciot-text: #f8fafc;
+  --hciot-text-muted: #94a3b8;
+  --hciot-accent: #38bdf8;
+  --hciot-accent-strong: #7dd3fc;
+  --hciot-secondary: #2dd4bf;
+  --hciot-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+}
+
 .hciot-shell {
   --hciot-bg: #f4f9f9;
   --hciot-panel: rgba(255, 255, 255, 0.85);
@@ -165,6 +200,13 @@
   color: var(--hciot-ink);
   font-size: 0.85rem;
   font-weight: 600;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.6rem center;
+  background-size: 0.8rem;
 }
 
 .hciot-voice-select:focus {
@@ -251,4 +293,17 @@
   .hciot-chat-workspace.is-active {
     grid-template-columns: 1fr;
   }
+}
+
+/* Override custom-scrollbar color to match hciot accent */
+.hciot-shell .custom-scrollbar {
+  scrollbar-color: color-mix(in srgb, var(--hciot-accent) 35%, transparent) transparent;
+}
+
+.hciot-shell .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--hciot-accent) 35%, transparent);
+}
+
+.hciot-shell .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--hciot-accent) 55%, transparent);
 }

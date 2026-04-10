@@ -18,7 +18,7 @@ interface SidebarProps {
   filesLoading: boolean;
   onProjectFilterChange: (value: string) => void;
   onTargetChange: (targetId: string) => void;
-  onUploadFile: (file: File) => void;
+  onUploadFile: (file: File) => Promise<void>;
   onDeleteFile: (fileName: string) => void;
   onRefresh: () => void;
   onOpenPromptManagement: () => void;
@@ -228,7 +228,7 @@ export default function Sidebar({
           />
         </div>
 
-        <div className="file-list-container">
+        <div className="file-list-container custom-scrollbar">
           {filesLoading ? (
             <ul className="file-list" aria-label="載入中">
               {[1, 2, 3].map((i) => (

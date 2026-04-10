@@ -155,7 +155,7 @@ export default function ExistingImagePicker({
           </label>
         </div>
 
-        <div className="hciot-image-picker-body">
+        <div className="hciot-image-picker-body custom-scrollbar">
           {filteredImages.length === 0 ? (
             <div className="hciot-image-picker-empty">
               <ImageIcon size={24} />

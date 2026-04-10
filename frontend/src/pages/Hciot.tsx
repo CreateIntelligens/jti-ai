@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { FileText, HeartPulse, History, Moon, RotateCcw, Settings, Sun } from 'lucide-react';
 import { fetchWithApiKey } from '../services/api';
 
+import HciotSelect from '../components/hciot/HciotSelect';
 import ConversationHistoryModal from '../components/ConversationHistoryModal';
 import HciotSettingsModal from '../components/HciotSettingsModal';
 import HciotInputArea from '../components/hciot/HciotInputArea';
@@ -544,7 +545,7 @@ export default function Hciot() {
   };
 
   const handleEditKeyDown = (event: React.KeyboardEvent, turnNumber: number) => {
-    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+    if (event.nativeEvent.isComposing) return;
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       if (editText.trim()) {
@@ -556,7 +557,7 @@ export default function Hciot() {
     }
   };
 
-  const handleSubmit = (event: React.FormEvent) => {
+  const handleSubmit = (event: { preventDefault(): void }) => {
     event.preventDefault();
     const trimmed = userInput.trim();
     if (trimmed && !loading) {
@@ -565,7 +566,7 @@ export default function Hciot() {
   };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+    if (event.nativeEvent.isComposing) return;
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       const trimmed = userInput.trim();
@@ -633,15 +634,12 @@ export default function Hciot() {
               <span className="hciot-voice-select-label">
                 {currentLanguage === 'zh' ? '聲音' : 'Voice'}
               </span>
-              <select
+              <HciotSelect
                 className="hciot-voice-select"
                 value={selectedTtsCharacter}
-                onChange={(event) => setSelectedTtsCharacter(event.target.value)}
-              >
-                {ttsCharacters.map((character) => (
-                  <option key={character} value={character}>{character}</option>
-                ))}
-              </select>
+                onChange={setSelectedTtsCharacter}
+                options={ttsCharacters.map((character) => ({ value: character, label: character }))}
+              />
             </label>
           )}
           <button className="hciot-icon-button" onClick={() => setShowSettingsModal(true)} title={t('hciot_settings')}>
@@ -664,7 +662,7 @@ export default function Hciot() {
 
       <main className="hciot-main">
         <section className={`hciot-chat-workspace${workspace === 'chat' ? ' is-active' : ''}`}>
-          <aside className="hciot-sidebar">
+          <aside className="hciot-sidebar custom-scrollbar">
             <div className="hciot-topic-inline-panel">
               <HciotTopicGrid
                 topics={visibleTopics}

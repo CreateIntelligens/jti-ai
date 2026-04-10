@@ -73,7 +73,7 @@ export default function JtiMessageList({
   t,
 }: JtiMessageListProps) {
   return (
-    <div className="messages-area">
+    <div className="messages-area custom-scrollbar">
       {messages.length === 0 ? (
         <div className="welcome-screen">
           <div className="welcome-hero">

@@ -48,7 +48,7 @@ export default function ChatArea({
     }
   }, [editingTurn]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: { preventDefault(): void }) => {
     e.preventDefault();
     if (input.trim()) {
       onSendMessage(input.trim());
@@ -58,7 +58,7 @@ export default function ChatArea({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    if (e.nativeEvent.isComposing) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit(e);
@@ -66,7 +66,7 @@ export default function ChatArea({
   };
 
   const handleEditKeyDown = (e: React.KeyboardEvent, turnNumber: number) => {
-    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
+    if (e.nativeEvent.isComposing) return;
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleEditSubmit(turnNumber);
@@ -91,7 +91,7 @@ export default function ChatArea({
 
   return (
     <main>
-      <div className="chat-history" role="log" aria-live="polite" aria-label="對話歷史">
+      <div className="chat-history custom-scrollbar" role="log" aria-live="polite" aria-label="對話歷史">
         {messages.length === 0 ? (
           <div className="empty-state">
             <h3>✧ 開始對話 ✧</h3>

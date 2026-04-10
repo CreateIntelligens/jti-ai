@@ -173,7 +173,7 @@ body::before {
 
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: rgba(61, 217, 211, 0.3) transparent;
+  scrollbar-color: color-mix(in srgb, var(--primary-color, #8ab4f8) 35%, transparent) transparent;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -185,12 +185,12 @@ body::before {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(61, 217, 211, 0.3);
+  background: color-mix(in srgb, var(--primary-color, #8ab4f8) 35%, transparent);
   border-radius: 3px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(61, 217, 211, 0.5);
+  background: color-mix(in srgb, var(--primary-color, #8ab4f8) 55%, transparent);
 }
 
 /* ==================== UTILITIES ==================== */

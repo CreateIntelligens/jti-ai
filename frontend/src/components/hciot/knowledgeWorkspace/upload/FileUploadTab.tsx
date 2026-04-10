@@ -18,13 +18,22 @@ interface FileUploadTabProps {
   onUploadComplete: (firstUploadedFileName: string | null, count: number) => Promise<void>;
 }
 
+const FILE_ICON_MAP: Record<string, { icon: typeof FileIcon, color: string }> = {
+  csv: { icon: Table, color: 'hciot-icon-blue' },
+  pdf: { icon: FileText, color: 'hciot-icon-red' },
+  docx: { icon: FileType, color: 'hciot-icon-dark-blue' },
+  doc: { icon: FileType, color: 'hciot-icon-dark-blue' },
+  jpg: { icon: ImageIcon, color: 'hciot-icon-green' },
+  jpeg: { icon: ImageIcon, color: 'hciot-icon-green' },
+  png: { icon: ImageIcon, color: 'hciot-icon-green' },
+  gif: { icon: ImageIcon, color: 'hciot-icon-green' },
+  webp: { icon: ImageIcon, color: 'hciot-icon-green' },
+};
+
 function getFileIcon(filename: string) {
-  const ext = filename.split('.').pop()?.toLowerCase();
-  if (ext === 'csv') return <Table size={16} className="hciot-icon-blue" />;
-  if (ext === 'pdf') return <FileText size={16} className="hciot-icon-red" />;
-  if (ext === 'docx' || ext === 'doc') return <FileType size={16} className="hciot-icon-dark-blue" />;
-  if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(ext || '')) return <ImageIcon size={16} className="hciot-icon-green" />;
-  return <FileIcon size={16} className="hciot-icon-muted" />;
+  const ext = filename.split('.').pop()?.toLowerCase() || '';
+  const { icon: Icon, color } = FILE_ICON_MAP[ext] || { icon: FileIcon, color: 'hciot-icon-muted' };
+  return <Icon size={16} className={color} />;
 }
 
 const CSV_SAMPLE_ZH = `q,a,img
@@ -42,8 +51,42 @@ function downloadCsvSample(language: HciotLanguage) {
   downloadBlob(new Blob([content], { type: 'text/csv;charset=utf-8' }), filename);
 }
 
+const I18N = {
+  zh: {
+    csvHint: 'CSV 格式範例',
+    downloadSample: '下載範例',
+    downloadTitle: '下載範例 CSV',
+    q: '問題（必填）',
+    a: '回答',
+    img: '圖片 檔名（選填，不需要副檔名）',
+    qText1: '什麼是高血壓？',
+    aText1: '血壓持續偏高的狀態...',
+    qText2: '如何量血壓？',
+    aText2: '請先靜坐5分鐘...',
+    duplicate: '(重複)',
+    duplicateTitle: '重複檔名',
+    remove: '移除',
+  },
+  en: {
+    csvHint: 'CSV Format Example',
+    downloadSample: 'Download',
+    downloadTitle: 'Download sample CSV',
+    q: 'Question (required)',
+    a: 'Answer',
+    img: 'Image ID (optional, upload image first)',
+    qText1: 'What is hypertension?',
+    aText1: 'A condition where blood pressure is consistently elevated...',
+    qText2: 'How to measure blood pressure?',
+    aText2: 'Please sit quietly for 5 minutes...',
+    duplicate: '(Dup)',
+    duplicateTitle: 'Duplicate filename',
+    remove: 'Remove',
+  },
+};
+
 function CsvFormatHint({ language }: { language: HciotLanguage }) {
   const [expanded, setExpanded] = useState(false);
+  const t = I18N[language];
 
   return (
     <div className="hciot-csv-hint">
@@ -54,16 +97,16 @@ function CsvFormatHint({ language }: { language: HciotLanguage }) {
           onClick={() => setExpanded((prev) => !prev)}
         >
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          {language === 'zh' ? 'CSV 格式範例' : 'CSV Format Example'}
+          {t.csvHint}
         </button>
         <button
           type="button"
           className="hciot-csv-hint-download"
           onClick={() => downloadCsvSample(language)}
-          title={language === 'zh' ? '下載範例 CSV' : 'Download sample CSV'}
+          title={t.downloadTitle}
         >
           <Download size={13} />
-          {language === 'zh' ? '下載範例' : 'Download'}
+          {t.downloadSample}
         </button>
       </div>
       {expanded && (
@@ -78,27 +121,21 @@ function CsvFormatHint({ language }: { language: HciotLanguage }) {
             </thead>
             <tbody>
               <tr>
-                <td>{language === 'zh' ? '什麼是高血壓？' : 'What is hypertension?'}</td>
-                <td>{language === 'zh' ? '血壓持續偏高的狀態...' : 'A condition where blood pressure is consistently elevated...'}</td>
+                <td>{t.qText1}</td>
+                <td>{t.aText1}</td>
                 <td></td>
               </tr>
               <tr>
-                <td>{language === 'zh' ? '如何量血壓？' : 'How to measure blood pressure?'}</td>
-                <td>{language === 'zh' ? '請先靜坐5分鐘...' : 'Please sit quietly for 5 minutes...'}</td>
+                <td>{t.qText2}</td>
+                <td>{t.aText2}</td>
                 <td>IMG_BP_001</td>
               </tr>
             </tbody>
           </table>
           <ul className="hciot-csv-hint-notes">
-            <li>
-              <strong>q</strong> — {language === 'zh' ? '問題（必填）' : 'Question (required)'}
-            </li>
-            <li>
-              <strong>a</strong> — {language === 'zh' ? '回答' : 'Answer'}
-            </li>
-            <li>
-              <strong>img</strong> — {language === 'zh' ? '圖片 檔名（選填，不需要副檔名）' : 'Image ID (optional, upload image first)'}
-            </li>
+            <li><strong>q</strong> — {t.q}</li>
+            <li><strong>a</strong> — {t.a}</li>
+            <li><strong>img</strong> — {t.img}</li>
           </ul>
         </div>
       )}
@@ -128,14 +165,12 @@ export default function FileUploadTab({
     }
   }, [open]);
 
-  const canSubmitFile = selectedFiles.some((item) => item.status === 'pending' || item.status === 'error')
-    && !uploadingLocal
-    && !uploading;
+  const isBusy = uploadingLocal || uploading;
+  const hasPending = selectedFiles.some((item) => item.status === 'pending' || item.status === 'error');
+  const canSubmitFile = hasPending && !isBusy;
 
   const handleFileSelect = (fileList: FileList | null) => {
-    if (!fileList?.length) {
-      return;
-    }
+    if (!fileList?.length) return;
 
     const newFiles = Array.from(fileList).map((file) => ({
       file,
@@ -143,8 +178,8 @@ export default function FileUploadTab({
       isDuplicate: false,
     }));
 
-    setSelectedFiles((previous) => {
-      const combined = [...previous, ...newFiles];
+    setSelectedFiles((prev) => {
+      const combined = [...prev, ...newFiles];
       const nameSet = new Set<string>();
       return combined.map((item) => {
         const isDuplicate = nameSet.has(item.file.name);
@@ -153,9 +188,7 @@ export default function FileUploadTab({
       });
     });
 
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const updateFileStatus = (index: number, updates: Partial<FileItem>) => {
@@ -227,39 +260,42 @@ export default function FileUploadTab({
       onSelect={handleFileSelect}
       onUpload={() => { void handleUploadFiles(); }}
       onClose={onClose}
-      renderItem={(item, index) => (
-        <div key={`${item.file.name}-${index}`} className="hciot-upload-file-item">
-          {getFileIcon(item.file.name)}
-          <span className="hciot-upload-file-name">
-            {item.file.name}
-          </span>
-          {item.isDuplicate && (
-            <span
-              className="hciot-file-warning hciot-file-warning-badge hciot-icon-warning"
-              title={language === 'zh' ? '重複檔名' : 'Duplicate filename'}
-            >
-              <AlertCircle size={12} />
-              {language === 'zh' ? '(重複)' : '(Dup)'}
-            </span>
-          )}
-          <span className="hciot-upload-file-size">
-            {item.file.size > 1024 ? `${(item.file.size / 1024).toFixed(1)} KB` : `${item.file.size} B`}
-          </span>
-          <div className="hciot-file-actions">
-            <UploadStatusIcon status={item.status} error={item.error} />
-            {item.status !== 'uploading' && item.status !== 'done' && (
-              <button
-                type="button"
-                className="hciot-qa-row-delete"
-                onClick={() => setSelectedFiles((previous) => previous.filter((_, itemIndex) => itemIndex !== index))}
-                title={language === 'zh' ? '移除' : 'Remove'}
+      renderItem={(item, index) => {
+        const t = I18N[language];
+        const fileSize = item.file.size > 1024
+          ? `${(item.file.size / 1024).toFixed(1)} KB`
+          : `${item.file.size} B`;
+
+        return (
+          <div key={`${item.file.name}-${index}`} className="hciot-upload-file-item">
+            {getFileIcon(item.file.name)}
+            <span className="hciot-upload-file-name">{item.file.name}</span>
+            {item.isDuplicate && (
+              <span
+                className="hciot-file-warning hciot-file-warning-badge hciot-icon-warning"
+                title={t.duplicateTitle}
               >
-                <X size={14} />
-              </button>
+                <AlertCircle size={12} />
+                {t.duplicate}
+              </span>
             )}
+            <span className="hciot-upload-file-size">{fileSize}</span>
+            <div className="hciot-file-actions">
+              <UploadStatusIcon status={item.status} error={item.error} />
+              {!['uploading', 'done'].includes(item.status) && (
+                <button
+                  type="button"
+                  className="hciot-qa-row-delete"
+                  onClick={() => setSelectedFiles((prev) => prev.filter((_, i) => i !== index))}
+                  title={t.remove}
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      }}
     />
   );
 }

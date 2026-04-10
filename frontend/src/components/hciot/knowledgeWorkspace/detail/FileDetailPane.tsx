@@ -1,5 +1,6 @@
 import { Download, FileText, Save, Trash2 } from 'lucide-react';
 
+import HciotSelect from '../../HciotSelect';
 import type { HciotLanguage } from '../../../../config/hciotTopics';
 import type { HciotKnowledgeFile, HciotTopicCategory } from '../../../../services/api/hciot';
 import { getFileLabel, NEW_VALUE, type FileMetadataDraft, type TopicOption } from '../topicUtils';
@@ -123,46 +124,37 @@ export default function FileDetailPane({
                 {language === 'zh' ? '科別 / 主題' : 'Category / Topic'}
               </label>
               <div className="hciot-file-metadata-controls">
-                <select
-                  value={draft.categoryId}
-                  onChange={(event) => onCategoryChange(event.target.value)}
+                <HciotSelect
                   className="hciot-file-select"
+                  value={draft.categoryId}
+                  onChange={onCategoryChange}
                   disabled={saving}
-                >
-                  {categoryOptions.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.labels[language]}
-                    </option>
-                  ))}
-                  <option value={NEW_VALUE}>
-                    {language === 'zh' ? '＋ 新增科別' : '+ New category'}
-                  </option>
-                </select>
+                  options={[
+                    ...categoryOptions.map((category) => ({ value: category.id, label: category.labels[language] })),
+                    { value: NEW_VALUE, label: language === 'zh' ? '＋ 新增科別' : '+ New category' },
+                  ]}
+                />
 
                 <span className="hciot-file-path-separator">/</span>
 
-                <select
-                  value={draft.topicId}
-                  onChange={(event) => onTopicChange(event.target.value)}
+                <HciotSelect
                   className="hciot-file-select"
+                  value={draft.topicId}
+                  onChange={onTopicChange}
                   disabled={saving || !draft.categoryId}
-                >
-                  <option value="">
-                    {draft.categoryId
-                      ? getNoTopicLabel(language)
-                      : (language === 'zh' ? '先選科別' : 'Select category first')}
-                  </option>
-                  {topicOptions.map((topic) => (
-                    <option key={topic.id} value={topic.id}>
-                      {topic.labels[language]}
-                    </option>
-                  ))}
-                  {draft.categoryId ? (
-                    <option value={NEW_VALUE}>
-                      {language === 'zh' ? '＋ 新增主題' : '+ New topic'}
-                    </option>
-                  ) : null}
-                </select>
+                  options={[
+                    {
+                      value: '',
+                      label: draft.categoryId
+                        ? getNoTopicLabel(language)
+                        : (language === 'zh' ? '先選科別' : 'Select category first'),
+                    },
+                    ...topicOptions.map((topic) => ({ value: topic.id, label: topic.labels[language] })),
+                    ...(draft.categoryId
+                      ? [{ value: NEW_VALUE, label: language === 'zh' ? '＋ 新增主題' : '+ New topic' }]
+                      : []),
+                  ]}
+                />
               </div>
             </div>
 

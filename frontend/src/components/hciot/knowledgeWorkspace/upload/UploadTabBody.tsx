@@ -78,7 +78,7 @@ export default function UploadTabBody<T>({
       {hint}
 
       {items.length > 0 && (
-        <div className="hciot-upload-file-list" style={listStyle}>
+        <div className="hciot-upload-file-list custom-scrollbar" style={listStyle}>
           {items.map((item, index) => renderItem(item, index))}
         </div>
       )}

@@ -190,7 +190,7 @@ export default function QaUploadTab({
       />
 
       <div className="hciot-upload-qa-body">
-        <div className="hciot-qa-rows">
+        <div className="hciot-qa-rows custom-scrollbar">
           {rows.map((row, index) => {
             const imageLabel = row.pendingImageName || row.img;
             const hasImage = Boolean(imageLabel);

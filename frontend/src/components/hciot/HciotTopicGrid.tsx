@@ -1,5 +1,4 @@
-import type { ChangeEvent } from 'react';
-
+import HciotSelect from './HciotSelect';
 import type { HciotCategory, HciotLanguage, HciotTopic } from '../../config/hciotTopics';
 
 interface HciotTopicGridProps {
@@ -33,17 +32,15 @@ export default function HciotTopicGrid({
   questionHeading,
   disabledMessage,
 }: HciotTopicGridProps) {
-  const findTopicById = (topicId: string) => topics.find((topic) => topic.id === topicId);
-  const selectedTopic = selectedTopicId ? findTopicById(selectedTopicId) || null : null;
+  const selectedTopic = selectedTopicId ? topics.find((t) => t.id === selectedTopicId) ?? null : null;
   const categorySelectPlaceholder = language === 'en' ? 'All categories' : '全部科別';
 
-  const handleCategoryChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    const value = event.target.value;
-    onSelectCategory?.(value || null);
+  const handleCategoryChange = (value: string) => {
+    onSelectCategory?.(value === '__all__' ? null : value);
   };
 
-  const handleTopicChange = (event: ChangeEvent<HTMLSelectElement>) => {
-    const topic = findTopicById(event.target.value);
+  const handleTopicChange = (value: string) => {
+    const topic = topics.find((t) => t.id === value);
     if (topic) {
       onSelect(topic);
     }
@@ -62,34 +59,26 @@ export default function HciotTopicGrid({
       </div>
 
       {categories.length > 1 ? (
-        <select
+        <HciotSelect
           className="hciot-topic-select"
-          value={selectedCategoryId || ''}
+          value={selectedCategoryId || '__all__'}
           onChange={handleCategoryChange}
           disabled={disabled}
-        >
-          <option value="">{categorySelectPlaceholder}</option>
-          {categories.map((cat) => (
-            <option key={cat.id} value={cat.id}>
-              {cat.labels[language]}
-            </option>
-          ))}
-        </select>
+          options={[
+            { value: '__all__', label: categorySelectPlaceholder },
+            ...categories.map((cat) => ({ value: cat.id, label: cat.labels[language] })),
+          ]}
+        />
       ) : null}
 
       {topics.length > 0 ? (
-        <select
+        <HciotSelect
           className="hciot-topic-select"
           value={selectedTopicId || ''}
           onChange={handleTopicChange}
           disabled={disabled}
-        >
-          {topics.map((topic, index) => (
-            <option key={topic.id || `topic-${index}`} value={topic.id}>
-              {topic.labels[language]}
-            </option>
-          ))}
-        </select>
+          options={topics.map((topic, index) => ({ value: topic.id || `topic-${index}`, label: topic.labels[language] }))}
+        />
       ) : null}
 
       {selectedTopic ? (
@@ -100,7 +89,7 @@ export default function HciotTopicGrid({
             </h4>
           </div>
 
-          <div className="hciot-topic-question-list">
+          <div className="hciot-topic-question-list custom-scrollbar">
             {selectedTopic.questions[language].map((question, index) => (
               <button
                 key={`${selectedTopic.id}-${question}`}
