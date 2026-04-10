@@ -99,6 +99,12 @@ class HciotKnowledgeStore:
             query["filename"] = self._safe_filename(filename)
         return query
 
+    def has_non_csv_files(self, language: str, topic_id: str) -> bool:
+        query = self._query(language)
+        query["topic_id"] = topic_id
+        query["filename"] = {"$not": {"$regex": r"\.csv$", "$options": "i"}}
+        return self.collection.count_documents(query, limit=1) > 0
+
     def get_topic_csv_files(self, language: str, topic_id: str) -> list[dict[str, Any]]:
         query = self._query(language)
         query["topic_id"] = topic_id

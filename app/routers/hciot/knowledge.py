@@ -191,8 +191,12 @@ def _sync_topic_questions_from_store(
 
     existing = topic_store.get_topic(topic_id)
     if existing:
-        topic_store.update_topic(topic_id, {"questions": {"zh": questions, "en": questions}})
-        logger.info("[HCIoT KB] Synced %d questions -> %s", len(questions), topic_id)
+        if not questions and not store.has_non_csv_files(language, topic_id):
+            topic_store.delete_topic(topic_id)
+            logger.info("[HCIoT KB] Deleted empty topic %s", topic_id)
+        else:
+            topic_store.update_topic(topic_id, {"questions": {"zh": questions, "en": questions}})
+            logger.info("[HCIoT KB] Synced %d questions -> %s", len(questions), topic_id)
         return True
 
     if not questions:

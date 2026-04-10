@@ -134,7 +134,7 @@ export function getCurrentPathLabel(
   const categoryLabel = selectedFile[`category_label_${language}` as const] || categoryPrefix(selectedFile.topic_id);
   const topicLabel = selectedFile[`topic_label_${language}` as const] || selectedFile.topic_id;
   if (!categoryLabel && !topicLabel) {
-    return language === 'zh' ? '關於元復醫院' : 'About Yuan-Fu Hospital';
+    return language === 'zh' ? '未分類' : 'Uncategorized';
   }
 
   return topicLabel ? `${categoryLabel} / ${topicLabel}` : categoryLabel;
@@ -158,6 +158,8 @@ export function buildExplorerTree(
   });
 
   const sortedCategoryEntries = [...filesByCategory.entries()].sort(([leftId, leftFiles], [rightId, rightFiles]) => {
+    if (!leftId && rightId) return 1;
+    if (leftId && !rightId) return -1;
     const leftCategory = categories.find((item) => item.id === leftId);
     const rightCategory = categories.find((item) => item.id === rightId);
     const leftLabel = leftCategory?.labels[language] || leftFiles[0]?.[`category_label_${language}` as const] || leftId;

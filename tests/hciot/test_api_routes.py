@@ -50,6 +50,5 @@ class TestHciotApiRoutes(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(attach_tts.call_args.kwargs["character"], "healthy3")
 
-
 if __name__ == "__main__":
     unittest.main()
