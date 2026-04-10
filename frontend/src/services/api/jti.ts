@@ -1,4 +1,5 @@
 import { API_BASE, fetchAsAdmin, handleResponse } from './base';
+import { downloadBlob } from '../../utils/download';
 
 // ========== JTI Prompt Management ==========
 
@@ -351,15 +352,7 @@ export async function exportQuizResultsCsv(language: string): Promise<void> {
   const params = new URLSearchParams({ language, type: 'results' });
   const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/transfer/export?${params}`);
   if (!response.ok) throw new Error('Export failed');
-  const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `quiz_results_${language}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  window.URL.revokeObjectURL(url);
+  downloadBlob(await response.blob(), `quiz_results_${language}.csv`);
 }
 
 export async function getQuizBankStats(language: string = 'zh', bankId?: string): Promise<QuizBankStats> {
@@ -385,13 +378,5 @@ export async function exportQuizBankCsv(language: string, bankId: string): Promi
   const params = new URLSearchParams({ language, bank_id: bankId, type: 'questions' });
   const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/transfer/export?${params}`);
   if (!response.ok) throw new Error('Export failed');
-  const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `quiz_bank_${bankId}_${language}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  window.URL.revokeObjectURL(url);
+  downloadBlob(await response.blob(), `quiz_bank_${bankId}_${language}.csv`);
 }

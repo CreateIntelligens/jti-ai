@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { AlertCircle, ChevronDown, ChevronRight, File as FileIcon, FileText, FileType, Image as ImageIcon, Table, X } from 'lucide-react';
+import { AlertCircle, ChevronDown, ChevronRight, Download, File as FileIcon, FileText, FileType, Image as ImageIcon, Table, X } from 'lucide-react';
 
 import type { HciotLanguage } from '../../../../config/hciotTopics';
+import { downloadBlob } from '../../../../utils/download';
 import type { TopicLabels } from '../topicUtils';
 import UploadStatusIcon from './UploadStatusIcon';
 import UploadTabBody from './UploadTabBody';
@@ -26,19 +27,45 @@ function getFileIcon(filename: string) {
   return <FileIcon size={16} className="hciot-icon-muted" />;
 }
 
+const CSV_SAMPLE_ZH = `q,a,img
+什麼是高血壓？,血壓持續偏高的狀態，收縮壓 ≥140 mmHg 或舒張壓 ≥90 mmHg。,
+如何量血壓？,請先靜坐5分鐘，再將血壓計袖帶套在上臂並按下量測鍵。,IMG_BP_001
+`;
+const CSV_SAMPLE_EN = `q,a,img
+What is hypertension?,A condition where blood pressure is consistently elevated (systolic ≥140 mmHg or diastolic ≥90 mmHg).,
+How to measure blood pressure?,Sit quietly for 5 minutes then place the cuff on your upper arm and press the start button.,IMG_BP_001
+`;
+
+function downloadCsvSample(language: HciotLanguage) {
+  const content = language === 'zh' ? CSV_SAMPLE_ZH : CSV_SAMPLE_EN;
+  const filename = language === 'zh' ? 'qa_sample_zh.csv' : 'qa_sample_en.csv';
+  downloadBlob(new Blob([content], { type: 'text/csv;charset=utf-8' }), filename);
+}
+
 function CsvFormatHint({ language }: { language: HciotLanguage }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
     <div className="hciot-csv-hint">
-      <button
-        type="button"
-        className="hciot-csv-hint-toggle"
-        onClick={() => setExpanded((prev) => !prev)}
-      >
-        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        {language === 'zh' ? 'CSV 格式範例' : 'CSV Format Example'}
-      </button>
+      <div className="hciot-csv-hint-header">
+        <button
+          type="button"
+          className="hciot-csv-hint-toggle"
+          onClick={() => setExpanded((prev) => !prev)}
+        >
+          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          {language === 'zh' ? 'CSV 格式範例' : 'CSV Format Example'}
+        </button>
+        <button
+          type="button"
+          className="hciot-csv-hint-download"
+          onClick={() => downloadCsvSample(language)}
+          title={language === 'zh' ? '下載範例 CSV' : 'Download sample CSV'}
+        >
+          <Download size={13} />
+          {language === 'zh' ? '下載範例' : 'Download'}
+        </button>
+      </div>
       {expanded && (
         <div className="hciot-csv-hint-content">
           <table className="hciot-csv-hint-table">
@@ -70,7 +97,7 @@ function CsvFormatHint({ language }: { language: HciotLanguage }) {
               <strong>a</strong> — {language === 'zh' ? '回答' : 'Answer'}
             </li>
             <li>
-              <strong>img</strong> — {language === 'zh' ? '圖片 ID（選填，需先上傳圖片）' : 'Image ID (optional, upload image first)'}
+              <strong>img</strong> — {language === 'zh' ? '圖片 檔名（選填，不需要副檔名）' : 'Image ID (optional, upload image first)'}
             </li>
           </ul>
         </div>
