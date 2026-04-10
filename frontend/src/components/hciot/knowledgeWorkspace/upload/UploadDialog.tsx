@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useEscapeKey } from '../../../../hooks/useEscapeKey';
 import { Image as ImageIcon, Plus, Upload, X } from 'lucide-react';
 import HciotSelect from '../../HciotSelect';
 
@@ -177,20 +178,7 @@ export default function UploadDialog({
     }
   }, [open]);
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, open]);
+  useEscapeKey(onClose, open);
 
   if (!open) {
     return null;

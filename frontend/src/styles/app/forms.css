@@ -288,7 +288,7 @@
   opacity: 0.8;
 }
 
-.bento-minimal-select .custom-select-trigger {
+.app-select-trigger.bento-minimal-select {
   background: transparent !important;
   border: none !important;
   padding: 0.7rem 1.2rem 0.7rem 2.8rem !important;
@@ -296,10 +296,7 @@
   font-size: 0.95rem !important;
   font-weight: 500;
   box-shadow: none !important;
-}
-
-.bento-minimal-select .custom-select-dropdown {
-  transform: translateY(-4px);
+  color: #e0e6ff;
 }
 
 /* ==========================================================================

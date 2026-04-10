@@ -9,6 +9,7 @@ import MergedCsvPane from './knowledgeWorkspace/detail/MergedCsvPane';
 import UploadDialog from './knowledgeWorkspace/upload/UploadDialog';
 import ImageDetailPane from './knowledgeWorkspace/detail/ImageDetailPane';
 import { NEW_VALUE, buildLabels, buildCategoryOptions, buildTopicOptions, createEmptyDraft, draftFromFile, getErrorMessage, getDraftMetadataPayload, slugify, type FileMetadataDraft, type TopicLabels } from './knowledgeWorkspace/topicUtils';
+import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { buildExplorerTree, filterExplorerNodes, flattenExplorerNodes, getCurrentPathLabel, readExpandedKeys, writeExpandedKeys } from './knowledgeWorkspace/explorer/explorerTree';
 
 interface HciotKnowledgeWorkspaceProps {
@@ -278,6 +279,9 @@ export default function HciotKnowledgeWorkspace({
     setSelectedImageName(imageName);
     setSelectedMergedTopicId(mergedTopicId);
   };
+
+  const hasSelection = !!(selectedFileName || selectedImageName || selectedMergedTopicId);
+  useEscapeKey(() => { if (discardChanges()) selectWorkspaceItem({}); }, hasSelection);
 
   const handleSelectFile = (fileName: string) => {
     if (fileName === selectedFileName || !discardChanges()) return;

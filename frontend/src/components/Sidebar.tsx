@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import { Download, FolderKanban, LibraryBig, Pencil, X } from 'lucide-react';
 import type { FileItem, KnowledgeTarget, AppTarget, KnowledgeLanguage } from '../types';
-import CustomSelect from './CustomSelect';
+import AppSelect from './AppSelect';
 import * as api from '../services/api';
 
 interface SidebarProps {
@@ -145,6 +146,7 @@ export default function Sidebar({
     setIsEditing(false);
     setFileEditContent('');
   };
+  useEscapeKey(closeViewer, !!viewingFile);
 
   const handleSaveEdit = async () => {
     if (!viewingFile || !managedContext) return;
@@ -174,7 +176,7 @@ export default function Sidebar({
         <div className="bento-row-inline">
           <div className="bento-select-wrapper" title="專案">
             <FolderKanban className="bento-icon" size={16} />
-            <CustomSelect
+            <AppSelect
               value={projectFilter}
               onChange={onProjectFilterChange}
               options={projectFilterOptions}
@@ -186,7 +188,7 @@ export default function Sidebar({
         <div className="bento-row-inline">
           <div className="bento-select-wrapper" title="知識庫">
             <LibraryBig className="bento-icon" size={16} />
-            <CustomSelect
+            <AppSelect
               value={currentTargetId || ''}
               onChange={onTargetChange}
               options={knowledgeTargets.length === 0 ? [{ value: '', label: '尚無知識庫' }] : knowledgeTargets.map((target) => ({

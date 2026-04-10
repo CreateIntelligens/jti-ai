@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useEscapeKey } from '../../../../hooks/useEscapeKey';
 import { Image as ImageIcon, Search, X } from 'lucide-react';
 
 import type { HciotLanguage } from '../../../../config/hciotTopics';
@@ -36,20 +37,7 @@ export default function ExistingImagePicker({
     }
   }, [open]);
 
-  useEffect(() => {
-    if (!open) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        onClose();
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onClose, open]);
+  useEscapeKey(onClose, open);
 
   const normalizedQuery = query.trim().toLowerCase();
   const filteredImages = useMemo(() => {

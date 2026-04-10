@@ -1,3 +1,5 @@
+import { useEscapeKey } from '../hooks/useEscapeKey';
+
 interface ConfirmDialogProps {
   isOpen: boolean;
   message: string;
@@ -17,6 +19,8 @@ export default function ConfirmDialog({
   confirmText = '確認刪除',
   cancelText = '取消',
 }: ConfirmDialogProps) {
+  useEscapeKey(onCancel, isOpen && !loading);
+
   if (!isOpen) return null;
 
   return (

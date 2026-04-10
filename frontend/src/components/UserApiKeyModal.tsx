@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import * as api from '../services/api';
-import CustomSelect from './CustomSelect';
+import AppSelect from './AppSelect';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface UserApiKeyModalProps {
@@ -94,7 +94,7 @@ export default function UserApiKeyModal({ isOpen, onClose, onApiKeySaved }: User
             }}>
               使用中的 Key
             </label>
-            <CustomSelect
+            <AppSelect
               value={activeKey}
               onChange={handleSelectKey}
               options={[

@@ -1,4 +1,4 @@
-import CustomSelect from '../CustomSelect';
+import AppSelect from '../AppSelect';
 import type { Store } from '../../types';
 
 interface APIKey {
@@ -112,7 +112,7 @@ export default function ApiKeyTab({
                 <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
                   指定 Prompt（可選）
                 </label>
-                <CustomSelect
+                <AppSelect
                   value={apiKeyPromptIndex}
                   onChange={onApiKeyPromptIndexChange}
                   options={[

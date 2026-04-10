@@ -317,7 +317,7 @@
   color: var(--crystal-teal);
 }
 
-[data-theme="light"] .bento-minimal-select .custom-select-trigger {
+[data-theme="light"] .app-select-trigger.bento-minimal-select {
   color: var(--text-primary) !important;
 }
 
