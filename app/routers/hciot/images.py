@@ -139,23 +139,21 @@ async def upload_image(
     actual_image_id = image_id or parsed.stem
     store = get_hciot_image_store()
 
-    if store.image_exists(actual_image_id):
-        raise HTTPException(status_code=409, detail=f"Image ID {actual_image_id} already exists.")
-
     contents = await file.read()
     if len(contents) > MAX_IMAGE_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Max 10MB allowed.")
 
     mime = file.content_type or mimetypes.guess_type(file.filename)[0] or "image/jpeg"
 
-    success = store.insert_image(actual_image_id, contents, content_type=mime)
-    if not success:
+    result = store.upsert_image(actual_image_id, contents, content_type=mime)
+    if not result["success"]:
         raise HTTPException(status_code=500, detail="Failed to store image in database.")
 
     return {
         "filename": file.filename,
         "image_id": actual_image_id,
-        "url": f"/api/hciot/images/{actual_image_id}"
+        "url": f"/api/hciot/images/{actual_image_id}",
+        "replaced": result["replaced"],
     }
 
 

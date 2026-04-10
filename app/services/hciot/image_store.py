@@ -58,24 +58,34 @@ class HciotImageStore:
             })
         return result
 
-    def insert_image(
+    def upsert_image(
         self,
         image_id: str,
         data: bytes,
         content_type: str = "image/jpeg",
-    ) -> bool:
-        doc = {
-            "image_id": image_id,
-            "data": Binary(data),
-            "content_type": content_type,
-            "size": len(data),
-            "created_at": datetime.now(timezone.utc),
-        }
+    ) -> dict[str, bool]:
+        """Insert or replace an image. Returns {success, replaced}.
+
+        replaced=True means an existing image was overwritten.
+        created_at is preserved on updates via $setOnInsert.
+        """
         try:
-            self.collection.insert_one(doc)
-            return True
+            result = self.collection.update_one(
+                {"image_id": image_id},
+                {
+                    "$set": {
+                        "image_id": image_id,
+                        "data": Binary(data),
+                        "content_type": content_type,
+                        "size": len(data),
+                    },
+                    "$setOnInsert": {"created_at": datetime.now(timezone.utc)},
+                },
+                upsert=True,
+            )
+            return {"success": True, "replaced": result.upserted_id is None}
         except Exception:
-            return False
+            return {"success": False, "replaced": False}
 
     def image_exists(self, image_id: str) -> bool:
         return self.collection.count_documents({"image_id": image_id}, limit=1) > 0
