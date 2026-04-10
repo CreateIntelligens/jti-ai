@@ -228,9 +228,9 @@ export default function FileUploadTab({
       onUpload={() => { void handleUploadFiles(); }}
       onClose={onClose}
       renderItem={(item, index) => (
-        <div key={`${item.file.name}-${index}`} className="hciot-upload-file-item hciot-upload-item-content">
+        <div key={`${item.file.name}-${index}`} className="hciot-upload-file-item">
           {getFileIcon(item.file.name)}
-          <span className="hciot-upload-file-name hciot-upload-name-text">
+          <span className="hciot-upload-file-name">
             {item.file.name}
           </span>
           {item.isDuplicate && (
@@ -242,7 +242,7 @@ export default function FileUploadTab({
               {language === 'zh' ? '(重複)' : '(Dup)'}
             </span>
           )}
-          <span className="hciot-upload-file-size hciot-upload-size-text">
+          <span className="hciot-upload-file-size">
             {item.file.size > 1024 ? `${(item.file.size / 1024).toFixed(1)} KB` : `${item.file.size} B`}
           </span>
           <div className="hciot-file-actions">
