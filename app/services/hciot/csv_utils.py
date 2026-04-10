@@ -86,7 +86,7 @@ def _image_filename_fragment(raw: str, fallback_index: int) -> str:
 
 
 def normalize_qa_csv_rows(file_bytes: bytes) -> bytes | None:
-    """Remove fully blank QA rows while preserving the original columns."""
+    """Remove fully blank QA rows and backfill missing index values."""
     parsed = _parse_csv_rows(file_bytes)
     if parsed is None:
         return None
@@ -95,7 +95,19 @@ def normalize_qa_csv_rows(file_bytes: bytes) -> bytes | None:
     if "q" not in fieldnames:
         return None
 
-    meaningful_rows = [row for row in rows if _has_meaningful_qa_content(row)]
+    if "index" not in fieldnames:
+        fieldnames = ["index", *fieldnames]
+
+    meaningful_rows = []
+    i = 1
+    for row in rows:
+        if not _has_meaningful_qa_content(row):
+            continue
+        if not row.get("index"):
+            row["index"] = str(i)
+        meaningful_rows.append(row)
+        i += 1
+
     return _rows_to_csv_bytes(fieldnames, meaningful_rows)
 
 

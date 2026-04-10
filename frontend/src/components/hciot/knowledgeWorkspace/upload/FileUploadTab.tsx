@@ -44,7 +44,6 @@ function CsvFormatHint({ language }: { language: HciotLanguage }) {
           <table className="hciot-csv-hint-table">
             <thead>
               <tr>
-                <th>index</th>
                 <th>q</th>
                 <th>a</th>
                 <th>img</th>
@@ -52,13 +51,11 @@ function CsvFormatHint({ language }: { language: HciotLanguage }) {
             </thead>
             <tbody>
               <tr>
-                <td>TOPIC_001</td>
                 <td>{language === 'zh' ? '什麼是高血壓？' : 'What is hypertension?'}</td>
                 <td>{language === 'zh' ? '血壓持續偏高的狀態...' : 'A condition where blood pressure is consistently elevated...'}</td>
                 <td></td>
               </tr>
               <tr>
-                <td>TOPIC_002</td>
                 <td>{language === 'zh' ? '如何量血壓？' : 'How to measure blood pressure?'}</td>
                 <td>{language === 'zh' ? '請先靜坐5分鐘...' : 'Please sit quietly for 5 minutes...'}</td>
                 <td>IMG_BP_001</td>
@@ -66,9 +63,6 @@ function CsvFormatHint({ language }: { language: HciotLanguage }) {
             </tbody>
           </table>
           <ul className="hciot-csv-hint-notes">
-            <li>
-              <strong>index</strong> — {language === 'zh' ? '編號（如 TOPIC_001）' : 'Row ID (e.g. TOPIC_001)'}
-            </li>
             <li>
               <strong>q</strong> — {language === 'zh' ? '問題（必填）' : 'Question (required)'}
             </li>

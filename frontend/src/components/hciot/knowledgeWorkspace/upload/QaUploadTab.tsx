@@ -160,7 +160,7 @@ export default function QaUploadTab({
       const prefix = (resolvedTopic.fullTopicId.split('/').pop() || resolvedTopic.fullTopicId)
         .toUpperCase()
         .replace(/-/g, '_');
-      const blob = buildCsvBlob(preparedRows.filter((row) => row.q.trim()), prefix);
+      const blob = buildCsvBlob(preparedRows.filter((row) => row.q.trim()));
       const file = new File([blob], `${prefix.toLowerCase()}_qa_${Date.now()}.csv`, { type: 'text/csv' });
       await onSubmitQA(file, resolvedTopic.fullTopicId, resolvedTopic.labels);
     } catch (error) {

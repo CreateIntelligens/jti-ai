@@ -54,14 +54,13 @@ export function applyExistingRowImage(row: QARow, imageId: string): QARow {
   };
 }
 
-export function buildCsvBlob(rows: QARow[], topicPrefix: string): Blob {
-  const lines = ['index,q,a,img'];
-  rows.forEach((row, index) => {
-    const rowIndex = `${topicPrefix}_${String(index + 1).padStart(3, '0')}`;
+export function buildCsvBlob(rows: QARow[]): Blob {
+  const lines = ['q,a,img'];
+  rows.forEach((row) => {
     const q = row.q.replace(/"/g, '""');
     const a = row.a.replace(/"/g, '""');
     const img = (row.img || '').replace(/"/g, '""');
-    lines.push(`${rowIndex},"${q}","${a}","${img}"`);
+    lines.push(`"${q}","${a}","${img}"`);
   });
   return new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
 }
