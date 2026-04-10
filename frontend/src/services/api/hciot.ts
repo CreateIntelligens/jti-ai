@@ -79,11 +79,36 @@ export interface HciotTopicQuestions {
 
 const HCIOT_ADMIN_BASE = `${API_BASE}/hciot-admin`;
 const HCIOT_API_BASE = `${API_BASE}/hciot`;
-const HCIOT_TOPICS_ADMIN_BASE = `${HCIOT_ADMIN_BASE}/topics`;
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
+type QueryValue = string | null | undefined;
 
 function normLang(language: string): string {
   return language.toLowerCase().startsWith('en') ? 'en' : 'zh';
+}
+
+function buildQuery(params: Record<string, QueryValue>): string {
+  const query = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) {
+      query.set(key, value);
+    }
+  });
+
+  return query.toString();
+}
+
+function appendQuery(path: string, params: Record<string, QueryValue>): string {
+  const query = buildQuery(params);
+  return query ? `${path}?${query}` : path;
+}
+
+function buildAdminUrl(path: string, params?: Record<string, QueryValue>): string {
+  return `${HCIOT_ADMIN_BASE}${appendQuery(path, params || {})}`;
+}
+
+function buildApiUrl(path: string, params?: Record<string, QueryValue>): string {
+  return `${HCIOT_API_BASE}${appendQuery(path, params || {})}`;
 }
 
 function jsonRequest(method: 'POST' | 'PUT', body: unknown): RequestInit {
@@ -100,9 +125,22 @@ function appendOptionalFormValue(formData: FormData, key: string, value: string 
   }
 }
 
+async function fetchAdminJson<T>(
+  path: string,
+  options?: RequestInit,
+  params?: Record<string, QueryValue>,
+): Promise<T> {
+  const response = await fetchAsAdmin(buildAdminUrl(path, params), options);
+  return handleResponse<T>(response);
+}
+
+async function fetchApiJson<T>(path: string, options?: RequestInit): Promise<T> {
+  const response = await fetchWithApiKey(buildApiUrl(path), options);
+  return handleResponse<T>(response);
+}
+
 export async function getHciotTtsCharacters(): Promise<{ characters: string[] }> {
-  const response = await fetchWithApiKey(`${HCIOT_API_BASE}/tts/characters`);
-  return handleResponse<{ characters: string[] }>(response);
+  return fetchApiJson<{ characters: string[] }>('/tts/characters');
 }
 
 export async function hciotStartChat(language: string, previousSessionId?: string | null): Promise<StartChatResponse> {
@@ -140,57 +178,50 @@ export async function hciotSendMessage(
 }
 
 export async function listHciotPrompts(language: string = 'zh'): Promise<HciotPromptListResponse> {
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/prompts/?language=${normLang(language)}`);
-  return handleResponse<HciotPromptListResponse>(response);
+  return fetchAdminJson<HciotPromptListResponse>('/prompts/', undefined, {
+    language: normLang(language),
+  });
 }
 
 export async function createHciotPrompt(name: string, content: string, language: string = 'zh'): Promise<HciotPrompt> {
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/prompts/?language=${normLang(language)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, content }),
+  return fetchAdminJson<HciotPrompt>('/prompts/', jsonRequest('POST', { name, content }), {
+    language: normLang(language),
   });
-  return handleResponse<HciotPrompt>(response);
 }
 
 export async function updateHciotPrompt(promptId: string, name?: string, content?: string, language: string = 'zh'): Promise<HciotPrompt> {
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/prompts/${promptId}?language=${normLang(language)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, content }),
+  return fetchAdminJson<HciotPrompt>(`/prompts/${promptId}`, jsonRequest('PUT', { name, content }), {
+    language: normLang(language),
   });
-  return handleResponse<HciotPrompt>(response);
 }
 
 export async function deleteHciotPrompt(promptId: string, language: string = 'zh'): Promise<void> {
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/prompts/${promptId}?language=${normLang(language)}`, {
+  await fetchAdminJson<void>(`/prompts/${promptId}`, {
     method: 'DELETE',
+  }, {
+    language: normLang(language),
   });
-  await handleResponse<void>(response);
 }
 
 export async function setActiveHciotPrompt(promptId: string | null, language: string = 'zh'): Promise<void> {
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/prompts/active?language=${normLang(language)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt_id: promptId }),
+  await fetchAdminJson<void>('/prompts/active', jsonRequest('POST', { prompt_id: promptId }), {
+    language: normLang(language),
   });
-  await handleResponse<void>(response);
 }
 
 export async function cloneDefaultHciotPrompt(language: string = 'zh'): Promise<HciotPrompt> {
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/prompts/clone?language=${normLang(language)}`, {
+  return fetchAdminJson<HciotPrompt>('/prompts/clone', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+  }, {
+    language: normLang(language),
   });
-  return handleResponse<HciotPrompt>(response);
 }
 
 export async function getHciotRuntimeSettings(promptId?: string, language: string = 'zh'): Promise<HciotRuntimeSettingsResponse> {
-  const query = new URLSearchParams({ language: normLang(language) });
-  if (promptId) query.set('prompt_id', promptId);
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/prompts/runtime-settings?${query}`);
-  return handleResponse<HciotRuntimeSettingsResponse>(response);
+  return fetchAdminJson<HciotRuntimeSettingsResponse>('/prompts/runtime-settings', undefined, {
+    language: normLang(language),
+    prompt_id: promptId,
+  });
 }
 
 export async function updateHciotRuntimeSettings(
@@ -199,27 +230,34 @@ export async function updateHciotRuntimeSettings(
   language: string = 'zh',
 ): Promise<{ settings: HciotRuntimeSettings; message: string; prompt_id?: string }> {
   const payload = promptId ? { ...settings, prompt_id: promptId } : settings;
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/prompts/runtime-settings?language=${normLang(language)}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  return handleResponse(response);
+  return fetchAdminJson<{ settings: HciotRuntimeSettings; message: string; prompt_id?: string }>(
+    '/prompts/runtime-settings',
+    jsonRequest('POST', payload),
+    { language: normLang(language) },
+  );
 }
 
 export async function listHciotKnowledgeFiles(language: string = 'zh'): Promise<{ files: HciotKnowledgeFile[] }> {
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/knowledge/files/?language=${normLang(language)}`);
-  return handleResponse<{ files: HciotKnowledgeFile[] }>(response);
+  return fetchAdminJson<{ files: HciotKnowledgeFile[] }>('/knowledge/files/', undefined, {
+    language: normLang(language),
+  });
 }
 
 export async function getHciotKnowledgeFileContent(filename: string, language: string = 'zh'): Promise<HciotKnowledgeFileContent> {
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/knowledge/files/${encodeURIComponent(filename)}/content?language=${normLang(language)}`);
-  return handleResponse<HciotKnowledgeFileContent>(response);
+  return fetchAdminJson<HciotKnowledgeFileContent>(
+    `/knowledge/files/${encodeURIComponent(filename)}/content`,
+    undefined,
+    { language: normLang(language) },
+  );
 }
 
 export function downloadHciotKnowledgeFile(filename: string, language: string = 'zh'): void {
-  const params = new URLSearchParams({ language: normLang(language) });
-  window.open(`${HCIOT_ADMIN_BASE}/knowledge/files/${encodeURIComponent(filename)}/download?${params}`, '_blank');
+  window.open(
+    buildAdminUrl(`/knowledge/files/${encodeURIComponent(filename)}/download`, {
+      language: normLang(language),
+    }),
+    '_blank',
+  );
 }
 
 export async function updateHciotKnowledgeFileContent(
@@ -227,12 +265,11 @@ export async function updateHciotKnowledgeFileContent(
   content: string,
   language: string = 'zh',
 ): Promise<{ message: string; synced: boolean; topic_synced: boolean }> {
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/knowledge/files/${encodeURIComponent(filename)}/content?language=${normLang(language)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content }),
-  });
-  return handleResponse(response);
+  return fetchAdminJson<{ message: string; synced: boolean; topic_synced: boolean }>(
+    `/knowledge/files/${encodeURIComponent(filename)}/content`,
+    jsonRequest('PUT', { content }),
+    { language: normLang(language) },
+  );
 }
 
 export async function uploadHciotKnowledgeFile(
@@ -241,23 +278,28 @@ export async function uploadHciotKnowledgeFile(
 ): Promise<HciotKnowledgeFile & { synced: boolean; topic_synced: boolean; uploaded_count?: number; uploaded_files?: string[] }> {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/knowledge/upload/?language=${normLang(language)}`, {
-    method: 'POST',
-    body: formData,
-  });
-  return handleResponse(response);
+  return fetchAdminJson<HciotKnowledgeFile & { synced: boolean; topic_synced: boolean; uploaded_count?: number; uploaded_files?: string[] }>(
+    '/knowledge/upload/',
+    {
+      method: 'POST',
+      body: formData,
+    },
+    { language: normLang(language) },
+  );
 }
 
 export async function deleteHciotKnowledgeFile(fileName: string, language: string = 'zh'): Promise<void> {
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/knowledge/files/${encodeURIComponent(fileName)}?language=${normLang(language)}`, {
+  await fetchAdminJson<void>(`/knowledge/files/${encodeURIComponent(fileName)}`, {
     method: 'DELETE',
+  }, {
+    language: normLang(language),
   });
-  await handleResponse<void>(response);
 }
 
 export async function getHciotConversationDetail(sessionId: string): Promise<Record<string, unknown>> {
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/conversations?session_id=${encodeURIComponent(sessionId)}`);
-  return handleResponse<Record<string, unknown>>(response);
+  return fetchAdminJson<Record<string, unknown>>('/conversations', undefined, {
+    session_id: sessionId,
+  });
 }
 
 export async function updateHciotKnowledgeFileMetadata(
@@ -271,11 +313,11 @@ export async function updateHciotKnowledgeFileMetadata(
   },
   language: string = 'zh',
 ): Promise<HciotKnowledgeFile & { topic_synced: boolean }> {
-  const response = await fetchAsAdmin(
-    `${HCIOT_ADMIN_BASE}/knowledge/files/${encodeURIComponent(filename)}/metadata?language=${normLang(language)}`,
+  return fetchAdminJson<HciotKnowledgeFile & { topic_synced: boolean }>(
+    `/knowledge/files/${encodeURIComponent(filename)}/metadata`,
     jsonRequest('PUT', metadata),
+    { language: normLang(language) },
   );
-  return handleResponse<HciotKnowledgeFile & { topic_synced: boolean }>(response);
 }
 
 // ========== Topic Admin ==========
@@ -293,8 +335,7 @@ export interface HciotTopicCategory {
 }
 
 export async function listHciotTopicsAdmin(): Promise<{ categories: HciotTopicCategory[] }> {
-  const response = await fetchWithApiKey(`${API_BASE}/hciot/topics`);
-  return handleResponse<{ categories: HciotTopicCategory[] }>(response);
+  return fetchApiJson<{ categories: HciotTopicCategory[] }>('/topics');
 }
 
 export async function updateHciotTopic(
@@ -302,13 +343,14 @@ export async function updateHciotTopic(
   data: { labels?: HciotLabels; category_labels?: HciotLabels; questions?: HciotTopicQuestions },
 ): Promise<Record<string, unknown>> {
   // topic_id contains "/" so we can't use encodeURIComponent — pass raw
-  const response = await fetchAsAdmin(`${HCIOT_TOPICS_ADMIN_BASE}/${topicId}`, jsonRequest('PUT', data));
-  return handleResponse(response);
+  return fetchAdminJson<Record<string, unknown>>(
+    `/topics/${topicId}`,
+    jsonRequest('PUT', data),
+  );
 }
 
 export async function deleteHciotTopic(topicId: string): Promise<void> {
-  const response = await fetchAsAdmin(`${HCIOT_TOPICS_ADMIN_BASE}/${topicId}`, { method: 'DELETE' });
-  await handleResponse<void>(response);
+  await fetchAdminJson<void>(`/topics/${topicId}`, { method: 'DELETE' });
 }
 
 export async function createHciotTopic(
@@ -317,13 +359,12 @@ export async function createHciotTopic(
   categoryLabels: HciotLabels,
   questions: HciotTopicQuestions = { zh: [], en: [] },
 ): Promise<Record<string, unknown>> {
-  const response = await fetchAsAdmin(`${HCIOT_TOPICS_ADMIN_BASE}/`, jsonRequest('POST', {
+  return fetchAdminJson<Record<string, unknown>>('/topics/', jsonRequest('POST', {
     topic_id: topicId,
     labels,
     category_labels: categoryLabels,
     questions,
   }));
-  return handleResponse(response);
 }
 
 export interface UploadWithTopicOptions {
@@ -350,11 +391,11 @@ export async function uploadHciotKnowledgeFileWithTopic(
   appendOptionalFormValue(formData, 'topic_label_zh', opts.topicLabelZh);
   appendOptionalFormValue(formData, 'topic_label_en', opts.topicLabelEn);
 
-  const response = await fetchAsAdmin(
-    `${HCIOT_ADMIN_BASE}/knowledge/upload/?language=${normLang(opts.language)}`,
+  return fetchAdminJson<HciotKnowledgeFile & { synced: boolean; topic_synced: boolean; uploaded_count?: number; uploaded_files?: string[] }>(
+    '/knowledge/upload/',
     { method: 'POST', body: formData },
+    { language: normLang(opts.language) },
   );
-  return handleResponse(response);
 }
 
 // ========== Image Admin ==========
@@ -368,8 +409,7 @@ export interface HciotImage {
 }
 
 export async function listHciotImages(): Promise<{ images: HciotImage[] }> {
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/images/`);
-  return handleResponse<{ images: HciotImage[] }>(response);
+  return fetchAdminJson<{ images: HciotImage[] }>('/images/');
 }
 
 export async function uploadHciotImage(file: File, imageId?: string): Promise<HciotImage> {
@@ -378,25 +418,22 @@ export async function uploadHciotImage(file: File, imageId?: string): Promise<Hc
   if (imageId) {
     formData.append('image_id', imageId);
   }
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/images/upload`, {
+  return fetchAdminJson<HciotImage>('/images/upload', {
     method: 'POST',
     body: formData,
   });
-  return handleResponse<HciotImage>(response);
 }
 
 export async function deleteHciotImage(imageId: string): Promise<void> {
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/images/${encodeURIComponent(imageId)}`, {
+  await fetchAdminJson<void>(`/images/${encodeURIComponent(imageId)}`, {
     method: 'DELETE',
   });
-  await handleResponse<void>(response);
 }
 
 export async function deleteUnusedHciotImages(): Promise<{ deleted_count: number; deleted_image_ids: string[] }> {
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/images/cleanup-unused`, {
+  return fetchAdminJson<{ deleted_count: number; deleted_image_ids: string[] }>('/images/cleanup-unused', {
     method: 'DELETE',
   });
-  return handleResponse<{ deleted_count: number; deleted_image_ids: string[] }>(response);
 }
 
 // ========== Merged CSV ==========
@@ -415,10 +452,8 @@ export interface HciotMergedCsvResponse {
 }
 
 export async function getHciotTopicMergedCsv(topicId: string, language: string = 'zh'): Promise<HciotMergedCsvResponse> {
-  const query = new URLSearchParams({
+  return fetchAdminJson<HciotMergedCsvResponse>('/knowledge/topic-csv-merged', undefined, {
     topic_id: topicId,
-    language: normLang(language)
+    language: normLang(language),
   });
-  const response = await fetchAsAdmin(`${HCIOT_ADMIN_BASE}/knowledge/topic-csv-merged?${query}`);
-  return handleResponse<HciotMergedCsvResponse>(response);
 }

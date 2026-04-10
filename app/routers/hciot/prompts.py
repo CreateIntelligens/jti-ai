@@ -35,6 +35,7 @@ CUSTOM_PROMPT_NAME_PREFIX = {
     "zh": "自訂衛教助手設定",
     "en": "Custom Education Assistant",
 }
+SUPPORTED_LANGUAGES = ("zh", "en")
 
 
 class CreatePromptRequest(BaseModel):
@@ -79,6 +80,17 @@ def _normalize_language(language: Optional[str]) -> str:
 
 def _get_store_name_for_language(language: Optional[str]) -> str:
     return HCIOT_STORE_NAME_EN if _normalize_language(language) == "en" else HCIOT_STORE_NAME_ZH
+
+
+def _resolve_language_and_store(language: Optional[str]) -> tuple[str, str]:
+    normalized_language = _normalize_language(language)
+    return normalized_language, _get_store_name_for_language(normalized_language)
+
+
+def _require_prompt_manager():
+    if not deps.prompt_manager:
+        raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
+    return deps.prompt_manager
 
 
 def _get_default_prompt_dict(language: str = "zh") -> dict:
@@ -153,7 +165,7 @@ def _normalize_persona_pair(raw_pair, fallback_content: Optional[str]) -> Dict[s
         return legacy_pair
 
     pair: Dict[str, str] = {}
-    for lang in ("zh", "en"):
+    for lang in SUPPORTED_LANGUAGES:
         value = raw_pair.get(lang)
         pair[lang] = value if isinstance(value, str) and value.strip() else legacy_pair[lang]
     return pair
@@ -177,7 +189,7 @@ def _merge_runtime_settings(
     data = current.model_dump()
 
     if request.response_rule_sections is not None:
-        for lang in ("zh", "en"):
+        for lang in SUPPORTED_LANGUAGES:
             section = request.response_rule_sections.get(lang)
             if not section:
                 continue
@@ -187,7 +199,7 @@ def _merge_runtime_settings(
                     data["response_rule_sections"][lang][field] = value
 
     if request.welcome is not None:
-        for lang in ("zh", "en"):
+        for lang in SUPPORTED_LANGUAGES:
             block = request.welcome.get(lang)
             if not block:
                 continue
@@ -206,9 +218,7 @@ def _validate_and_resolve_prompt_id(requested_prompt_id: Optional[str], store_na
     if requested_prompt_id:
         if requested_prompt_id == SYSTEM_DEFAULT_ID:
             return SYSTEM_DEFAULT_ID
-        if not deps.prompt_manager:
-            raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
-        prompt = deps.prompt_manager.get_prompt(store_name, requested_prompt_id)
+        prompt = _require_prompt_manager().get_prompt(store_name, requested_prompt_id)
         if not prompt:
             raise HTTPException(status_code=404, detail="人物設定不存在")
         return requested_prompt_id
@@ -218,6 +228,41 @@ def _validate_and_resolve_prompt_id(requested_prompt_id: Optional[str], store_na
 
     store_prompts = deps.prompt_manager._load_store_prompts(store_name)
     return store_prompts.active_prompt_id or SYSTEM_DEFAULT_ID
+
+
+def _copy_default_runtime_settings(prompt_id: str, store_name: str) -> None:
+    prompt_manager = _require_prompt_manager()
+    base_runtime = load_runtime_settings_from_prompt_manager(
+        prompt_manager,
+        SYSTEM_DEFAULT_ID,
+        store_name=store_name,
+    )
+    save_runtime_settings_to_prompt_manager(
+        prompt_manager,
+        base_runtime,
+        prompt_id=prompt_id,
+        store_name=store_name,
+    )
+
+
+def _enforce_custom_prompt_limit(prompts) -> None:
+    if len(prompts) >= MAX_CUSTOM_PROMPTS:
+        raise HTTPException(status_code=400, detail=f"自訂人物設定最多 {MAX_CUSTOM_PROMPTS} 個")
+
+
+def _pop_prompt_from_attr(store_prompts, attr: str, prompt_id: str) -> bool:
+    mapping = getattr(store_prompts, attr, None)
+    if isinstance(mapping, dict) and prompt_id in mapping:
+        mapping.pop(prompt_id)
+        setattr(store_prompts, attr, mapping)
+        return True
+    return False
+
+
+def _remove_prompt_overrides(store_prompts, prompt_id: str) -> bool:
+    removed_runtime = _pop_prompt_from_attr(store_prompts, "hciot_runtime_settings_by_prompt", prompt_id)
+    removed_persona = _pop_prompt_from_attr(store_prompts, "hciot_persona_by_prompt", prompt_id)
+    return removed_runtime or removed_persona
 
 
 @router.get("/")
@@ -265,20 +310,15 @@ def create_hciot_prompt(
     language: str = "zh",
     auth: dict = Depends(verify_auth),
 ):
-    if not deps.prompt_manager:
-        raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
-
-    lang = _normalize_language(language)
-    store_name = _get_store_name_for_language(lang)
-    prompts = deps.prompt_manager.list_prompts(store_name)
-
-    if len(prompts) >= MAX_CUSTOM_PROMPTS:
-        raise HTTPException(status_code=400, detail=f"自訂人物設定最多 {MAX_CUSTOM_PROMPTS} 個")
+    prompt_manager = _require_prompt_manager()
+    lang, store_name = _resolve_language_and_store(language)
+    prompts = prompt_manager.list_prompts(store_name)
+    _enforce_custom_prompt_limit(prompts)
 
     from app.prompts import Prompt
 
     new_prompt = Prompt(name=request.name, content=request.content)
-    store_prompts = deps.prompt_manager._load_store_prompts(store_name)
+    store_prompts = prompt_manager._load_store_prompts(store_name)
     store_prompts.prompts.append(new_prompt)
 
     default_pair = _get_default_persona_pair()
@@ -288,34 +328,19 @@ def create_hciot_prompt(
     persona_map = _get_persona_map(store_prompts)
     persona_map[new_prompt.id] = persona_pair
     store_prompts.hciot_persona_by_prompt = persona_map
-    deps.prompt_manager._save_store_prompts(store_prompts)
+    prompt_manager._save_store_prompts(store_prompts)
 
-    base_runtime = load_runtime_settings_from_prompt_manager(
-        deps.prompt_manager,
-        SYSTEM_DEFAULT_ID,
-        store_name=store_name,
-    )
-    save_runtime_settings_to_prompt_manager(
-        deps.prompt_manager,
-        base_runtime,
-        prompt_id=new_prompt.id,
-        store_name=store_name,
-    )
+    _copy_default_runtime_settings(new_prompt.id, store_name)
 
     return new_prompt.model_dump()
 
 
 @router.post("/clone")
 def clone_default_prompt(language: str = "zh", auth: dict = Depends(verify_auth)):
-    if not deps.prompt_manager:
-        raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
-
-    lang = _normalize_language(language)
-    store_name = _get_store_name_for_language(lang)
-    prompts = deps.prompt_manager.list_prompts(store_name)
-
-    if len(prompts) >= MAX_CUSTOM_PROMPTS:
-        raise HTTPException(status_code=400, detail=f"自訂人物設定最多 {MAX_CUSTOM_PROMPTS} 個")
+    prompt_manager = _require_prompt_manager()
+    lang, store_name = _resolve_language_and_store(language)
+    prompts = prompt_manager.list_prompts(store_name)
+    _enforce_custom_prompt_limit(prompts)
 
     from app.prompts import Prompt
 
@@ -324,26 +349,16 @@ def clone_default_prompt(language: str = "zh", auth: dict = Depends(verify_auth)
         content=PERSONA.get(lang, PERSONA["zh"]),
     )
 
-    store_prompts = deps.prompt_manager._load_store_prompts(store_name)
+    store_prompts = prompt_manager._load_store_prompts(store_name)
     store_prompts.prompts.append(clone)
     store_prompts.active_prompt_id = clone.id
 
     persona_map = _get_persona_map(store_prompts)
     persona_map[clone.id] = _get_default_persona_pair()
     store_prompts.hciot_persona_by_prompt = persona_map
-    deps.prompt_manager._save_store_prompts(store_prompts)
+    prompt_manager._save_store_prompts(store_prompts)
 
-    base_runtime = load_runtime_settings_from_prompt_manager(
-        deps.prompt_manager,
-        SYSTEM_DEFAULT_ID,
-        store_name=store_name,
-    )
-    save_runtime_settings_to_prompt_manager(
-        deps.prompt_manager,
-        base_runtime,
-        prompt_id=clone.id,
-        store_name=store_name,
-    )
+    _copy_default_runtime_settings(clone.id, store_name)
 
     main_agent.remove_all_sessions()
     return {"prompt": clone.model_dump(), "message": "已複製預設衛教助手設定並啟用"}
@@ -359,12 +374,9 @@ def update_hciot_prompt(
     if prompt_id == SYSTEM_DEFAULT_ID:
         raise HTTPException(status_code=403, detail="預設人物設定為唯讀，無法修改。請先建立副本。")
 
-    if not deps.prompt_manager:
-        raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
-
-    lang = _normalize_language(language)
-    store_name = _get_store_name_for_language(lang)
-    store_prompts = deps.prompt_manager._load_store_prompts(store_name)
+    prompt_manager = _require_prompt_manager()
+    lang, store_name = _resolve_language_and_store(language)
+    store_prompts = prompt_manager._load_store_prompts(store_name)
     prompt_index = next((i for i, p in enumerate(store_prompts.prompts) if p.id == prompt_id), None)
     if prompt_index is None:
         raise HTTPException(status_code=404, detail=f"Prompt {prompt_id} 不存在")
@@ -383,7 +395,7 @@ def update_hciot_prompt(
     prompt.content = persona_pair.get(lang, prompt.content)
     prompt.updated_at = datetime.utcnow().isoformat()
     store_prompts.prompts[prompt_index] = prompt
-    deps.prompt_manager._save_store_prompts(store_prompts)
+    prompt_manager._save_store_prompts(store_prompts)
 
     payload = prompt.model_dump()
     payload["content"] = persona_pair.get(lang, payload.get("content", ""))
@@ -395,30 +407,14 @@ def delete_hciot_prompt(prompt_id: str, language: str = "zh", auth: dict = Depen
     if prompt_id == SYSTEM_DEFAULT_ID:
         raise HTTPException(status_code=403, detail="預設人物設定無法刪除")
 
-    if not deps.prompt_manager:
-        raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
-
-    store_name = _get_store_name_for_language(language)
+    prompt_manager = _require_prompt_manager()
+    _, store_name = _resolve_language_and_store(language)
 
     try:
-        deps.prompt_manager.delete_prompt(store_name, prompt_id)
-        store_prompts = deps.prompt_manager._load_store_prompts(store_name)
-        changed = False
-
-        runtime_map = getattr(store_prompts, "hciot_runtime_settings_by_prompt", None)
-        if isinstance(runtime_map, dict) and prompt_id in runtime_map:
-            runtime_map.pop(prompt_id, None)
-            store_prompts.hciot_runtime_settings_by_prompt = runtime_map
-            changed = True
-
-        persona_map = getattr(store_prompts, "hciot_persona_by_prompt", None)
-        if isinstance(persona_map, dict) and prompt_id in persona_map:
-            persona_map.pop(prompt_id, None)
-            store_prompts.hciot_persona_by_prompt = persona_map
-            changed = True
-
-        if changed:
-            deps.prompt_manager._save_store_prompts(store_prompts)
+        prompt_manager.delete_prompt(store_name, prompt_id)
+        store_prompts = prompt_manager._load_store_prompts(store_name)
+        if _remove_prompt_overrides(store_prompts, prompt_id):
+            prompt_manager._save_store_prompts(store_prompts)
 
         return {"message": "人物設定已刪除"}
     except ValueError as e:
@@ -431,16 +427,14 @@ def set_active_hciot_prompt(
     language: str = "zh",
     auth: dict = Depends(verify_auth),
 ):
-    if not deps.prompt_manager:
-        raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
-
-    store_name = _get_store_name_for_language(language)
+    prompt_manager = _require_prompt_manager()
+    _, store_name = _resolve_language_and_store(language)
 
     try:
         if request.prompt_id and request.prompt_id != SYSTEM_DEFAULT_ID:
-            deps.prompt_manager.set_active_prompt(store_name, request.prompt_id)
+            prompt_manager.set_active_prompt(store_name, request.prompt_id)
         else:
-            deps.prompt_manager.clear_active_prompt(store_name)
+            prompt_manager.clear_active_prompt(store_name)
 
         main_agent.remove_all_sessions()
         return {"message": "已設定啟用的人物設定", "prompt_id": request.prompt_id}
@@ -450,17 +444,14 @@ def set_active_hciot_prompt(
 
 @router.get("/active")
 def get_active_hciot_prompt(language: str = "zh", auth: dict = Depends(verify_auth)):
-    if not deps.prompt_manager:
-        raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
-
-    store_name = _get_store_name_for_language(language)
-    prompt = deps.prompt_manager.get_active_prompt(store_name)
+    prompt_manager = _require_prompt_manager()
+    lang, store_name = _resolve_language_and_store(language)
+    prompt = prompt_manager.get_active_prompt(store_name)
     if not prompt:
         return {"prompt": _get_default_prompt_dict(language), "is_default": True}
 
-    store_prompts = deps.prompt_manager._load_store_prompts(store_name)
+    store_prompts = prompt_manager._load_store_prompts(store_name)
     persona_map = _get_persona_map(store_prompts)
-    lang = _normalize_language(language)
 
     payload = prompt.model_dump()
     payload["content"] = _get_prompt_content_for_language(
@@ -478,7 +469,7 @@ def get_runtime_settings(
     language: str = "zh",
     auth: dict = Depends(verify_auth),
 ):
-    store_name = _get_store_name_for_language(language)
+    _, store_name = _resolve_language_and_store(language)
     runtime_prompt_id = _validate_and_resolve_prompt_id(prompt_id, store_name)
     settings = load_runtime_settings_from_prompt_manager(
         deps.prompt_manager,
@@ -494,22 +485,20 @@ def update_runtime_settings(
     language: str = "zh",
     auth: dict = Depends(verify_auth),
 ):
-    if not deps.prompt_manager:
-        raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
-
-    store_name = _get_store_name_for_language(language)
+    prompt_manager = _require_prompt_manager()
+    _, store_name = _resolve_language_and_store(language)
     runtime_prompt_id = _validate_and_resolve_prompt_id(request.prompt_id, store_name)
     if runtime_prompt_id == SYSTEM_DEFAULT_ID:
         raise HTTPException(status_code=403, detail="預設設定為唯讀，請先建立副本並啟用後再編輯。")
 
     current = load_runtime_settings_from_prompt_manager(
-        deps.prompt_manager,
+        prompt_manager,
         runtime_prompt_id,
         store_name=store_name,
     )
     updated = _merge_runtime_settings(current, request)
     save_runtime_settings_to_prompt_manager(
-        deps.prompt_manager,
+        prompt_manager,
         updated,
         prompt_id=runtime_prompt_id,
         store_name=store_name,

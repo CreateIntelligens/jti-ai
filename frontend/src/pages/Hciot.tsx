@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileText, HeartPulse, History, Moon, RotateCcw, Settings, Sun } from 'lucide-react';
 import { fetchWithApiKey } from '../services/api';
@@ -36,6 +36,7 @@ const TTS_POLL_INTERVAL_MS = 3000;
 const TTS_STALL_TIMEOUT_MS = 12000;
 const TTS_CHARACTER_STORAGE_KEY = 'hciot:tts-character';
 const WORKSPACE_STORAGE_KEY = 'hciot:workspace';
+type WorkspaceMode = 'chat' | 'files';
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -69,6 +70,22 @@ function resolveTtsCharacter(characters: string[], preferredValue?: string): str
   return characters[0] || '';
 }
 
+function readStoredWorkspace(): WorkspaceMode {
+  return sessionStorage.getItem(WORKSPACE_STORAGE_KEY) === 'files' ? 'files' : 'chat';
+}
+
+function writeStoredWorkspace(workspace: WorkspaceMode): void {
+  sessionStorage.setItem(WORKSPACE_STORAGE_KEY, workspace);
+}
+
+function buildSessionInfo(sessionId?: string | null): string {
+  return sessionId ? `#${sessionId.substring(0, 8)}` : '';
+}
+
+function focusSoon(ref: RefObject<HTMLTextAreaElement | null>): void {
+  window.setTimeout(() => ref.current?.focus(), 100);
+}
+
 function isSameMessage(left: HciotMessage, right: HciotMessage): boolean {
   return (
     left.timestamp === right.timestamp &&
@@ -95,6 +112,45 @@ function attachTtsMessageId(
   });
 }
 
+function buildOpeningMessages(openingMessage?: string): HciotMessage[] {
+  if (!openingMessage) {
+    return [];
+  }
+
+  return [{ text: openingMessage, type: 'assistant', timestamp: Date.now() }];
+}
+
+function findUserMessageIndexByTurn(messages: HciotMessage[], turnNumber: number): number {
+  return messages.findIndex(
+    (message) => message.type === 'user' && message.turnNumber === turnNumber,
+  );
+}
+
+function updateLastUserTurnNumber(
+  messages: HciotMessage[],
+  turnNumber?: number,
+): HciotMessage[] {
+  if (turnNumber === undefined) {
+    return messages;
+  }
+
+  let lastUserIndex = -1;
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    if (messages[index].type === 'user') {
+      lastUserIndex = index;
+      break;
+    }
+  }
+
+  if (lastUserIndex === -1) {
+    return messages;
+  }
+
+  return messages.map((message, index) => (
+    index === lastUserIndex ? { ...message, turnNumber } : message
+  ));
+}
+
 export default function Hciot() {
   const { t, i18n } = useTranslation();
   const { theme, toggleTheme } = useTheme();
@@ -112,10 +168,7 @@ export default function Hciot() {
   const [currentLanguage, setCurrentLanguage] = useState(normalizeHciotLanguage(i18n.language));
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
-  const [workspace, setWorkspace] = useState<'chat' | 'files'>(() => {
-    const saved = sessionStorage.getItem(WORKSPACE_STORAGE_KEY);
-    return saved === 'files' ? 'files' : 'chat';
-  });
+  const [workspace, setWorkspace] = useState<WorkspaceMode>(() => readStoredWorkspace());
   const [editingTurn, setEditingTurn] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
@@ -290,6 +343,11 @@ export default function Hciot() {
     return ttsStateMap[id];
   }, [ttsStateMap]);
 
+  const switchWorkspace = useCallback((nextWorkspace: WorkspaceMode) => {
+    setWorkspace(nextWorkspace);
+    writeStoredWorkspace(nextWorkspace);
+  }, []);
+
   useEffect(() => {
     if (editingTurn !== null && editTextareaRef.current) {
       editTextareaRef.current.focus();
@@ -315,17 +373,14 @@ export default function Hciot() {
     const lang = normalizeHciotLanguage(targetLanguage || currentLanguage);
     const result = await api.hciotStartChat(lang, previousSessionId);
     setSessionId(result.session_id || null);
-    setSessionInfo(result.session_id ? `#${result.session_id.substring(0, 8)}` : '');
+    setSessionInfo(buildSessionInfo(result.session_id));
     setStatusText(t('status_connected'));
     setStoreMissing(false);
-    const opening = result.opening_message
-      ? [{ text: result.opening_message, type: 'assistant' as const, timestamp: Date.now() }]
-      : [];
-    setMessages(opening);
+    setMessages(buildOpeningMessages(result.opening_message));
     if (lang !== currentLanguage) {
       setCurrentLanguage(lang);
     }
-    setTimeout(() => inputRef.current?.focus(), 100);
+    focusSoon(inputRef);
     return result.session_id || null;
   }, [currentLanguage, t]);
 
@@ -444,19 +499,7 @@ export default function Hciot() {
       }
 
       setMessages((prev) => {
-        let lastUserIndex = -1;
-        for (let index = prev.length - 1; index >= 0; index -= 1) {
-          if (prev[index].type === 'user') {
-            lastUserIndex = index;
-            break;
-          }
-        }
-        return [
-          ...prev.map((m, i) =>
-            i === lastUserIndex ? { ...m, turnNumber: data.turn_number } : m,
-          ),
-          nextMessage,
-        ];
+        return [...updateLastUserTurnNumber(prev, data.turn_number), nextMessage];
       });
 
       setStatusText(t('status_chatting'));
@@ -469,19 +512,19 @@ export default function Hciot() {
       ]);
     } finally {
       setLoading(false);
-      setTimeout(() => inputRef.current?.focus(), 100);
+      focusSoon(inputRef);
     }
   }, [loading, selectedTtsCharacter, sessionId, startSession, t]);
 
   const handleRegenerate = async (turnNumber: number) => {
     if (!sessionId || loading) return;
-    const userMessage = messages.find((message) => message.type === 'user' && message.turnNumber === turnNumber);
+    const userMessageIndex = findUserMessageIndexByTurn(messages, turnNumber);
+    const userMessage = userMessageIndex === -1 ? null : messages[userMessageIndex];
     if (!userMessage?.text) return;
 
     setMessages((prev) => {
-      const userIndex = prev.findIndex((message) => message.type === 'user' && message.turnNumber === turnNumber);
-      if (userIndex === -1) return prev;
-      return prev.slice(0, userIndex + 1);
+      const userIndex = findUserMessageIndexByTurn(prev, turnNumber);
+      return userIndex === -1 ? prev : prev.slice(0, userIndex + 1);
     });
 
     await sendMessage(userMessage.text, turnNumber);
@@ -491,7 +534,7 @@ export default function Hciot() {
     if (!sessionId || loading) return;
 
     setMessages((prev) => {
-      const userIndex = prev.findIndex((message) => message.type === 'user' && message.turnNumber === turnNumber);
+      const userIndex = findUserMessageIndexByTurn(prev, turnNumber);
       if (userIndex === -1) return prev;
       return [...prev.slice(0, userIndex), { text: newText, type: 'user', timestamp: Date.now() }];
     });
@@ -571,7 +614,7 @@ export default function Hciot() {
             <button
               type="button"
               className={`hciot-view-button${workspace === 'chat' ? ' is-active' : ''}`}
-              onClick={() => { setWorkspace('chat'); sessionStorage.setItem(WORKSPACE_STORAGE_KEY, 'chat'); }}
+              onClick={() => switchWorkspace('chat')}
             >
               <HeartPulse size={16} />
               <span>{currentLanguage === 'zh' ? '聊天' : 'Chat'}</span>
@@ -579,7 +622,7 @@ export default function Hciot() {
             <button
               type="button"
               className={`hciot-view-button${workspace === 'files' ? ' is-active' : ''}`}
-              onClick={() => { setWorkspace('files'); sessionStorage.setItem(WORKSPACE_STORAGE_KEY, 'files'); }}
+              onClick={() => switchWorkspace('files')}
             >
               <FileText size={16} />
               <span>{currentLanguage === 'zh' ? '檔案管理' : 'Files'}</span>
@@ -724,7 +767,7 @@ export default function Hciot() {
               imageId: message.imageId,
             })),
           );
-          setSessionInfo(`#${sid.substring(0, 8)}`);
+          setSessionInfo(buildSessionInfo(sid));
           setStatusText(t('status_connected'));
         }}
       />

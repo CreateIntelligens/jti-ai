@@ -16,16 +16,22 @@ interface HciotKnowledgeWorkspaceProps {
   language: HciotLanguage;
 }
 
+function createEmptyTopicDraft(): Pick<FileMetadataDraft, 'topicId' | 'topicLabelZh' | 'topicLabelEn'> {
+  return {
+    topicId: '',
+    topicLabelZh: '',
+    topicLabelEn: '',
+  };
+}
+
+function getLocalizedText(language: HciotLanguage, zh: string, en: string): string {
+  return language === 'zh' ? zh : en;
+}
+
 export default function HciotKnowledgeWorkspace({
   active,
   language,
 }: HciotKnowledgeWorkspaceProps) {
-  const emptyTopicDraft = (): Pick<FileMetadataDraft, 'topicId' | 'topicLabelZh' | 'topicLabelEn'> => ({
-    topicId: '',
-    topicLabelZh: '',
-    topicLabelEn: '',
-  });
-
   const statusTimerRef = useRef<number | null>(null);
   const suppressHoverRef = useRef(false);
 
@@ -54,6 +60,7 @@ export default function HciotKnowledgeWorkspace({
   const [qaDialogOpen, setQaDialogOpen] = useState(false);
 
   const deferredSearchQuery = useDeferredValue(searchQuery.trim().toLowerCase());
+  const text = (zh: string, en: string) => getLocalizedText(language, zh, en);
 
   const patchDraft = (changes: Partial<FileMetadataDraft>) => {
     setDraft((previous) => ({ ...previous, ...changes }));
@@ -161,7 +168,7 @@ export default function HciotKnowledgeWorkspace({
       });
     } catch (error) {
       console.error('Failed to load HCIoT knowledge workspace:', error);
-      showStatus(language === 'zh' ? '載入檔案管理失敗' : 'Failed to load file workspace');
+      showStatus(text('載入檔案管理失敗', 'Failed to load file workspace'));
     } finally {
       setLoadingWorkspace(false);
     }
@@ -215,7 +222,7 @@ export default function HciotKnowledgeWorkspace({
         setOriginalText('');
         setEditorText('');
         setFileEditable(false);
-        setContentMessage(language === 'zh' ? '無法載入檔案內容' : 'Unable to load file content');
+        setContentMessage(text('無法載入檔案內容', 'Unable to load file content'));
       })
       .finally(() => {
         if (!cancelled) {
@@ -252,33 +259,40 @@ export default function HciotKnowledgeWorkspace({
 
   const discardChanges = () => {
     if (!hasUnsavedChanges) return true;
-    return window.confirm(
-      language === 'zh'
-        ? '目前檔案有尚未儲存的變更，確定要切換嗎？'
-        : 'You have unsaved changes. Switch anyway?',
-    );
+    return window.confirm(text(
+      '目前檔案有尚未儲存的變更，確定要切換嗎？',
+      'You have unsaved changes. Switch anyway?',
+    ));
+  };
+
+  const selectWorkspaceItem = ({
+    fileName = null,
+    imageName = null,
+    mergedTopicId = null,
+  }: {
+    fileName?: string | null;
+    imageName?: string | null;
+    mergedTopicId?: string | null;
+  }) => {
+    setSelectedFileName(fileName);
+    setSelectedImageName(imageName);
+    setSelectedMergedTopicId(mergedTopicId);
   };
 
   const handleSelectFile = (fileName: string) => {
     if (fileName === selectedFileName || !discardChanges()) return;
     ensureSelectedPathExpanded(fileName);
-    setSelectedFileName(fileName);
-    setSelectedImageName(null);
-    setSelectedMergedTopicId(null);
+    selectWorkspaceItem({ fileName });
   };
 
   const handleSelectImage = (fileName: string) => {
     if (!discardChanges()) return;
-    setSelectedImageName(fileName);
-    setSelectedFileName(null);
-    setSelectedMergedTopicId(null);
+    selectWorkspaceItem({ imageName: fileName });
   };
 
   const handleSelectMergedCsv = (topicId: string) => {
     if (!discardChanges()) return;
-    setSelectedMergedTopicId(topicId);
-    setSelectedFileName(null);
-    setSelectedImageName(null);
+    selectWorkspaceItem({ mergedTopicId: topicId });
   };
 
   const uploadFileWithTopic = async (
@@ -303,22 +317,17 @@ export default function HciotKnowledgeWorkspace({
     });
   };
 
-  const handleUploadFile = async (
-    file: File,
-    topicId: string | null,
-    labels: TopicLabels | null,
-  ) => {
-    return uploadFileWithTopic(file, topicId, labels);
+  const completeUpload = async (firstUploadedFileName: string | null, message: string) => {
+    await refreshWorkspace(firstUploadedFileName);
+    setQaDialogOpen(false);
+    showStatus(message);
   };
 
   const handleUploadComplete = async (firstUploadedFileName: string | null, count: number) => {
-    await refreshWorkspace(firstUploadedFileName);
-    setQaDialogOpen(false);
-    showStatus(
-      language === 'zh'
-        ? `已上傳 ${count} 個檔案`
-        : `Uploaded ${count} file(s)`,
-    );
+    await completeUpload(firstUploadedFileName, text(
+      `已上傳 ${count} 個檔案`,
+      `Uploaded ${count} file(s)`,
+    ));
   };
 
   const handleQASubmit = async (
@@ -343,11 +352,10 @@ export default function HciotKnowledgeWorkspace({
       return;
     }
 
-    const confirmed = window.confirm(
-      language === 'zh'
-        ? `確定要刪除 ${selectedFile.display_name || selectedFile.name}？`
-        : `Delete ${selectedFile.display_name || selectedFile.name}?`,
-    );
+    const confirmed = window.confirm(text(
+      `確定要刪除 ${selectedFile.display_name || selectedFile.name}？`,
+      `Delete ${selectedFile.display_name || selectedFile.name}?`,
+    ));
     if (!confirmed) {
       return;
     }
@@ -356,7 +364,7 @@ export default function HciotKnowledgeWorkspace({
     try {
       await api.deleteHciotKnowledgeFile(selectedFile.name, language);
       await refreshWorkspace();
-      showStatus(language === 'zh' ? '檔案已刪除' : 'File deleted');
+      showStatus(text('檔案已刪除', 'File deleted'));
     } catch (error) {
       console.error('Failed to delete HCIoT file:', error);
       alert(getErrorMessage(error));
@@ -368,13 +376,15 @@ export default function HciotKnowledgeWorkspace({
   const handleDeleteImage = async () => {
     if (!selectedImage) return;
     const referenceCount = selectedImage.reference_count ?? 0;
-    let confirmMessage = language === 'zh'
-      ? `確定要刪除圖片 ${selectedImage.image_id}？`
-      : `Delete image ${selectedImage.image_id}?`;
+    let confirmMessage = text(
+      `確定要刪除圖片 ${selectedImage.image_id}？`,
+      `Delete image ${selectedImage.image_id}?`,
+    );
     if (referenceCount > 0) {
-      confirmMessage = language === 'zh'
-        ? `圖片 ${selectedImage.image_id} 目前被 ${referenceCount} 題引用，刪除後相關回答將無法顯示圖片。確定要刪除嗎？`
-        : `Image ${selectedImage.image_id} is still referenced by ${referenceCount} item(s). Delete it anyway?`;
+      confirmMessage = text(
+        `圖片 ${selectedImage.image_id} 目前被 ${referenceCount} 題引用，刪除後相關回答將無法顯示圖片。確定要刪除嗎？`,
+        `Image ${selectedImage.image_id} is still referenced by ${referenceCount} item(s). Delete it anyway?`,
+      );
     }
     const confirmed = window.confirm(confirmMessage);
     if (!confirmed) return;
@@ -383,8 +393,8 @@ export default function HciotKnowledgeWorkspace({
       await api.deleteHciotImage(selectedImage.image_id);
       await refreshWorkspace();
       setSelectedImageName(null);
-      showStatus(language === 'zh' ? '圖片已刪除' : 'Image deleted');
-    } catch (error: any) {
+      showStatus(text('圖片已刪除', 'Image deleted'));
+    } catch (error) {
       console.error('Failed to delete HCIoT image:', error);
       alert(getErrorMessage(error));
     } finally {
@@ -397,11 +407,10 @@ export default function HciotKnowledgeWorkspace({
       return;
     }
 
-    const confirmed = window.confirm(
-      language === 'zh'
-        ? `確定要刪除 ${unusedImageCount} 張未被任何題目引用的圖片？`
-        : `Delete ${unusedImageCount} unused image(s)?`,
-    );
+    const confirmed = window.confirm(text(
+      `確定要刪除 ${unusedImageCount} 張未被任何題目引用的圖片？`,
+      `Delete ${unusedImageCount} unused image(s)?`,
+    ));
     if (!confirmed) {
       return;
     }
@@ -413,11 +422,10 @@ export default function HciotKnowledgeWorkspace({
       if (selectedImageName && response.deleted_image_ids.includes(selectedImageName)) {
         setSelectedImageName(null);
       }
-      showStatus(
-        language === 'zh'
-          ? `已刪除 ${response.deleted_count} 張未引用圖片`
-          : `Deleted ${response.deleted_count} unused image(s)`,
-      );
+      showStatus(text(
+        `已刪除 ${response.deleted_count} 張未引用圖片`,
+        `Deleted ${response.deleted_count} unused image(s)`,
+      ));
     } catch (error) {
       console.error('Failed to clean unused HCIoT images:', error);
       alert(getErrorMessage(error));
@@ -427,9 +435,10 @@ export default function HciotKnowledgeWorkspace({
   };
 
   const handleUploadImageComplete = async (count: number) => {
-    await refreshWorkspace();
-    setQaDialogOpen(false);
-    showStatus(language === 'zh' ? `已上傳 ${count} 張圖片` : `Uploaded ${count} image(s)`);
+    await completeUpload(null, text(
+      `已上傳 ${count} 張圖片`,
+      `Uploaded ${count} image(s)`,
+    ));
   };
 
   const currentCategory = useMemo(() => {
@@ -460,7 +469,7 @@ export default function HciotKnowledgeWorkspace({
         categoryId: NEW_VALUE,
         categoryLabelZh: '',
         categoryLabelEn: '',
-        ...emptyTopicDraft(),
+        ...createEmptyTopicDraft(),
       });
       return;
     }
@@ -470,7 +479,7 @@ export default function HciotKnowledgeWorkspace({
       categoryId: value,
       categoryLabelZh: category?.labels.zh || '',
       categoryLabelEn: category?.labels.en || '',
-      ...emptyTopicDraft(),
+      ...createEmptyTopicDraft(),
     });
   };
 
@@ -478,7 +487,7 @@ export default function HciotKnowledgeWorkspace({
     if (!value) {
       setDraft((previous) => ({
         ...previous,
-        ...emptyTopicDraft(),
+        ...createEmptyTopicDraft(),
       }));
       return;
     }
@@ -501,6 +510,61 @@ export default function HciotKnowledgeWorkspace({
     });
   };
 
+  const resolveDraftBeforeSave = async (currentDraft: FileMetadataDraft): Promise<FileMetadataDraft> => {
+    let nextDraft = { ...currentDraft };
+
+    if (nextDraft.categoryId === NEW_VALUE) {
+      const labels = buildLabels(nextDraft.categoryLabelZh, nextDraft.categoryLabelEn);
+      if (!labels) {
+        throw new Error(text('請輸入新科別名稱', 'Please enter a category name'));
+      }
+      const createdCategoryId = slugify(labels.en || labels.zh);
+      if (!createdCategoryId) {
+        throw new Error(text('無法建立科別 ID', 'Unable to create category id'));
+      }
+      nextDraft = {
+        ...nextDraft,
+        categoryId: createdCategoryId,
+        categoryLabelZh: labels.zh,
+        categoryLabelEn: labels.en,
+      };
+    }
+
+    if (!nextDraft.categoryId) {
+      return {
+        ...nextDraft,
+        ...createEmptyTopicDraft(),
+      };
+    }
+
+    if (nextDraft.topicId !== NEW_VALUE) {
+      return nextDraft;
+    }
+
+    const labels = buildLabels(nextDraft.topicLabelZh, nextDraft.topicLabelEn);
+    if (!labels) {
+      throw new Error(text('請輸入新主題名稱', 'Please enter a topic name'));
+    }
+    const createdTopicSlug = slugify(labels.en || labels.zh);
+    if (!createdTopicSlug) {
+      throw new Error(text('無法建立主題 ID', 'Unable to create topic id'));
+    }
+
+    const fullTopicId = `${nextDraft.categoryId}/${createdTopicSlug}`;
+    const categoryLabels = buildLabels(nextDraft.categoryLabelZh, nextDraft.categoryLabelEn)
+      || { zh: nextDraft.categoryId, en: nextDraft.categoryId };
+    await api.createHciotTopic(fullTopicId, labels, categoryLabels);
+    const topicData = await api.listHciotTopicsAdmin();
+    setCategories(topicData.categories || []);
+
+    return {
+      ...nextDraft,
+      topicId: fullTopicId,
+      topicLabelZh: labels.zh,
+      topicLabelEn: labels.en,
+    };
+  };
+
   const handleSave = async () => {
     if (!selectedFile) {
       return;
@@ -508,53 +572,7 @@ export default function HciotKnowledgeWorkspace({
 
     setSaving(true);
     try {
-      let nextDraft = { ...draft };
-
-      if (nextDraft.categoryId === NEW_VALUE) {
-        const labels = buildLabels(nextDraft.categoryLabelZh, nextDraft.categoryLabelEn);
-        if (!labels) {
-          throw new Error(language === 'zh' ? '請輸入新科別名稱' : 'Please enter a category name');
-        }
-        const createdCategoryId = slugify(labels.en || labels.zh);
-        if (!createdCategoryId) {
-          throw new Error(language === 'zh' ? '無法建立科別 ID' : 'Unable to create category id');
-        }
-        nextDraft = {
-          ...nextDraft,
-          categoryId: createdCategoryId,
-          categoryLabelZh: labels.zh,
-          categoryLabelEn: labels.en,
-        };
-      }
-
-      if (!nextDraft.categoryId) {
-        nextDraft = {
-          ...nextDraft,
-          ...emptyTopicDraft(),
-        };
-      } else if (nextDraft.topicId === NEW_VALUE) {
-        const labels = buildLabels(nextDraft.topicLabelZh, nextDraft.topicLabelEn);
-        if (!labels) {
-          throw new Error(language === 'zh' ? '請輸入新主題名稱' : 'Please enter a topic name');
-        }
-        const createdTopicSlug = slugify(labels.en || labels.zh);
-        if (!createdTopicSlug) {
-          throw new Error(language === 'zh' ? '無法建立主題 ID' : 'Unable to create topic id');
-        }
-
-        const fullTopicId = `${nextDraft.categoryId}/${createdTopicSlug}`;
-        const categoryLabels = buildLabels(nextDraft.categoryLabelZh, nextDraft.categoryLabelEn)
-          || { zh: nextDraft.categoryId, en: nextDraft.categoryId };
-        await api.createHciotTopic(fullTopicId, labels, categoryLabels);
-        const topicData = await api.listHciotTopicsAdmin();
-        setCategories(topicData.categories || []);
-        nextDraft = {
-          ...nextDraft,
-          topicId: fullTopicId,
-          topicLabelZh: labels.zh,
-          topicLabelEn: labels.en,
-        };
-      }
+      const nextDraft = await resolveDraftBeforeSave(draft);
 
       if (metadataDirty || draft.categoryId === NEW_VALUE || draft.topicId === NEW_VALUE) {
         const updatedMetadata = await api.updateHciotKnowledgeFileMetadata(
@@ -576,7 +594,7 @@ export default function HciotKnowledgeWorkspace({
 
       setDraft(nextDraft);
       await refreshWorkspace(selectedFile.name);
-      showStatus(language === 'zh' ? '變更已儲存' : 'Changes saved');
+      showStatus(text('變更已儲存', 'Changes saved'));
     } catch (error) {
       console.error('Failed to save HCIoT file changes:', error);
       alert(getErrorMessage(error));
@@ -650,7 +668,7 @@ export default function HciotKnowledgeWorkspace({
         availableImages={images}
         uploading={uploading}
         onClose={() => setQaDialogOpen(false)}
-        onUploadFile={handleUploadFile}
+        onUploadFile={uploadFileWithTopic}
         onUploadComplete={handleUploadComplete}
         onSubmitQA={handleQASubmit}
         onUploadImage={api.uploadHciotImage}

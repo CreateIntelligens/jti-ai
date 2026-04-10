@@ -50,6 +50,70 @@ def _normalized_label(value: str | None, fallback: str) -> str:
     return (value or "").strip() or fallback
 
 
+def _schedule_gemini_sync(
+    background_tasks: BackgroundTasks,
+    language: str,
+    filename: str,
+    file_bytes: bytes,
+) -> None:
+    store_name = _store_name(language)
+    if store_name:
+        background_tasks.add_task(_gemini_background, sync_to_gemini, store_name, filename, file_bytes)
+
+
+def _schedule_gemini_delete(
+    background_tasks: BackgroundTasks,
+    language: str,
+    filename: str,
+) -> None:
+    store_name = _store_name(language)
+    if store_name:
+        background_tasks.add_task(_gemini_background, delete_from_gemini, store_name, filename)
+
+
+def _build_merged_topic_id(category_id: str | None, topic_id: str | None) -> str | None:
+    if category_id and topic_id:
+        return f"{category_id.strip()}/{topic_id.strip()}"
+    if topic_id and "/" in topic_id:
+        return topic_id.strip()
+    if category_id:
+        return category_id.strip()
+    return None
+
+
+def _get_doc_or_404(language: str, filename: str) -> tuple[str, dict]:
+    safe_name = safe_filename(filename)
+    store = get_hciot_knowledge_store()
+    doc = store.get_file(language, safe_name)
+    if not doc:
+        raise HTTPException(status_code=404, detail="檔案不存在")
+    return safe_name, doc
+
+
+def _insert_uploaded_file(
+    *,
+    language: str,
+    filename: str,
+    file_bytes: bytes,
+    content_type: str,
+    editable: bool,
+    topic_id: str | None,
+    category_labels: dict[str, str | None],
+    topic_labels: dict[str, str | None],
+):
+    return get_hciot_knowledge_store().insert_file(
+        language=language,
+        filename=filename,
+        data=file_bytes,
+        display_name=filename,
+        content_type=content_type,
+        editable=editable,
+        topic_id=topic_id,
+        category_labels=category_labels,
+        topic_labels=topic_labels,
+    )
+
+
 def _last_image_filename_fragment(stem: str) -> str | None:
     upper_stem = stem.upper()
     index = upper_stem.rfind("IMG_")
@@ -168,11 +232,7 @@ def list_knowledge_files(language: str = "zh", auth: dict = Depends(verify_auth)
 
 @router.get("/files/{filename}/content")
 def get_file_content(filename: str, language: str = "zh", auth: dict = Depends(verify_auth)):
-    safe_name = safe_filename(filename)
-    store = get_hciot_knowledge_store()
-    doc = store.get_file(language, safe_name)
-    if not doc:
-        raise HTTPException(status_code=404, detail="檔案不存在")
+    safe_name, doc = _get_doc_or_404(language, filename)
 
     ext = Path(safe_name).suffix.lower()
     file_bytes = doc.get("data", b"")
@@ -195,11 +255,7 @@ def get_file_content(filename: str, language: str = "zh", auth: dict = Depends(v
 
 @router.get("/files/{filename}/download")
 def download_file(filename: str, language: str = "zh", auth: dict = Depends(verify_auth)):
-    safe_name = safe_filename(filename)
-    store = get_hciot_knowledge_store()
-    doc = store.get_file(language, safe_name)
-    if not doc:
-        raise HTTPException(status_code=404, detail="檔案不存在")
+    safe_name, doc = _get_doc_or_404(language, filename)
 
     file_bytes = doc.get("data", b"")
     content_type = doc.get("content_type") or "application/octet-stream"
@@ -240,41 +296,29 @@ def _rewrite_csv_file_with_split_uploads(
         if not updated:
             raise HTTPException(status_code=404, detail="檔案不存在")
 
-        store_name = _store_name(language)
-        if store_name:
-            background_tasks.add_task(_gemini_background, sync_to_gemini, store_name, safe_name, new_bytes)
+        _schedule_gemini_sync(background_tasks, language, safe_name, new_bytes)
         return
 
     upload_map = {name: data for name, data in uploads}
     target_names = set(upload_map)
-    store_name = _store_name(language)
 
     if safe_name in target_names:
         safe_name_bytes = upload_map.pop(safe_name)
         updated = store.update_file_content(language, safe_name, safe_name_bytes)
         if not updated:
             raise HTTPException(status_code=404, detail="檔案不存在")
-        if store_name:
-            background_tasks.add_task(
-                _gemini_background,
-                sync_to_gemini,
-                store_name,
-                safe_name,
-                safe_name_bytes,
-            )
+        _schedule_gemini_sync(background_tasks, language, safe_name, safe_name_bytes)
     else:
         deleted = store.delete_file(language, safe_name)
         if not deleted:
             raise HTTPException(status_code=404, detail="檔案不存在")
-        if store_name:
-            background_tasks.add_task(_gemini_background, delete_from_gemini, store_name, safe_name)
+        _schedule_gemini_delete(background_tasks, language, safe_name)
 
     for upload_name, upload_bytes in upload_map.items():
-        saved = store.insert_file(
+        saved = _insert_uploaded_file(
             language=language,
             filename=upload_name,
-            data=upload_bytes,
-            display_name=upload_name,
+            file_bytes=upload_bytes,
             content_type=doc.get("content_type") or "application/octet-stream",
             editable=bool(doc.get("editable", False)),
             topic_id=doc.get("topic_id"),
@@ -287,14 +331,7 @@ def _rewrite_csv_file_with_split_uploads(
                 "en": doc.get("topic_label_en"),
             },
         )
-        if store_name:
-            background_tasks.add_task(
-                _gemini_background,
-                sync_to_gemini,
-                store_name,
-                saved["name"],
-                upload_bytes,
-            )
+        _schedule_gemini_sync(background_tasks, language, saved["name"], upload_bytes)
 
 
 @router.put("/files/{filename}/content")
@@ -305,15 +342,12 @@ async def update_file_content(
     language: str = "zh",
     auth: dict = Depends(verify_auth),
 ):
-    safe_name = safe_filename(filename)
+    safe_name, doc = _get_doc_or_404(language, filename)
     ext = Path(safe_name).suffix.lower()
     if ext not in EDITABLE_EXTENSIONS:
         raise HTTPException(status_code=400, detail="此檔案格式不支援線上編輯")
 
     store = get_hciot_knowledge_store()
-    doc = store.get_file(language, safe_name)
-    if not doc:
-        raise HTTPException(status_code=404, detail="檔案不存在")
 
     old_bytes = doc.get("data", b"")
     if ext == ".docx":
@@ -341,9 +375,7 @@ async def update_file_content(
         if not updated:
             raise HTTPException(status_code=404, detail="檔案不存在")
 
-        store_name = _store_name(language)
-        if store_name:
-            background_tasks.add_task(_gemini_background, sync_to_gemini, store_name, safe_name, new_bytes)
+        _schedule_gemini_sync(background_tasks, language, safe_name, new_bytes)
 
     topic_synced = _sync_topic_questions_for_doc(language, doc)
 
@@ -357,11 +389,8 @@ async def update_file_metadata(
     language: str = "zh",
     auth: dict = Depends(verify_auth),
 ):
-    safe_name = safe_filename(filename)
+    safe_name, existing = _get_doc_or_404(language, filename)
     store = get_hciot_knowledge_store()
-    existing = store.get_file(language, safe_name)
-    if not existing:
-        raise HTTPException(status_code=404, detail="檔案不存在")
 
     updated = store.update_file_metadata(language, safe_name, request.model_dump())
     if not updated:
@@ -403,27 +432,17 @@ async def upload_knowledge_file(
     if ext == ".csv":
         file_bytes = normalize_qa_csv_rows(file_bytes) or file_bytes
 
-    # Merge category_id + topic_id into single topic_id
-    merged_topic_id = None
-    if category_id and topic_id:
-        merged_topic_id = f"{category_id.strip()}/{topic_id.strip()}"
-    elif topic_id and "/" in topic_id:
-        merged_topic_id = topic_id.strip()
-    elif category_id:
-        merged_topic_id = category_id.strip()
+    merged_topic_id = _build_merged_topic_id(category_id, topic_id)
 
-    store = get_hciot_knowledge_store()
-    store_name = _store_name(language)
     category_labels = {"zh": category_label_zh, "en": category_label_en}
     topic_labels = {"zh": topic_label_zh, "en": topic_label_en}
     uploads = split_qa_csv_by_image(file_bytes, safe_name) or [(safe_name, file_bytes)]
     saved_files = []
     for upload_name, upload_bytes in uploads:
-        saved = store.insert_file(
+        saved = _insert_uploaded_file(
             language=language,
             filename=upload_name,
-            data=upload_bytes,
-            display_name=upload_name,
+            file_bytes=upload_bytes,
             content_type=content_type,
             editable=editable,
             topic_id=merged_topic_id,
@@ -431,9 +450,7 @@ async def upload_knowledge_file(
             topic_labels=topic_labels,
         )
         saved_files.append(saved)
-
-        if store_name:
-            background_tasks.add_task(_gemini_background, sync_to_gemini, store_name, saved["name"], upload_bytes)
+        _schedule_gemini_sync(background_tasks, language, saved["name"], upload_bytes)
 
     topic_synced = _sync_topic_questions_from_store(
         language=language,
@@ -466,16 +483,13 @@ async def upload_knowledge_file(
 async def delete_knowledge_file(
     filename: str, background_tasks: BackgroundTasks, language: str = "zh", auth: dict = Depends(verify_auth),
 ):
-    safe_name = safe_filename(filename)
+    safe_name, existing = _get_doc_or_404(language, filename)
     store = get_hciot_knowledge_store()
-    existing = store.get_file(language, safe_name)
     deleted = store.delete_file(language, safe_name)
     if not deleted:
         raise HTTPException(status_code=404, detail="檔案不存在")
 
-    store_name = _store_name(language)
-    if store_name:
-        background_tasks.add_task(_gemini_background, delete_from_gemini, store_name, safe_name)
+    _schedule_gemini_delete(background_tasks, language, safe_name)
 
     topic_synced = _sync_topic_questions_for_doc(language, existing)
 
