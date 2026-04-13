@@ -88,40 +88,38 @@ Current Mode: Patient education chat
 def _compose_response_rules(
     language: str,
     sections: Dict[str, str],
-    max_response_chars: int,
+    limit: int,
 ) -> str:
-    if language == "en":
-        return f"""## Your Role
+    is_en = language == "en"
+    
+    # Headers and labels
+    headers = {
+        "role": "## Your Role" if is_en else "## 你的角色",
+        "scope": "## Scope Restriction" if is_en else "## 範圍限制",
+        "rules": "## Response Rules" if is_en else "## 回應規則",
+        "kb": "## Knowledge Base Usage" if is_en else "## 知識庫使用規則"
+    }
+    
+    length_rule = (
+        f"- Length: keep each response within {limit} words when practical"
+        if is_en else
+        f"- 字數：每次回覆不超過{limit}字（必要時更短）"
+    )
+
+    return f"""{headers['role']}
 
 {sections.get('role_scope', '')}
 
-## Scope Restriction
+{headers['scope']}
 
 {sections.get('scope_limits', '')}
 
-## Response Rules
+{headers['rules']}
 
 {sections.get('response_style', '')}
-- Length: keep each response within {max_response_chars} characters when practical
+{length_rule}
 
-## Knowledge Base Usage
-
-{sections.get('knowledge_rules', '')}"""
-
-    return f"""## 你的角色
-
-{sections.get('role_scope', '')}
-
-## 範圍限制
-
-{sections.get('scope_limits', '')}
-
-## 回應規則
-
-{sections.get('response_style', '')}
-- 字數：每次回覆不超過{max_response_chars}字（必要時更短）
-
-## 知識庫使用規則
+{headers['kb']}
 
 {sections.get('knowledge_rules', '')}"""
 
@@ -134,12 +132,11 @@ def build_system_instruction(
     persona: str,
     language: str,
     response_rule_sections: Optional[Dict[str, str]] = None,
-    max_response_chars: int = DEFAULT_MAX_RESPONSE_CHARS,
+    limit: int = DEFAULT_MAX_RESPONSE_CHARS,
 ) -> str:
-    defaults = get_default_response_rule_sections()
-    normalized_language = "en" if language == "en" else "zh"
-    sections = response_rule_sections or defaults.get(normalized_language, defaults["zh"])
-    rules = _compose_response_rules(normalized_language, sections, max_response_chars)
+    normalized_lang = "en" if language == "en" else "zh"
+    sections = response_rule_sections or DEFAULT_RESPONSE_RULE_SECTIONS[normalized_lang]
+    rules = _compose_response_rules(normalized_lang, sections, limit)
     return f"{persona}\n\n{rules}"
 
 

@@ -69,7 +69,7 @@ class HciotMainAgent(BaseAgent):
         return build_system_instruction(
             persona=persona, language=language,
             response_rule_sections=response_rule_sections,
-            max_response_chars=max_response_chars,
+            limit=max_response_chars,
         )
 
     def _load_runtime_settings(self, prompt_manager, prompt_id, store_name):

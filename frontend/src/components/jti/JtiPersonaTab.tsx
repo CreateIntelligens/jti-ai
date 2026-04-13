@@ -26,8 +26,9 @@ export interface JtiPersonaTabProps {
   onSetActive: (promptId: string | null) => Promise<void>;
   onCloneDefault: () => Promise<void>;
   cloning: boolean;
-  onCreate: (name: string, content: string) => Promise<void>;
-  creating: boolean;
+  onCreate?: (name: string, content: string) => Promise<void>;
+  creating?: boolean;
+  showCreateForm?: boolean;
   onStartEdit: (prompt: Prompt) => void;
   editingId: string | null;
   editName: string;
@@ -62,6 +63,7 @@ export default function JtiPersonaTab({
   cloning,
   onCreate,
   creating,
+  showCreateForm = true,
   onStartEdit,
   editingId,
   editName,
@@ -125,14 +127,10 @@ export default function JtiPersonaTab({
     return lines.slice(0, maxLines).join('\n') + '...';
   };
 
-  const shouldShowExpandButton = (_content?: string, _isActive?: boolean) => true;
-
-  const getExpandButtonText = (expanded: boolean, _isActive?: boolean) => {
-    return expanded ? '收起完整內容' : '展開完整內容';
-  };
+  const getExpandButtonText = (expanded: boolean) => expanded ? '收起完整內容' : '展開完整內容';
 
   const handleCreate = async () => {
-    if (!newContent.trim()) return;
+    if (!newContent.trim() || !onCreate) return;
     const name = newName.trim() || `自訂人物設定 ${customPrompts.length + 1}`;
     await onCreate(name, newContent.trim());
     setNewName('');
@@ -374,12 +372,12 @@ export default function JtiPersonaTab({
                     {cloning ? '複製中...' : '以此為基礎建立副本'}
                   </button>
                 )}
-                {shouldShowExpandButton(defaultPrompt.content, defaultPrompt.is_active) && (
+                {true && (
                   <button
                     className="jti-btn small secondary jti-prompt-expand"
                     onClick={() => handleToggleExpand(defaultPrompt.id)}
                   >
-                    {getExpandButtonText(expandedIds.has(defaultPrompt.id), defaultPrompt.is_active)}
+                    {getExpandButtonText(expandedIds.has(defaultPrompt.id))}
                   </button>
                 )}
               </div>
@@ -467,12 +465,12 @@ export default function JtiPersonaTab({
                     >
                       刪除
                     </button>
-                    {shouldShowExpandButton(prompt.content, prompt.is_active) && (
+                    {true && (
                       <button
                         className="jti-btn small secondary jti-prompt-expand"
                         onClick={() => handleToggleExpand(prompt.id)}
                       >
-                        {getExpandButtonText(expandedIds.has(prompt.id), prompt.is_active)}
+                        {getExpandButtonText(expandedIds.has(prompt.id))}
                       </button>
                     )}
                   </div>
@@ -490,7 +488,7 @@ export default function JtiPersonaTab({
       </div>
 
       {/* Create new persona */}
-      {customPrompts.length < maxCustom ? (
+      {showCreateForm && (customPrompts.length < maxCustom ? (
         <div className="jti-prompt-create">
           <h3 className="jti-prompt-create-title">
             新增自訂人物設定（{customPrompts.length}/{maxCustom}）
@@ -521,7 +519,7 @@ export default function JtiPersonaTab({
         <div className="jti-prompt-limit">
           自訂人物設定已達上限（{maxCustom} 個）
         </div>
-      )}
+      ))}
 
       <ConfirmDialog
         isOpen={!!confirmDeleteId}

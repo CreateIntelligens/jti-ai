@@ -92,7 +92,7 @@ export default function ApiKeyTab({
           <label style={{ display: 'block', marginBottom: '0.5rem', color: 'var(--text-muted)' }}>
             選擇知識庫
           </label>
-          <CustomSelect
+          <AppSelect
             value={apiKeyStore}
             onChange={onApiKeyStoreChange}
             options={[

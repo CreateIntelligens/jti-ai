@@ -90,18 +90,21 @@ export default function HciotTopicGrid({
           </div>
 
           <div className="hciot-topic-question-list custom-scrollbar">
-            {selectedTopic.questions[language].map((question, index) => (
-              <button
-                key={`${selectedTopic.id}-${question}`}
-                type="button"
-                className="hciot-topic-question-chip"
-                onClick={() => onSelectQuestion(question)}
-                disabled={disabled}
-              >
-                <span className="hciot-topic-question-index">{index + 1}</span>
-                <span className="hciot-topic-question-label">{question}</span>
-              </button>
-            ))}
+            {selectedTopic.questions[language].map((question, index) => {
+              const key = `${selectedTopic.id}-${question}`;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  className="hciot-topic-question-chip"
+                  onClick={() => onSelectQuestion(question)}
+                  disabled={disabled}
+                >
+                  <span className="hciot-topic-question-index">{index + 1}</span>
+                  <span className="hciot-topic-question-label">{question}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
       ) : null}

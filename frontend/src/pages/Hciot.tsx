@@ -736,7 +736,7 @@ export default function Hciot() {
 
         <HciotKnowledgeWorkspace
           active={workspace === 'files'}
-          language={currentLanguage}
+          language="zh"
         />
       </main>
 

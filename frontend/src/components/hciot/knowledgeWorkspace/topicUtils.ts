@@ -136,34 +136,42 @@ export function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+function buildGenericOptions<T extends { id: string; labels: HciotLabels }>(
+  items: T[],
+  selectedId: string,
+  labels: { zh: string; en: string },
+  language: HciotLanguage,
+  extraDefaults: Partial<T> = {},
+): T[] {
+  const sorted = [...items].sort((a, b) => sortByLabel(a.labels[language], b.labels[language]));
+
+  if (!selectedId || selectedId === NEW_VALUE) return sorted;
+
+  const exists = sorted.some(i => i.id === selectedId);
+  if (exists) return sorted;
+
+  return [
+    ...sorted,
+    {
+      ...extraDefaults,
+      id: selectedId,
+      labels: {
+        zh: labels.zh || selectedId,
+        en: labels.en || selectedId,
+      },
+    } as T
+  ];
+}
+
 export function buildCategoryOptions(
   categories: HciotTopicCategory[],
   draft: FileMetadataDraft,
   language: HciotLanguage,
-): CategoryOption[] {
-  const sortedCategories = categories
-    .slice()
-    .sort((left, right) => sortByLabel(left.labels[language], right.labels[language]));
-
-  const hasCurrentCategory = draft.categoryId
-    && draft.categoryId !== NEW_VALUE
-    && sortedCategories.some((category) => category.id === draft.categoryId);
-
-  if (!hasCurrentCategory && draft.categoryId) {
-    return [
-      ...sortedCategories,
-      {
-        id: draft.categoryId,
-        labels: {
-          zh: draft.categoryLabelZh || draft.categoryId,
-          en: draft.categoryLabelEn || draft.categoryId,
-        },
-        topics: [],
-      },
-    ];
-  }
-
-  return sortedCategories;
+): HciotTopicCategory[] {
+  return buildGenericOptions(categories, draft.categoryId, {
+    zh: draft.categoryLabelZh,
+    en: draft.categoryLabelEn
+  }, language, { topics: [] });
 }
 
 export function buildTopicOptions(
@@ -185,27 +193,8 @@ export function buildTopicOptions(
     return [];
   }
 
-  const sortedTopics = currentCategory.topics
-    .slice()
-    .sort((left, right) => sortByLabel(left.labels[language], right.labels[language]));
-
-  const hasCurrentTopic = draft.topicId
-    && draft.topicId !== NEW_VALUE
-    && sortedTopics.some((topic) => topic.id === draft.topicId);
-
-  if (!hasCurrentTopic && draft.topicId) {
-    return [
-      ...sortedTopics,
-      {
-        id: draft.topicId,
-        labels: {
-          zh: draft.topicLabelZh || draft.topicId,
-          en: draft.topicLabelEn || draft.topicId,
-        },
-        questions: { zh: [], en: [] },
-      },
-    ];
-  }
-
-  return sortedTopics;
+  return buildGenericOptions(currentCategory.topics, draft.topicId, {
+    zh: draft.topicLabelZh,
+    en: draft.topicLabelEn
+  }, language, { questions: { zh: [], en: [] } });
 }
