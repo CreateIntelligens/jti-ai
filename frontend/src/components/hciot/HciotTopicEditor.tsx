@@ -31,6 +31,30 @@ function getDeleteMessage(confirmDelete: DeleteTarget | null, language: 'zh' | '
 }
 
 export default function HciotTopicEditor({ language, categories, onCategoriesChange }: Props) {
+  const isZh = language === 'zh';
+  const t = {
+    title: isZh ? '科別與題目' : 'Categories & Topics',
+    topics: isZh ? '主題' : 'topics',
+    questions: isZh ? '題' : 'Q',
+    edit: isZh ? '編輯' : 'Edit',
+    delete: isZh ? '刪除' : 'Delete',
+    rename: isZh ? '改名' : 'Rename',
+    save: isZh ? '儲存' : 'Save',
+    saving: isZh ? '儲存中…' : 'Saving…',
+    cancel: isZh ? '取消' : 'Cancel',
+    addTopic: isZh ? '新增主題' : 'Add topic',
+    addCat: isZh ? '新增科別' : 'Add category',
+    editQs: isZh ? '編輯題目' : 'Edit questions',
+    noQs: isZh ? '尚無題目' : 'No questions yet',
+    qsPlaceholder: isZh ? '每行一題…' : 'One question per line…',
+    catPlaceholderZh: isZh ? '中文' : 'Label (zh)',
+    catPlaceholderEn: isZh ? 'English' : 'Label (en)',
+    newCatZh: isZh ? '科別中文名' : 'Category name (zh)',
+    newCatEn: isZh ? '科別英文名' : 'Category name (en)',
+    newTopicZh: isZh ? '主題中文名' : 'Topic name (zh)',
+    newTopicEn: isZh ? '主題英文名' : 'Topic name (en)',
+  };
+
   const [expandedCatId, setExpandedCatId] = useState<string | null>(null);
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [editCatLabels, setEditCatLabels] = useState({ zh: '', en: '' });
@@ -203,9 +227,9 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
 
               {isEditingThis ? (
                 <div className="hciot-te-inline-edit">
-                  <input className="hciot-kb-input" placeholder="中文" value={editCatLabels.zh}
+                  <input className="hciot-kb-input" placeholder={t.catPlaceholderZh} value={editCatLabels.zh}
                     onChange={(e) => setEditCatLabels(p => ({ ...p, zh: e.target.value }))} autoFocus />
-                  <input className="hciot-kb-input" placeholder="English" value={editCatLabels.en}
+                  <input className="hciot-kb-input" placeholder={t.catPlaceholderEn} value={editCatLabels.en}
                     onChange={(e) => setEditCatLabels(p => ({ ...p, en: e.target.value }))} />
                   <button className="hciot-te-icon-btn confirm" onClick={() => saveEditCat(cat)} disabled={saving}><Check size={14} /></button>
                   <button className="hciot-te-icon-btn" onClick={() => setEditingCatId(null)}><X size={14} /></button>
@@ -216,15 +240,15 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
                     {cat.labels[language]}
                   </span>
                   <span className="hciot-te-badge">
-                    {cat.topics.length} {language === 'zh' ? '主題' : 'topics'} · {totalQuestions(cat)} {language === 'zh' ? '題' : 'Q'}
+                    {cat.topics.length} {t.topics} · {totalQuestions(cat)} {t.questions}
                   </span>
                   <div className="hciot-te-cat-actions">
-                    <button className="hciot-te-icon-btn" onClick={() => startEditCat(cat)} title={language === 'zh' ? '編輯' : 'Edit'}>
+                    <button className="hciot-te-icon-btn" onClick={() => startEditCat(cat)} title={t.edit}>
                       <Pencil size={13} />
                     </button>
                     <button className="hciot-te-icon-btn danger"
                       onClick={() => setConfirmDelete({ type: 'category', catId: cat.id })}
-                      title={language === 'zh' ? '刪除' : 'Delete'}>
+                      title={t.delete}>
                       <Trash2 size={13} />
                     </button>
                   </div>
@@ -245,9 +269,9 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
                         <GripVertical size={14} className="hciot-te-grip" />
                         {isEditingTopic ? (
                           <div className="hciot-te-inline-edit">
-                            <input className="hciot-kb-input" placeholder="中文" value={editTopicLabels.zh}
+                            <input className="hciot-kb-input" placeholder={t.catPlaceholderZh} value={editTopicLabels.zh}
                               onChange={(e) => setEditTopicLabels(p => ({ ...p, zh: e.target.value }))} autoFocus />
-                            <input className="hciot-kb-input" placeholder="English" value={editTopicLabels.en}
+                            <input className="hciot-kb-input" placeholder={t.catPlaceholderEn} value={editTopicLabels.en}
                               onChange={(e) => setEditTopicLabels(p => ({ ...p, en: e.target.value }))} />
                             <button className="hciot-te-icon-btn confirm" onClick={() => saveEditTopic(topic.id)} disabled={saving}><Check size={14} /></button>
                             <button className="hciot-te-icon-btn" onClick={() => setEditingTopicId(null)}><X size={14} /></button>
@@ -255,14 +279,14 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
                         ) : (
                           <>
                             <span className="hciot-te-topic-name">{topic.labels[language]}</span>
-                            <span className="hciot-te-badge small">{qs.length} {language === 'zh' ? '題' : 'Q'}</span>
+                            <span className="hciot-te-badge small">{qs.length} {t.questions}</span>
                             <div className="hciot-te-cat-actions">
-                              <button className="hciot-te-icon-btn" onClick={() => startEditTopic(topic)} title={language === 'zh' ? '改名' : 'Rename'}>
+                              <button className="hciot-te-icon-btn" onClick={() => startEditTopic(topic)} title={t.rename}>
                                 <Pencil size={12} />
                               </button>
                               <button className="hciot-te-icon-btn danger"
                                 onClick={() => setConfirmDelete({ type: 'topic', catId: cat.id, topicId: topic.id })}
-                                title={language === 'zh' ? '刪除' : 'Delete'}>
+                                title={t.delete}>
                                 <Trash2 size={12} />
                               </button>
                             </div>
@@ -275,14 +299,14 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
                           <div className="hciot-te-qs-edit">
                             <textarea className="hciot-te-qs-textarea" value={questionsText}
                               onChange={(e) => setQuestionsText(e.target.value)}
-                              placeholder={language === 'zh' ? '每行一題…' : 'One question per line…'}
+                              placeholder={t.qsPlaceholder}
                               rows={Math.max(4, qs.length + 1)} />
                             <div className="hciot-te-qs-actions">
                               <button className="hciot-te-btn confirm" onClick={() => saveQuestions(topic.id)} disabled={saving}>
-                                {saving ? (language === 'zh' ? '儲存中…' : 'Saving…') : (language === 'zh' ? '儲存' : 'Save')}
+                                {saving ? t.saving : t.save}
                               </button>
                               <button className="hciot-te-btn" onClick={() => setEditingQuestions(null)}>
-                                {language === 'zh' ? '取消' : 'Cancel'}
+                                {t.cancel}
                               </button>
                             </div>
                           </div>
@@ -298,10 +322,10 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
                                 ))}
                               </ul>
                             ) : (
-                              <p className="hciot-te-empty">{language === 'zh' ? '尚無題目' : 'No questions yet'}</p>
+                              <p className="hciot-te-empty">{t.noQs}</p>
                             )}
                             <button className="hciot-te-btn edit-qs" onClick={() => startEditQuestions(topic)}>
-                              <Pencil size={12} /> {language === 'zh' ? '編輯題目' : 'Edit questions'}
+                              <Pencil size={12} /> {t.editQs}
                             </button>
                           </>
                         )}
@@ -312,16 +336,16 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
 
                 {addingTopicInCat === cat.id ? (
                   <div className="hciot-te-add-row">
-                    <input className="hciot-kb-input" placeholder={language === 'zh' ? '主題中文名' : 'Topic name (zh)'}
+                    <input className="hciot-kb-input" placeholder={t.newTopicZh}
                       value={newTopicZh} onChange={(e) => setNewTopicZh(e.target.value)} autoFocus />
-                    <input className="hciot-kb-input" placeholder={language === 'zh' ? '主題英文名' : 'Topic name (en)'}
+                    <input className="hciot-kb-input" placeholder={t.newTopicEn}
                       value={newTopicEn} onChange={(e) => setNewTopicEn(e.target.value)} />
                     <button className="hciot-te-icon-btn confirm" onClick={() => confirmAddTopic(cat)} disabled={saving}><Check size={14} /></button>
                     <button className="hciot-te-icon-btn" onClick={resetTopicDraft}><X size={14} /></button>
                   </div>
                 ) : (
                   <button className="hciot-te-add-btn" onClick={() => setAddingTopicInCat(cat.id)}>
-                    <Plus size={14} /> {language === 'zh' ? '新增主題' : 'Add topic'}
+                    <Plus size={14} /> {t.addTopic}
                   </button>
                 )}
               </div>
@@ -332,16 +356,16 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
 
       {addingCat ? (
         <div className="hciot-te-add-row" style={{ marginTop: '0.5rem' }}>
-          <input className="hciot-kb-input" placeholder={language === 'zh' ? '科別中文名' : 'Category name (zh)'}
+          <input className="hciot-kb-input" placeholder={t.newCatZh}
             value={newCatZh} onChange={(e) => setNewCatZh(e.target.value)} autoFocus />
-          <input className="hciot-kb-input" placeholder={language === 'zh' ? '科別英文名' : 'Category name (en)'}
+          <input className="hciot-kb-input" placeholder={t.newCatEn}
             value={newCatEn} onChange={(e) => setNewCatEn(e.target.value)} />
           <button className="hciot-te-icon-btn confirm" onClick={confirmAddCat} disabled={saving}><Check size={14} /></button>
           <button className="hciot-te-icon-btn" onClick={resetCategoryDraft}><X size={14} /></button>
         </div>
       ) : (
         <button className="hciot-te-add-btn" onClick={() => setAddingCat(true)} style={{ marginTop: '0.5rem' }}>
-          <Plus size={14} /> {language === 'zh' ? '新增科別' : 'Add category'}
+          <Plus size={14} /> {t.addCat}
         </button>
       )}
 

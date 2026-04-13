@@ -115,24 +115,40 @@ export default function HciotKnowledgeTab({
     setNewTopicLabelEn('');
   }, [selectedCategoryId]);
 
+  const t = {
+    hint: lang === 'zh' ? '📋 上傳 CSV（含 q 欄位）時，題目將自動匯入指定科別／主題' : '📋 When CSV has a q column, questions auto-import to the selected category/topic',
+    category: lang === 'zh' ? '科別' : 'Category',
+    topic: lang === 'zh' ? '主題' : 'Topic',
+    none: lang === 'zh' ? '— 不指定 —' : '— None —',
+    newCat: lang === 'zh' ? '＋ 新增科別' : '+ New category',
+    newTopic: lang === 'zh' ? '＋ 新增主題' : '+ New topic',
+    zhName: lang === 'zh' ? '中文名稱' : 'Label (zh)',
+    enName: lang === 'zh' ? '英文名稱' : 'Label (en)',
+    topicZh: lang === 'zh' ? '主題中文名' : 'Topic label (zh)',
+    topicEn: lang === 'zh' ? '主題英文名' : 'Topic label (en)',
+    upload: lang === 'zh' ? '點擊或拖放檔案上傳' : 'Click or drag files to upload',
+    uploading: lang === 'zh' ? '上傳中...' : 'Uploading...',
+    formatHint: lang === 'zh' ? '支援 PDF、TXT、Word、CSV 等格式' : 'Supports PDF, TXT, Word, CSV, etc.',
+    fileCount: (count: number) => `共 ${count} 個檔案（${lang === 'zh' ? '中文' : 'English'} 知識庫）`,
+    empty: lang === 'zh' ? '知識庫尚無檔案' : 'No files in knowledge base',
+    confirmDelete: lang === 'zh' ? '確定要刪除此檔案嗎？' : 'Are you sure you want to delete this file?',
+  };
+
   const buildTopicOpts = (): TopicUploadOpts | undefined => {
     if (!effectiveCategoryId || !effectiveTopicId) return undefined;
+
     const existingTopic = topicsInCategory.find((t) => t.id === selectedTopicId);
-    // Extract just the topic slug if selectedTopicId is a full "cat/topic" format
     const topicSlug = isNewTopic
       ? effectiveTopicId
-      : (selectedTopicId.includes('/') ? selectedTopicId.split('/').slice(1).join('/') : selectedTopicId);
+      : (selectedTopicId.split('/').pop() || selectedTopicId);
+
     return {
       categoryId: effectiveCategoryId,
       topicId: topicSlug,
       categoryLabelZh: isNewCategory ? newCategoryLabelZh.trim() || undefined : undefined,
       categoryLabelEn: isNewCategory ? newCategoryLabelEn.trim() || undefined : undefined,
-      topicLabelZh: isNewTopic
-        ? newTopicLabelZh.trim() || undefined
-        : existingTopic?.labels.zh,
-      topicLabelEn: isNewTopic
-        ? newTopicLabelEn.trim() || undefined
-        : existingTopic?.labels.en,
+      topicLabelZh: isNewTopic ? newTopicLabelZh.trim() || undefined : existingTopic?.labels.zh,
+      topicLabelEn: isNewTopic ? newTopicLabelEn.trim() || undefined : existingTopic?.labels.en,
     };
   };
 
@@ -152,84 +168,52 @@ export default function HciotKnowledgeTab({
 
       {/* Topic association fields */}
       <div className="hciot-kb-topic-section">
-        <p className="hciot-kb-topic-hint">
-          {lang === 'zh'
-            ? '📋 上傳 CSV（含 q 欄位）時，題目將自動匯入指定科別／主題'
-            : '📋 When CSV has a q column, questions auto-import to the selected category/topic'}
-        </p>
+        <p className="hciot-kb-topic-hint">{t.hint}</p>
 
         <div className="hciot-kb-selectors">
-          {/* Category dropdown */}
           <div className="hciot-kb-field">
-            <label className="hciot-kb-label">
-              {lang === 'zh' ? '科別' : 'Category'}
-            </label>
+            <label className="hciot-kb-label">{t.category}</label>
             <HciotSelect
               className="hciot-kb-select"
               value={selectedCategoryId}
               onChange={setSelectedCategoryId}
               options={[
-                { value: '', label: lang === 'zh' ? '— 不指定 —' : '— None —' },
+                { value: '', label: t.none },
                 ...categories.map((cat) => ({ value: cat.id, label: cat.labels[lang] })),
-                { value: NEW_VALUE, label: lang === 'zh' ? '＋ 新增科別' : '+ New category' },
+                { value: NEW_VALUE, label: t.newCat },
               ]}
             />
           </div>
 
-          {/* Topic dropdown (only when a category is selected) */}
           {(effectiveCategoryId || isNewCategory) && (
             <div className="hciot-kb-field">
-              <label className="hciot-kb-label">
-                {lang === 'zh' ? '主題' : 'Topic'}
-              </label>
+              <label className="hciot-kb-label">{t.topic}</label>
               <HciotSelect
                 className="hciot-kb-select"
                 value={selectedTopicId}
                 onChange={setSelectedTopicId}
                 disabled={isNewCategory && !effectiveCategoryId}
                 options={[
-                  { value: '', label: lang === 'zh' ? '— 不指定 —' : '— None —' },
+                  { value: '', label: t.none },
                   ...(!isNewCategory ? topicsInCategory.map((t) => ({ value: t.id, label: t.labels[lang] })) : []),
-                  { value: NEW_VALUE, label: lang === 'zh' ? '＋ 新增主題' : '+ New topic' },
+                  { value: NEW_VALUE, label: t.newTopic },
                 ]}
               />
             </div>
           )}
         </div>
 
-        {/* New category inputs */}
         {isNewCategory && (
           <div className="hciot-kb-new-fields">
-            <input
-              className="hciot-kb-input"
-              placeholder={lang === 'zh' ? '中文名稱' : 'Label (zh)'}
-              value={newCategoryLabelZh}
-              onChange={(e) => setNewCategoryLabelZh(e.target.value)}
-            />
-            <input
-              className="hciot-kb-input"
-              placeholder={lang === 'zh' ? '英文名稱' : 'Label (en)'}
-              value={newCategoryLabelEn}
-              onChange={(e) => setNewCategoryLabelEn(e.target.value)}
-            />
+            <input className="hciot-kb-input" placeholder={t.zhName} value={newCategoryLabelZh} onChange={(e) => setNewCategoryLabelZh(e.target.value)} />
+            <input className="hciot-kb-input" placeholder={t.enName} value={newCategoryLabelEn} onChange={(e) => setNewCategoryLabelEn(e.target.value)} />
           </div>
         )}
 
-        {/* New topic inputs */}
         {isNewTopic && effectiveCategoryId && (
           <div className="hciot-kb-new-fields">
-            <input
-              className="hciot-kb-input"
-              placeholder={lang === 'zh' ? '主題中文名' : 'Topic label (zh)'}
-              value={newTopicLabelZh}
-              onChange={(e) => setNewTopicLabelZh(e.target.value)}
-            />
-            <input
-              className="hciot-kb-input"
-              placeholder={lang === 'zh' ? '主題英文名' : 'Topic label (en)'}
-              value={newTopicLabelEn}
-              onChange={(e) => setNewTopicLabelEn(e.target.value)}
-            />
+            <input className="hciot-kb-input" placeholder={t.topicZh} value={newTopicLabelZh} onChange={(e) => setNewTopicLabelZh(e.target.value)} />
+            <input className="hciot-kb-input" placeholder={t.topicEn} value={newTopicLabelEn} onChange={(e) => setNewTopicLabelEn(e.target.value)} />
           </div>
         )}
       </div>
@@ -260,19 +244,15 @@ export default function HciotKnowledgeTab({
         />
         <Upload size={24} className="jti-kb-upload-icon" />
         <p className="jti-kb-upload-text">
-          {uploading ? '上傳中...' : '點擊或拖放檔案上傳'}
+          {uploading ? t.uploading : t.upload}
         </p>
-        <p className="jti-kb-upload-hint">
-          支援 PDF、TXT、Word、CSV 等格式
-        </p>
+        <p className="jti-kb-upload-hint">{t.formatHint}</p>
       </div>
 
       {/* File list */}
-      <div className="jti-kb-file-count">
-        共 {kbFiles.length} 個檔案（{language === 'zh' ? '中文' : 'English'} 知識庫）
-      </div>
+      <div className="jti-kb-file-count">{t.fileCount(kbFiles.length)}</div>
       {kbFiles.length === 0 ? (
-        <div className="jti-kb-empty">知識庫尚無檔案</div>
+        <div className="jti-kb-empty">{t.empty}</div>
       ) : (
         <div className="jti-kb-file-list">
           {kbFiles.map((file) => {
@@ -317,7 +297,7 @@ export default function HciotKnowledgeTab({
 
       <ConfirmDialog
         isOpen={!!confirmDeleteFile}
-        message="確定要刪除此檔案嗎？"
+        message={t.confirmDelete}
         onConfirm={onDeleteFileConfirm}
         onCancel={onDeleteFileCancel}
       />
