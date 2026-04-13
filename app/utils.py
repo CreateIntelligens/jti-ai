@@ -36,21 +36,14 @@ def group_conversations_by_session(conversations: list) -> list:
             sessions[sid] = {
                 "session_id": sid,
                 "conversations": [],
-                "first_message_time": conv.get("timestamp"),
+                "first_message_time": None,
                 "total": 0
             }
         sessions[sid]["conversations"].append(conv)
         sessions[sid]["total"] += 1
 
-
-def get_other_language(language: str) -> str:
-    """Get the opposite language (en <-> zh)."""
-    return "en" if language == "zh" else "zh"
-
-    session_list = list(sessions.values())
-
     # 每個 session 內的對話按 turn_number 升序排列（確保正確時序）
-    for s in session_list:
+    for s in sessions.values():
         s["conversations"].sort(
             key=lambda c: (c.get("turn_number") or 0, c.get("timestamp") or "")
         )
@@ -58,8 +51,14 @@ def get_other_language(language: str) -> str:
         if s["conversations"]:
             s["first_message_time"] = s["conversations"][0].get("timestamp")
 
+    session_list = list(sessions.values())
     session_list.sort(key=lambda x: x["first_message_time"] or "", reverse=True)
     return session_list
+
+
+def get_other_language(language: str) -> str:
+    """Get the opposite language (en <-> zh)."""
+    return "en" if language == "zh" else "zh"
 
 
 def group_conversations_as_summary(conversations: list) -> list:

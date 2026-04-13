@@ -124,23 +124,21 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@compat_history_router.get(
-    "/history",
-    response_model=ConversationsGroupedResponse,
-    response_model_exclude_none=True,
-)
-@admin_history_router.get(
-    "",
-    response_model=ConversationsGroupedResponse,
-    response_model_exclude_none=True,
-)
+@compat_history_router.get("/history")
+@admin_history_router.get("")
 async def get_conversations(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    session_id: Optional[str] = None,
     auth: dict = Depends(verify_admin),
 ):
     mode = "hciot"
     try:
+        # Single-session detail request (used by ConversationHistoryModal resume)
+        if session_id:
+            conversations = [c for c in conversation_logger.get_session_logs(session_id) if c.get("mode") == mode]
+            return {"mode": mode, "conversations": conversations}
+
         query = build_date_query(mode, date_from, date_to)
         session_ids, total_sessions = conversation_logger.get_paginated_session_ids(query=query, page=1, page_size=100000)
         all_conversations = conversation_logger.get_logs_for_sessions(session_ids)

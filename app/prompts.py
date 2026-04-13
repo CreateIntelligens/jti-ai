@@ -82,6 +82,9 @@ class PromptManager:
     def _save_store_prompts(self, store_prompts: StorePrompts):
         """保存 Store 的 prompts"""
         data = store_prompts.model_dump(exclude_none=True)
+        # active_prompt_id must be explicitly persisted even when None,
+        # otherwise $set leaves the old value in MongoDB.
+        data["active_prompt_id"] = store_prompts.active_prompt_id
 
         self.collection.update_one(
             {"store_name": store_prompts.store_name},

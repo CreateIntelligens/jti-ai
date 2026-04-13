@@ -37,7 +37,6 @@ export default function HciotSettingsModal({
   const [activePromptId, setActivePromptId] = useState<string | null>(null);
   const [maxCustom, setMaxCustom] = useState(MAX_CUSTOM);
   const [loading, setLoading] = useState(false);
-  const [creating, setCreating] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editContent, setEditContent] = useState('');
@@ -74,8 +73,9 @@ export default function HciotSettingsModal({
       const data = await api.getHciotRuntimeSettings(promptId, normalizedLanguage);
       setRuntimeSettings(data.settings || null);
       setRuntimePromptId(promptId);
-    } catch (error) {
-      console.error('Failed to load HCIoT runtime settings:', error);
+    } catch {
+      setRuntimeSettings(null);
+      setRuntimePromptId(SYSTEM_DEFAULT_ID);
     }
   };
 
@@ -89,8 +89,7 @@ export default function HciotSettingsModal({
   };
 
   const refreshRuntimeSettings = async (latestActivePromptId: string | null) => {
-    const targetPromptId = resolveRuntimePromptId(latestActivePromptId);
-    await Promise.all([loadRuntimeSettings(targetPromptId), loadDefaultRuntimeSettings()]);
+    await loadRuntimeSettings(resolveRuntimePromptId(latestActivePromptId));
   };
 
   useEffect(() => {
@@ -100,7 +99,10 @@ export default function HciotSettingsModal({
 
     const init = async () => {
       const latestActivePromptId = await loadPrompts();
-      await refreshRuntimeSettings(latestActivePromptId);
+      await Promise.all([
+        refreshRuntimeSettings(latestActivePromptId),
+        loadDefaultRuntimeSettings(),
+      ]);
     };
 
     void init();
@@ -139,18 +141,6 @@ export default function HciotSettingsModal({
     await loadRuntimeSettings(promptId);
   };
 
-  const handleCreate = async (name: string, content: string) => {
-    setCreating(true);
-    try {
-      await api.createHciotPrompt(name, content, normalizedLanguage);
-      const latestActivePromptId = await loadPrompts();
-      await refreshRuntimeSettings(latestActivePromptId);
-    } catch (error) {
-      alert(`建立失敗: ${error instanceof Error ? error.message : String(error)}`);
-    } finally {
-      setCreating(false);
-    }
-  };
 
   const handleCloneDefault = async () => {
     setCloning(true);
@@ -169,12 +159,23 @@ export default function HciotSettingsModal({
   };
 
   const handleSetActive = async (promptId: string | null) => {
+    // Optimistic update so UI reacts before the server round-trip completes.
+    setActivePromptId(promptId);
+    setRuntimePromptId(resolveRuntimePromptId(promptId));
+    setPrompts(prev =>
+      prev.map(p => ({
+        ...p,
+        is_active: promptId ? p.id === promptId : p.id === SYSTEM_DEFAULT_ID,
+      })),
+    );
+
     try {
       await api.setActiveHciotPrompt(promptId, normalizedLanguage);
       const latestActivePromptId = await loadPrompts();
       await refreshRuntimeSettings(latestActivePromptId);
       onPromptChange();
     } catch (error) {
+      await refreshRuntimeSettings(await loadPrompts());
       alert(`設定失敗: ${error instanceof Error ? error.message : String(error)}`);
     }
   };
@@ -214,13 +215,28 @@ export default function HciotSettingsModal({
     }
 
     const promptId = confirmDeleteId;
+    const wasActive = promptId === activePromptId;
     setDeleting(true);
     try {
       await api.deleteHciotPrompt(promptId, normalizedLanguage);
       setConfirmDeleteId(null);
+
+      if (wasActive) {
+        setActivePromptId(null);
+        setRuntimePromptId(SYSTEM_DEFAULT_ID);
+        setPrompts(prev =>
+          prev
+            .filter(p => p.id !== promptId)
+            .map(p => p.id === SYSTEM_DEFAULT_ID ? { ...p, is_active: true } : p),
+        );
+      } else {
+        setPrompts(prev => prev.filter(p => p.id !== promptId));
+      }
+
       const latestActivePromptId = await loadPrompts();
       await refreshRuntimeSettings(latestActivePromptId);
-      if (promptId === activePromptId) {
+
+      if (wasActive) {
         onPromptChange();
       }
       setSuccessMsg('✅ 已刪除衛教助手設定');
@@ -282,8 +298,7 @@ export default function HciotSettingsModal({
             onSetActive={handleSetActive}
             onCloneDefault={handleCloneDefault}
             cloning={cloning}
-            onCreate={handleCreate}
-            creating={creating}
+            showCreateForm={false}
             onStartEdit={startEdit}
             editingId={editingId}
             editName={editName}

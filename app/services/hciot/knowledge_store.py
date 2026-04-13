@@ -52,25 +52,26 @@ class HciotKnowledgeStore:
         topic_labels: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         normalized_topic_id = cls._normalize_optional_text(topic_id)
+        
+        # If no topic_id, all related metadata should be None
+        if not normalized_topic_id:
+            return {
+                "topic_id": None,
+                "category_label_zh": None,
+                "category_label_en": None,
+                "topic_label_zh": None,
+                "topic_label_en": None,
+            }
 
-        category_labels = category_labels or {}
-        topic_labels = topic_labels or {}
-
-        category_label_zh = (
-            cls._normalize_optional_text(category_labels.get("zh")) if normalized_topic_id else None
-        )
-        category_label_en = (
-            cls._normalize_optional_text(category_labels.get("en")) if normalized_topic_id else None
-        )
-        topic_label_zh = cls._normalize_optional_text(topic_labels.get("zh")) if normalized_topic_id else None
-        topic_label_en = cls._normalize_optional_text(topic_labels.get("en")) if normalized_topic_id else None
+        cat_labels = category_labels or {}
+        top_labels = topic_labels or {}
 
         return {
             "topic_id": normalized_topic_id,
-            "category_label_zh": category_label_zh,
-            "category_label_en": category_label_en,
-            "topic_label_zh": topic_label_zh,
-            "topic_label_en": topic_label_en,
+            "category_label_zh": cls._normalize_optional_text(cat_labels.get("zh")),
+            "category_label_en": cls._normalize_optional_text(cat_labels.get("en")),
+            "topic_label_zh": cls._normalize_optional_text(top_labels.get("zh")),
+            "topic_label_en": cls._normalize_optional_text(top_labels.get("en")),
         }
 
     @staticmethod
@@ -164,9 +165,9 @@ class HciotKnowledgeStore:
         base_name = self._safe_filename(filename)
         path = Path(base_name)
         stem, suffix = path.stem, path.suffix
+        
         candidate = base_name
         counter = 1
-
         while self.collection.find_one(self._query(language, candidate), {"_id": 1}):
             candidate = f"{stem}_{counter}{suffix}"
             counter += 1

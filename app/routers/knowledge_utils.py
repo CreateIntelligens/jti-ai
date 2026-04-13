@@ -40,8 +40,8 @@ def gemini_background(log_prefix: str, operation: Callable, store_name: str, fil
 class KnowledgeStoreProtocol(Protocol):
     """Minimal interface shared by JTI and HCIoT knowledge stores."""
 
-    def list_files(self, language: str, **kwargs: Any) -> list[dict[str, Any]]: ...
-    def delete_file(self, language: str, filename: str, **kwargs: Any) -> bool: ...
+    def list_files(self, language: str) -> list[dict[str, Any]]: ...
+    def delete_file(self, language: str, filename: str) -> bool: ...
     def insert_file(self, language: str, filename: str, data: bytes, **kwargs: Any) -> dict[str, Any]: ...
 
 
@@ -186,22 +186,26 @@ def sync_gemini_db_background(
 
         now = datetime.now(timezone.utc)
         for f in db_files:
-            if f["display_name"] not in gemini_names:
-                # Skip recently created files — Gemini sync may still be in progress
-                created = f.get("created_at")
-                if isinstance(created, datetime):
-                    age = (now - created).total_seconds()
-                    if age < _GEMINI_SYNC_GRACE_SECONDS:
-                        logger.info(f"[{log_prefix}] DB-only but recent ({age:.0f}s), skipping: {f['display_name']}")
-                        continue
-                logger.info(f"[{log_prefix}] DB-only, removing: {f['display_name']}")
-                store.delete_file(language, f["name"])
+            if f["display_name"] in gemini_names:
+                continue
+                
+            # Skip recently created files — Gemini sync may still be in progress
+            created = f.get("created_at")
+            if isinstance(created, datetime):
+                age = (now - created).total_seconds()
+                if age < _GEMINI_SYNC_GRACE_SECONDS:
+                    logger.info(f"[{log_prefix}] DB-only but recent ({age:.0f}s), skipping: {f['display_name']}")
+                    continue
+                    
+            logger.info(f"[{log_prefix}] DB-only, removing: {f['display_name']}")
+            store.delete_file(language, f["name"])
 
-        for doc in gemini_docs:
-            if doc.display_name not in db_names and register_gemini_only:
-                logger.info(f"[{log_prefix}] Gemini-only, registering: {doc.display_name}")
-                store.insert_file(language, doc.display_name, b"", editable=False, **extra_kwargs)
-                db_names.add(doc.display_name)
+        if register_gemini_only:
+            for doc in gemini_docs:
+                if doc.display_name not in db_names:
+                    logger.info(f"[{log_prefix}] Gemini-only, registering: {doc.display_name}")
+                    store.insert_file(language, doc.display_name, b"", editable=False, **extra_kwargs)
+                    db_names.add(doc.display_name)
     except Exception as e:
         logger.warning(f"[{log_prefix}] background sync error: {e}")
 
