@@ -160,8 +160,11 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
 
   const saveQuestions = async (topicId: string) => {
     const lines = toQuestionLines(questionsText);
+    const existingTopic = categories.flatMap((c) => c.topics).find((t) => t.id === topicId);
+    const existingQuestions = existingTopic?.questions ?? { zh: [], en: [] };
+    const updatedQuestions = { ...existingQuestions, [language]: lines };
     await runSavingAction(async () => {
-      await api.updateHciotTopic(topicId, { questions: { zh: lines, en: lines } });
+      await api.updateHciotTopic(topicId, { questions: updatedQuestions });
       setEditingQuestions(null);
       await reload();
     });

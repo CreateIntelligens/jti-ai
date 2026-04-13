@@ -42,6 +42,11 @@ def group_conversations_by_session(conversations: list) -> list:
         sessions[sid]["conversations"].append(conv)
         sessions[sid]["total"] += 1
 
+
+def get_other_language(language: str) -> str:
+    """Get the opposite language (en <-> zh)."""
+    return "en" if language == "zh" else "zh"
+
     session_list = list(sessions.values())
 
     # 每個 session 內的對話按 turn_number 升序排列（確保正確時序）

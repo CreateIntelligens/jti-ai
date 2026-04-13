@@ -30,6 +30,7 @@ from app.routers.knowledge_utils import (
 from app.services.hciot.csv_utils import extract_questions_from_csv, merge_csv_files, normalize_qa_csv_rows, split_qa_csv_by_image
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.hciot.topic_store import get_hciot_topic_store
+from app.utils import get_other_language
 
 logger = logging.getLogger(__name__)
 
@@ -195,7 +196,7 @@ def _sync_topic_questions_from_store(
             topic_store.delete_topic(topic_id)
             logger.info("[HCIoT KB] Deleted empty topic %s", topic_id)
         else:
-            topic_store.update_topic(topic_id, {"questions": {"zh": questions, "en": questions}})
+            topic_store.update_topic(topic_id, {f"questions.{language}": questions})
             logger.info("[HCIoT KB] Synced %d questions -> %s", len(questions), topic_id)
         return True
 
@@ -213,7 +214,7 @@ def _sync_topic_questions_from_store(
                 "zh": _normalized_label(category_label_zh, prefix),
                 "en": _normalized_label(category_label_en, prefix),
             },
-            "questions": {"zh": questions, "en": questions},
+            "questions": {language: questions, get_other_language(language): []},
         },
     )
     logger.info("[HCIoT KB] Synced %d questions -> %s", len(questions), topic_id)
@@ -224,6 +225,10 @@ def _sync_topic_questions_from_store(
 def list_knowledge_files(language: str = "zh", auth: dict = Depends(verify_auth)):
     store = get_hciot_knowledge_store()
     files = store.list_files(language)
+    effective_language = language
+    if not files and language != "zh":
+        files = store.list_files("zh")
+        effective_language = "zh"
     start_background_sync(
         ENV_PREFIX,
         get_hciot_knowledge_store,
@@ -231,7 +236,7 @@ def list_knowledge_files(language: str = "zh", auth: dict = Depends(verify_auth)
         LOG_PREFIX,
         register_gemini_only=False,
     )
-    return {"files": files, "language": language}
+    return {"files": files, "language": effective_language}
 
 
 @router.get("/files/{filename}/content")
