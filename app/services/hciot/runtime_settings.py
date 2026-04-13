@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field
 
 from app.services.hciot.agent_prompts import (
     DEFAULT_MAX_RESPONSE_CHARS,
+    DEFAULT_RESPONSE_RULE_SECTIONS,
     WELCOME_TEXT,
-    get_default_response_rule_sections,
 )
 
 HCIOT_STORE_NAME = "__hciot__"
@@ -44,8 +44,8 @@ class WelcomeBlock(BaseModel):
 class HciotRuntimeSettings(BaseModel):
     response_rule_sections: Dict[str, RuleSections] = Field(
         default_factory=lambda: {
-            "zh": RuleSections(**get_default_response_rule_sections()["zh"]),
-            "en": RuleSections(**get_default_response_rule_sections()["en"]),
+            "zh": RuleSections(**DEFAULT_RESPONSE_RULE_SECTIONS["zh"]),
+            "en": RuleSections(**DEFAULT_RESPONSE_RULE_SECTIONS["en"]),
         }
     )
     welcome: Dict[str, WelcomeBlock] = Field(

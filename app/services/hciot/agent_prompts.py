@@ -4,7 +4,6 @@ HCIoT assistant prompts and system rules.
 
 from __future__ import annotations
 
-from copy import deepcopy
 from typing import Dict, Optional
 
 DEFAULT_MAX_RESPONSE_CHARS = 60
@@ -122,10 +121,6 @@ def _compose_response_rules(
 {headers['kb']}
 
 {sections.get('knowledge_rules', '')}"""
-
-
-def get_default_response_rule_sections() -> Dict[str, Dict[str, str]]:
-    return deepcopy(DEFAULT_RESPONSE_RULE_SECTIONS)
 
 
 def build_system_instruction(
