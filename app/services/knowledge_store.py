@@ -102,7 +102,7 @@ class KnowledgeStore:
             "created_at": doc.get("created_at"),
         }
 
-    def list_files(self, language: str, namespace: str = "jti") -> list[dict[str, Any]]:
+    def list_files(self, language: str, namespace: str = "jti", **kwargs: Any) -> list[dict[str, Any]]:
         """List files for a language."""
         docs = list(
             self.collection.find(
@@ -199,6 +199,7 @@ class KnowledgeStore:
         content_type: str = "application/octet-stream",
         editable: bool = True,
         namespace: str = "jti",
+        **kwargs: Any,
     ) -> dict[str, Any]:
         """Insert new file; if duplicated, append _{n} suffix."""
         lang = self._normalize_language(language)
@@ -231,7 +232,7 @@ class KnowledgeStore:
         doc.pop("_id", None)
         return self._metadata_from_doc(doc)
 
-    def delete_file(self, language: str, filename: str, namespace: str = "jti") -> bool:
+    def delete_file(self, language: str, filename: str, namespace: str = "jti", **kwargs: Any) -> bool:
         """Delete file by namespace + language + filename."""
         normalized_namespace = self._normalize_namespace(namespace)
         result = self.collection.delete_one(self._query(language, filename, normalized_namespace))

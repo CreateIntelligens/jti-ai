@@ -119,7 +119,7 @@ class HciotKnowledgeStore:
             })
         return results
 
-    def list_files(self, language: str) -> list[dict[str, Any]]:
+    def list_files(self, language: str, **kwargs: Any) -> list[dict[str, Any]]:
         cursor = self.collection.find(
             self._query(language),
             {
@@ -159,6 +159,7 @@ class HciotKnowledgeStore:
         topic_id: str | None = None,
         category_labels: dict[str, Any] | None = None,
         topic_labels: dict[str, Any] | None = None,
+        **kwargs: Any,
     ) -> dict[str, Any]:
         base_name = self._safe_filename(filename)
         path = Path(base_name)
@@ -194,7 +195,7 @@ class HciotKnowledgeStore:
         doc.pop("_id", None)
         return self._metadata_from_doc(doc)
 
-    def delete_file(self, language: str, filename: str) -> bool:
+    def delete_file(self, language: str, filename: str, **kwargs: Any) -> bool:
         result = self.collection.delete_one(self._query(language, filename))
         return result.deleted_count > 0
 
