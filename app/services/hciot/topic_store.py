@@ -28,7 +28,7 @@ class HciotTopicStore:
     COLLECTION = "hciot_topics"
 
     def __init__(self):
-        self.db = get_mongo_db()
+        self.db = get_mongo_db("hciot_app")
         self.collection = self.db[self.COLLECTION]
 
     def _prepare_payload(self, data: dict, topic_id: str | None = None) -> dict:

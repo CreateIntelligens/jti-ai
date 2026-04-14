@@ -15,7 +15,7 @@ class HciotImageStore:
     COLLECTION_NAME = "hciot_images"
 
     def __init__(self):
-        self.db = get_mongo_db()
+        self.db = get_mongo_db("hciot_app")
         self.collection = self.db[self.COLLECTION_NAME]
         self.collection.create_index([("image_id", ASCENDING)], unique=True)
 

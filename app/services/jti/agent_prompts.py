@@ -160,6 +160,7 @@ SESSION_STATE_TEMPLATES = {
 目前階段: {step_value}
 測驗進度: {answers_count}/4 題
 測驗結果: {quiz_result}
+現在時間: {now}
 
 ⚠️ 重要：必須使用繁體中文回應所有內容，即使使用者用英文提問
 </內部狀態資訊>""",
@@ -167,6 +168,7 @@ SESSION_STATE_TEMPLATES = {
 Current Stage: {step_value}
 Quiz Progress: {answers_count}/4 questions
 Quiz Result: {quiz_result}
+Current time: {now}
 
 ⚠️ CRITICAL: You MUST respond in English only, even if user writes in Chinese
 </Internal State Info>""",

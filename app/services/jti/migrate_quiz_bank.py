@@ -39,7 +39,7 @@ def _upgrade_legacy_data() -> None:
     """
     from app.services.mongo_client import get_mongo_db
 
-    db = get_mongo_db()
+    db = get_mongo_db("jti_app")
     if db is None:
         return
 
@@ -192,7 +192,7 @@ def _upgrade_legacy_quiz_results() -> None:
     """
     from app.services.mongo_client import get_mongo_db
 
-    db = get_mongo_db()
+    db = get_mongo_db("jti_app")
     if db is None:
         return
 

@@ -17,7 +17,7 @@ class HciotKnowledgeStore:
     NAMESPACE = "hciot"
 
     def __init__(self):
-        self.db = get_mongo_db()
+        self.db = get_mongo_db("hciot_app")
         self.collection = self.db[self.COLLECTION_NAME]
 
     @staticmethod

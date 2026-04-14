@@ -30,7 +30,7 @@ class QuizResultsStore:
     METADATA_COLLECTION = "quiz_results_metadata"
 
     def __init__(self):
-        self.db = get_mongo_db()
+        self.db = get_mongo_db("jti_app")
         self.collection = self.db[self.COLLECTION_NAME]
         self.metadata = self.db[self.METADATA_COLLECTION]
 

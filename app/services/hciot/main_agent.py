@@ -79,8 +79,10 @@ class HciotMainAgent(BaseAgent):
         return load_runtime_settings_from_prompt_manager(None)
 
     def _get_session_state(self, session: Session) -> str:
+        from datetime import datetime, timezone
         template = SESSION_STATE_TEMPLATES.get(session.language, SESSION_STATE_TEMPLATES["zh"])
-        return template.format(step_value=session.step.value)
+        now = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M")
+        return template.format(step_value=session.step.value, now=now)
 
     def _build_intent_prompt(self, query: str, language: str) -> str:
         return build_intent_prompt(query)

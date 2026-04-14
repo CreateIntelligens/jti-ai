@@ -105,12 +105,15 @@ class MainAgent(BaseAgent):
 
     def _get_session_state(self, session: Session) -> str:
         """取得動態 Session 狀態（會變化的資訊）"""
+        from datetime import datetime, timezone
         template = SESSION_STATE_TEMPLATES.get(session.language, SESSION_STATE_TEMPLATES["zh"])
         not_yet = "Not calculated yet" if session.language == "en" else "尚未計算"
+        now = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M")
         return template.format(
             step_value=session.step.value,
             answers_count=len(session.answers),
             quiz_result=session.quiz_result_id or not_yet,
+            now=now,
         )
 
     def _file_search(self, query: str, language: str, session_id: str | None = None) -> tuple[str | None, list[dict] | None]:

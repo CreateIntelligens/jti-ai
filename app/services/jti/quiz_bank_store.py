@@ -32,7 +32,7 @@ class QuizBankStore:
     METADATA_COLLECTION = "quiz_bank_metadata"
 
     def __init__(self):
-        self.db = get_mongo_db()
+        self.db = get_mongo_db("jti_app")
         self.questions = self.db[self.QUESTIONS_COLLECTION]
         self.metadata = self.db[self.METADATA_COLLECTION]
 

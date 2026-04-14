@@ -27,7 +27,7 @@ class KnowledgeStore:
     DEFAULT_NAMESPACE = "jti"
 
     def __init__(self):
-        self.db = get_mongo_db()
+        self.db = get_mongo_db("jti_app")
         self.collection = self.db[self.COLLECTION_NAME]
 
     @staticmethod

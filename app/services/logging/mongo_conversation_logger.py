@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class MongoConversationLogger:
     """MongoDB 對話日誌記錄器"""
 
-    def __init__(self, keep_file_logs: bool = True, db_name: str | None = None):
+    def __init__(self, keep_file_logs: bool = True, db_name: str = "jti_app"):
         """初始化日誌記錄器
 
         Args:

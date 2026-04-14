@@ -22,34 +22,22 @@ logger = logging.getLogger(__name__)
 class MongoSessionManager(SessionStateMixin):
     """MongoDB Session 管理器"""
 
-    def __init__(self, db_name: str | None = None):
+    def __init__(self, db_name: str = "jti_app"):
         self.db = get_mongo_db(db_name)
         self.sessions_collection = self.db["sessions"]
         self._pending: Dict[str, Session] = {}  # lazy write 暫存，尚未寫入 MongoDB
 
     def create_session(self, language: str = "zh") -> Session:
-        """建立新 session（優先立即寫入 MongoDB，失敗時暫存記憶體）"""
+        """Create new session (write to MongoDB, fallback to pending memory)."""
         session = Session(language=language)
         try:
             now = datetime.now()
-            session_dict = session.model_dump(mode="json")
-            session_dict["created_at"] = now
-            session_dict["updated_at"] = now
-
-            self.sessions_collection.update_one(
-                {"session_id": session.session_id},
-                {"$set": session_dict},
-                upsert=True
-            )
-            logger.info(f"Created session in MongoDB: {session.session_id} (language={language})")
+            doc = {**session.model_dump(mode="json"), "created_at": now, "updated_at": now}
+            self.sessions_collection.update_one({"session_id": session.session_id}, {"$set": doc}, upsert=True)
+            logger.info(f"Created session in MongoDB: {session.session_id}")
         except Exception as e:
-            # 若 MongoDB 當下異常，先退回 pending，避免中斷使用流程
             self._pending[session.session_id] = session
-            logger.warning(
-                "Failed to persist new session, fallback to pending memory: %s (session=%s)",
-                e,
-                session.session_id,
-            )
+            logger.warning(f"Failed to persist session, fallback to pending: {e}")
         return session
 
     def get_session(self, session_id: str) -> Optional[Session]:
@@ -68,28 +56,16 @@ class MongoSessionManager(SessionStateMixin):
             return None
 
     def update_session(self, session: Session) -> Session:
-        """更新 session"""
+        """Update session in MongoDB."""
         try:
             session.update_timestamp()
-            session_dict = session.model_dump(mode="json")
-
-            session_dict["updated_at"] = datetime.now()
-
-            result = self.sessions_collection.update_one(
-                {"session_id": session.session_id},
-                {"$set": session_dict},
-                upsert=True
-            )
-            self._pending.pop(session.session_id, None)  # 已寫入 DB，從暫存移除
-
-            logger.info(
-                f"Updated session in MongoDB: {session.session_id}, "
-                f"step={session.step.value}, answers={len(session.answers)}"
-            )
+            doc = {**session.model_dump(mode="json"), "updated_at": datetime.now()}
+            self.sessions_collection.update_one({"session_id": session.session_id}, {"$set": doc}, upsert=True)
+            self._pending.pop(session.session_id, None)
+            logger.info(f"Updated session: {session.session_id}, step={session.step.value}")
             return session
-
         except Exception as e:
-            logger.error(f"Failed to update session in MongoDB: {e}")
+            logger.error(f"Failed to update session: {e}")
             raise
 
     def delete_session(self, session_id: str) -> bool:
@@ -276,15 +252,13 @@ class MongoSessionManager(SessionStateMixin):
 
     @staticmethod
     def _doc_to_session(doc: Dict[str, Any]) -> Optional[Session]:
+        """Convert MongoDB doc to Session object."""
+        if not doc: return None
         cleaned = dict(doc)
-        cleaned.pop("_id", None)
-        cleaned.pop("expires_at", None)
-        cleaned.pop("created_at", None)
-        cleaned.pop("updated_at", None)
-        try:
-            return Session(**cleaned)
+        for k in ("_id", "expires_at", "created_at", "updated_at"): cleaned.pop(k, None)
+        try: return Session(**cleaned)
         except Exception as e:
-            logger.warning(f"Failed to parse session document: {e}")
+            logger.warning(f"Failed to parse session: {e}")
             return None
 
     def _find_sessions(self, query: dict) -> List[Session]:

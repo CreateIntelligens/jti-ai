@@ -32,11 +32,7 @@ class MongoDBClient:
         if self._client is not None:
             return
 
-        self.uri = os.getenv(
-            "MONGODB_URI",
-            "mongodb://localhost:27017/jti_app"
-        )
-        self.db_name = "jti_app"
+        self.uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
         self.connect()
 
     def connect(self) -> None:
@@ -53,7 +49,7 @@ class MongoDBClient:
 
     def _initialize_collections(self) -> None:
         """初始化集合和索引"""
-        db = self.get_db()
+        db = self.get_client()["jti_app"]
 
         # ===== sessions 集合 =====
         if "sessions" not in db.list_collection_names():
@@ -86,21 +82,6 @@ class MongoDBClient:
             logger.info("Created indexes for 'conversations' collection")
         except Exception as e:
             logger.warning(f"Index creation for 'conversations': {e}")
-
-        # ===== quizzes 集合（可選） =====
-        if "quizzes" not in db.list_collection_names():
-            db.create_collection("quizzes")
-            logger.info("Created 'quizzes' collection")
-
-        quizzes = db["quizzes"]
-
-        try:
-            quizzes.create_index("session_id")
-            quizzes.create_index([("completed_at", -1)])
-            quizzes.create_index([("language", 1), ("completed_at", -1)])
-            logger.info("Created indexes for 'quizzes' collection")
-        except Exception as e:
-            logger.warning(f"Index creation for 'quizzes': {e}")
 
         # ===== knowledge_files 集合 =====
         if "knowledge_files" not in db.list_collection_names():
@@ -205,10 +186,6 @@ class MongoDBClient:
             self.connect()
         return self._client
 
-    def get_db(self):
-        """取得資料庫實例"""
-        return self.get_client()[self.db_name]
-
     def close(self) -> None:
         """關閉連接"""
         if self._client:
@@ -241,16 +218,14 @@ def get_mongo_client() -> MongoDBClient:
 _initialized_dbs: set = set()
 
 
-def get_mongo_db(db_name: str | None = None):
-    """便利函數：取得資料庫實例。db_name 為 None 時回傳預設 jti_app。"""
+def get_mongo_db(db_name: str):
+    """便利函數：取得資料庫實例。必須明確指定 db_name（如 'jti_app' 或 'hciot_app'）。"""
     client = get_mongo_client()
-    if db_name:
-        db = client.get_client()[db_name]
-        if db_name not in _initialized_dbs:
-            _initialized_dbs.add(db_name)
-            _ensure_base_indexes(db, db_name)
-        return db
-    return client.get_db()
+    db = client.get_client()[db_name]
+    if db_name not in _initialized_dbs:
+        _initialized_dbs.add(db_name)
+        _ensure_base_indexes(db, db_name)
+    return db
 
 
 def _ensure_base_indexes(db, db_name: str) -> None:
