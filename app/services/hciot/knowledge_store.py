@@ -51,35 +51,25 @@ class HciotKnowledgeStore:
         category_labels: dict[str, Any] | None = None,
         topic_labels: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        normalized_topic_id = cls._normalize_optional_text(topic_id)
+        tid = cls._normalize_optional_text(topic_id)
+        cat = category_labels or {}
+        top = topic_labels or {}
         
-        # If no topic_id, all related metadata should be None
-        if not normalized_topic_id:
-            return {
-                "topic_id": None,
-                "category_label_zh": None,
-                "category_label_en": None,
-                "topic_label_zh": None,
-                "topic_label_en": None,
-            }
-
-        cat_labels = category_labels or {}
-        top_labels = topic_labels or {}
-
         return {
-            "topic_id": normalized_topic_id,
-            "category_label_zh": cls._normalize_optional_text(cat_labels.get("zh")),
-            "category_label_en": cls._normalize_optional_text(cat_labels.get("en")),
-            "topic_label_zh": cls._normalize_optional_text(top_labels.get("zh")),
-            "topic_label_en": cls._normalize_optional_text(top_labels.get("en")),
+            "topic_id": tid,
+            "category_label_zh": cls._normalize_optional_text(cat.get("zh")) if tid else None,
+            "category_label_en": cls._normalize_optional_text(cat.get("en")) if tid else None,
+            "topic_label_zh": cls._normalize_optional_text(top.get("zh")) if tid else None,
+            "topic_label_en": cls._normalize_optional_text(top.get("en")) if tid else None,
         }
 
     @staticmethod
     def _metadata_from_doc(doc: dict[str, Any]) -> dict[str, Any]:
+        filename = doc.get("filename", "")
         return {
-            "name": doc.get("filename", ""),
-            "filename": doc.get("filename", ""),
-            "display_name": doc.get("display_name", doc.get("filename", "")),
+            "name": filename,
+            "filename": filename,
+            "display_name": doc.get("display_name", filename),
             "content_type": doc.get("content_type", "application/octet-stream"),
             "size": int(doc.get("size", 0)),
             "editable": bool(doc.get("editable", False)),
@@ -149,6 +139,18 @@ class HciotKnowledgeStore:
         doc["data"] = self._to_bytes(doc.get("data"))
         return doc
 
+    def _resolve_filename(self, language: str, filename: str) -> str:
+        base_name = self._safe_filename(filename)
+        path = Path(base_name)
+        stem, suffix = path.stem, path.suffix
+        
+        candidate = base_name
+        counter = 1
+        while self.collection.find_one(self._query(language, candidate), {"_id": 1}):
+            candidate = f"{stem}_{counter}{suffix}"
+            counter += 1
+        return candidate
+
     def insert_file(
         self,
         language: str,
@@ -162,16 +164,7 @@ class HciotKnowledgeStore:
         topic_labels: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
-        base_name = self._safe_filename(filename)
-        path = Path(base_name)
-        stem, suffix = path.stem, path.suffix
-        
-        candidate = base_name
-        counter = 1
-        while self.collection.find_one(self._query(language, candidate), {"_id": 1}):
-            candidate = f"{stem}_{counter}{suffix}"
-            counter += 1
-
+        candidate = self._resolve_filename(language, filename)
         now = datetime.now(timezone.utc)
         doc = {
             "namespace": self.NAMESPACE,
@@ -184,16 +177,13 @@ class HciotKnowledgeStore:
             "editable": bool(editable),
             "created_at": now,
             "updated_at": now,
-        }
-        doc.update(
-            self._association_metadata(
+            **self._association_metadata(
                 topic_id=topic_id,
                 category_labels=category_labels,
                 topic_labels=topic_labels,
             )
-        )
+        }
         self.collection.insert_one(doc)
-        doc.pop("_id", None)
         return self._metadata_from_doc(doc)
 
     def delete_file(self, language: str, filename: str, **kwargs: Any) -> bool:

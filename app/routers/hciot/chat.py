@@ -85,25 +85,25 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
+        # Handle turn rollback if requested
         if request.turn_number is not None:
-            deleted_count = conversation_logger.delete_turns_from(request.session_id, request.turn_number)
-            if deleted_count > 0:
-                all_logs = conversation_logger.get_session_logs(request.session_id)
-                logs = [l for l in all_logs if l.get("mode") == "hciot"]
-                if logs:
-                    session = session_manager.rebuild_session_from_logs(request.session_id, logs)
-                    if not session:
-                        raise HTTPException(status_code=500, detail="Failed to rebuild session from logs")
-                else:
-                    session.chat_history = []
-                    session_manager.update_session(session)
-                main_agent.remove_session(request.session_id)
+            conversation_logger.delete_turns_from(request.session_id, request.turn_number)
+            logs = [l for l in conversation_logger.get_session_logs(request.session_id) if l.get("mode") == "hciot"]
+            if logs:
+                session = session_manager.rebuild_session_from_logs(request.session_id, logs)
+                if not session:
+                    raise HTTPException(status_code=500, detail="Failed to rebuild session from logs")
+            else:
+                session.chat_history = []
+                session_manager.update_session(session)
+            main_agent.remove_session(request.session_id)
 
         result = await main_agent.chat(session_id=request.session_id, user_message=request.message)
 
+        # Log conversation and prepare response
         updated_session = session_manager.get_session(request.session_id)
         language = updated_session.language if updated_session else "zh"
-        log_result = conversation_logger.log_conversation(
+        _, final_turn_number = conversation_logger.log_conversation(
             session_id=request.session_id,
             user_message=request.message,
             agent_response=result["message"],
@@ -111,12 +111,16 @@ async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
             mode="hciot",
             citations=result.get("citations"),
             image_id=result.get("image_id"),
-        )
-        final_turn_number = log_result[1] if log_result else None
+        ) or (None, None)
+
         result["tts_text"] = to_tts_text(result["message"], language)
         response = ChatResponse(**result, turn_number=final_turn_number)
-        tts_character = request.tts_character.strip() if request.tts_character else None
-        return attach_tts_message_id(response, language, _tts_manager, character=tts_character)
+        return attach_tts_message_id(
+            response, 
+            language, 
+            _tts_manager, 
+            character=request.tts_character.strip() if request.tts_character else None
+        )
     except HTTPException:
         raise
     except Exception as e:

@@ -34,6 +34,104 @@ interface QaUploadTabProps {
   onDeleteImage?: DeleteImageHandler;
 }
 
+interface QaRowItemProps {
+  index: number;
+  row: QARow;
+  language: HciotLanguage;
+  previewUrl: string;
+  onUpdate: (updates: Partial<QARow>) => void;
+  onRemove: () => void;
+  onClearImage: () => void;
+  onUploadImage: () => void;
+  onChooseExisting: () => void;
+}
+
+function QaRowItem({
+  index,
+  row,
+  language,
+  previewUrl,
+  onUpdate,
+  onRemove,
+  onClearImage,
+  onUploadImage,
+  onChooseExisting,
+}: QaRowItemProps) {
+  const imageLabel = row.pendingImageName || row.img;
+  const hasImage = Boolean(imageLabel);
+
+  return (
+    <div className="hciot-qa-row">
+      <span className="hciot-qa-row-number">{index + 1}</span>
+      <div className="hciot-qa-row-fields">
+        <input
+          className="hciot-qa-input"
+          placeholder={language === 'zh' ? '問題 (Q)' : 'Question (Q)'}
+          value={row.q}
+          onChange={(event) => onUpdate({ q: event.target.value })}
+        />
+        <div className="hciot-qa-row-fields-inner">
+          <textarea
+            className="hciot-qa-textarea hciot-qa-textarea-flexible"
+            placeholder={language === 'zh' ? '回答 (A)' : 'Answer (A)'}
+            value={row.a}
+            onChange={(event) => onUpdate({ a: event.target.value })}
+            rows={2}
+          />
+          <div className="hciot-qa-row-image">
+            {hasImage && (
+              <div className="hciot-qa-image-preview">
+                {previewUrl ? (
+                  <img src={previewUrl} alt={imageLabel} className="hciot-qa-image-thumb" />
+                ) : (
+                  <span className="hciot-qa-image-name" title={imageLabel}>{imageLabel}</span>
+                )}
+                {row.imgStatus === 'uploading' && (
+                  <Loader2 size={14} className="animate-spin" />
+                )}
+                {row.imgStatus === 'error' && (
+                  <span title={row.imgError}><XCircle size={14} className="text-red-500" /></span>
+                )}
+                <button type="button" className="hciot-qa-image-clear" onClick={onClearImage}>
+                  <X size={10} />
+                </button>
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '6px', marginTop: hasImage ? '4px' : 0 }}>
+              <button
+                type="button"
+                className="hciot-qa-image-btn"
+                onClick={onUploadImage}
+                title={language === 'zh' ? '上傳圖片' : 'Upload Image'}
+              >
+                <ImageIcon size={14} />
+                {!hasImage && (language === 'zh' ? '上傳' : 'Upload')}
+              </button>
+              <button
+                type="button"
+                className="hciot-qa-image-btn"
+                onClick={onChooseExisting}
+                title={language === 'zh' ? '選擇既有圖片' : 'Choose Existing Image'}
+              >
+                <Table size={14} />
+                {!hasImage && (language === 'zh' ? '既有' : 'Existing')}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button
+        type="button"
+        className="hciot-qa-row-delete"
+        onClick={onRemove}
+        title={language === 'zh' ? '移除' : 'Remove'}
+      >
+        <Trash2 size={14} />
+      </button>
+    </div>
+  );
+}
+
 export default function QaUploadTab({
   open,
   language,
@@ -66,75 +164,50 @@ export default function QaUploadTab({
   const canSubmitQA = validRows.length > 0 && hasTopicSelection && !uploadingLocal && !uploading;
 
   const updateRow = (index: number, updates: Partial<QARow>) => {
-    setRows((previous) => previous.map((row, rowIndex) => (
-      rowIndex === index ? { ...row, ...updates } : row
-    )));
+    setRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...updates } : row)));
   };
 
   const removeRow = (index: number) => {
-    setRows((previous) => {
-      const nextRows = previous.filter((_, rowIndex) => rowIndex !== index);
-      return nextRows.length > 0 ? nextRows : [createEmptyRow()];
+    setRows((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      return next.length > 0 ? next : [createEmptyRow()];
     });
   };
 
   const handleRowImageSelect = (fileList: FileList | null) => {
-    if (!fileList?.length || pendingRowImageIndex === null) {
-      return;
-    }
-    const file = fileList[0];
-    if (!file.type.startsWith('image/')) {
-      return;
-    }
+    const file = fileList?.[0];
+    if (!file?.type.startsWith('image/') || pendingRowImageIndex === null) return;
 
     const rowIndex = pendingRowImageIndex;
     setPendingRowImageIndex(null);
-    setRows((previous) => previous.map((row, index) => index === rowIndex ? {
-      ...row,
+    updateRow(rowIndex, {
       img: '',
       pendingImageFile: file,
       pendingImageName: file.name,
       imgStatus: 'pending',
       imgError: undefined,
-    } : row));
+    });
 
-    if (rowImageInputRef.current) {
-      rowImageInputRef.current.value = '';
-    }
-  };
-
-  const handleSelectExistingImage = (imageId: string) => {
-    if (pickerRowIndex === null) {
-      return;
-    }
-
-    const rowIndex = pickerRowIndex;
-    setPickerRowIndex(null);
-    setRows((previous) => previous.map((row, index) => (
-      index === rowIndex ? applyExistingRowImage(row, imageId) : row
-    )));
+    if (rowImageInputRef.current) rowImageInputRef.current.value = '';
   };
 
   const handleSubmit = async () => {
-    if (!validRows.length || !resolvedTopic) {
-      return;
-    }
+    if (!validRows.length || !resolvedTopic) return;
 
     setUploadingLocal(true);
     const originalRows = rows.map((row) => ({ ...row }));
     const uploadedImageIds: string[] = [];
-    let imageUploadFailedIndex: number | null = null;
-    let imageUploadFailedMessage: string | undefined;
+    let failedIndex: number | null = null;
+    let failedMsg: string | undefined;
     let stage: 'images' | 'submit' = 'images';
 
     try {
       const preparedRows = [...originalRows];
-      for (const [index, row] of preparedRows.entries()) {
-        if (!row.q.trim() || !row.pendingImageFile) {
-          continue;
-        }
+      for (let i = 0; i < preparedRows.length; i++) {
+        const row = preparedRows[i];
+        if (!row.q.trim() || !row.pendingImageFile) continue;
 
-        updateRow(index, { imgStatus: 'uploading', imgError: undefined });
+        updateRow(i, { imgStatus: 'uploading', imgError: undefined });
 
         try {
           const imageId = extractUploadedImageId(await onUploadImage(row.pendingImageFile));
@@ -147,11 +220,11 @@ export default function QaUploadTab({
             imgStatus: 'done',
             imgError: undefined,
           };
-          preparedRows[index] = { ...preparedRows[index], ...updates };
-          updateRow(index, updates);
+          preparedRows[i] = { ...preparedRows[i], ...updates };
+          updateRow(i, updates);
         } catch (error: any) {
-          imageUploadFailedIndex = index;
-          imageUploadFailedMessage = error?.message || String(error);
+          failedIndex = i;
+          failedMsg = error?.message || String(error);
           throw error;
         }
       }
@@ -166,11 +239,9 @@ export default function QaUploadTab({
     } catch (error) {
       if (stage === 'images') {
         await rollbackUploadedImages(uploadedImageIds, onDeleteImage);
-        setRows(originalRows.map((row, index) => index === imageUploadFailedIndex ? {
-          ...row,
-          imgStatus: 'error',
-          imgError: imageUploadFailedMessage,
-        } : row));
+        if (failedIndex !== null) {
+          updateRow(failedIndex, { imgStatus: 'error', imgError: failedMsg });
+        }
       }
       alert(error instanceof Error ? error.message : String(error));
     } finally {
@@ -186,98 +257,33 @@ export default function QaUploadTab({
         images={availableImages}
         selectedImageId={pickerRowIndex === null ? null : (rows[pickerRowIndex]?.img || null)}
         onClose={() => setPickerRowIndex(null)}
-        onSelect={handleSelectExistingImage}
+        onSelect={(id) => {
+          if (pickerRowIndex !== null) {
+            updateRow(pickerRowIndex, applyExistingRowImage(rows[pickerRowIndex], id));
+            setPickerRowIndex(null);
+          }
+        }}
       />
 
       <div className="hciot-upload-qa-body">
         <div className="hciot-qa-rows custom-scrollbar">
-          {rows.map((row, index) => {
-            const imageLabel = row.pendingImageName || row.img;
-            const hasImage = Boolean(imageLabel);
-            const previewUrl = row.pendingImageFile
-              ? pendingUrls.get(row.pendingImageFile) || ''
-              : getHciotImageUrl(row.img) || '';
-
-            return (
-              <div key={index} className="hciot-qa-row">
-                <span className="hciot-qa-row-number">{index + 1}</span>
-                <div className="hciot-qa-row-fields">
-                  <input
-                    className="hciot-qa-input"
-                    placeholder={language === 'zh' ? '問題 (Q)' : 'Question (Q)'}
-                    value={row.q}
-                    onChange={(event) => updateRow(index, { q: event.target.value })}
-                  />
-                  <div className="hciot-qa-row-fields-inner">
-                    <textarea
-                      className="hciot-qa-textarea hciot-qa-textarea-flexible"
-                      placeholder={language === 'zh' ? '回答 (A)' : 'Answer (A)'}
-                      value={row.a}
-                      onChange={(event) => updateRow(index, { a: event.target.value })}
-                      rows={2}
-                    />
-                    <div className="hciot-qa-row-image">
-                      {hasImage && (
-                        <div className="hciot-qa-image-preview">
-                          {previewUrl ? (
-                            <img src={previewUrl} alt={imageLabel} className="hciot-qa-image-thumb" />
-                          ) : (
-                            <span className="hciot-qa-image-name" title={imageLabel}>{imageLabel}</span>
-                          )}
-                          {row.imgStatus === 'uploading' && (
-                            <Loader2 size={14} className="animate-spin" />
-                          )}
-                          {row.imgStatus === 'error' && (
-                            <span title={row.imgError}><XCircle size={14} className="text-red-500" /></span>
-                          )}
-                          <button
-                            type="button"
-                            className="hciot-qa-image-clear"
-                            onClick={() => setRows((previous) => previous.map((item, itemIndex) => (
-                              itemIndex === index ? clearRowImageState(item) : item
-                            )))}
-                          >
-                            <X size={10} />
-                          </button>
-                        </div>
-                      )}
-                      <div style={{ display: 'flex', gap: '6px', marginTop: hasImage ? '4px' : 0 }}>
-                        <button
-                          type="button"
-                          className="hciot-qa-image-btn"
-                          onClick={() => {
-                            setPendingRowImageIndex(index);
-                            rowImageInputRef.current?.click();
-                          }}
-                          title={language === 'zh' ? '上傳圖片' : 'Upload Image'}
-                        >
-                          <ImageIcon size={14} />
-                          {!hasImage ? (language === 'zh' ? '上傳' : 'Upload') : null}
-                        </button>
-                        <button
-                          type="button"
-                          className="hciot-qa-image-btn"
-                          onClick={() => setPickerRowIndex(index)}
-                          title={language === 'zh' ? '選擇既有圖片' : 'Choose Existing Image'}
-                        >
-                          <Table size={14} />
-                          {!hasImage ? (language === 'zh' ? '既有' : 'Existing') : null}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  className="hciot-qa-row-delete"
-                  onClick={() => removeRow(index)}
-                  title={language === 'zh' ? '移除' : 'Remove'}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            );
-          })}
+          {rows.map((row, index) => (
+            <QaRowItem
+              key={index}
+              index={index}
+              row={row}
+              language={language}
+              previewUrl={row.pendingImageFile ? pendingUrls.get(row.pendingImageFile) || '' : getHciotImageUrl(row.img) || ''}
+              onUpdate={(updates) => updateRow(index, updates)}
+              onRemove={() => removeRow(index)}
+              onClearImage={() => updateRow(index, clearRowImageState(row))}
+              onUploadImage={() => {
+                setPendingRowImageIndex(index);
+                rowImageInputRef.current?.click();
+              }}
+              onChooseExisting={() => setPickerRowIndex(index)}
+            />
+          ))}
         </div>
 
         <input
@@ -291,7 +297,7 @@ export default function QaUploadTab({
         <button
           type="button"
           className="hciot-qa-add-row"
-          onClick={() => setRows((previous) => [...previous, createEmptyRow()])}
+          onClick={() => setRows((prev) => [...prev, createEmptyRow()])}
         >
           <Plus size={14} />
           {language === 'zh' ? '新增一題' : 'Add row'}

@@ -110,28 +110,36 @@ export function draftFromFile(
   };
 }
 
-export function getFileMetadataPayload(file: HciotKnowledgeFile) {
-  return {
-    topic_id: file.topic_id || null,
-    category_label_zh: file.category_label_zh || null,
-    category_label_en: file.category_label_en || null,
-    topic_label_zh: file.topic_label_zh || null,
-    topic_label_en: file.topic_label_en || null,
-  };
-}
+export function getMetadataPayload(data: HciotKnowledgeFile | FileMetadataDraft) {
+  // Common logic for both HciotKnowledgeFile and FileMetadataDraft
+  const isDraft = 'categoryId' in data;
+  const categoryId = isDraft
+    ? (data.categoryId && data.categoryId !== NEW_VALUE ? data.categoryId : null)
+    : (data.topic_id ? categoryPrefix(data.topic_id) : null);
 
-export function getDraftMetadataPayload(draft: FileMetadataDraft) {
-  const categoryId = draft.categoryId && draft.categoryId !== NEW_VALUE ? draft.categoryId : null;
-  const topicId = categoryId && draft.topicId && draft.topicId !== NEW_VALUE ? draft.topicId : null;
+  const topicId = isDraft
+    ? (categoryId && data.topicId && data.topicId !== NEW_VALUE ? data.topicId : null)
+    : data.topic_id;
+
+  if (isDraft) {
+    return {
+      topic_id: topicId,
+      category_label_zh: categoryId ? data.categoryLabelZh.trim() || null : null,
+      category_label_en: categoryId ? data.categoryLabelEn.trim() || null : null,
+      topic_label_zh: topicId ? data.topicLabelZh.trim() || null : null,
+      topic_label_en: topicId ? data.topicLabelEn.trim() || null : null,
+    };
+  }
 
   return {
     topic_id: topicId,
-    category_label_zh: categoryId ? draft.categoryLabelZh.trim() || null : null,
-    category_label_en: categoryId ? draft.categoryLabelEn.trim() || null : null,
-    topic_label_zh: topicId ? draft.topicLabelZh.trim() || null : null,
-    topic_label_en: topicId ? draft.topicLabelEn.trim() || null : null,
+    category_label_zh: data.category_label_zh || null,
+    category_label_en: data.category_label_en || null,
+    topic_label_zh: data.topic_label_zh || null,
+    topic_label_en: data.topic_label_en || null,
   };
 }
+
 export function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -145,10 +153,9 @@ function buildGenericOptions<T extends { id: string; labels: HciotLabels }>(
 ): T[] {
   const sorted = [...items].sort((a, b) => sortByLabel(a.labels[language], b.labels[language]));
 
-  if (!selectedId || selectedId === NEW_VALUE) return sorted;
-
-  const exists = sorted.some(i => i.id === selectedId);
-  if (exists) return sorted;
+  if (!selectedId || selectedId === NEW_VALUE || sorted.some(i => i.id === selectedId)) {
+    return sorted;
+  }
 
   return [
     ...sorted,
@@ -180,17 +187,17 @@ export function buildTopicOptions(
   language: HciotLanguage,
 ): TopicOption[] {
   if (!currentCategory) {
-    if (draft.topicId && draft.topicId !== NEW_VALUE) {
-      return [{
-        id: draft.topicId,
-        labels: {
-          zh: draft.topicLabelZh || draft.topicId,
-          en: draft.topicLabelEn || draft.topicId,
-        },
-        questions: { zh: [], en: [] },
-      }];
+    if (!draft.topicId || draft.topicId === NEW_VALUE) {
+      return [];
     }
-    return [];
+    return [{
+      id: draft.topicId,
+      labels: {
+        zh: draft.topicLabelZh || draft.topicId,
+        en: draft.topicLabelEn || draft.topicId,
+      },
+      questions: { zh: [], en: [] },
+    }];
   }
 
   return buildGenericOptions(currentCategory.topics, draft.topicId, {
