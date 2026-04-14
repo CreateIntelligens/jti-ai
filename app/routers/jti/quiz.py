@@ -20,7 +20,7 @@ from app.services.session.session_manager_factory import get_session_manager
 session_manager = get_session_manager()
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["JTI Quiz"])
+router = APIRouter(tags=["JTI Quiz"], dependencies=[Depends(verify_auth)])
 
 
 class QuizActionRequest(BaseModel):
@@ -28,7 +28,7 @@ class QuizActionRequest(BaseModel):
 
 
 @router.post("/quiz/start")
-async def quiz_start(request: QuizActionRequest, auth: dict = Depends(verify_auth)):
+async def quiz_start(request: QuizActionRequest):
     """直接開始測驗（不依賴自然語言判斷）"""
     try:
         s = session_manager.get_session(request.session_id)
@@ -44,7 +44,7 @@ async def quiz_start(request: QuizActionRequest, auth: dict = Depends(verify_aut
 
 
 @router.post("/quiz/pause")
-async def quiz_pause(request: QuizActionRequest, auth: dict = Depends(verify_auth)):
+async def quiz_pause(request: QuizActionRequest):
     """直接暫停測驗（不依賴自然語言判斷）"""
     try:
         session = _get_or_rebuild_session(request.session_id)

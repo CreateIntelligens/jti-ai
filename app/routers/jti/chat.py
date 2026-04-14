@@ -55,15 +55,17 @@ session_manager = get_session_manager()
 conversation_logger = get_conversation_logger()
 logger = logging.getLogger(__name__)
 
-runtime_router = APIRouter(prefix="/api/jti", tags=["JTI Chat"])
+runtime_router = APIRouter(prefix="/api/jti", tags=["JTI Chat"], dependencies=[Depends(verify_auth)])
 compat_history_router = APIRouter(
     prefix="/api/jti",
     tags=["JTI Conversations"],
     include_in_schema=False,
+    dependencies=[Depends(verify_admin)],
 )
 admin_history_router = APIRouter(
     prefix="/api/jti-admin/conversations",
     tags=["JTI Conversations"],
+    dependencies=[Depends(verify_admin)],
 )
 router = runtime_router
 
@@ -73,7 +75,7 @@ register_tts_endpoints(runtime_router, _tts_manager)
 # === Endpoints ===
 
 @runtime_router.post("/chat/start", response_model=CreateSessionResponse)
-async def create_session(request: CreateSessionRequest, auth: dict = Depends(verify_auth)):
+async def create_session(request: CreateSessionRequest):
     """建立新的 JTI 對話 Session"""
     try:
         if request.previous_session_id:
@@ -92,7 +94,7 @@ async def create_session(request: CreateSessionRequest, auth: dict = Depends(ver
 
 
 @runtime_router.post("/chat/message", response_model=ChatResponse)
-async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
+async def chat(request: ChatRequest):
     """
     主要對話端點
 
@@ -360,7 +362,6 @@ async def get_conversations(
     session_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    auth: dict = Depends(verify_admin),
 ):
     """取得對話歷史"""
     mode = "jti"
@@ -387,7 +388,7 @@ async def get_conversations(
 
 @compat_history_router.delete("/history", response_model=DeleteConversationResponse)
 @admin_history_router.delete("", response_model=DeleteConversationResponse)
-async def delete_conversations(request: DeleteConversationRequest, auth: dict = Depends(verify_admin)):
+async def delete_conversations(request: DeleteConversationRequest):
     """批量刪除對話紀錄"""
     total_logs = 0
     deleted_count = 0
@@ -414,7 +415,6 @@ async def export_conversations(
     session_ids: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    auth: dict = Depends(verify_admin),
 ):
     """匯出對話歷史為 JSON 格式"""
     mode = "jti"

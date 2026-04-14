@@ -9,13 +9,12 @@ import logging
 import re
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
-from app.auth import verify_auth
 from app.schemas.chat import ChatResponse
-from app.services.tts_jobs import TtsJobManager, jti_tts_job_manager, hciot_tts_job_manager
+from app.services.tts_jobs import TtsJobManager
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +96,7 @@ def register_tts_endpoints(router: APIRouter, manager: TtsJobManager) -> None:
     """Mount GET ``/tts/{tts_message_id}`` and POST ``/tts`` on *router*."""
 
     @router.get("/tts/{tts_message_id}")
-    async def get_tts_audio(tts_message_id: str, auth: dict = Depends(verify_auth)):
+    async def get_tts_audio(tts_message_id: str):
         """Get pre-generated TTS audio by message id."""
         job = manager.get_job(tts_message_id)
         if not job:
@@ -124,7 +123,7 @@ def register_tts_endpoints(router: APIRouter, manager: TtsJobManager) -> None:
         )
 
     @router.post("/tts")
-    async def create_tts_audio(request: TtsCreateRequest, auth: dict = Depends(verify_auth)):
+    async def create_tts_audio(request: TtsCreateRequest):
         """Create a new background TTS job and return its message id."""
         text = (request.text or "").strip()
         if not text:

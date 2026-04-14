@@ -14,7 +14,7 @@ from urllib.parse import quote
 
 from functools import partial
 
-from app.auth import verify_admin, verify_auth
+from app.auth import verify_admin
 from app.routers.knowledge_utils import (
     EDITABLE_EXTENSIONS,
     TEXT_PREVIEW_EXTENSIONS,
@@ -222,7 +222,7 @@ def _sync_topic_questions_from_store(
 
 
 @router.get("/files/")
-def list_knowledge_files(language: str = "zh", auth: dict = Depends(verify_auth)):
+def list_knowledge_files(language: str = "zh"):
     store = get_hciot_knowledge_store()
     files = store.list_files(language)
     effective_language = language
@@ -240,7 +240,7 @@ def list_knowledge_files(language: str = "zh", auth: dict = Depends(verify_auth)
 
 
 @router.get("/files/{filename}/content")
-def get_file_content(filename: str, language: str = "zh", auth: dict = Depends(verify_auth)):
+def get_file_content(filename: str, language: str = "zh"):
     safe_name, doc = _get_doc_or_404(language, filename)
 
     ext = Path(safe_name).suffix.lower()
@@ -263,7 +263,7 @@ def get_file_content(filename: str, language: str = "zh", auth: dict = Depends(v
 
 
 @router.get("/files/{filename}/download")
-def download_file(filename: str, language: str = "zh", auth: dict = Depends(verify_auth)):
+def download_file(filename: str, language: str = "zh"):
     safe_name, doc = _get_doc_or_404(language, filename)
 
     file_bytes = doc.get("data", b"")
@@ -349,7 +349,6 @@ async def update_file_content(
     req: UpdateContentRequest,
     background_tasks: BackgroundTasks,
     language: str = "zh",
-    auth: dict = Depends(verify_auth),
 ):
     safe_name, doc = _get_doc_or_404(language, filename)
     ext = Path(safe_name).suffix.lower()
@@ -396,7 +395,6 @@ async def update_file_metadata(
     filename: str,
     request: UpdateFileMetadataRequest,
     language: str = "zh",
-    auth: dict = Depends(verify_auth),
 ):
     safe_name, existing = _get_doc_or_404(language, filename)
     store = get_hciot_knowledge_store()
@@ -429,7 +427,6 @@ async def upload_knowledge_file(
     category_label_en: str | None = Form(None),
     topic_label_zh: str | None = Form(None),
     topic_label_en: str | None = Form(None),
-    auth: dict = Depends(verify_auth),
 ):
     display_name = file.filename or f"file_{uuid.uuid4().hex[:8]}"
     safe_name = safe_filename(display_name)
@@ -490,7 +487,7 @@ async def upload_knowledge_file(
 
 @router.delete("/files/{filename}")
 async def delete_knowledge_file(
-    filename: str, background_tasks: BackgroundTasks, language: str = "zh", auth: dict = Depends(verify_auth),
+    filename: str, background_tasks: BackgroundTasks, language: str = "zh",
 ):
     safe_name, existing = _get_doc_or_404(language, filename)
     store = get_hciot_knowledge_store()
@@ -510,7 +507,7 @@ async def delete_knowledge_file(
 
 
 @router.get("/topic-csv-merged")
-def get_topic_csv_merged(topic_id: str, language: str = "zh", auth: dict = Depends(verify_auth)):
+def get_topic_csv_merged(topic_id: str, language: str = "zh"):
     store = get_hciot_knowledge_store()
     docs = store.get_topic_csv_files(language, topic_id)
 

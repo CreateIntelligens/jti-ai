@@ -9,7 +9,7 @@ from typing import Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.auth import verify_admin, verify_auth
+from app.auth import verify_admin
 from app.services.hciot.agent_prompts import PERSONA
 from app.services.hciot.main_agent import main_agent
 from app.services.hciot.runtime_settings import (
@@ -266,7 +266,7 @@ def _remove_prompt_overrides(store_prompts, prompt_id: str) -> bool:
 
 
 @router.get("/")
-def list_hciot_prompts(language: str = "zh", auth: dict = Depends(verify_auth)):
+def list_hciot_prompts(language: str = "zh"):
     lang = _normalize_language(language)
     store_name = _get_store_name_for_language(lang)
     default_prompt = _get_default_prompt_dict(lang)
@@ -308,7 +308,6 @@ def list_hciot_prompts(language: str = "zh", auth: dict = Depends(verify_auth)):
 def create_hciot_prompt(
     request: CreatePromptRequest,
     language: str = "zh",
-    auth: dict = Depends(verify_auth),
 ):
     prompt_manager = _require_prompt_manager()
     lang, store_name = _resolve_language_and_store(language)
@@ -336,7 +335,7 @@ def create_hciot_prompt(
 
 
 @router.post("/clone")
-def clone_default_prompt(language: str = "zh", auth: dict = Depends(verify_auth)):
+def clone_default_prompt(language: str = "zh"):
     prompt_manager = _require_prompt_manager()
     lang, store_name = _resolve_language_and_store(language)
     prompts = prompt_manager.list_prompts(store_name)
@@ -369,7 +368,6 @@ def update_hciot_prompt(
     prompt_id: str,
     request: UpdatePromptRequest,
     language: str = "zh",
-    auth: dict = Depends(verify_auth),
 ):
     if prompt_id == SYSTEM_DEFAULT_ID:
         raise HTTPException(status_code=403, detail="預設人物設定為唯讀，無法修改。請先建立副本。")
@@ -403,7 +401,7 @@ def update_hciot_prompt(
 
 
 @router.delete("/{prompt_id}")
-def delete_hciot_prompt(prompt_id: str, language: str = "zh", auth: dict = Depends(verify_auth)):
+def delete_hciot_prompt(prompt_id: str, language: str = "zh"):
     if prompt_id == SYSTEM_DEFAULT_ID:
         raise HTTPException(status_code=403, detail="預設人物設定無法刪除")
 
@@ -425,7 +423,6 @@ def delete_hciot_prompt(prompt_id: str, language: str = "zh", auth: dict = Depen
 def set_active_hciot_prompt(
     request: SetActivePromptRequest,
     language: str = "zh",
-    auth: dict = Depends(verify_auth),
 ):
     prompt_manager = _require_prompt_manager()
     _, store_name = _resolve_language_and_store(language)
@@ -443,7 +440,7 @@ def set_active_hciot_prompt(
 
 
 @router.get("/active")
-def get_active_hciot_prompt(language: str = "zh", auth: dict = Depends(verify_auth)):
+def get_active_hciot_prompt(language: str = "zh"):
     prompt_manager = _require_prompt_manager()
     lang, store_name = _resolve_language_and_store(language)
     prompt = prompt_manager.get_active_prompt(store_name)
@@ -467,7 +464,6 @@ def get_active_hciot_prompt(language: str = "zh", auth: dict = Depends(verify_au
 def get_runtime_settings(
     prompt_id: Optional[str] = None,
     language: str = "zh",
-    auth: dict = Depends(verify_auth),
 ):
     _, store_name = _resolve_language_and_store(language)
     runtime_prompt_id = _validate_and_resolve_prompt_id(prompt_id, store_name)
@@ -483,7 +479,6 @@ def get_runtime_settings(
 def update_runtime_settings(
     request: UpdateRuntimeSettingsRequest,
     language: str = "zh",
-    auth: dict = Depends(verify_auth),
 ):
     prompt_manager = _require_prompt_manager()
     _, store_name = _resolve_language_and_store(language)

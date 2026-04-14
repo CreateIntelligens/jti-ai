@@ -15,7 +15,6 @@ from app.routers.tts_utils import attach_tts_message_id, register_tts_endpoints
 from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
-    ConversationsGroupedResponse,
     CreateSessionRequest,
     CreateSessionResponse,
     DeleteConversationRequest,
@@ -40,20 +39,22 @@ conversation_logger = get_hciot_conversation_logger()
 logger = logging.getLogger(__name__)
 
 
-runtime_router = APIRouter(prefix="/api/hciot", tags=["HCIoT Chat"])
+runtime_router = APIRouter(prefix="/api/hciot", tags=["HCIoT Chat"], dependencies=[Depends(verify_auth)])
 compat_history_router = APIRouter(
     prefix="/api/hciot",
     tags=["HCIoT Conversations"],
     include_in_schema=False,
+    dependencies=[Depends(verify_admin)],
 )
 admin_history_router = APIRouter(
     prefix="/api/hciot-admin/conversations",
     tags=["HCIoT Conversations"],
+    dependencies=[Depends(verify_admin)],
 )
 router = runtime_router
 
 @runtime_router.get("/tts/characters")
-async def get_tts_characters(auth: dict = Depends(verify_auth)):
+async def get_tts_characters():
     """Return available TTS character voices."""
     return {"characters": get_available_tts_characters()}
 
@@ -62,7 +63,7 @@ register_tts_endpoints(runtime_router, _tts_manager)
 
 
 @runtime_router.post("/chat/start", response_model=CreateSessionResponse)
-async def create_session(request: CreateSessionRequest, auth: dict = Depends(verify_auth)):
+async def create_session(request: CreateSessionRequest):
     try:
         if request.previous_session_id:
             main_agent.remove_session(request.previous_session_id)
@@ -79,7 +80,7 @@ async def create_session(request: CreateSessionRequest, auth: dict = Depends(ver
 
 
 @runtime_router.post("/chat/message", response_model=ChatResponse)
-async def chat(request: ChatRequest, auth: dict = Depends(verify_auth)):
+async def chat(request: ChatRequest):
     try:
         session = session_manager.get_session(request.session_id)
         if not session:
@@ -134,7 +135,6 @@ async def get_conversations(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     session_id: Optional[str] = None,
-    auth: dict = Depends(verify_admin),
 ):
     mode = "hciot"
     try:
@@ -155,7 +155,7 @@ async def get_conversations(
 
 @compat_history_router.delete("/history", response_model=DeleteConversationResponse)
 @admin_history_router.delete("", response_model=DeleteConversationResponse)
-async def delete_conversations(request: DeleteConversationRequest, auth: dict = Depends(verify_admin)):
+async def delete_conversations(request: DeleteConversationRequest):
     total_logs = 0
     deleted_count = 0
     for sid in request.session_ids:
@@ -181,7 +181,6 @@ async def export_conversations(
     session_ids: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
-    auth: dict = Depends(verify_admin),
 ):
     mode = "hciot"
     try:

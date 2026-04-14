@@ -13,7 +13,7 @@ from typing import Optional, Dict
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
-from app.auth import verify_admin, verify_auth
+from app.auth import verify_admin
 from app.services.jti.main_agent import main_agent
 from app.services.jti.agent_prompts import PERSONA
 from app.services.jti.runtime_settings import (
@@ -241,7 +241,7 @@ def _validate_and_resolve_prompt_id(requested_prompt_id: Optional[str], store_na
 
 
 @router.get("/")
-def list_jti_prompts(language: str = "zh", auth: dict = Depends(verify_auth)):
+def list_jti_prompts(language: str = "zh"):
     """列出所有 JTI 人物設定（預設 + 自訂）"""
     lang = _normalize_language(language)
     store_name = _get_store_name_for_language(lang)
@@ -285,7 +285,6 @@ def list_jti_prompts(language: str = "zh", auth: dict = Depends(verify_auth)):
 def create_jti_prompt(
     request: CreatePromptRequest,
     language: str = "zh",
-    auth: dict = Depends(verify_auth),
 ):
     """建立自訂人物設定（最多 3 個）"""
     if not deps.prompt_manager:
@@ -334,7 +333,7 @@ def create_jti_prompt(
 
 
 @router.post("/clone")
-def clone_default_prompt(language: str = "zh", auth: dict = Depends(verify_auth)):
+def clone_default_prompt(language: str = "zh"):
     """複製預設人物設定為新的自訂人物設定，並自動啟用"""
     if not deps.prompt_manager:
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
@@ -393,7 +392,6 @@ def update_jti_prompt(
     prompt_id: str,
     request: UpdatePromptRequest,
     language: str = "zh",
-    auth: dict = Depends(verify_auth),
 ):
     """更新人物設定（禁止修改預設）"""
     if prompt_id == SYSTEM_DEFAULT_PROMPT_ID:
@@ -434,7 +432,7 @@ def update_jti_prompt(
 
 
 @router.delete("/{prompt_id}")
-def delete_jti_prompt(prompt_id: str, language: str = "zh", auth: dict = Depends(verify_auth)):
+def delete_jti_prompt(prompt_id: str, language: str = "zh"):
     """刪除人物設定（禁止刪除預設）"""
     if prompt_id == SYSTEM_DEFAULT_PROMPT_ID:
         raise HTTPException(status_code=403, detail="預設人物設定無法刪除")
@@ -463,7 +461,6 @@ def delete_jti_prompt(prompt_id: str, language: str = "zh", auth: dict = Depends
 def set_active_jti_prompt(
     request: SetActivePromptRequest,
     language: str = "zh",
-    auth: dict = Depends(verify_auth),
 ):
     """設定啟用的人物設定，切換後清除所有 chat session
 
@@ -491,7 +488,7 @@ def set_active_jti_prompt(
 
 
 @router.get("/active")
-def get_active_jti_prompt(language: str = "zh", auth: dict = Depends(verify_auth)):
+def get_active_jti_prompt(language: str = "zh"):
     """取得當前啟用的人物設定"""
     if not deps.prompt_manager:
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
@@ -520,7 +517,6 @@ def get_active_jti_prompt(language: str = "zh", auth: dict = Depends(verify_auth
 def get_runtime_settings(
     prompt_id: Optional[str] = None,
     language: str = "zh",
-    auth: dict = Depends(verify_auth),
 ):
     """取得 JTI runtime 設定（分段回覆規則/歡迎文字/字數限制）"""
     store_name = _get_store_name_for_language(language)
@@ -540,7 +536,6 @@ def get_runtime_settings(
 def update_runtime_settings(
     request: UpdateRuntimeSettingsRequest,
     language: str = "zh",
-    auth: dict = Depends(verify_auth),
 ):
     """更新 JTI runtime 設定，更新後清除 chat sessions。"""
     if not deps.prompt_manager:

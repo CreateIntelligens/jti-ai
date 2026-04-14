@@ -15,7 +15,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from urllib.parse import quote
 
-from app.auth import verify_admin, verify_auth
+from app.auth import verify_admin
 from functools import partial
 
 from app.routers.knowledge_utils import (
@@ -73,7 +73,7 @@ def _extract_upload_text_for_validation(filename: str, file_bytes: bytes) -> str
 
 
 @router.get("/files/")
-def list_knowledge_files(language: str = "zh", auth: dict = Depends(verify_auth)):
+def list_knowledge_files(language: str = "zh"):
     """列出知識庫中的檔案"""
     store = get_knowledge_store()
     files = store.list_files(language)
@@ -88,7 +88,7 @@ def list_knowledge_files(language: str = "zh", auth: dict = Depends(verify_auth)
 
 
 @router.get("/files/{filename}/content")
-def get_file_content(filename: str, language: str = "zh", auth: dict = Depends(verify_auth)):
+def get_file_content(filename: str, language: str = "zh"):
     """讀取檔案內容（僅支援文字檔）"""
     safe_name = safe_filename(filename)
     store = get_knowledge_store()
@@ -129,7 +129,7 @@ def get_file_content(filename: str, language: str = "zh", auth: dict = Depends(v
 
 
 @router.get("/files/{filename}/download")
-def download_file(filename: str, language: str = "zh", auth: dict = Depends(verify_auth)):
+def download_file(filename: str, language: str = "zh"):
     """下載知識庫檔案"""
     safe_name = safe_filename(filename)
     store = get_knowledge_store()
@@ -158,7 +158,6 @@ async def update_file_content(
     req: UpdateContentRequest,
     background_tasks: BackgroundTasks,
     language: str = "zh",
-    auth: dict = Depends(verify_auth),
 ):
     """更新文字檔內容（同步到 Gemini File Search）"""
     safe_name = safe_filename(filename)
@@ -201,7 +200,6 @@ async def upload_knowledge_file(
     background_tasks: BackgroundTasks,
     language: str = "zh",
     file: UploadFile = File(...),
-    auth: dict = Depends(verify_auth),
 ):
     """上傳檔案到知識庫 + Gemini File Search"""
     display_name = file.filename or f"file_{uuid.uuid4().hex[:8]}"
@@ -243,7 +241,7 @@ async def upload_knowledge_file(
 
 @router.delete("/files/{filename}")
 async def delete_knowledge_file(
-    filename: str, background_tasks: BackgroundTasks, language: str = "zh", auth: dict = Depends(verify_auth),
+    filename: str, background_tasks: BackgroundTasks, language: str = "zh",
 ):
     """刪除檔案 + Gemini File Search 中的對應文件"""
     safe_name = safe_filename(filename)

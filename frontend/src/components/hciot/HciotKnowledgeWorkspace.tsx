@@ -8,7 +8,7 @@ import FileDetailPane from './knowledgeWorkspace/detail/FileDetailPane';
 import MergedCsvPane from './knowledgeWorkspace/detail/MergedCsvPane';
 import UploadDialog from './knowledgeWorkspace/upload/UploadDialog';
 import ImageDetailPane from './knowledgeWorkspace/detail/ImageDetailPane';
-import { NEW_VALUE, buildLabels, buildCategoryOptions, buildTopicOptions, createEmptyDraft, draftFromFile, getErrorMessage, getDraftMetadataPayload, slugify, type FileMetadataDraft, type TopicLabels } from './knowledgeWorkspace/topicUtils';
+import { NEW_VALUE, buildLabels, buildCategoryOptions, buildTopicOptions, createEmptyDraft, draftFromFile, getErrorMessage, getMetadataPayload, slugify, type FileMetadataDraft, type TopicLabels } from './knowledgeWorkspace/topicUtils';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { buildExplorerTree, filterExplorerNodes, flattenExplorerNodes, getCurrentPathLabel, readExpandedKeys, writeExpandedKeys } from './knowledgeWorkspace/explorer/explorerTree';
 
@@ -581,7 +581,7 @@ export default function HciotKnowledgeWorkspace({
       if (metadataDirty || draft.categoryId === NEW_VALUE || draft.topicId === NEW_VALUE) {
         const updatedMetadata = await api.updateHciotKnowledgeFileMetadata(
           selectedFile.name,
-          getDraftMetadataPayload(nextDraft),
+          getMetadataPayload(nextDraft),
           language,
         );
         setFiles((previous) => previous.map((file) => (
