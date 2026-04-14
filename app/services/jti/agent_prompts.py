@@ -93,45 +93,41 @@ def _compose_response_rules(
     sections: Dict[str, str],
     max_response_chars: int,
 ) -> str:
+    is_en = language == "en"
+    headers = {
+        "role": "## Your Role" if is_en else "## 你的角色",
+        "scope": "## Scope Restriction (Strictly Follow)" if is_en else "## 範圍限制（嚴格遵守）",
+        "rules": "## Response Rules" if is_en else "## 回應規則",
+        "kb": "## Knowledge Base Usage (Most Important)" if is_en else "## 知識庫使用規則（最重要）"
+    }
+    
     if max_response_chars > 0:
-        length_rule_en = f"- Length: keep each response within {max_response_chars} characters"
-        length_rule_zh = f"- 字數：每次回覆不超過{max_response_chars}字（必要時更短）"
+        length_rule = (
+            f"- Length: keep each response within {max_response_chars} characters"
+            if is_en else
+            f"- 字數：每次回覆不超過{max_response_chars}字（必要時更短）"
+        )
     else:
-        length_rule_en = "- Length: no strict character limit"
-        length_rule_zh = "- 字數：不限制（可依情境自然回覆）"
+        length_rule = (
+            "- Length: no strict character limit"
+            if is_en else
+            "- 字數：不限制（可依情境自然回覆）"
+        )
 
-    if language == "en":
-        return f"""## Your Role
-
-{sections.get('role_scope', '')}
-
-## Scope Restriction (Strictly Follow)
-
-{sections.get('scope_limits', '')}
-
-## Response Rules
-
-{sections.get('response_style', '')}
-{length_rule_en}
-
-## Knowledge Base Usage (Most Important)
-
-{sections.get('knowledge_rules', '')}"""
-
-    return f"""## 你的角色
+    return f"""{headers['role']}
 
 {sections.get('role_scope', '')}
 
-## 範圍限制（嚴格遵守）
+{headers['scope']}
 
 {sections.get('scope_limits', '')}
 
-## 回應規則
+{headers['rules']}
 
 {sections.get('response_style', '')}
-{length_rule_zh}
+{length_rule}
 
-## 知識庫使用規則（最重要）
+{headers['kb']}
 
 {sections.get('knowledge_rules', '')}"""
 

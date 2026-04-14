@@ -8,7 +8,7 @@ Session 管理服務
 注意：目前使用記憶體存儲，生產環境應該換成 Redis
 """
 
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from app.models.session import Session, SessionStep
 from .session_state_mixin import SessionStateMixin
 import logging
@@ -53,6 +53,10 @@ class SessionManager(SessionStateMixin):
             logger.info(f"Deleted session: {session_id}")
             return True
         return False
+
+    def rebuild_session_from_logs(self, session_id: str, logs: List[Dict]) -> Optional[Session]:
+        """In-memory fallback — no persistent logs, always returns None."""
+        return None
 
     # === 輔助方法 ===
 

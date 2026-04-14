@@ -25,50 +25,18 @@ class GeneralChatSessionManager:
         # 建立索引
         self.collection.create_index("session_id", unique=True)
 
-    def create_session(
-        self,
-        session_id: str,
-        store_name: str,
-        model: str,
-        system_instruction: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """建立或更新 session"""
+    def create_session(self, session_id: str, store_name: str, model: str, system_instruction: Optional[str] = None) -> Dict[str, Any]:
+        """Create or update session."""
         now = datetime.now()
-
-        doc = {
-            "session_id": session_id,
-            "store_name": store_name,
-            "model": model,
-            "system_instruction": system_instruction,
-            "chat_history": [],
-            "created_at": now,
-            "updated_at": now,
-        }
-
-        try:
-            self.collection.update_one(
-                {"session_id": session_id},
-                {"$set": doc},
-                upsert=True,
-            )
-            logger.info(f"Created/updated general chat session: {session_id}")
-            return doc
-        except Exception as e:
-            logger.error(f"Failed to create general chat session: {e}")
-            raise
+        doc = {"session_id": session_id, "store_name": store_name, "model": model, "system_instruction": system_instruction, "chat_history": [], "created_at": now, "updated_at": now}
+        self.collection.update_one({"session_id": session_id}, {"$set": doc}, upsert=True)
+        return doc
 
     def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
-        """取得 session"""
-        try:
-            doc = self.collection.find_one({"session_id": session_id})
-            if doc is None:
-                return None
-
-            doc.pop("_id", None)
-            return doc
-        except Exception as e:
-            logger.error(f"Failed to get general chat session: {e}")
-            return None
+        """Get session without internal ID."""
+        doc = self.collection.find_one({"session_id": session_id})
+        if doc: doc.pop("_id", None)
+        return doc
 
     def add_message(self, session_id: str, role: str, content: str, citations: Optional[List[Dict]] = None) -> bool:
         """新增訊息到對話歷史"""

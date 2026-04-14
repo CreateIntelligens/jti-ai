@@ -152,53 +152,43 @@ class BaseAgent:
     # --- 共用 session 管理 ---
 
     def _get_or_create_chat_session(self, session: Session):
-        """取得或建立持久 Gemini chat session"""
+        """Get or create a persistent Gemini chat session."""
         sid = session.session_id
         if sid in self._chat_sessions:
             return self._chat_sessions[sid]
 
         history = build_chat_history(session.chat_history) if session.chat_history else []
         if history:
-            logger.info(
-                "從歷史恢復 chat session: %d 筆 (session=%s...)",
-                len(history), sid[:8],
-            )
+            logger.info("恢復 chat session: %d 筆 (session=%s...)", len(history), sid[:8])
 
-        system_instruction = self._get_system_instruction(session)
         config = types.GenerateContentConfig(
-            system_instruction=[types.Part.from_text(text=system_instruction)],
+            system_instruction=[types.Part.from_text(text=self._get_system_instruction(session))],
             thinking_config=types.ThinkingConfig(thinking_budget=0),
         )
 
         chat_session = _gemini_service.client.chats.create(
-            model=self.model_name,
-            config=config,
-            history=history,
+            model=self.model_name, config=config, history=history,
         )
         self._chat_sessions[sid] = chat_session
         return chat_session
 
     def _sync_history_to_db(self, session_id: str, user_message: str, assistant_message: str, citations: list | None = None):
-        """將 user/model 訊息同步到 MongoDB"""
+        """Sync user/assistant messages to MongoDB."""
         session = self._session_manager.get_session(session_id)
-        if not session:
-            return
+        if not session: return
+
         session.chat_history.append({"role": "user", "content": user_message})
         entry = {"role": "assistant", "content": assistant_message}
-        if citations:
-            entry["citations"] = citations
+        if citations: entry["citations"] = citations
         session.chat_history.append(entry)
         self._session_manager.update_session(session)
 
-    def _sync_history_to_db_background(self, session_id: str, user_message: str, assistant_message: str, citations: list | None = None):
-        """背景非同步寫入 DB，不阻塞回應"""
+    def _sync_history_to_db_background(self, *args, **kwargs):
+        """Asynchronously write to DB without blocking response."""
         try:
-            loop = asyncio.get_running_loop()
-            loop.run_in_executor(
-                None, self._sync_history_to_db, session_id, user_message, assistant_message, citations,
-            )
+            asyncio.get_running_loop().run_in_executor(None, lambda: self._sync_history_to_db(*args, **kwargs))
         except Exception:
-            self._sync_history_to_db(session_id, user_message, assistant_message, citations)
+            self._sync_history_to_db(*args, **kwargs)
 
     def remove_session(self, session_id: str):
         """清除記憶體中的 chat session"""

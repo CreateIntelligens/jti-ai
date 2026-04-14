@@ -40,7 +40,10 @@ class ConversationLogger:
         session_state: Optional[Dict] = None,
         error: Optional[str] = None,
         mode: str = "jti",
-        responded_at: Optional[datetime] = None
+        responded_at: Optional[datetime] = None,
+        citations: Optional[List[Dict]] = None,
+        image_id: Optional[str] = None,
+        **kwargs,
     ) -> None:
         """記錄一次對話
 

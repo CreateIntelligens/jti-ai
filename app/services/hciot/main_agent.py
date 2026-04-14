@@ -96,93 +96,56 @@ class HciotMainAgent(BaseAgent):
         return self._extract_citations(response, include_text=True)
 
     @classmethod
-    def _extract_top_citation_image_id(
-        cls,
-        citations: list[dict] | None,
-    ) -> str | None:
-        """Return image_id from the top citation.
-
-        1. Dedicated ``_IMG_`` CSV → read the row's raw ``img`` value
-        2. IMG_ token in citation title
-        3. IMG_ token in citation chunk text
-        """
-        if not isinstance(citations, list) or not citations:
+    def _extract_top_citation_image_id(cls, citations: list[dict] | None) -> str | None:
+        """Return image_id from the top citation (either from CSV or token)."""
+        if not citations or not isinstance(citations[0], dict):
             return None
+        
         first = citations[0]
-        if not isinstance(first, dict):
-            return None
+        title, text = first.get("title") or "", first.get("text") or ""
+        filenames = [cls._citation_filename(title), cls._citation_filename(first.get("uri"))]
+        
+        # 1. Prefer dedicated _IMG_ CSV
+        if any(f and "_img_" in f.lower() for f in filenames):
+            for f in filenames:
+                image_id = cls._extract_image_id_from_csv(f, require_single_row=True)
+                if image_id: return image_id
 
-        title = first.get("title") or ""
-        text = first.get("text") or ""
-        filenames = [
-            cls._citation_filename(title),
-            cls._citation_filename(first.get("uri")),
-        ]
-        if any(filename and "_img_" in filename.lower() for filename in filenames):
-            return cls._extract_image_id_from_dedicated_img_csv(filenames)
-
+        # 2. Search for IMG_ token
         for value in (title, text):
             match = cls.IMAGE_TOKEN_PATTERN.search(value)
-            if match:
-                return match.group(0)
-        return None
-
-    @classmethod
-    def _extract_image_id_from_dedicated_img_csv(cls, filenames: list[str]) -> str | None:
-        for filename in filenames:
-            image_id = cls._extract_image_id_from_csv(filename, require_single_meaningful_row=True)
-            if image_id:
-                return image_id
+            if match: return match.group(0)
         return None
 
     @classmethod
     def _clean_image_id(cls, raw: str) -> str | None:
         raw = (raw or "").strip()
-        if not raw:
-            return None
-        if "=" in raw:
-            raw = raw.split("=", 1)[0].strip()
-        if "/" in raw:
-            raw = raw.split("/")[-1]
-        if "." in raw:
-            raw = raw.rsplit(".", 1)[0]
+        if not raw: return None
+        # Remove extensions and path/query markers
+        raw = raw.split("=", 1)[0].split("/")[-1].rsplit(".", 1)[0].strip()
         return raw or None
 
     @classmethod
-    def _extract_image_id_from_csv(
-        cls,
-        filename: str,
-        *,
-        require_single_meaningful_row: bool = False,
-    ) -> str | None:
-        """Read a CSV from knowledge store and return the row img value as image_id."""
-        if not filename:
-            return None
+    def _extract_image_id_from_csv(cls, filename: str, *, require_single_row: bool = False) -> str | None:
+        """Read a CSV from knowledge store and return the row img value."""
+        if not filename: return None
         try:
-            import csv
-            import io
+            import csv, io
             store = get_hciot_knowledge_store()
             doc = store.get_file("zh", filename) or store.get_file("en", filename)
-            if not doc or not doc.get("data"):
-                return None
-            text = doc["data"].decode("utf-8-sig")
-            reader = csv.DictReader(io.StringIO(text))
-            if not reader.fieldnames or "img" not in reader.fieldnames:
-                return None
+            if not (doc and doc.get("data")): return None
+            
+            reader = csv.DictReader(io.StringIO(doc["data"].decode("utf-8-sig")))
+            if not reader.fieldnames or "img" not in reader.fieldnames: return None
+            
             rows = list(reader)
-            if require_single_meaningful_row:
-                meaningful_rows = [
-                    row for row in rows
-                    if any((row.get(key) or "").strip() for key in ("q", "a", "img"))
-                ]
-                if len(meaningful_rows) != 1:
-                    return None
-                return cls._clean_image_id(meaningful_rows[0].get("img") or "")
+            if require_single_row:
+                meaningful = [r for r in rows if any((r.get(k) or "").strip() for k in ("q", "a", "img"))]
+                return cls._clean_image_id(meaningful[0].get("img")) if len(meaningful) == 1 else None
 
             for row in rows:
-                image_id = cls._clean_image_id(row.get("img") or "")
-                if image_id:
-                    return image_id
+                image_id = cls._clean_image_id(row.get("img"))
+                if image_id: return image_id
         except Exception as e:
             logger.debug("Failed to extract image_id from CSV %s: %s", filename, e)
         return None
@@ -197,33 +160,20 @@ class HciotMainAgent(BaseAgent):
 
     @classmethod
     def _localize_citations(cls, language: str, citations: list[dict] | None) -> list[dict] | None:
-        if not citations:
-            return citations
-
-        file_map = {
-            item["name"].lower(): item.get("display_name") or item["name"]
-            for item in get_hciot_knowledge_store().list_files(language)
-            if item.get("name")
-        }
-
-        localized: list[dict] = []
-        for citation in citations:
-            if not isinstance(citation, dict):
-                continue
-
-            localized_citation = dict(citation)
-            filename_candidates = [
-                cls._citation_filename(localized_citation.get("title")),
-                cls._citation_filename(localized_citation.get("uri")),
-            ]
-            for filename in filename_candidates:
-                display_name = file_map.get(filename.lower())
-                if display_name:
-                    localized_citation["title"] = display_name
+        """Replace filenames with display names from the knowledge store."""
+        if not citations: return citations
+        file_map = {f["name"].lower(): f.get("display_name") or f["name"] for f in get_hciot_knowledge_store().list_files(language) if f.get("name")}
+        
+        localized = []
+        for c in citations:
+            target = dict(c)
+            for key in ("title", "uri"):
+                name = cls._citation_filename(target.get(key)).lower()
+                if name in file_map:
+                    target["title"] = file_map[name]
                     break
-            localized.append(localized_citation)
-
-        return localized or None
+            localized.append(target)
+        return localized
 
     async def chat(self, session_id: str, user_message: str) -> dict[str, Any]:
         try:
@@ -231,34 +181,26 @@ class HciotMainAgent(BaseAgent):
                 return {"error": "Gemini client not initialized", "message": "系統未正確初始化，請檢查 API Key 設定。"}
 
             session = session_manager.get_session(session_id)
-            if session is None:
+            if not session:
                 return {"error": "Session not found", "message": "找不到對話記錄，請重新開始。"}
 
             kb_result, citations = await self._concurrent_intent_and_search(user_message, session.language, session_id)
             citations = self._localize_citations(session.language, citations)
             image_id = self._extract_top_citation_image_id(citations)
 
-            session_state = self._get_session_state(session)
-            enriched_message = self._build_enriched_message(session_state, user_message, session.language, kb_result)
+            enriched = self._build_enriched_message(self._get_session_state(session), user_message, session.language, kb_result)
             chat_session = self._get_or_create_chat_session(session)
-            response = await run_sync(gemini_with_retry, lambda: chat_session.send_message(enriched_message))
+            response = await run_sync(gemini_with_retry, lambda: chat_session.send_message(enriched))
 
-            if enriched_message != user_message:
+            if enriched != user_message:
                 self._clean_enriched_history(chat_session, user_message)
 
-            final_message = extract_response_text(response)
-            if not final_message:
-                final_message = "目前無法回應，請稍後再試。"
-
-            final_message = strip_citations(final_message)
-            if not final_message:
-                final_message = "目前無法回應，請稍後再試。"
+            final_message = strip_citations(extract_response_text(response)) or "目前無法回應，請稍後再試。"
             self._sync_history_to_db_background(session_id, user_message, final_message, citations)
-            updated_session = session_manager.get_session(session_id)
-
+            
             return {
                 "message": final_message,
-                "session": updated_session.model_dump() if updated_session else None,
+                "session": session.model_dump(),
                 "tool_calls": [],
                 "citations": citations,
                 "image_id": image_id,

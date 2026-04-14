@@ -159,85 +159,45 @@ class MainAgent(BaseAgent):
         """Extract citation list for JTI, keeping chunk text for inline previews."""
         return self._extract_citations(response, include_text=True)
 
-    async def chat(
-        self,
-        session_id: str,
-        user_message: str,
-    ) -> dict:
-        """
-        處理對話
-
-        流程：
-        1. 併發跑 Intent Check + File Search
-        2. Intent=NO → 跳過知識庫，直接讓主 agent 自然婉拒
-        3. Intent=YES → 帶知識庫結果給主 agent 回應
-        """
+    async def chat(self, session_id: str, user_message: str) -> dict:
         try:
             if not _gemini_service.client:
-                message = "系統未正確初始化，請檢查 API Key 設定。"
-                return {
-                    "error": "Gemini client not initialized",
-                    "message": message,
-                    "tts_text": to_tts_text(message, "zh"),
-                }
+                msg = "系統未正確初始化，請檢查 API Key 設定。"
+                return {"error": "Gemini client not initialized", "message": msg, "tts_text": to_tts_text(msg, "zh")}
 
             session = session_manager.get_session(session_id)
-            if session is None:
-                message = "找不到對話記錄，請重新開始。"
-                return {
-                    "error": "Session not found",
-                    "message": message,
-                    "tts_text": to_tts_text(message, "zh"),
-                }
+            if not session:
+                msg = "找不到對話記錄，請重新開始。"
+                return {"error": "Session not found", "message": msg, "tts_text": to_tts_text(msg, "zh")}
 
-            # 1. 併發執行 Intent Check 和 File Search
             t0 = time.time()
             kb_result, citations = await self._concurrent_intent_and_search(user_message, session.language, session_id)
 
-            # 2. 組合訊息送給主 agent
-            # 每輪都注入動態 session 狀態，避免模型遺忘目前是否仍在測驗或已完成測驗。
-            session_state = self._get_session_state(session)
-            enriched_message = self._build_enriched_message(session_state, user_message, session.language, kb_result)
+            enriched = self._build_enriched_message(self._get_session_state(session), user_message, session.language, kb_result)
             chat_session = self._get_or_create_chat_session(session)
 
             logger.info(f"使用者訊息: {user_message[:200]}...")
             t2 = time.time()
-            response = await run_sync(gemini_with_retry, lambda: chat_session.send_message(enriched_message))
-            t3 = time.time()
-            logger.info(f"[計時] 主 Agent: {(t3-t2)*1000:.0f}ms | 總計: {(t3-t0)*1000:.0f}ms")
+            response = await run_sync(gemini_with_retry, lambda: chat_session.send_message(enriched))
+            logger.info(f"[計時] 主 Agent: {(time.time()-t2)*1000:.0f}ms | 總計: {(time.time()-t0)*1000:.0f}ms")
 
-            # 3. 清理 chat session 歷史：把 enriched_message 替換回乾淨的 user_message
-            if enriched_message != user_message:
+            if enriched != user_message:
                 self._clean_enriched_history(chat_session, user_message)
 
-            # 4. 取得回應
-            final_message = extract_response_text(response)
-            if not final_message:
-                final_message = "AI目前故障 請聯絡"
-                logger.warning(f"LLM 未生成任何文本回應，使用者輸入：{user_message[:50]}")
-
-            final_message = strip_citations(final_message)
-
-            # 5. 同步 DB（背景）
+            final_message = strip_citations(extract_response_text(response)) or "AI目前故障 請聯絡"
             self._sync_history_to_db_background(session_id, user_message, final_message, citations)
-            updated_session = session_manager.get_session(session_id)
 
             return {
                 "message": final_message,
                 "tts_text": to_tts_text(final_message, session.language),
-                "session": updated_session.model_dump() if updated_session else None,
+                "session": session.model_dump(),
                 "tool_calls": [],
                 "citations": citations
             }
-
         except Exception as e:
             logger.error(f"Chat failed: {e}", exc_info=True)
-            message = f"抱歉，發生錯誤：{str(e)}"
-            return {
-                "error": str(e),
-                "message": message,
-                "tts_text": to_tts_text(message, "zh"),
-            }
+            msg = f"抱歉，發生錯誤：{str(e)}"
+            return {"error": str(e), "message": msg, "tts_text": to_tts_text(msg, "zh")}
 
     async def chat_with_tool_result(
         self,

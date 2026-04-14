@@ -54,13 +54,12 @@ class KnowledgeStore:
         return self._normalize_namespace(namespace) == self.DEFAULT_NAMESPACE
 
     def _query(self, language: str, filename: str | None = None, namespace: str = "jti") -> dict[str, Any]:
-        """Build a standard query filter."""
-        q: dict[str, Any] = {
+        """Build standard query filter."""
+        q = {
             "namespace": self._normalize_namespace(namespace),
             "language": self._normalize_language(language),
         }
-        if filename is not None:
-            q["filename"] = self._safe_filename(filename)
+        if filename: q["filename"] = self._safe_filename(filename)
         return q
 
     def _legacy_query(self, language: str, filename: str | None = None) -> dict[str, Any]:

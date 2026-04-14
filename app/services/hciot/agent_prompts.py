@@ -93,8 +93,6 @@ def _compose_response_rules(
     limit: int,
 ) -> str:
     is_en = language == "en"
-    
-    # Headers and labels
     headers = {
         "role": "## Your Role" if is_en else "## 你的角色",
         "scope": "## Scope Restriction" if is_en else "## 範圍限制",
