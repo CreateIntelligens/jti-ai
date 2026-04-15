@@ -44,12 +44,7 @@ def _init_jti_default_prompt(prompt_manager) -> None:
             if store_prompts.active_prompt_id == SYSTEM_DEFAULT_PROMPT_ID:
                 store_prompts.active_prompt_id = None
             prompt_manager._save_store_prompts(store_prompts)
-            print(
-                f"[Startup] 🔄 已清理 MongoDB 中的舊預設人物設定 "
-                f"(store={store_name}, id={SYSTEM_DEFAULT_PROMPT_ID})"
-            )
-
-    print("[Startup] ✅ JTI 預設人物設定從 agent_prompts.py 讀取（地端唯讀）")
+            logger.debug("Cleaned legacy default prompt from store=%s", store_name)
 
 
 def _get_default_persona_pair() -> Dict[str, str]:
@@ -147,7 +142,7 @@ def _migrate_jti_profile_storage(prompt_manager) -> None:
         if changed:
             store_prompts.jti_profiles_by_prompt = profiles_map
             prompt_manager._save_store_prompts(store_prompts)
-            print(f"[Startup] ✅ 已整併 JTI 人物設定/回覆規則儲存格式 (store={store_name})")
+            logger.debug("Migrated JTI profiles for store=%s", store_name)
 
 
 def _seed_quiz_data() -> None:

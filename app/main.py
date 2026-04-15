@@ -1,6 +1,7 @@
 """Gemini File Search FastAPI backend."""
 
 from contextlib import asynccontextmanager
+import asyncio
 import logging
 import os
 import re
@@ -92,12 +93,57 @@ from .routers.hciot import topics_admin as hciot_topics_admin
 from .services.mongo_client import get_mongo_client
 import app.deps as deps
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
-    """Initialize managers on application startup."""
+    """Initialize managers and background backfill on application startup."""
     deps.init_managers()
+    
+    # Self-Hosted RAG: Parallel backfill
+    try:
+        from app.services.rag.backfill import get_backfill_service
+        asyncio.create_task(_run_rag_backfill(get_backfill_service()))
+    except Exception as e:
+        logger.error(f"[RAG] Failed to init backfill: {e}")
+        
     yield
+
+    # Teardown: release embedding model to avoid semaphore leak warnings
+    try:
+        from app.services.embedding.service import EmbeddingService
+        if EmbeddingService._model is not None:
+            EmbeddingService._model = None
+            EmbeddingService._instance = None
+            logger.info("[Shutdown] Embedding model released.")
+    except Exception as e:
+        logger.warning(f"[Shutdown] Embedding cleanup failed: {e}")
+
+
+async def _run_rag_backfill(backfill):
+    """Background task to warm up embedding model and index knowledge files."""
+    import time as _time
+    loop = asyncio.get_running_loop()
+    t0 = _time.time()
+    try:
+        await loop.run_in_executor(None, backfill.embedding_service.encode, "warmup")
+    except Exception as e:
+        logger.error("[RAG] Embedding warmup failed: %s", e)
+        return
+
+    try:
+        tasks = [
+            loop.run_in_executor(None, backfill.run_backfill, src, lang)
+            for src in ["jti", "hciot"] for lang in ["zh", "en"]
+        ]
+        await asyncio.gather(*tasks)
+        total = backfill.lancedb_store.get_stats().get("count", 0)
+        elapsed = _time.time() - t0
+        logger.info("[RAG] Ready — %d chunks indexed in %.1fs", total, elapsed)
+    except Exception as e:
+        logger.error("[RAG] Backfill failed: %s", e)
+
 
 
 app = FastAPI(title="Gemini File Search API", lifespan=lifespan)

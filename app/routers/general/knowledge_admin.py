@@ -2,12 +2,9 @@
 Knowledge Management API for JTI and HCIoT.
 """
 
-import io
+import logging
 import mimetypes
-import os
 import uuid
-import zipfile
-import xml.etree.ElementTree as ET
 from pathlib import Path
 from urllib.parse import quote
 
@@ -17,10 +14,14 @@ from pydantic import BaseModel
 
 from app.auth import verify_admin, verify_auth
 from app.routers.knowledge_utils import (
-    delete_from_gemini as _shared_delete_from_gemini,
-    sync_to_gemini as _shared_sync_to_gemini,
+    delete_from_rag,
+    extract_docx_text,
+    sync_to_rag,
+    write_docx_text,
 )
 from app.services.knowledge_store import get_knowledge_store
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/knowledge", tags=["Knowledge Management"], dependencies=[Depends(verify_admin)])
 
@@ -40,91 +41,6 @@ def _safe_filename(name: str) -> str:
     return Path(name).name
 
 
-def _get_store_name(app_name: str, language: str) -> str | None:
-    normalized_app = _normalize_app_name(app_name)
-    normalized_language = "en" if str(language).lower().startswith("en") else "zh"
-
-    env_key = f"{normalized_app.upper()}_STORE_ID_{normalized_language.upper()}"
-    store_id = os.getenv(env_key)
-
-    # HCIoT fallback: try language-neutral HCIOT_STORE_ID if language-specific key is missing
-    if not store_id and normalized_app == "hciot":
-        store_id = os.getenv("HCIOT_STORE_ID")
-
-    if not store_id:
-        return None
-    return store_id if store_id.startswith("fileSearchStores/") else f"fileSearchStores/{store_id}"
-
-
-def _extract_docx_text_from_bytes(data: bytes) -> str:
-    ns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
-    try:
-        with zipfile.ZipFile(io.BytesIO(data), "r") as zf:
-            xml_content = zf.read("word/document.xml")
-        root = ET.fromstring(xml_content)
-        paragraphs = []
-        for p in root.iter(f"{ns}p"):
-            texts = [t.text or "" for t in p.iter(f"{ns}t")]
-            paragraphs.append("".join(texts))
-        return "\n".join(paragraphs)
-    except Exception as e:
-        return f"[無法解析 docx: {e}]"
-
-
-def _write_docx_text_to_bytes(original_data: bytes, text: str) -> bytes:
-    ns = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
-
-    with zipfile.ZipFile(io.BytesIO(original_data), "r") as zf:
-        xml_content = zf.read("word/document.xml")
-
-    root = ET.fromstring(xml_content)
-    body = root.find(f"{{{ns}}}body")
-    if body is None:
-        raise ValueError("docx 格式異常：找不到 body")
-
-    non_para = []
-    for child in list(body):
-        if child.tag == f"{{{ns}}}p":
-            body.remove(child)
-        else:
-            non_para.append(child)
-            body.remove(child)
-
-    for line in text.split("\n"):
-        p = ET.SubElement(body, f"{{{ns}}}p")
-        r = ET.SubElement(p, f"{{{ns}}}r")
-        t = ET.SubElement(r, f"{{{ns}}}t")
-        t.set("{http://www.w3.org/XML/1998/namespace}space", "preserve")
-        t.text = line
-
-    for elem in non_para:
-        body.append(elem)
-
-    new_xml = ET.tostring(root, encoding="utf-8", xml_declaration=True)
-
-    output = io.BytesIO()
-    with zipfile.ZipFile(io.BytesIO(original_data), "r") as z_in:
-        with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as z_out:
-            for item in z_in.infolist():
-                if item.filename == "word/document.xml":
-                    z_out.writestr(item, new_xml)
-                else:
-                    z_out.writestr(item, z_in.read(item.filename))
-    return output.getvalue()
-
-
-def _sync_to_gemini(app_name: str, language: str, filename: str, file_bytes: bytes) -> bool:
-    store_name = _get_store_name(app_name, language)
-    if not store_name:
-        return False
-    return _shared_sync_to_gemini(store_name, filename, file_bytes)
-
-
-def _delete_from_gemini(app_name: str, language: str, filename: str) -> int:
-    store_name = _get_store_name(app_name, language)
-    if not store_name:
-        return 0
-    return _shared_delete_from_gemini(store_name, filename)
 
 
 class UpdateContentRequest(BaseModel):
@@ -161,7 +77,7 @@ def get_file_content(
     file_bytes = doc.get("data", b"")
 
     if ext == ".docx":
-        content = _extract_docx_text_from_bytes(file_bytes)
+        content = extract_docx_text(file_bytes)
         return {
             "filename": safe_name,
             "editable": True,
@@ -230,7 +146,7 @@ async def update_file_content(
     old_bytes = doc.get("data", b"")
     if ext == ".docx":
         try:
-            new_bytes = _write_docx_text_to_bytes(old_bytes, req.content)
+            new_bytes = write_docx_text(old_bytes, req.content)
         except Exception as e:
             raise HTTPException(status_code=500, detail=f"寫入 docx 失敗: {e}")
     else:
@@ -240,11 +156,10 @@ async def update_file_content(
     if not updated:
         raise HTTPException(status_code=404, detail="檔案不存在")
 
-    if _get_store_name(namespace, language):
-        try:
-            _sync_to_gemini(namespace, language, safe_name, new_bytes)
-        except Exception as e:
-            return {"message": f"已更新，但 Gemini 同步失敗: {e}", "synced": False, "app": namespace}
+    try:
+        sync_to_rag(namespace, language, safe_name, new_bytes)
+    except Exception as e:
+        return {"message": f"已更新，但 RAG 同步失敗: {e}", "synced": False, "app": namespace}
 
     return {"message": "已更新", "synced": True, "app": namespace}
 
@@ -276,18 +191,18 @@ async def upload_knowledge_file(
         namespace=namespace,
     )
 
-    gemini_synced = False
-    if _get_store_name(namespace, language):
-        try:
-            gemini_synced = _sync_to_gemini(namespace, language, saved["name"], file_bytes)
-        except Exception as e:
-            print(f"[Knowledge] Gemini sync failed for {namespace}/{saved['name']}: {e}")
+    rag_synced = False
+    try:
+        sync_to_rag(namespace, language, saved["name"], file_bytes)
+        rag_synced = True
+    except Exception as e:
+        logger.warning("[Knowledge] RAG sync failed for %s/%s: %s", namespace, saved["name"], e)
 
     return {
         "name": saved["name"],
         "display_name": saved["display_name"],
         "size": saved["size"],
-        "synced": gemini_synced,
+        "synced": rag_synced,
         "app": namespace,
     }
 
@@ -306,13 +221,11 @@ def delete_knowledge_file(
     if not doc:
         raise HTTPException(status_code=404, detail="檔案不存在")
 
-    gemini_deleted_count = 0
-    if _get_store_name(namespace, language):
-        try:
-            gemini_deleted_count = _delete_from_gemini(namespace, language, safe_name)
-        except Exception as e:
-            print(f"[Knowledge] Gemini delete failed for {namespace}/{safe_name}: {e}")
-            raise HTTPException(status_code=502, detail="Gemini 同步刪除失敗，Mongo 未刪除")
+    try:
+        delete_from_rag(namespace, language, safe_name)
+    except Exception as e:
+        logger.warning("[Knowledge] RAG delete failed for %s/%s: %s", namespace, safe_name, e)
+        raise HTTPException(status_code=502, detail="RAG 同步刪除失敗，Mongo 未刪除")
 
     deleted = store.delete_file(language, safe_name, namespace=namespace)
     if not deleted:
@@ -323,5 +236,4 @@ def delete_knowledge_file(
         "app": namespace,
         "synced": True,
         "mongo_deleted": True,
-        "gemini_deleted_count": gemini_deleted_count,
     }

@@ -8,3 +8,10 @@ openpyxl>=3.1.0
 pydantic>=2.0.0
 pydantic-settings>=2.0.0
 opencc-python-reimplemented>=0.1.7
+lancedb>=0.12.0
+FlagEmbedding>=1.2.0
+torch==2.5.1
+transformers==4.46.3
+accelerate==0.34.2
+sentence-transformers==3.3.1
+tf-keras

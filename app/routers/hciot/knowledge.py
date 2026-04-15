@@ -12,19 +12,14 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from urllib.parse import quote
 
-from functools import partial
-
 from app.auth import verify_admin
 from app.routers.knowledge_utils import (
     EDITABLE_EXTENSIONS,
     TEXT_PREVIEW_EXTENSIONS,
-    delete_from_gemini,
+    delete_from_rag,
     extract_docx_text,
-    gemini_background,
-    get_store_name,
     safe_filename,
-    start_background_sync,
-    sync_to_gemini,
+    sync_to_rag,
     write_docx_text,
 )
 from app.services.hciot.csv_utils import extract_questions_from_csv, merge_csv_files, normalize_qa_csv_rows, split_qa_csv_by_image
@@ -36,40 +31,30 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["HCIoT Knowledge"], dependencies=[Depends(verify_admin)])
 
-ENV_PREFIX = "HCIOT"
-LOG_PREFIX = "HCIoT sync"
+SOURCE_TYPE = "hciot"
 
 
-def _store_name(language: str) -> str | None:
-    return get_store_name(ENV_PREFIX, language)
+def _schedule_rag_sync(
+    background_tasks: BackgroundTasks,
+    language: str,
+    filename: str,
+    file_bytes: bytes,
+) -> None:
+    background_tasks.add_task(sync_to_rag, SOURCE_TYPE, language, filename, file_bytes)
 
 
-_gemini_background = partial(gemini_background, "HCIoT KB")
+def _schedule_rag_delete(
+    background_tasks: BackgroundTasks,
+    language: str,
+    filename: str,
+) -> None:
+    background_tasks.add_task(delete_from_rag, SOURCE_TYPE, language, filename)
 
 
 def _normalized_label(value: str | None, fallback: str) -> str:
     return (value or "").strip() or fallback
 
 
-def _schedule_gemini_sync(
-    background_tasks: BackgroundTasks,
-    language: str,
-    filename: str,
-    file_bytes: bytes,
-) -> None:
-    store_name = _store_name(language)
-    if store_name:
-        background_tasks.add_task(_gemini_background, sync_to_gemini, store_name, filename, file_bytes)
-
-
-def _schedule_gemini_delete(
-    background_tasks: BackgroundTasks,
-    language: str,
-    filename: str,
-) -> None:
-    store_name = _store_name(language)
-    if store_name:
-        background_tasks.add_task(_gemini_background, delete_from_gemini, store_name, filename)
 
 
 def _build_merged_topic_id(category_id: str | None, topic_id: str | None) -> str | None:
@@ -229,13 +214,6 @@ def list_knowledge_files(language: str = "zh"):
     if not files and language != "zh":
         files = store.list_files("zh")
         effective_language = "zh"
-    start_background_sync(
-        ENV_PREFIX,
-        get_hciot_knowledge_store,
-        language,
-        LOG_PREFIX,
-        register_gemini_only=False,
-    )
     return {"files": files, "language": effective_language}
 
 
@@ -305,7 +283,7 @@ def _rewrite_csv_file_with_split_uploads(
         if not updated:
             raise HTTPException(status_code=404, detail="檔案不存在")
 
-        _schedule_gemini_sync(background_tasks, language, safe_name, new_bytes)
+        _schedule_rag_sync(background_tasks, language, safe_name, new_bytes)
         return
 
     upload_map = {name: data for name, data in uploads}
@@ -316,12 +294,12 @@ def _rewrite_csv_file_with_split_uploads(
         updated = store.update_file_content(language, safe_name, safe_name_bytes)
         if not updated:
             raise HTTPException(status_code=404, detail="檔案不存在")
-        _schedule_gemini_sync(background_tasks, language, safe_name, safe_name_bytes)
+        _schedule_rag_sync(background_tasks, language, safe_name, safe_name_bytes)
     else:
         deleted = store.delete_file(language, safe_name)
         if not deleted:
             raise HTTPException(status_code=404, detail="檔案不存在")
-        _schedule_gemini_delete(background_tasks, language, safe_name)
+        _schedule_rag_delete(background_tasks, language, safe_name)
 
     for upload_name, upload_bytes in upload_map.items():
         saved = _insert_uploaded_file(
@@ -340,7 +318,7 @@ def _rewrite_csv_file_with_split_uploads(
                 "en": doc.get("topic_label_en"),
             },
         )
-        _schedule_gemini_sync(background_tasks, language, saved["name"], upload_bytes)
+        _schedule_rag_sync(background_tasks, language, saved["name"], upload_bytes)
 
 
 @router.put("/files/{filename}/content")
@@ -383,7 +361,7 @@ async def update_file_content(
         if not updated:
             raise HTTPException(status_code=404, detail="檔案不存在")
 
-        _schedule_gemini_sync(background_tasks, language, safe_name, new_bytes)
+        _schedule_rag_sync(background_tasks, language, safe_name, new_bytes)
 
     topic_synced = _sync_topic_questions_for_doc(language, doc)
 
@@ -456,7 +434,7 @@ async def upload_knowledge_file(
             topic_labels=topic_labels,
         )
         saved_files.append(saved)
-        _schedule_gemini_sync(background_tasks, language, saved["name"], upload_bytes)
+        _schedule_rag_sync(background_tasks, language, saved["name"], upload_bytes)
 
     topic_synced = _sync_topic_questions_from_store(
         language=language,
@@ -495,7 +473,7 @@ async def delete_knowledge_file(
     if not deleted:
         raise HTTPException(status_code=404, detail="檔案不存在")
 
-    _schedule_gemini_delete(background_tasks, language, safe_name)
+    _schedule_rag_delete(background_tasks, language, safe_name)
 
     topic_synced = _sync_topic_questions_for_doc(language, existing)
 

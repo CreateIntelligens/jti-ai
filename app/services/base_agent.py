@@ -18,16 +18,14 @@ from google.genai import types
 from app.models.session import Session
 import app.services.gemini_service as _gemini_service
 from app.services.agent_utils import build_chat_history, normalize_language
-from app.services.gemini_clients import get_client_for_store
+from app.services.rag.service import get_rag_pipeline
 
 logger = logging.getLogger(__name__)
-
-FILE_SEARCH_MODEL = "gemini-2.5-flash-lite"
-FILE_SEARCH_MAX_RETRIES = 3
 
 
 class BaseAgent:
     """Gemini chat session 管理基底類別"""
+
 
     def __init__(self, model_name: str):
         self.model_name = model_name
@@ -48,9 +46,9 @@ class BaseAgent:
     def _get_store_name_for_language(language: str) -> str:
         raise NotImplementedError
 
-    @staticmethod
-    def _get_file_search_store_name(language: str) -> str | None:
-        """Return the full fileSearchStores/... name for File Search, or None if unconfigured."""
+    @property
+    def _rag_source_type(self) -> str:
+        """Return the source_type for RAG ('jti_knowledge' or 'hciot_knowledge')."""
         raise NotImplementedError
 
     def _build_intent_prompt(self, query: str, language: str) -> str:
@@ -219,21 +217,19 @@ class BaseAgent:
             chunks = response.candidates[0].grounding_metadata.grounding_chunks
         except (AttributeError, IndexError, TypeError):
             return None
-        if not chunks:
-            return None
-        citations = []
-        seen = set()
-        for c in chunks:
+            
+        citations, seen = [], set()
+        for c in (chunks or []):
             ctx = getattr(c, 'retrieved_context', None)
-            if not ctx:
-                continue
+            if not ctx: continue
+            
             uri = getattr(ctx, 'uri', None) or ""
             title = getattr(ctx, 'title', None) or uri or "參考資料"
             key = uri or title
+            
             if key not in seen:
                 citation = {"uri": uri, "title": title}
-                if include_text:
-                    text = getattr(ctx, "text", None)
+                if include_text and (text := getattr(ctx, "text", None)):
                     if isinstance(text, str) and text.strip():
                         citation["text"] = text
                 citations.append(citation)
@@ -277,7 +273,7 @@ class BaseAgent:
     # --- 共用 intent check / file search ---
 
     def _check_intent_fast(self, query: str, language: str = "zh", session_id: str | None = None) -> str:
-        """快速判斷是否為不相關話題 (File Search 前置過濾)"""
+        """快速判斷是否為不相關話題 (RAG 前置過濾)"""
         try:
             base_prompt = self._build_intent_prompt(query, language)
             recent = self._get_recent_history_summary(session_id) if session_id else []
@@ -289,7 +285,7 @@ class BaseAgent:
             else:
                 prompt = base_prompt
             response = _gemini_service.client.models.generate_content(
-                model=FILE_SEARCH_MODEL,
+                model="gemini-2.0-flash-lite",
                 contents=prompt,
                 config=types.GenerateContentConfig(thinking_config=types.ThinkingConfig(thinking_budget=0)),
             )
@@ -301,49 +297,26 @@ class BaseAgent:
             logger.error(f"[Intent Check] failed: {e}")
             return self._intent_default_on_error()
 
+
     def _extract_file_search_citations(self, response) -> list[dict] | None:
         """從 File Search response 提取 citations。子類可覆寫以自訂提取邏輯。"""
         return self._extract_citations(response)
 
     def _file_search(self, query: str, language: str, session_id: str | None = None) -> tuple[str | None, list[dict] | None]:
-        """用 File Search 查知識庫（無狀態，每次獨立查詢以確保 grounding）"""
-        store_name = self._get_file_search_store_name(language)
-        if not store_name:
-            logger.warning("[File Search] no knowledge store configured, skipping")
+        """用本地 RAGPipeline 查知識庫（取代 Gemini File Search）"""
+        try:
+            pipeline = get_rag_pipeline()
+            kb_text, citations = pipeline.retrieve(
+                query,
+                language=normalize_language(language),
+                source_type=self._rag_source_type,
+                top_k=3
+            )
+            return kb_text, citations
+        except Exception as e:
+            logger.error(f"[Local RAG] 檢索失敗: {e}")
             return None, None
 
-        client = get_client_for_store(store_name)
-        search_query = self._prepare_search_query(query, language)
-        logger.info(f"[File Search] 查詢: {search_query[:100]}...")
-
-        for attempt in range(FILE_SEARCH_MAX_RETRIES):
-            try:
-                response = client.models.generate_content(
-                    model=FILE_SEARCH_MODEL,
-                    contents=search_query,
-                    config=types.GenerateContentConfig(
-                        tools=[
-                            types.Tool(
-                                file_search=types.FileSearch(
-                                    file_search_store_names=[store_name]
-                                )
-                            )
-                        ],
-                        thinking_config=types.ThinkingConfig(thinking_budget=0),
-                    ),
-                )
-                result = response.text.strip() if response.text else None
-                citations = self._extract_file_search_citations(response)
-                logger.info(f"[File Search] 結果: {len(result) if result else 0} 字, 來源: {len(citations) if citations else 0} 筆")
-                return result, citations
-            except Exception as e:
-                is_retryable = "503" in str(e) and attempt < FILE_SEARCH_MAX_RETRIES - 1
-                if is_retryable:
-                    logger.warning(f"[File Search] 503，{attempt+1}/{FILE_SEARCH_MAX_RETRIES} 次重試...")
-                    time.sleep(1)
-                    continue
-                logger.error(f"[File Search] 失敗: {e}")
-                return None, None
 
     async def _concurrent_intent_and_search(self, user_message: str, language: str, session_id: str | None = None) -> tuple[str | None, list[dict] | None]:
         """

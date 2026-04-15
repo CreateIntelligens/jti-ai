@@ -1,11 +1,10 @@
 """
 Gemini Multi-Key Registry
 
-讀取 GEMINI_API_KEYS（逗號分隔），為每把 key 建立 genai.Client，
-自動掃描每把 key 擁有的 File Search Stores，建立 store_name → client mapping。
+讀取 GEMINI_API_KEYS（逗號分隔），為每把 key 建立 genai.Client。
 
 用法：
-    from app.services.gemini_clients import get_client_for_store, get_default_client
+    from app.services.gemini_clients import get_default_client
 """
 
 import logging
@@ -33,13 +32,12 @@ def _parse_key_token(token: str, index: int) -> tuple[str, str]:
 
 
 def init_registry() -> None:
-    """讀取所有 API keys，建立 clients，掃描 stores 建立 mapping。"""
+    """讀取所有 API keys，建立 genai.Client 列表。"""
     global _store_to_client, _clients, _key_names
     _store_to_client = {}
     _clients = []
     _key_names = []
 
-    # 只讀 GEMINI_API_KEYS（逗號分隔）
     keys_raw = os.getenv("GEMINI_API_KEYS", "")
     tokens = [t.strip() for t in keys_raw.split(",") if t.strip()]
 
@@ -50,24 +48,17 @@ def init_registry() -> None:
     seen_keys: set[str] = set()
     for i, token in enumerate(tokens):
         name, api_key = _parse_key_token(token, i)
+        if api_key in seen_keys:
+            continue
+        seen_keys.add(api_key)
         try:
             c = genai.Client(api_key=api_key)
             _clients.append(c)
             _key_names.append(name)
-            # 同一把 key 只掃一次 store，避免後面的 index 覆蓋前面的 mapping
-            if api_key in seen_keys:
-                logger.info(f"[Registry] {name} ({api_key[:8]}...): 同 key，跳過 store 掃描")
-                continue
-            seen_keys.add(api_key)
-            stores = list(c.file_search_stores.list())
-            logger.info(f"[Registry] {name} ({api_key[:8]}...): 發現 {len(stores)} 個 stores")
-            for s in stores:
-                logger.info(f"  - {s.name} ({s.display_name})")
-                _store_to_client[s.name] = c
         except Exception as e:
             logger.error(f"[Registry] {name} ({api_key[:8]}...) 初始化失敗（已跳過）: {e}")
 
-    logger.info(f"[Registry] 共 {len(_clients)} 個 clients, {len(_store_to_client)} 個 store mappings")
+    logger.info(f"[Registry] 共 {len(_clients)} 個 Gemini clients")
 
 
 def register_store(store_name: str, client: genai.Client) -> None:

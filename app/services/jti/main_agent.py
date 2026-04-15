@@ -80,12 +80,9 @@ class MainAgent(BaseAgent):
     def _get_store_name_for_language(language: str) -> str:
         return "__jti__en" if normalize_language(language) == "en" else "__jti__"
 
-    @staticmethod
-    def _get_file_search_store_name(language: str) -> str | None:
-        store_id = os.getenv(f"JTI_STORE_ID_{language.upper()}") or os.getenv("JTI_STORE_ID_ZH")
-        if not store_id:
-            return None
-        return f"fileSearchStores/{store_id}"
+    @property
+    def _rag_source_type(self) -> str:
+        return "jti_knowledge"
 
     def _get_default_persona(self, language: str) -> str:
         return PERSONA.get(language, PERSONA["zh"])
@@ -116,39 +113,6 @@ class MainAgent(BaseAgent):
             now=now,
         )
 
-    def _file_search(self, query: str, language: str, session_id: str | None = None) -> tuple[str | None, list[dict] | None]:
-        """JTI: 用 File Search 取 top 3 citations，再從 MongoDB 讀原始檔案內容"""
-        _, citations = super()._file_search(query, language, session_id)
-        if not citations:
-            return None, None
-
-        from app.services.knowledge_store import get_knowledge_store
-
-        top_citations = citations[:3]
-        store = get_knowledge_store()
-        lang = normalize_language(language)
-
-        contents: list[str] = []
-        for citation in top_citations:
-            filename = citation.get("title", "")
-            if not filename:
-                continue
-            data = store.get_file_data(lang, filename, namespace="jti")
-            if not data:
-                continue
-            try:
-                text = data.decode("utf-8").strip()
-            except UnicodeDecodeError:
-                continue
-            if text:
-                contents.append(f"[{filename}]\n{text}")
-
-        if not contents:
-            return None, top_citations
-
-        kb_text = "\n\n".join(contents)
-        logger.info(f"[File Search] 原始檔案內容: {len(contents)} 筆, {len(kb_text)} 字")
-        return kb_text, top_citations
 
     def _build_intent_prompt(self, query: str, language: str) -> str:
         lang_key = normalize_language(language)

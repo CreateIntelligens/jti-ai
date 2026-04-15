@@ -35,7 +35,7 @@ def _get_or_create(
         try:
             instance = mongo_factory()
             _singletons[key] = instance
-            logger.info("Using MongoDB %s", label)
+            logger.debug("Using MongoDB %s", label)
             return instance
         except Exception as e:
             fallback_desc = "falling back to in-memory" if fallback_factory else "disabled"

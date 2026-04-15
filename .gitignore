@@ -88,6 +88,8 @@ data/*.sqlite
 data/knowledge/
 data/tts_cache/
 data/hciot/images/
+data/lancedb/
+.hf_cache/
 
 # Git worktrees
 .worktrees/

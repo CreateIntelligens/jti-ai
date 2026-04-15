@@ -11,19 +11,29 @@ services:
       - ./.env:/app/.env
       - ./data:/app/data
       - ./logs:/app/logs
+      - ./data/lancedb:/app/data/lancedb
+      - ./.hf_cache:/home/appuser/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     expose:
       - "${PORT:-8008}"
     environment:
       - PYTHONDONTWRITEBYTECODE=1
       - BACKEND_PORT=${PORT:-8008}
       - TZ=Asia/Taipei
-    command: uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8008} --workers 2
+      - HF_HOME=/home/appuser/.cache/huggingface
+    command: uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8008} --reload
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-8008}/health')"]
       interval: 30s
       timeout: 10s
-      retries: 3
-      start_period: 15s
+      retries: 10
+      start_period: 300s
     restart: unless-stopped
 
   frontend:
@@ -46,3 +56,4 @@ services:
       - PORT=${PORT:-8008}
       - TZ=Asia/Taipei
     restart: unless-stopped
+

@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Library, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { Library, ChevronDown, ChevronUp } from 'lucide-react';
 
 export interface Citation {
   title: string;
@@ -47,36 +47,23 @@ export default function CitationsList({ citations, messageIndex }: CitationsList
           {citations.map((cit, i) => {
             const title = cit.title || cit.uri || '參考資料';
             const isPreviewOpen = previewIndex === i;
+            const hasContent = !!cit.text;
             return (
               <div key={`${messageIndex}-cit-${i}`} className="citation-item">
-                {cit.uri ? (
-                  <a
-                    href={cit.uri}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="citation-badge link"
-                    title={title}
-                  >
-                    <span className="citation-number">[{i + 1}]</span>
-                    <span className="citation-title">{title}</span>
-                    <ExternalLink size={12} className="citation-external-icon" />
-                  </a>
-                ) : (
-                  <span
-                    className={`citation-badge${cit.text ? ' has-preview' : ''}`}
-                    title={title}
-                    onClick={cit.text ? () => togglePreview(i) : undefined}
-                  >
-                    <span className="citation-number">[{i + 1}]</span>
-                    <span className="citation-title">{title}</span>
-                    {cit.text && (
-                      isPreviewOpen
-                        ? <ChevronUp size={12} className="citation-external-icon" />
-                        : <ChevronDown size={12} className="citation-external-icon" />
-                    )}
-                  </span>
-                )}
-                {cit.text && isPreviewOpen && (
+                <span
+                  className={`citation-badge${hasContent ? ' has-preview' : ''}`}
+                  title={title}
+                  onClick={hasContent ? () => togglePreview(i) : undefined}
+                >
+                  <span className="citation-number">[{i + 1}]</span>
+                  <span className="citation-title">{title}</span>
+                  {hasContent && (
+                    isPreviewOpen
+                      ? <ChevronUp size={12} className="citation-chevron-inline" />
+                      : <ChevronDown size={12} className="citation-chevron-inline" />
+                  )}
+                </span>
+                {hasContent && isPreviewOpen && (
                   <pre className="citation-preview">{cit.text}</pre>
                 )}
               </div>

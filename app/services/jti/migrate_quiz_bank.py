@@ -169,7 +169,7 @@ def migrate_quiz_bank() -> None:
         existing_meta = store.get_metadata(lang, bank_id=DEFAULT_BANK_ID)
         existing_questions = store.list_questions(lang, DEFAULT_BANK_ID)
         if not _default_bank_is_outdated(existing_meta, existing_questions, data):
-            logger.info("[Startup] Quiz bank (%s) already matches seed JSON, skipping sync", lang)
+            logger.debug("Quiz bank (%s) up to date, skipping", lang)
             continue
 
         # Upsert metadata with multi-set fields
@@ -178,7 +178,7 @@ def migrate_quiz_bank() -> None:
         # Replace all questions so stale extras are removed during sync.
         questions = data.get("questions", [])
         count = store.replace_all_questions(lang, DEFAULT_BANK_ID, questions)
-        print(f"[Startup] ✅ Synced quiz bank ({lang}): {count} questions")
+        logger.info("[Startup] Synced quiz bank (%s): %d questions", lang, count)
 
 
 def _upgrade_legacy_quiz_results() -> None:
@@ -250,9 +250,9 @@ def migrate_quiz_results() -> None:
         existing_meta = store.get_set_metadata(lang, DEFAULT_SET_ID)
         existing_results = store.get_all_results(lang, set_id=DEFAULT_SET_ID)
         if not _default_quiz_results_are_outdated(existing_meta, existing_results, data, lang):
-            logger.info("[Startup] Quiz results (%s) already match seed JSON, skipping sync", lang)
+            logger.debug("Quiz results (%s) up to date, skipping", lang)
             continue
 
         store.upsert_set_metadata(lang, DEFAULT_SET_ID, _default_quiz_results_set_payload(lang))
         count = store.replace_all_results(lang, data, set_id=DEFAULT_SET_ID)
-        print(f"[Startup] ✅ Synced quiz results ({lang}): {count} entries")
+        logger.info("[Startup] Synced quiz results (%s): %d entries", lang, count)

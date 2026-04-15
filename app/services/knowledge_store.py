@@ -78,23 +78,21 @@ class KnowledgeStore:
         namespace: str,
         projection: Optional[dict[str, Any]] = None,
     ) -> Optional[dict[str, Any]]:
-        doc = self.collection.find_one(self._query(language, filename, namespace), projection)
+        query = self._query(language, filename, namespace)
+        doc = self.collection.find_one(query, projection)
         if doc or not self._supports_legacy_fallback(namespace):
             return doc
         return self.collection.find_one(self._legacy_query(language, filename), projection)
 
     def _filename_exists(self, language: str, filename: str, namespace: str) -> bool:
-        if self.collection.find_one(self._query(language, filename, namespace), {"_id": 1}):
-            return True
-        if self._supports_legacy_fallback(namespace):
-            return self.collection.find_one(self._legacy_query(language, filename), {"_id": 1}) is not None
-        return False
+        return self._find_one_with_legacy_fallback(language, filename, namespace, {"_id": 1}) is not None
 
     def _metadata_from_doc(self, doc: dict[str, Any]) -> dict[str, Any]:
+        fname = doc.get("filename", "")
         return {
-            "name": doc.get("filename", ""),
-            "filename": doc.get("filename", ""),
-            "display_name": doc.get("display_name", doc.get("filename", "")),
+            "name": fname,
+            "filename": fname,
+            "display_name": doc.get("display_name", fname),
             "content_type": doc.get("content_type", "application/octet-stream"),
             "size": int(doc.get("size", 0)),
             "editable": bool(doc.get("editable", False)),
@@ -102,51 +100,30 @@ class KnowledgeStore:
         }
 
     def list_files(self, language: str, namespace: str = "jti", **kwargs: Any) -> list[dict[str, Any]]:
-        """List files for a language."""
-        docs = list(
-            self.collection.find(
-                self._query(language, namespace=namespace),
-                {"_id": 0, "filename": 1, "display_name": 1, "size": 1, "editable": 1, "created_at": 1},
-            ).sort("filename", 1)
-        )
+        """List files for a language with legacy fallback for JTI."""
+        projection = {"_id": 0, "filename": 1, "display_name": 1, "size": 1, "editable": 1, "created_at": 1}
+        docs = list(self.collection.find(self._query(language, namespace=namespace), projection).sort("filename", 1))
 
         if self._supports_legacy_fallback(namespace):
-            legacy_docs = self.collection.find(
-                self._legacy_query(language),
-                {"_id": 0, "filename": 1, "display_name": 1, "size": 1, "editable": 1, "created_at": 1},
-            ).sort("filename", 1)
-            seen = {doc.get("filename", "") for doc in docs}
-            for doc in legacy_docs:
-                filename = doc.get("filename", "")
-                if filename not in seen:
-                    docs.append(doc)
-                    seen.add(filename)
+            legacy_docs = self.collection.find(self._legacy_query(language), projection).sort("filename", 1)
+            seen = {d["filename"] for d in docs if "filename" in d}
+            docs.extend(d for d in legacy_docs if d.get("filename") not in seen)
+            docs.sort(key=lambda d: d.get("filename", ""))
 
-        docs.sort(key=lambda doc: doc.get("filename", ""))
-
-        return [self._metadata_from_doc(doc) for doc in docs]
+        return [self._metadata_from_doc(d) for d in docs]
 
     def get_file(self, language: str, filename: str, namespace: str = "jti") -> Optional[dict[str, Any]]:
         """Get full file document including binary data."""
         doc = self._find_one_with_legacy_fallback(language, filename, namespace)
-        if not doc:
-            return None
-
-        doc.pop("_id", None)
-        doc["data"] = self._to_bytes(doc.get("data"))
+        if doc:
+            doc.pop("_id", None)
+            doc["data"] = self._to_bytes(doc.get("data"))
         return doc
 
     def get_file_data(self, language: str, filename: str, namespace: str = "jti") -> Optional[bytes]:
         """Get file binary data only."""
-        doc = self._find_one_with_legacy_fallback(
-            language,
-            filename,
-            namespace,
-            {"_id": 0, "data": 1},
-        )
-        if not doc:
-            return None
-        return self._to_bytes(doc.get("data"))
+        doc = self._find_one_with_legacy_fallback(language, filename, namespace, {"_id": 0, "data": 1})
+        return self._to_bytes(doc.get("data")) if doc else None
 
     def save_file(
         self,

@@ -16,7 +16,7 @@ from app.services.agent_utils import (
     normalize_language,
     strip_citations,
 )
-from app.services.base_agent import FILE_SEARCH_MODEL, BaseAgent
+from app.services.base_agent import BaseAgent
 from app.services.hciot.agent_prompts import (
     PERSONA,
     SESSION_STATE_TEMPLATES,
@@ -38,7 +38,7 @@ class HciotMainAgent(BaseAgent):
     IMAGE_TOKEN_PATTERN = re.compile(r"IMG_[A-Za-z0-9_]+", re.IGNORECASE)
 
     def __init__(self):
-        super().__init__(model_name=FILE_SEARCH_MODEL)
+        super().__init__(model_name="gemini-2.0-flash-lite")
 
     @property
     def _session_manager(self):
@@ -52,15 +52,9 @@ class HciotMainAgent(BaseAgent):
     def _get_store_name_for_language(language: str) -> str:
         return "__hciot__en" if normalize_language(language) == "en" else HCIOT_STORE_NAME
 
-    @staticmethod
-    def _get_file_search_store_name(language: str) -> str | None:
-        lang_upper = normalize_language(language).upper()
-        store_id = os.getenv(f"HCIOT_STORE_ID_{lang_upper}") or os.getenv("HCIOT_STORE_ID")
-        if not store_id:
-            return None
-        if store_id.startswith("fileSearchStores/"):
-            return store_id
-        return f"fileSearchStores/{store_id}"
+    @property
+    def _rag_source_type(self) -> str:
+        return "hciot_knowledge"
 
     def _get_default_persona(self, language: str) -> str:
         return PERSONA.get(language, PERSONA["zh"])

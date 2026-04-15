@@ -27,8 +27,9 @@ _CACHE_DIR = Path(os.getenv("TTS_CACHE_DIR", "/app/data/tts_cache"))
 class TtsJobManager:
     """Manage TTS jobs on shared filesystem for multi-worker support."""
 
-    def __init__(self, character: str) -> None:
+    def __init__(self, character: str, replacement: str = "") -> None:
         self.character = character
+        self.replacement = replacement
         self.tts_api_url = _TTS_API_URL
         self.timeout_seconds = _TIMEOUT_SECONDS
         self.cache_ttl_seconds = _CACHE_TTL_SECONDS
@@ -143,7 +144,10 @@ class TtsJobManager:
         logger.info("[TTS] ready job=%s elapsed_ms=%.0f bytes=%d content_type=%s", job_id, (now - created_at) * 1000, len(audio_bytes), content_type)
 
     def _generate_job(self, job_id: str, text: str, character: str | None = None) -> None:
-        payload = json.dumps({"text": text, "character": character or self.character}).encode("utf-8")
+        body: dict[str, Any] = {"text": text, "character": character or self.character}
+        if self.replacement:
+            body["replacement"] = self.replacement
+        payload = json.dumps(body).encode("utf-8")
         request = urllib.request.Request(
             self.tts_api_url,
             data=payload,
@@ -206,5 +210,5 @@ class TtsJobManager:
 
 
 # Per-app singletons — characters configurable via env vars
-jti_tts_job_manager = TtsJobManager(character=os.getenv("JTI_TTS_CHARACTER", "hayley"))
-hciot_tts_job_manager = TtsJobManager(character=(os.getenv("HCIOT_TTS_CHARACTER", "healthy2").split(",")[0]).strip() or "healthy2")
+jti_tts_job_manager = TtsJobManager(character=os.getenv("JTI_TTS_CHARACTER", "hayley"), replacement="jti")
+hciot_tts_job_manager = TtsJobManager(character=(os.getenv("HCIOT_TTS_CHARACTER", "healthy2").split(",")[0]).strip() or "healthy2", replacement="hciot")

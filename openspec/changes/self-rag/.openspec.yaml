@@ -1,0 +1,32 @@
+---
+name: self-rag
+title: Self-Hosted RAG System
+description: Replace Gemini File Search with self-hosted vector search for 10x performance improvement (1-3s → ~100ms)
+version: 1.0.0
+
+status: draft  # draft, approved, in_progress, completed
+
+authors:
+  - spark
+
+created: 2026-04-15
+updated: 2026-04-15
+
+specs:
+  - specs/embedding/spec.md
+  - specs/vector-store/spec.md
+  - specs/rag-pipeline/spec.md
+
+artifacts:
+  proposal: proposal.md
+  design: design.md
+  tasks: tasks.md
+
+tags:
+  - performance
+  - backend
+  - rag
+  - vector-search
+  - gemini
+
+dependencies: []

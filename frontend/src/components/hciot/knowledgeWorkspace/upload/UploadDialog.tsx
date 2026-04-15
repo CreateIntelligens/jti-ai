@@ -37,6 +37,56 @@ interface UploadDialogProps {
 
 const DEFAULT_CATEGORY = 'other';
 
+function resolveTopicInfo(
+  categoryId: string,
+  topicId: string,
+  newCategoryZh: string,
+  newTopicZh: string,
+  currentCategory: HciotTopicCategory | null | undefined,
+): ResolvedUploadTopic | null {
+  if (!categoryId) return null;
+
+  let catId = categoryId;
+  let catLabels = { zh: '', en: '' };
+
+  if (categoryId === NEW_VALUE) {
+    const b = buildLabels(newCategoryZh, '');
+    if (!b) return null;
+    catLabels = b;
+    catId = slugify(catLabels.en);
+  } else {
+    if (!currentCategory) return null;
+    catLabels = { zh: currentCategory.labels.zh, en: currentCategory.labels.en };
+  }
+
+  let topSlug = '';
+  let topLabels = { zh: '', en: '' };
+
+  if (topicId === NEW_VALUE) {
+    const b = buildLabels(newTopicZh, '');
+    if (b) {
+      topLabels = b;
+      topSlug = slugify(topLabels.en);
+    }
+  } else if (topicId && currentCategory) {
+    const existing = currentCategory.topics.find((t) => t.id === topicId);
+    if (existing) {
+      topSlug = topicId.split('/').pop() || topicId;
+      topLabels = { zh: existing.labels.zh, en: existing.labels.en };
+    }
+  }
+
+  return {
+    fullTopicId: topSlug ? `${catId}/${topSlug}` : catId,
+    labels: {
+      categoryLabelZh: catLabels.zh,
+      categoryLabelEn: catLabels.en,
+      topicLabelZh: topLabels.zh,
+      topicLabelEn: topLabels.en,
+    },
+  };
+}
+
 function useTopicSelection(categories: HciotTopicCategory[], language: HciotLanguage, open: boolean) {
   const [categoryId, setCategoryId] = useState(DEFAULT_CATEGORY);
   const [topicId, setTopicId] = useState('');
@@ -67,50 +117,10 @@ function useTopicSelection(categories: HciotTopicCategory[], language: HciotLang
     return [...currentCategory.topics].sort((a, b) => sortByLabel(a.labels[language], b.labels[language]));
   }, [currentCategory, language]);
 
-  const resolvedTopic = useMemo((): ResolvedUploadTopic | null => {
-    if (!categoryId) return null;
-
-    let catId = categoryId;
-    let catLabels = { zh: '', en: '' };
-
-    if (categoryId === NEW_VALUE) {
-      const b = buildLabels(newCategoryZh, '');
-      if (!b) return null;
-      catLabels = b;
-      catId = slugify(catLabels.en);
-    } else {
-      if (!currentCategory) return null;
-      catId = categoryId;
-      catLabels = { zh: currentCategory.labels.zh, en: currentCategory.labels.en };
-    }
-
-    let topSlug = '';
-    let topLabels = { zh: '', en: '' };
-
-    if (topicId === NEW_VALUE) {
-      const b = buildLabels(newTopicZh, '');
-      if (b) {
-        topLabels = b;
-        topSlug = slugify(topLabels.en);
-      }
-    } else if (topicId) {
-      const existing = currentCategory?.topics.find((t) => t.id === topicId);
-      if (existing) {
-        topSlug = topicId.split('/').pop() || topicId;
-        topLabels = { zh: existing.labels.zh, en: existing.labels.en };
-      }
-    }
-
-    return {
-      fullTopicId: topSlug ? `${catId}/${topSlug}` : catId,
-      labels: {
-        categoryLabelZh: catLabels.zh,
-        categoryLabelEn: catLabels.en,
-        topicLabelZh: topLabels.zh,
-        topicLabelEn: topLabels.en,
-      },
-    };
-  }, [categoryId, topicId, newCategoryZh, newTopicZh, currentCategory]);
+  const resolvedTopic = useMemo(
+    () => resolveTopicInfo(categoryId, topicId, newCategoryZh, newTopicZh, currentCategory),
+    [categoryId, topicId, newCategoryZh, newTopicZh, currentCategory],
+  );
 
   return {
     categoryId,

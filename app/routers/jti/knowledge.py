@@ -1,7 +1,5 @@
 """
 JTI 知識庫管理 API
-
-MongoDB + Gemini File Search Store 同步管理。
 """
 
 import logging
@@ -16,18 +14,14 @@ from pydantic import BaseModel
 from urllib.parse import quote
 
 from app.auth import verify_admin
-from functools import partial
 
 from app.routers.knowledge_utils import (
     EDITABLE_EXTENSIONS,
     TEXT_PREVIEW_EXTENSIONS,
-    delete_from_gemini,
+    delete_from_rag,
     extract_docx_text,
-    gemini_background,
-    get_store_name,
     safe_filename,
-    start_background_sync,
-    sync_to_gemini,
+    sync_to_rag,
     write_docx_text,
 )
 from app.services.knowledge_store import get_knowledge_store
@@ -36,17 +30,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["JTI Knowledge"], dependencies=[Depends(verify_admin)])
 
-ENV_PREFIX = "JTI"
-FALLBACK_ENV_KEY = "JTI_STORE_ID_ZH"
-LOG_PREFIX = "JTI sync"
+SOURCE_TYPE = "jti"
 CORE_MARKER_PATTERN = re.compile(r"\[CORE\s*:", re.IGNORECASE)
-
-
-def _store_name(language: str) -> str | None:
-    return get_store_name(ENV_PREFIX, language, fallback_env_key=FALLBACK_ENV_KEY)
-
-
-_gemini_background = partial(gemini_background, "JTI KB")
 
 
 def _reject_core_markers(content: str) -> None:
@@ -77,10 +62,6 @@ def list_knowledge_files(language: str = "zh"):
     """列出知識庫中的檔案"""
     store = get_knowledge_store()
     files = store.list_files(language)
-    start_background_sync(
-        ENV_PREFIX, get_knowledge_store, language, LOG_PREFIX,
-        insert_kwargs={"namespace": "jti"}, fallback_env_key=FALLBACK_ENV_KEY,
-    )
     return {"files": files, "language": language}
 
 
@@ -185,9 +166,7 @@ async def update_file_content(
     if not updated:
         raise HTTPException(status_code=404, detail="檔案不存在")
 
-    store_name = _store_name(language)
-    if store_name:
-        background_tasks.add_task(_gemini_background, sync_to_gemini, store_name, safe_name, new_bytes)
+    background_tasks.add_task(sync_to_rag, SOURCE_TYPE, language, safe_name, new_bytes)
 
     return {"message": "已更新", "synced": False}
 
@@ -224,9 +203,7 @@ async def upload_knowledge_file(
         editable=editable,
     )
 
-    store_name = _store_name(language)
-    if store_name:
-        background_tasks.add_task(_gemini_background, sync_to_gemini, store_name, saved["name"], file_bytes)
+    background_tasks.add_task(sync_to_rag, SOURCE_TYPE, language, saved["name"], file_bytes)
 
     return {
         "name": saved["name"],
@@ -243,16 +220,14 @@ async def upload_knowledge_file(
 async def delete_knowledge_file(
     filename: str, background_tasks: BackgroundTasks, language: str = "zh",
 ):
-    """刪除檔案 + Gemini File Search 中的對應文件"""
+    """刪除檔案"""
     safe_name = safe_filename(filename)
     store = get_knowledge_store()
     deleted = store.delete_file(language, safe_name)
     if not deleted:
         raise HTTPException(status_code=404, detail="檔案不存在")
 
-    store_name = _store_name(language)
-    if store_name:
-        background_tasks.add_task(_gemini_background, delete_from_gemini, store_name, safe_name)
+    background_tasks.add_task(delete_from_rag, SOURCE_TYPE, language, safe_name)
 
     return {
         "message": "已刪除",

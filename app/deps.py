@@ -11,6 +11,8 @@ from typing import Dict, Optional
 
 from fastapi import HTTPException
 
+logger = logging.getLogger(__name__)
+
 from .core import FileSearchManager
 from .api_keys import APIKeyManager
 from .services.session.session_manager_factory import get_conversation_logger, get_general_chat_session_manager
@@ -39,10 +41,6 @@ def init_managers():
         prompt_manager = PromptManager()
         api_key_manager = APIKeyManager()
         general_session_manager = get_general_chat_session_manager()
-        if general_session_manager:
-            print("[Startup] ✅ GeneralChatSessionManager (MongoDB) 已啟用")
-        else:
-            print("[Startup] ⚠️ GeneralChatSessionManager 未啟用，使用記憶體模式")
 
         # === Module-specific startup hooks ===
         from .services.jti.startup import jti_startup
@@ -50,8 +48,11 @@ def init_managers():
 
         from .services.hciot.startup import hciot_startup
         hciot_startup()
+
+        storage = "MongoDB" if general_session_manager else "in-memory"
+        logger.info("[Startup] Managers ready (storage=%s)", storage)
     except ValueError as e:
-        print(f"警告: {e}")
+        logger.warning("[Startup] %s", e)
 
 
 def _get_or_create_manager(user_api_key: Optional[str] = None, session_id: Optional[str] = None) -> FileSearchManager:

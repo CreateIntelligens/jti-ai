@@ -50,11 +50,11 @@ class MongoDBClient:
     def _initialize_collections(self) -> None:
         """初始化集合和索引"""
         db = self.get_client()["jti_app"]
+        collections_ready: list[str] = []
 
         # ===== sessions 集合 =====
         if "sessions" not in db.list_collection_names():
             db.create_collection("sessions")
-            logger.info("Created 'sessions' collection")
 
         sessions = db["sessions"]
 
@@ -64,14 +64,13 @@ class MongoDBClient:
             sessions.create_index("mode")
             sessions.create_index("language")
             sessions.create_index([("created_at", -1)])
-            logger.info("Created indexes for 'sessions' collection")
+            collections_ready.append("sessions")
         except Exception as e:
             logger.warning(f"Index creation for 'sessions': {e}")
 
         # ===== conversations 集合 =====
         if "conversations" not in db.list_collection_names():
             db.create_collection("conversations")
-            logger.info("Created 'conversations' collection")
 
         conversations = db["conversations"]
 
@@ -79,14 +78,13 @@ class MongoDBClient:
             conversations.create_index([("session_id", 1), ("turn_number", 1)])
             conversations.create_index([("mode", 1), ("timestamp", -1)])
             conversations.create_index([("timestamp", -1)])
-            logger.info("Created indexes for 'conversations' collection")
+            collections_ready.append("conversations")
         except Exception as e:
             logger.warning(f"Index creation for 'conversations': {e}")
 
         # ===== knowledge_files 集合 =====
         if "knowledge_files" not in db.list_collection_names():
             db.create_collection("knowledge_files")
-            logger.info("Created 'knowledge_files' collection")
 
         knowledge_files = db["knowledge_files"]
 
@@ -120,14 +118,13 @@ class MongoDBClient:
             )
             knowledge_files.create_index([("namespace", 1), ("language", 1)])
             knowledge_files.create_index("language")
-            logger.info("Created indexes for 'knowledge_files' collection")
+            collections_ready.append("knowledge_files")
         except Exception as e:
             logger.warning(f"Index creation for 'knowledge_files': {e}")
 
         # ===== quiz_bank_questions 集合 =====
         quiz_bank_questions = db["quiz_bank_questions"]
         try:
-            # Drop legacy single-bank indexes if they exist
             for idx_name in list(quiz_bank_questions.index_information().keys()):
                 if idx_name != "_id_" and "bank_id" not in idx_name:
                     try:
@@ -138,14 +135,13 @@ class MongoDBClient:
                 [("language", 1), ("bank_id", 1), ("id", 1)], unique=True
             )
             quiz_bank_questions.create_index([("language", 1), ("bank_id", 1)])
-            logger.info("Created indexes for 'quiz_bank_questions' collection")
+            collections_ready.append("quiz_bank_questions")
         except Exception as e:
             logger.warning(f"Index creation for 'quiz_bank_questions': {e}")
 
         # ===== quiz_bank_metadata 集合 =====
         quiz_bank_metadata = db["quiz_bank_metadata"]
         try:
-            # Drop legacy single-bank indexes if they exist
             for idx_name in list(quiz_bank_metadata.index_information().keys()):
                 if idx_name != "_id_" and "bank_id" not in idx_name:
                     try:
@@ -156,14 +152,13 @@ class MongoDBClient:
                 [("language", 1), ("bank_id", 1)], unique=True
             )
             quiz_bank_metadata.create_index("language")
-            logger.info("Created indexes for 'quiz_bank_metadata' collection")
+            collections_ready.append("quiz_bank_metadata")
         except Exception as e:
             logger.warning(f"Index creation for 'quiz_bank_metadata': {e}")
 
         # ===== quiz_results 集合 =====
         quiz_results_col = db["quiz_results"]
         try:
-            # Drop legacy quiz-result indexes without set_id if they exist.
             try:
                 quiz_results_col.drop_index("language_1_color_id_1")
             except Exception:
@@ -176,9 +171,11 @@ class MongoDBClient:
                 [("language", 1), ("set_id", 1), ("quiz_id", 1)], unique=True
             )
             quiz_results_col.create_index("language")
-            logger.info("Created indexes for 'quiz_results' collection")
+            collections_ready.append("quiz_results")
         except Exception as e:
             logger.warning(f"Index creation for 'quiz_results': {e}")
+
+        logger.debug("MongoDB indexes ready (%d/%d): %s", len(collections_ready), 6, ", ".join(collections_ready))
 
     def get_client(self) -> MongoClient:
         """取得 MongoDB 客戶端"""
@@ -241,6 +238,6 @@ def _ensure_base_indexes(db, db_name: str) -> None:
         conversations.create_index([("mode", 1), ("timestamp", -1)])
         conversations.create_index([("timestamp", -1)])
 
-        logger.info("Ensured base indexes for database '%s'", db_name)
+        logger.debug("Ensured base indexes for database '%s'", db_name)
     except Exception as e:
         logger.warning("Index creation for '%s' failed: %s", db_name, e)
