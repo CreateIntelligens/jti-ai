@@ -85,10 +85,6 @@ class HciotMainAgent(BaseAgent):
         """HCIoT defaults to NO on intent check failure (block unrelated queries)."""
         return "NO"
 
-    def _extract_file_search_citations(self, response) -> list[dict] | None:
-        """Extract citation list for HCIoT, keeping chunk text for image-id matching."""
-        return self._extract_citations(response, include_text=True)
-
     @classmethod
     def _extract_top_citation_image_id(cls, citations: list[dict] | None) -> str | None:
         """Return image_id from the top citation (either from CSV or token)."""

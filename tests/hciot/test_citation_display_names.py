@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.hciot.main_agent import FILE_SEARCH_MODEL, HciotMainAgent
+from app.services.hciot.main_agent import HciotMainAgent
 
 
 def test_localize_citations_uses_display_name(monkeypatch):
@@ -35,11 +35,10 @@ def test_localize_citations_uses_display_name(monkeypatch):
     ]
 
 
-def test_hciot_agent_uses_flash_lite_for_chat_and_file_search():
+def test_hciot_agent_uses_flash_lite_for_chat():
     agent = HciotMainAgent()
 
-    assert agent.model_name == "gemini-2.5-flash-lite"
-    assert FILE_SEARCH_MODEL == "gemini-2.5-flash-lite"
+    assert agent.model_name == "gemini-2.0-flash-lite"
 
 
 def test_extract_top_citation_image_id_does_not_fallback_to_other_csv_rows():

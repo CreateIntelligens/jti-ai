@@ -2,7 +2,7 @@
 Main Agent - 核心對話邏輯
 
 架構：
-- 併發跑 Intent Check + File Search（都用 flash-lite）
+- 併發跑 Intent Check + RAG Knowledge Search
 - Intent=NO（無關話題）→ 跳過知識庫結果，直接讓主 agent 回應（自然婉拒）
 - Intent=YES → 帶知識庫結果給主 agent 回應
 """
@@ -118,10 +118,6 @@ class MainAgent(BaseAgent):
         lang_key = normalize_language(language)
         template = _INTENT_PROMPT.get(lang_key, _INTENT_PROMPT["zh"])
         return template.format(query=query)
-
-    def _extract_file_search_citations(self, response) -> list[dict] | None:
-        """Extract citation list for JTI, keeping chunk text for inline previews."""
-        return self._extract_citations(response, include_text=True)
 
     async def chat(self, session_id: str, user_message: str) -> dict:
         try:

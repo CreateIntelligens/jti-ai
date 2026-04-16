@@ -3,7 +3,7 @@ Base Agent - 共用的 Gemini chat session 管理邏輯
 
 提供 JTI MainAgent 與 HCIoT HciotMainAgent 共用的：
 - Gemini chat session 建立與快取
-- File Search chat session 管理與查詢
+- RAG 知識庫查詢
 - MongoDB 歷史同步（含背景非同步寫入）
 - session 清除
 """
@@ -60,7 +60,7 @@ class BaseAgent:
         return "YES"
 
     def _prepare_search_query(self, query: str, language: str) -> str:
-        """在送出 File Search 前加上知識庫查詢前綴。"""
+        """在送出知識庫查詢前加上前綴。"""
         prefix = "Please search the knowledge base: " if normalize_language(language) == "en" else "請你在知識庫查："
         return f"{prefix}{query}"
 
@@ -210,32 +210,6 @@ class BaseAgent:
                 types.Content(role="model", parts=[types.Part.from_text(text=model_message)])
             )
 
-    @staticmethod
-    def _extract_citations(response, include_text: bool = False) -> list[dict] | None:
-        """從 Gemini response 的 grounding_metadata 提取來源列表。"""
-        try:
-            chunks = response.candidates[0].grounding_metadata.grounding_chunks
-        except (AttributeError, IndexError, TypeError):
-            return None
-            
-        citations, seen = [], set()
-        for c in (chunks or []):
-            ctx = getattr(c, 'retrieved_context', None)
-            if not ctx: continue
-            
-            uri = getattr(ctx, 'uri', None) or ""
-            title = getattr(ctx, 'title', None) or uri or "參考資料"
-            key = uri or title
-            
-            if key not in seen:
-                citation = {"uri": uri, "title": title}
-                if include_text and (text := getattr(ctx, "text", None)):
-                    if isinstance(text, str) and text.strip():
-                        citation["text"] = text
-                citations.append(citation)
-                seen.add(key)
-        return citations or None
-
     def _get_recent_history_summary(self, session_id: str, max_turns: int = 3) -> list[str]:
         """從第二層 chat session 提取最近幾輪用戶訊息，供 intent check 使用。"""
         chat_session = self._chat_sessions.get(session_id)
@@ -270,7 +244,7 @@ class BaseAgent:
             )
         return f"{session_state}\n\n{question_block}"
 
-    # --- 共用 intent check / file search ---
+    # --- 共用 intent check / knowledge search ---
 
     def _check_intent_fast(self, query: str, language: str = "zh", session_id: str | None = None) -> str:
         """快速判斷是否為不相關話題 (RAG 前置過濾)"""
@@ -298,12 +272,8 @@ class BaseAgent:
             return self._intent_default_on_error()
 
 
-    def _extract_file_search_citations(self, response) -> list[dict] | None:
-        """從 File Search response 提取 citations。子類可覆寫以自訂提取邏輯。"""
-        return self._extract_citations(response)
-
-    def _file_search(self, query: str, language: str, session_id: str | None = None) -> tuple[str | None, list[dict] | None]:
-        """用本地 RAGPipeline 查知識庫（取代 Gemini File Search）"""
+    def _knowledge_search(self, query: str, language: str, session_id: str | None = None) -> tuple[str | None, list[dict] | None]:
+        """用本地 RAG Pipeline 查知識庫"""
         try:
             pipeline = get_rag_pipeline()
             kb_text, citations = pipeline.retrieve(
@@ -320,7 +290,7 @@ class BaseAgent:
 
     async def _concurrent_intent_and_search(self, user_message: str, language: str, session_id: str | None = None) -> tuple[str | None, list[dict] | None]:
         """
-        併發跑 Intent Check + File Search。
+        併發跑 Intent Check + Knowledge Search (RAG)。
         Intent=NO 時快速攔截跳過知識庫；Intent=YES 時使用知識庫結果。
         """
         loop = asyncio.get_running_loop()
@@ -329,7 +299,7 @@ class BaseAgent:
         intent_task = asyncio.ensure_future(
             loop.run_in_executor(None, self._check_intent_fast, user_message, language, session_id))
         search_task = asyncio.ensure_future(
-            loop.run_in_executor(None, self._file_search, user_message, language, session_id))
+            loop.run_in_executor(None, self._knowledge_search, user_message, language, session_id))
 
         done, _ = await asyncio.wait(
             [intent_task, search_task],
@@ -343,7 +313,7 @@ class BaseAgent:
         await asyncio.gather(intent_task, search_task)
         intent = intent_task.result()
         kb_text, citations = search_task.result() if intent == "YES" else (None, None)
-        logger.info(f"[計時] Intent={intent}, File Search: {(time.time()-t0)*1000:.0f}ms")
+        logger.info(f"[計時] Intent={intent}, RAG: {(time.time()-t0)*1000:.0f}ms")
         return kb_text, citations
 
     @staticmethod

@@ -2,17 +2,15 @@
 Gemini API 整合服務（使用新版 google-genai SDK）
 
 職責：
-1. 上傳知識庫檔案（docx）到 Gemini File API
-2. 建立 File Search Store
-3. 提供 Main Agent 呼叫介面
+1. 初始化 Gemini client
+2. 提供 Main Agent 呼叫介面
+3. 提供 retry / run_sync 工具函數
 """
 
 import asyncio
 import logging
 import time
 from typing import Callable, TypeVar
-
-from google.genai import types
 
 T = TypeVar("T")
 
@@ -31,60 +29,6 @@ def init_gemini_client():
         logger.info("Gemini client initialized from registry")
     except ValueError:
         logger.warning("GEMINI_API_KEYS not found - Gemini client not initialized")
-
-
-class GeminiService:
-    """Gemini 服務封裝"""
-
-    def __init__(self, model_name: str = "gemini-2.5-flash-lite"):
-        self.model_name = model_name
-        self.file_search_store_id: str | None = None
-        self.client = client
-
-    async def upload_knowledge_base(
-        self, file_path: str, display_name: str = "Quiz Knowledge Base"
-    ) -> str:
-        """
-        上傳知識庫檔案到 Gemini
-
-        Args:
-            file_path: 檔案路徑（docx）
-            display_name: 顯示名稱
-
-        Returns:
-            file_name: Gemini File name
-        """
-        try:
-            if not self.client:
-                raise ValueError("Gemini client not initialized")
-
-            logger.info(f"Uploading file: {file_path}")
-
-            # 上傳檔案
-            uploaded_file = self.client.files.upload(path=file_path)
-
-            logger.info(f"Uploaded file: {uploaded_file.name}")
-            return uploaded_file.name
-
-        except Exception as e:
-            logger.error(f"Failed to upload file: {e}")
-            raise
-
-    def get_model_with_tools(
-        self, tools: list[dict], store_id: str | None = None
-    ) -> str:
-        """
-        取得 Model 名稱（供 generate_content 使用）
-
-        Args:
-            tools: Custom function tools
-            store_id: File Search Store ID
-
-        Returns:
-            model_name: 模型名稱
-        """
-        # 新版 SDK 中，tools 在 generate_content 時才傳入
-        return self.model_name
 
 
 async def run_sync(fn: Callable[..., T], *args) -> T:
@@ -117,7 +61,3 @@ def gemini_with_retry(fn: Callable[[], T], retries: int = 3, base_delay: float =
             time.sleep(wait)
     # Unreachable: the loop always returns or raises
     raise RuntimeError("gemini_with_retry: unexpected exit")
-
-
-# 全域實例
-gemini_service = GeminiService()

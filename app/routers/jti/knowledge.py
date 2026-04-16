@@ -140,7 +140,7 @@ async def update_file_content(
     background_tasks: BackgroundTasks,
     language: str = "zh",
 ):
-    """更新文字檔內容（同步到 Gemini File Search）"""
+    """更新文字檔內容"""
     safe_name = safe_filename(filename)
     ext = Path(safe_name).suffix.lower()
     if ext not in EDITABLE_EXTENSIONS:
@@ -180,7 +180,7 @@ async def upload_knowledge_file(
     language: str = "zh",
     file: UploadFile = File(...),
 ):
-    """上傳檔案到知識庫 + Gemini File Search"""
+    """上傳檔案到知識庫"""
     display_name = file.filename or f"file_{uuid.uuid4().hex[:8]}"
     safe_name = safe_filename(display_name)
     file_bytes = await file.read()

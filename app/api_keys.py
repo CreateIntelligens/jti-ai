@@ -12,7 +12,13 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 from pymongo import MongoClient
 
-from .core import log
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+def log(message: str) -> None:
+    logger.info(message)
 
 
 class APIKey(BaseModel):

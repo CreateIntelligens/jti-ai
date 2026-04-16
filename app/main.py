@@ -1,10 +1,9 @@
-"""Gemini File Search FastAPI backend."""
+"""JTAI FastAPI backend (RAG-based)."""
 
 from contextlib import asynccontextmanager
 import asyncio
 import logging
 import os
-import re
 import time
 import uuid
 import warnings
@@ -82,12 +81,13 @@ from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from google.genai import types
 from google.genai.errors import ClientError
 
 from .auth import verify_auth, _extract_bearer_token
 from .services.agent_utils import strip_citations
 from .routers.jti import chat as jti_chat, quiz as jti_quiz, prompts as jti_prompts, knowledge as jti_knowledge, quiz_bank as jti_quiz_bank
-from .routers.general import chat, stores, prompts, api_keys, knowledge_admin
+from .routers.general import chat, prompts, api_keys, knowledge_admin
 from .routers.hciot import chat as hciot_chat, prompts as hciot_prompts, knowledge as hciot_knowledge, images as hciot_images
 from .routers.hciot import topics_admin as hciot_topics_admin
 from .services.mongo_client import get_mongo_client
@@ -146,7 +146,7 @@ async def _run_rag_backfill(backfill):
 
 
 
-app = FastAPI(title="Gemini File Search API", lifespan=lifespan)
+app = FastAPI(title="JTAI API", lifespan=lifespan)
 
 @app.exception_handler(ClientError)
 async def gemini_client_error_handler(request: Request, exc: ClientError):
@@ -232,7 +232,10 @@ def _get_system_prompt(api_key_info, store_name: str, messages: list) -> Optiona
 @app.post("/v1/chat/completions")
 async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Request, auth: dict = Depends(verify_auth)):
     """OpenAI-compatible Chat Completions API with knowledge-base-bound API keys."""
-    if not deps.manager:
+    from app.services.rag.service import get_rag_pipeline
+    from app.services.gemini_service import client as gemini_client
+
+    if not gemini_client:
         raise HTTPException(status_code=500, detail="Gemini API key not configured")
 
     # Resolve store_name and api_key_info
@@ -266,7 +269,27 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
         warning = f"Unsupported model '{request.model}', using default '{DEFAULT_MODEL}'. Supported: {', '.join(SUPPORTED_MODELS)}"
 
     try:
-        response = deps.manager.query(store_name, last_message, system_instruction=system_prompt, model=model_name)
+        # Use local RAG pipeline for retrieval
+        pipeline = get_rag_pipeline()
+        kb_text, _citations = pipeline.retrieve(last_message, language="zh", source_type="jti_knowledge", top_k=3)
+
+        # Build prompt with RAG context
+        contents = last_message
+        if kb_text:
+            contents = f"<知識庫查詢結果>\n{kb_text}\n</知識庫查詢結果>\n\n使用者問題： {last_message}"
+
+        config_kwargs = {}
+        if system_prompt:
+            config_kwargs["system_instruction"] = system_prompt
+
+        response = gemini_client.models.generate_content(
+            model=model_name,
+            contents=contents,
+            config=types.GenerateContentConfig(
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
+                **config_kwargs,
+            ),
+        )
 
         answer_text = strip_citations(response.text)
         if warning:
@@ -320,13 +343,10 @@ def health_check():
     except Exception:
         checks["gemini_api_key"] = False
 
-    # 3. FileSearchManager
-    checks["file_search_manager"] = deps.manager is not None
-
-    # 4. API Key Manager
+    # 3. API Key Manager
     checks["api_key_manager"] = deps.api_key_manager is not None
 
-    # 5. General Session Manager (MongoDB persistence)
+    # 4. General Session Manager (MongoDB persistence)
     checks["general_session_manager"] = deps.general_session_manager is not None
 
     all_ok = all(checks.values())
@@ -344,7 +364,7 @@ def health_check():
 @app.get("/")
 def index():
     """API root."""
-    return {"message": "Gemini File Search API", "docs": "/docs"}
+    return {"message": "JTAI API", "docs": "/docs"}
 
 
 # ========== Include Routers ==========
@@ -372,5 +392,4 @@ app.include_router(hciot_topics_admin.router, prefix="/api/hciot-admin/topics")
 app.include_router(chat.router)
 app.include_router(prompts.router)  # before stores (more specific path patterns)
 app.include_router(knowledge_admin.router)
-app.include_router(stores.router)
 app.include_router(api_keys.router)
