@@ -38,29 +38,11 @@ session_manager = get_session_manager()
 
 logger = logging.getLogger(__name__)
 
-_INTENT_PROMPT = {
-    "en": """Determine whether the following user message is related to JTI, Ploom X heated tobacco, tobacco sticks, accessories, or the "Find Your Destined Front Cover" quiz.
-If the user is asking about completely unrelated topics (for example: weather, food lists, travel spots, programming problems, politics), respond NO.
-If it is a greeting, gratitude, short everyday follow-up, or related to the topics above, respond YES.
-
-User message: "{query}"
-
-Reply with YES or NO only:""",
-    "zh": """判斷以下使用者語句是否與「JTI傑太日煙、Ploom X加熱菸、菸彈、配件、尋找命定前蓋測驗」相關。
-如果使用者在詢問完全無關的知識（例如：天氣、美食清單、旅遊景點、寫程式設計問題、政治等），請回覆 NO。
-如果是打招呼、表達感謝、日常簡短對話，或是與上述相關的主題，請回覆 YES。
-
-使用者訊息：「{query}」
-
-只能回覆 YES 或 NO：""",
-}
-
-
 class MainAgent(BaseAgent):
     """主要對話 Agent"""
 
     # JTI 用固定的 flash-lite，避免較強的 model 自行進行測驗流程
-    CHAT_MODEL = "gemini-2.5-flash-lite"
+    CHAT_MODEL = "gemini-3.1-flash-lite-preview"
 
     def __init__(self):
         super().__init__(model_name=self.CHAT_MODEL)
@@ -114,11 +96,6 @@ class MainAgent(BaseAgent):
         )
 
 
-    def _build_intent_prompt(self, query: str, language: str) -> str:
-        lang_key = normalize_language(language)
-        template = _INTENT_PROMPT.get(lang_key, _INTENT_PROMPT["zh"])
-        return template.format(query=query)
-
     async def chat(self, session_id: str, user_message: str) -> dict:
         try:
             if not _gemini_service.client:
@@ -131,7 +108,7 @@ class MainAgent(BaseAgent):
                 return {"error": "Session not found", "message": msg, "tts_text": to_tts_text(msg, "zh")}
 
             t0 = time.time()
-            kb_result, citations = await self._concurrent_intent_and_search(user_message, session.language, session_id)
+            kb_result, citations = await self._knowledge_search(user_message, session.language)
 
             enriched = self._build_enriched_message(self._get_session_state(session), user_message, session.language, kb_result)
             chat_session = self._get_or_create_chat_session(session)

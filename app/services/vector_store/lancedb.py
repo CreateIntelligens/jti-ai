@@ -1,3 +1,5 @@
+import threading
+
 import lancedb
 import pandas as pd
 import numpy as np
@@ -12,20 +14,23 @@ class LanceDBStore:
         self.table_name = table_name
         self._db = None
         self._table = None
+        self._lock = threading.Lock()
+
+    def _ensure_db(self):
+        if self._db is None:
+            import os
+            os.makedirs(self.uri, exist_ok=True)
+            self._db = lancedb.connect(self.uri)
 
     @property
     def table(self):
         """Lazy-loaded LanceDB table with auto-initialization."""
         if self._table is None:
-            # 1. Ensure DB connection
-            if self._db is None:
-                import os
-                os.makedirs(self.uri, exist_ok=True)
-                self._db = lancedb.connect(self.uri)
-            
-            # 2. Open table if it exists
-            if self.table_name in self._db.list_tables():
-                self._table = self._db.open_table(self.table_name)
+            with self._lock:
+                if self._table is None:
+                    self._ensure_db()
+                    if self.table_name in self._db.list_tables().tables:
+                        self._table = self._db.open_table(self.table_name)
         return self._table
 
     def search(
@@ -58,10 +63,15 @@ class LanceDBStore:
 
     def insert_chunks(self, chunks: List[Dict[str, Any]]):
         df = pd.DataFrame(chunks)
-        if self.table is None:
-            self._table = self._db.create_table(self.table_name, data=df)
-        else:
-            self.table.add(df)
+        with self._lock:
+            if self._table is None:
+                self._ensure_db()
+                if self.table_name in self._db.list_tables().tables:
+                    self._table = self._db.open_table(self.table_name)
+                else:
+                    self._table = self._db.create_table(self.table_name, data=df)
+                    return
+            self._table.add(df)
 
     def get_file_fingerprint(self, file_id: str, source_type: str, source_language: str) -> str | None:
         """Returns the stored SHA-256 fingerprint for a file, or None if not indexed."""

@@ -25,18 +25,38 @@ with patch.dict(sys.modules, {
 
 class TestRAGPipeline(unittest.TestCase):
     def test_semantic_chunker(self):
-        chunker = SemanticChunker(chunk_size_chars=20)
+        chunker = SemanticChunker(chunk_size_tokens=5)
         text = "This is a sentence. This is another one."
         chunks = chunker.chunk_text(text)
-        # "This is a sentence." is ~19 chars
+        # "This is a sentence." is ~5 tokens (19 chars / 4)
         self.assertTrue(len(chunks) >= 2)
         self.assertIn("This is a sentence.", chunks[0])
+
+    def test_semantic_chunker_overlap(self):
+        chunker = SemanticChunker(chunk_size_tokens=10, chunk_overlap_tokens=5)
+        text = "First sentence. Second sentence. Third sentence."
+        chunks = chunker.chunk_text(text)
+        # With overlap, the last sentence(s) of chunk N should appear at the start of chunk N+1
+        if len(chunks) >= 2:
+            # Find overlap by checking if any sentence appears in consecutive chunks
+            for i in range(len(chunks) - 1):
+                words_current = set(chunks[i].split())
+                words_next = set(chunks[i + 1].split())
+                overlap = words_current & words_next
+                self.assertTrue(len(overlap) > 0, "Chunks should overlap")
+
+    def test_semantic_chunker_chinese(self):
+        chunker = SemanticChunker(chunk_size_tokens=10, chunk_overlap_tokens=3)
+        text = "這是第一句話。這是第二句話。這是第三句話。這是很長的第四句話需要更多空間。"
+        chunks = chunker.chunk_text(text)
+        # Chinese: 1 char ≈ 1 token, so 10 tokens ≈ 10 chars
+        self.assertTrue(len(chunks) >= 2)
 
     def test_rag_pipeline_retrieve(self):
         pipeline = RAGPipeline()
         mock_embedding_service.encode.return_value = np.random.rand(1, 1024)
         mock_lancedb_store.search.return_value = [
-            {"text": "found chunk", "metadata": {"path": "doc1.txt"}, "file_id": "doc1.txt"}
+            {"text": "found chunk", "metadata": {"path": "doc1.txt"}, "file_id": "doc1.txt", "_distance": 0.3}
         ]
         
         kb_text, citations = pipeline.retrieve("query text", language="zh", top_k=5)

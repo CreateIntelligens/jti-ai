@@ -1,4 +1,6 @@
+import csv
 import hashlib
+import io
 import logging
 from typing import List, Dict, Any, Optional
 
@@ -43,6 +45,32 @@ class BackfillService:
         if self._mongodb_backup is None:
             self._mongodb_backup = get_mongodb_backup()
         return self._mongodb_backup
+
+    @staticmethod
+    def _normalize_image_id(raw: str) -> str | None:
+        """正規化 image_id：去路徑、去副檔名、去 query string。"""
+        value = (raw or "").strip()
+        if not value:
+            return None
+        if "=" in value:
+            value = value.split("=", 1)[-1].strip()
+        # Remove path prefix and extension
+        value = value.split("/")[-1].rsplit(".", 1)[0].strip()
+        return value or None
+
+    @staticmethod
+    def _chunk_csv_by_row(text: str) -> list[tuple[str, str | None]]:
+        """CSV 每一行當作一個 chunk。回傳 (chunk_text, image_id) tuples。"""
+        reader = csv.DictReader(io.StringIO(text))
+        results: list[tuple[str, str | None]] = []
+        for row in reader:
+            parts = [f"{k}: {v}" for k, v in row.items() if v and v.strip() and k != "img"]
+            if not parts:
+                continue
+            chunk_text = ", ".join(parts)
+            image_id = BackfillService._normalize_image_id(row.get("img", ""))
+            results.append((chunk_text, image_id))
+        return results
 
     def _compute_fingerprint(self, data: bytes) -> str:
         """Computes SHA256 hash of file content."""
@@ -113,18 +141,23 @@ class BackfillService:
             text = data.decode("utf-8", errors="ignore").strip()
             if not text:
                 return
-                
-            chunks_text = self.chunker.chunk_text(text)
+
+            if filename.lower().endswith(".csv"):
+                csv_rows = self._chunk_csv_by_row(text)
+                chunks_text = [t for t, _ in csv_rows]
+                image_ids = [img for _, img in csv_rows]
+            else:
+                chunks_text = self.chunker.chunk_text(text)
+                image_ids = [None] * len(chunks_text)
             if not chunks_text:
                 return
-                
+
             embeddings = self.embedding_service.encode(chunks_text)
-            
-            # Prepare metadata
+
             base_metadata = {"path": filename}
             if metadata:
                 base_metadata.update(metadata)
-                
+
             records = [{
                 "text": txt,
                 "vector": vec.tolist() if hasattr(vec, "tolist") else list(vec),
@@ -133,8 +166,9 @@ class BackfillService:
                 "source_type": full_source_type,
                 "chunk_index": i,
                 "file_fingerprint": fingerprint,
+                "image_id": img_id or "",
                 "metadata": base_metadata
-            } for i, (txt, vec) in enumerate(zip(chunks_text, embeddings))]
+            } for i, (txt, vec, img_id) in enumerate(zip(chunks_text, embeddings, image_ids))]
                 
             # Atomic Replace in current LanceDB table
             self.lancedb_store.delete_by_file(filename, full_source_type, source_language=language)
