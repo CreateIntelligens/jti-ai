@@ -43,14 +43,28 @@ export function sortByLabel(left: string, right: string): number {
 export function buildLabels(zh: string, en: string): HciotLabels | null {
   const zhLabel = zh.trim();
   const enLabel = en.trim();
-  if (!zhLabel && !enLabel) {
+  if (!zhLabel || !enLabel) {
     return null;
   }
 
   return {
-    zh: zhLabel || enLabel,
-    en: enLabel || zhLabel,
+    zh: zhLabel,
+    en: enLabel,
   };
+}
+
+export const DEFAULT_TOPIC_LABELS: HciotLabels = { zh: '預設主題', en: 'Default topic' };
+
+export function missingBilingualLabelMessage(
+  kind: 'category' | 'topic',
+  language: HciotLanguage,
+): string {
+  if (language === 'zh') {
+    return kind === 'category' ? '新增科別需要中英文名稱' : '新增主題需要中英文名稱';
+  }
+  return kind === 'category'
+    ? 'New categories require both zh and en labels'
+    : 'New topics require both zh and en labels';
 }
 
 export function createEmptyDraft(): FileMetadataDraft {

@@ -1,9 +1,15 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Pencil, Trash2, Plus, Check, X, GripVertical } from 'lucide-react';
-import type { HciotLabels, HciotTopicCategory } from '../../services/api/hciot';
+import type { HciotTopicCategory } from '../../services/api/hciot';
 import * as api from '../../services/api';
 import ConfirmDialog from '../ConfirmDialog';
-import { slugify, getErrorMessage } from './knowledgeWorkspace/topicUtils';
+import {
+  buildLabels,
+  DEFAULT_TOPIC_LABELS,
+  getErrorMessage,
+  missingBilingualLabelMessage,
+  slugify,
+} from './knowledgeWorkspace/topicUtils';
 
 interface Props {
   language: 'zh' | 'en';
@@ -13,10 +19,6 @@ interface Props {
 
 type HciotTopic = HciotTopicCategory['topics'][number];
 type DeleteTarget = { type: 'category' | 'topic'; catId: string; topicId?: string };
-
-function buildLabels(zh: string, en: string): HciotLabels {
-  return { zh: zh || en, en: en || zh };
-}
 
 function toQuestionLines(value: string): string[] {
   return value.split('\n').map((line) => line.trim()).filter(Boolean);
@@ -97,9 +99,13 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
   };
 
   const saveEditCat = async (cat: HciotTopicCategory) => {
-    if (!editCatLabels.zh.trim() && !editCatLabels.en.trim()) return;
+    const labels = buildLabels(editCatLabels.zh, editCatLabels.en);
+    if (!labels) {
+      alert(missingBilingualLabelMessage('category', language));
+      return;
+    }
     await runSavingAction(async () => {
-      await Promise.all(cat.topics.map((topic) => api.updateHciotTopic(topic.id, { category_labels: editCatLabels })));
+      await Promise.all(cat.topics.map((topic) => api.updateHciotTopic(topic.id, { category_labels: labels })));
       setEditingCatId(null);
       await reload();
     });
@@ -107,18 +113,15 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
 
   // "Add category" = add a first topic under the new category prefix
   const confirmAddCat = async () => {
-    const catZh = newCatZh.trim();
-    const catEn = newCatEn.trim();
-    if (!catZh && !catEn) return;
-    const catSlug = slugify(catEn || catZh);
+    const catLabels = buildLabels(newCatZh, newCatEn);
+    if (!catLabels) {
+      alert(missingBilingualLabelMessage('category', language));
+      return;
+    }
+    const catSlug = slugify(catLabels.en);
     if (!catSlug) return;
-    // Create a placeholder topic — user can rename it later
     const topicId = `${catSlug}/default`;
-    const catLabels = buildLabels(catZh, catEn);
-    const topicLabels = buildLabels(
-      language === 'zh' ? '預設主題' : 'Default topic',
-      'Default topic',
-    );
+    const topicLabels = DEFAULT_TOPIC_LABELS;
     await runSavingAction(async () => {
       await api.createHciotTopic(topicId, topicLabels, catLabels);
       resetCategoryDraft();
@@ -146,23 +149,29 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
   };
 
   const saveEditTopic = async (topicId: string) => {
-    if (!editTopicLabels.zh.trim() && !editTopicLabels.en.trim()) return;
+    const labels = buildLabels(editTopicLabels.zh, editTopicLabels.en);
+    if (!labels) {
+      alert(missingBilingualLabelMessage('topic', language));
+      return;
+    }
     await runSavingAction(async () => {
-      await api.updateHciotTopic(topicId, { labels: editTopicLabels });
+      await api.updateHciotTopic(topicId, { labels });
       setEditingTopicId(null);
       await reload();
     });
   };
 
   const confirmAddTopic = async (cat: HciotTopicCategory) => {
-    const zh = newTopicZh.trim();
-    const en = newTopicEn.trim();
-    if (!zh && !en) return;
-    const topicSlug = slugify(en || zh);
+    const labels = buildLabels(newTopicZh, newTopicEn);
+    if (!labels) {
+      alert(missingBilingualLabelMessage('topic', language));
+      return;
+    }
+    const topicSlug = slugify(labels.en);
     if (!topicSlug) return;
     const topicId = `${cat.id}/${topicSlug}`;
     await runSavingAction(async () => {
-      await api.createHciotTopic(topicId, buildLabels(zh, en), cat.labels);
+      await api.createHciotTopic(topicId, labels, cat.labels);
       resetTopicDraft();
       await reload();
     });

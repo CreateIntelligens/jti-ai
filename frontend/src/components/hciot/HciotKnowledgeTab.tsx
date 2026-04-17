@@ -3,7 +3,7 @@ import { Upload, FileText, Trash2, Download, Pencil, X } from 'lucide-react';
 import HciotSelect from './HciotSelect';
 import ConfirmDialog from '../ConfirmDialog';
 import HciotTopicEditor from './HciotTopicEditor';
-import { NEW_VALUE, slugify } from './knowledgeWorkspace/topicUtils';
+import { buildLabels, missingBilingualLabelMessage, NEW_VALUE, slugify } from './knowledgeWorkspace/topicUtils';
 import * as api from '../../services/api';
 
 interface KBFile {
@@ -92,7 +92,9 @@ export default function HciotKnowledgeTab({
 
   const isNewCategory = selectedCategoryId === NEW_VALUE;
   const isNewTopic = selectedTopicId === NEW_VALUE;
-  const effectiveCategoryId = isNewCategory ? slugify(newCategoryLabelEn || newCategoryLabelZh) : selectedCategoryId;
+  const newCategoryLabels = buildLabels(newCategoryLabelZh, newCategoryLabelEn);
+  const newTopicLabels = buildLabels(newTopicLabelZh, newTopicLabelEn);
+  const effectiveCategoryId = isNewCategory && newCategoryLabels ? slugify(newCategoryLabels.en) : selectedCategoryId;
 
   const selectedCategory = useMemo(
     () => categories.find((c) => c.id === selectedCategoryId),
@@ -100,7 +102,7 @@ export default function HciotKnowledgeTab({
   );
   const topicsInCategory = selectedCategory?.topics ?? [];
 
-  const effectiveTopicId = isNewTopic ? slugify(newTopicLabelEn || newTopicLabelZh) : selectedTopicId;
+  const effectiveTopicId = isNewTopic && newTopicLabels ? slugify(newTopicLabels.en) : selectedTopicId;
 
   useEffect(() => {
     api.listHciotTopicsAdmin()
@@ -145,14 +147,22 @@ export default function HciotKnowledgeTab({
     return {
       categoryId: effectiveCategoryId,
       topicId: topicSlug,
-      categoryLabelZh: isNewCategory ? newCategoryLabelZh.trim() || undefined : undefined,
-      categoryLabelEn: isNewCategory ? newCategoryLabelEn.trim() || undefined : undefined,
-      topicLabelZh: isNewTopic ? newTopicLabelZh.trim() || undefined : existingTopic?.labels.zh,
-      topicLabelEn: isNewTopic ? newTopicLabelEn.trim() || undefined : existingTopic?.labels.en,
+      categoryLabelZh: isNewCategory ? newCategoryLabels?.zh : undefined,
+      categoryLabelEn: isNewCategory ? newCategoryLabels?.en : undefined,
+      topicLabelZh: isNewTopic ? newTopicLabels?.zh : existingTopic?.labels.zh,
+      topicLabelEn: isNewTopic ? newTopicLabels?.en : existingTopic?.labels.en,
     };
   };
 
   const handleUpload = (files: FileList | File[]) => {
+    if (isNewCategory && !newCategoryLabels) {
+      alert(missingBilingualLabelMessage('category', lang));
+      return;
+    }
+    if (isNewTopic && !newTopicLabels) {
+      alert(missingBilingualLabelMessage('topic', lang));
+      return;
+    }
     void onUploadFiles(files, buildTopicOpts());
   };
 

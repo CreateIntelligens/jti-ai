@@ -520,9 +520,9 @@ export default function HciotKnowledgeWorkspace({
     if (nextDraft.categoryId === NEW_VALUE) {
       const labels = buildLabels(nextDraft.categoryLabelZh, nextDraft.categoryLabelEn);
       if (!labels) {
-        throw new Error(text('請輸入新科別名稱', 'Please enter a category name'));
+        throw new Error(text('請輸入新科別的中英文名稱', 'Please enter both zh and en category labels'));
       }
-      const createdCategoryId = slugify(labels.en || labels.zh);
+      const createdCategoryId = slugify(labels.en);
       if (!createdCategoryId) {
         throw new Error(text('無法建立科別 ID', 'Unable to create category id'));
       }
@@ -547,16 +547,18 @@ export default function HciotKnowledgeWorkspace({
 
     const labels = buildLabels(nextDraft.topicLabelZh, nextDraft.topicLabelEn);
     if (!labels) {
-      throw new Error(text('請輸入新主題名稱', 'Please enter a topic name'));
+      throw new Error(text('請輸入新主題的中英文名稱', 'Please enter both zh and en topic labels'));
     }
-    const createdTopicSlug = slugify(labels.en || labels.zh);
+    const createdTopicSlug = slugify(labels.en);
     if (!createdTopicSlug) {
       throw new Error(text('無法建立主題 ID', 'Unable to create topic id'));
     }
 
     const fullTopicId = `${nextDraft.categoryId}/${createdTopicSlug}`;
-    const categoryLabels = buildLabels(nextDraft.categoryLabelZh, nextDraft.categoryLabelEn)
-      || { zh: nextDraft.categoryId, en: nextDraft.categoryId };
+    const categoryLabels = buildLabels(nextDraft.categoryLabelZh, nextDraft.categoryLabelEn);
+    if (!categoryLabels) {
+      throw new Error(text('請輸入新科別的中英文名稱', 'Please enter both zh and en category labels'));
+    }
     await api.createHciotTopic(fullTopicId, labels, categoryLabels);
     const topicData = await api.listHciotTopicsAdmin();
     setCategories(topicData.categories || []);

@@ -13,6 +13,7 @@ interface FileUploadTabProps {
   language: HciotLanguage;
   uploading: boolean;
   resolvedTopic: ResolvedUploadTopic | null;
+  topicSelectionIncomplete: boolean;
   onClose: () => void;
   onUploadFile: (file: File, topicId: string | null, labels: TopicLabels | null) => Promise<{ name: string }>;
   onUploadComplete: (firstUploadedFileName: string | null, count: number) => Promise<void>;
@@ -148,6 +149,7 @@ export default function FileUploadTab({
   language,
   uploading,
   resolvedTopic,
+  topicSelectionIncomplete,
   onClose,
   onUploadFile,
   onUploadComplete,
@@ -167,7 +169,7 @@ export default function FileUploadTab({
 
   const isBusy = uploadingLocal || uploading;
   const hasPending = selectedFiles.some((item) => item.status === 'pending' || item.status === 'error');
-  const canSubmitFile = hasPending && !isBusy;
+  const canSubmitFile = hasPending && !isBusy && !topicSelectionIncomplete;
 
   const handleFileSelect = (fileList: FileList | null) => {
     if (!fileList?.length) return;
@@ -202,6 +204,12 @@ export default function FileUploadTab({
       .map((item, index) => ({ item, index }))
       .filter(({ item }) => item.status === 'pending' || item.status === 'error');
     if (!pendingFiles.length) {
+      return;
+    }
+    if (topicSelectionIncomplete) {
+      alert(language === 'zh'
+        ? '新增科別或主題時，請完整填寫中英文名稱'
+        : 'Please enter both zh and en labels for new categories or topics');
       return;
     }
 

@@ -19,7 +19,6 @@
 - 獨立的 `hciot_app` MongoDB database，與 JTI 資料完全隔離
 - 知識庫管理：Topic 分類、CSV 上傳（Q&A 格式）、圖片管理（MongoDB GridFS）
 - 圖片管理：上傳、更新、刪除、image picker，圖片在對話中以附件形式呈現
-- 多語言 Topic 標籤：儲存時自動翻譯缺失的雙語標籤
 - Backend normalize 時自動生成 CSV index
 - TTS 語音角色可透過環境變數設定
 
