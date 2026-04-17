@@ -178,10 +178,13 @@ class BaseAgent:
     def _get_or_create_chat_session(self, session: Session):
         """Get or create a persistent Gemini chat session."""
         sid = session.session_id
-        if sid in self._chat_sessions:
-            return self._chat_sessions[sid]
+        cached_session = self._chat_sessions.get(sid)
+        if cached_session is not None:
+            return cached_session
 
-        history = build_chat_history(session.chat_history) if session.chat_history else []
+        history = []
+        if session.chat_history:
+            history = build_chat_history(session.chat_history)
         if history:
             logger.info("恢復 chat session: %d 筆 (session=%s...)", len(history), sid[:8])
 
@@ -196,12 +199,14 @@ class BaseAgent:
     def _sync_history_to_db(self, session_id: str, user_message: str, assistant_message: str, citations: list | None = None):
         """Sync user/assistant messages to MongoDB."""
         session = self._session_manager.get_session(session_id)
-        if not session: return
+        if not session:
+            return
 
         session.chat_history.append({"role": "user", "content": user_message})
-        entry = {"role": "assistant", "content": assistant_message}
-        if citations: entry["citations"] = citations
-        session.chat_history.append(entry)
+        assistant_entry = {"role": "assistant", "content": assistant_message}
+        if citations:
+            assistant_entry["citations"] = citations
+        session.chat_history.append(assistant_entry)
         self._session_manager.update_session(session)
 
     def _sync_history_to_db_background(self, *args, **kwargs):
@@ -227,17 +232,21 @@ class BaseAgent:
     @staticmethod
     def _append_to_chat_history(chat_session, user_message: str, model_message: str):
         """將乾淨的 user/model 訊息追加到 SDK chat session 的內部歷史"""
-        if hasattr(chat_session, '_curated_history'):
-            chat_session._curated_history.append(
-                types.Content(role="user", parts=[types.Part.from_text(text=user_message)])
-            )
-            chat_session._curated_history.append(
-                types.Content(role="model", parts=[types.Part.from_text(text=model_message)])
-            )
+        curated_history = getattr(chat_session, "_curated_history", None)
+        if curated_history is None:
+            return
+
+        curated_history.append(
+            types.Content(role="user", parts=[types.Part.from_text(text=user_message)])
+        )
+        curated_history.append(
+            types.Content(role="model", parts=[types.Part.from_text(text=model_message)])
+        )
 
     # --- Function-calling loop ---
 
     _MAX_TOOL_ROUNDS = 2
+    _RAG_MAX_CITATIONS = 5
 
     async def _run_tool_loop(self, chat_session, enriched: str, session: Session, user_message: str):
         """Send enriched message with forced tool call, handle function calling loop.
@@ -313,21 +322,29 @@ class BaseAgent:
             )
             (_, ai_citations), (_, user_citations) = await asyncio.gather(ai_future, user_future)
 
-        # Merge and dedupe by text content
-        seen_texts: set[str] = set()
-        merged: list[dict] = []
+        # Merge, dedupe by text, keep the smallest distance per duplicate
+        by_text: dict[str, dict] = {}
         for c in (ai_citations or []) + (user_citations or []):
             txt = c.get("text", "")
-            if txt not in seen_texts:
-                seen_texts.add(txt)
-                merged.append(c)
+            if not txt:
+                continue
+            existing = by_text.get(txt)
+            if existing is None or c.get("_distance", 999) < existing.get("_distance", 999):
+                by_text[txt] = c
+
+        # Sort by distance (lower = more relevant) and cap to top N
+        merged = sorted(by_text.values(), key=lambda c: c.get("_distance", 999))[:self._RAG_MAX_CITATIONS]
 
         if not merged:
             return "知識庫中沒有找到相關資料。", None
 
-        kb_text = "\n---\n".join(c["text"] for c in merged if c.get("text"))
-        logger.info(f"[RAG Dual] ai={len(ai_citations or [])} + user={len(user_citations or [])} → merged={len(merged)}")
-        return kb_text, merged
+        kb_text = "\n---\n".join(c["text"] for c in merged)
+        distances = [f"{c.get('_distance', 999):.3f}" for c in merged]
+        logger.info(f"[RAG Dual] ai={len(ai_citations or [])} + user={len(user_citations or [])} → top {len(merged)} | distances={distances}")
+
+        # Strip internal fields before returning to caller
+        cleaned = [{k: v for k, v in c.items() if not k.startswith("_")} for c in merged]
+        return kb_text, cleaned
 
     @staticmethod
     def _clean_enriched_history(chat_session, original_user_message: str):

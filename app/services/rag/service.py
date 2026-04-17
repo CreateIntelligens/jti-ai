@@ -76,6 +76,7 @@ class RAGPipeline:
                 "uri": r.get("metadata", {}).get("path") or r.get("file_id", "unknown"),
                 "title": r.get("metadata", {}).get("display_name") or r.get("file_id", "Resource"),
                 "text": r.get("text", ""),
+                "_distance": float(r.get("_distance", 999)),
                 **({"image_id": r["image_id"]} if r.get("image_id") else {}),
             } for r in results]
 
