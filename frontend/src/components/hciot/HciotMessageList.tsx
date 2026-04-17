@@ -143,22 +143,26 @@ export default function HciotMessageList({
                             {msg.type === 'user' ? (
                               <button
                                 type="button"
-                                className="hciot-inline-action"
+                                className="hciot-inline-action hciot-inline-action-icon"
                                 onClick={() => {
                                   setEditingTurn(msg.turnNumber!);
                                   setEditText(msg.text);
                                 }}
+                                title="編輯並重送"
+                                aria-label="編輯訊息"
                               >
-                                Edit
+                                ✎
                               </button>
                             ) : null}
                             {msg.type === 'assistant' ? (
                               <button
                                 type="button"
-                                className="hciot-inline-action"
+                                className="hciot-inline-action hciot-inline-action-icon"
                                 onClick={() => handleRegenerate(msg.turnNumber!)}
+                                title="重新生成"
+                                aria-label="重新生成回覆"
                               >
-                                Retry
+                                ↻
                               </button>
                             ) : null}
                           </div>
