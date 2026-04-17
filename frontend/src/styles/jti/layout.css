@@ -2,13 +2,43 @@
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap');
 
 :root {
+  /* Brand */
   --gold: #e0c068;
   --gold-dark: #d4a843;
   --bronze: #cd7f32;
+
+  /* Surfaces */
   --bg: #1a1f2e;
   --bg-light: #2a3142;
+  --surface: rgba(26, 31, 46, 0.5);
+  --surface-strong: rgba(42, 49, 66, 0.9);
+  --surface-raised: rgba(255, 255, 255, 0.05);
+  --surface-hover: rgba(26, 31, 46, 0.8);
+
+  /* Text */
   --text: #e8eaed;
   --text-muted: #94a3b8;
+  --text-strong: #ffffff;
+  --text-on-accent: #1a1f2e;
+  --placeholder: rgba(232, 234, 237, 0.5);
+
+  /* Borders */
+  --border: rgba(224, 192, 104, 0.15);
+  --border-strong: rgba(224, 192, 104, 0.35);
+  --border-subtle: rgba(255, 255, 255, 0.08);
+
+  /* Accent tints */
+  --gold-tint-soft: rgba(224, 192, 104, 0.1);
+  --gold-tint: rgba(224, 192, 104, 0.2);
+  --gold-tint-strong: rgba(224, 192, 104, 0.35);
+
+  /* Effects */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 0 6px 16px rgba(224, 192, 104, 0.15);
+  --overlay: rgba(0, 0, 0, 0.6);
+
+  /* Control sizing */
   --control-h: 48px;
   --control-radius: 999px;
   --control-pad-x: 1.15rem;
@@ -52,7 +82,7 @@
 .jti-header {
   background: var(--bg-light);
   backdrop-filter: blur(22px) saturate(160%);
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid var(--border);
   padding: 1.2rem 2.5rem;
   position: sticky;
   top: 0;
@@ -90,8 +120,8 @@
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  border: 1px solid rgba(224, 192, 104, 0.38);
-  background: rgba(224, 192, 104, 0.1);
+  border: 1px solid var(--border-strong);
+  background: var(--gold-tint-soft);
   color: var(--gold);
 }
 
@@ -124,19 +154,19 @@
   padding: 0;
   border-radius: 50%;
   background: var(--bg-light);
-  border: 1.5px solid rgba(224, 192, 104, 0.15);
+  border: 1.5px solid var(--border);
   color: var(--gold);
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-md);
 }
 
 .icon-btn:hover {
-  background: rgba(224, 192, 104, 0.1);
+  background: var(--gold-tint-soft);
   border-color: var(--gold);
-  color: #fff;
+  color: var(--text-strong);
   transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(224, 192, 104, 0.15);
+  box-shadow: var(--shadow-lg);
 }
 
 .icon-btn:active {
@@ -153,7 +183,7 @@
 .icon-btn:focus-visible,
 .quick-action:focus-visible,
 .send-button:focus-visible {
-  outline: 2px solid rgba(224, 192, 104, 0.55);
+  outline: 2px solid var(--border-strong);
   outline-offset: 2px;
 }
 
@@ -166,7 +196,7 @@
   width: 68px;
   height: var(--control-h);
   background: var(--bg);
-  border: 1px solid rgba(224, 192, 104, 0.25);
+  border: 1px solid var(--border-strong);
   border-radius: 999px;
   cursor: pointer;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
@@ -175,7 +205,7 @@
 
 .lang-switch:hover {
   border-color: var(--gold);
-  box-shadow: 0 2px 10px rgba(224, 192, 104, 0.15);
+  box-shadow: var(--shadow-lg);
 }
 
 .lang-option {
@@ -202,8 +232,8 @@
   left: 3px;
   width: calc(50% - 4px);
   height: calc(100% - 6px);
-  background: rgba(224, 192, 104, 0.15);
-  border: 1px solid rgba(224, 192, 104, 0.3);
+  background: var(--gold-tint);
+  border: 1px solid var(--border-strong);
   border-radius: 999px;
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }

@@ -10,7 +10,7 @@
 .jti-quiz-subtabs {
   display: flex;
   gap: 0;
-  border-bottom: 1px solid rgba(224, 192, 104, 0.1);
+  border-bottom: 1px solid var(--border-subtle);
   margin-bottom: 0.5rem;
 }
 
@@ -52,9 +52,9 @@
   gap: 0.5rem;
   align-items: center;
   padding: 0.5rem 0.75rem;
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--surface);
   border-radius: 0.5rem;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-subtle);
   font-size: 0.8rem;
 }
 
@@ -68,7 +68,7 @@
 }
 
 .jti-quiz-stat-cat {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--gold-tint-soft);
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
   color: var(--text-muted);
@@ -85,9 +85,9 @@
 .jti-quiz-filter {
   flex: 1;
   padding: 0.45rem 0.7rem;
-  border: 1px solid rgba(224, 192, 104, 0.2);
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--surface-strong);
   color: var(--text);
   font-size: 0.85rem;
   font-family: inherit;
@@ -103,9 +103,9 @@
   align-items: center;
   gap: 0.3rem;
   padding: 0.45rem 0.8rem;
-  border: 1px solid rgba(224, 192, 104, 0.3);
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
-  background: rgba(224, 192, 104, 0.08);
+  background: var(--gold-tint-soft);
   color: var(--gold);
   font-size: 0.85rem;
   cursor: pointer;
@@ -115,7 +115,7 @@
 }
 
 .jti-quiz-add-btn:hover {
-  background: rgba(224, 192, 104, 0.15);
+  background: var(--gold-tint);
   border-color: var(--gold);
 }
 
@@ -126,8 +126,8 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.75rem;
-  background: rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(224, 192, 104, 0.12);
+  background: var(--surface);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
 }
 
@@ -146,9 +146,9 @@
 .jti-quiz-result-edit input,
 .jti-quiz-result-edit textarea {
   padding: 0.45rem 0.7rem;
-  border: 1px solid rgba(224, 192, 104, 0.2);
+  border: 1px solid var(--border);
   border-radius: 6px;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--surface-strong);
   color: var(--text);
   font-size: 0.85rem;
   font-family: inherit;
@@ -201,8 +201,8 @@
   gap: 0.3rem;
   padding: 0.4rem 0.75rem;
   border-radius: 6px;
-  border: 1px solid rgba(224, 192, 104, 0.3);
-  background: rgba(224, 192, 104, 0.1);
+  border: 1px solid var(--border-strong);
+  background: var(--gold-tint);
   color: var(--gold);
   font-size: 0.8rem;
   cursor: pointer;
@@ -211,17 +211,17 @@
 }
 
 .jti-quiz-form-actions button:hover {
-  background: rgba(224, 192, 104, 0.2);
+  background: var(--gold-tint-strong);
 }
 
 .jti-quiz-form-actions button.cancel {
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: var(--border-subtle);
   background: transparent;
   color: var(--text-muted);
 }
 
 .jti-quiz-form-actions button.cancel:hover {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--surface);
 }
 
 .jti-quiz-form-actions button:disabled {
@@ -246,15 +246,15 @@
 
 /* Question card */
 .jti-quiz-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--surface);
   transition: border-color 0.2s ease;
   overflow: hidden;
 }
 
 .jti-quiz-card:hover {
-  border-color: rgba(224, 192, 104, 0.2);
+  border-color: var(--border-strong);
 }
 
 .jti-quiz-card-header {
@@ -267,7 +267,7 @@
 }
 
 .jti-quiz-card-header:hover {
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--gold-tint-soft);
 }
 
 .jti-quiz-card-info {
@@ -281,7 +281,7 @@
   font-size: 0.72rem;
   font-weight: 600;
   color: var(--gold);
-  background: rgba(224, 192, 104, 0.1);
+  background: var(--gold-tint);
   padding: 0.1rem 0.4rem;
   border-radius: 4px;
 }
@@ -289,14 +289,15 @@
 .jti-quiz-card-cat {
   font-size: 0.72rem;
   color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--gold-tint-soft);
   padding: 0.1rem 0.4rem;
   border-radius: 4px;
 }
 
 .jti-quiz-card-weight {
   font-size: 0.7rem;
-  color: rgba(255, 255, 255, 0.3);
+  color: var(--text-muted);
+  opacity: 0.7;
 }
 
 .jti-quiz-card-text {
@@ -331,7 +332,7 @@
 }
 
 .jti-quiz-card-actions .icon-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--gold-tint);
   color: var(--gold);
 }
 
@@ -343,7 +344,7 @@
 /* Card body (expanded) */
 .jti-quiz-card-body {
   padding: 0.5rem 0.75rem 0.75rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid var(--border-subtle);
 }
 
 /* Options view */
@@ -359,7 +360,7 @@
   gap: 0.4rem;
   font-size: 0.82rem;
   padding: 0.3rem 0.5rem;
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--surface);
   border-radius: 6px;
 }
 
@@ -377,7 +378,7 @@
 .jti-quiz-option-view .option-score {
   font-size: 0.72rem;
   color: var(--text-muted);
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--gold-tint-soft);
   padding: 0.1rem 0.4rem;
   border-radius: 4px;
 }
@@ -414,7 +415,7 @@
 }
 
 .jti-quiz-delete-confirm button.cancel {
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--border-subtle);
   background: transparent;
   color: var(--text-muted);
 }
@@ -433,15 +434,15 @@
 }
 
 .jti-quiz-result-card {
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--surface);
   overflow: hidden;
   transition: border-color 0.2s;
 }
 
 .jti-quiz-result-card:hover {
-  border-color: rgba(224, 192, 104, 0.2);
+  border-color: var(--border-strong);
 }
 
 .jti-quiz-result-card-header {
@@ -506,7 +507,7 @@
 }
 
 .jti-quiz-result-card-header .icon-btn:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--gold-tint);
   color: var(--gold);
 }
 
@@ -526,9 +527,9 @@
   font-size: 0.72rem;
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--gold-tint-soft);
   color: var(--text-muted);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
 }
 
 .jti-quiz-result-desc {
@@ -544,7 +545,7 @@
   flex-direction: column;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem 0.75rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  border-top: 1px solid var(--border-subtle);
 }
 
 /* ========== Bank Bar ========== */
@@ -564,9 +565,9 @@
   flex: 0 0 auto;
   min-width: 130px;
   padding: 0.5rem 0.65rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--border-subtle);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.02);
+  background: var(--surface);
   cursor: pointer;
   transition: all 0.15s;
   position: relative;
@@ -574,11 +575,11 @@
 
 .jti-bank-card.selected {
   border-color: var(--gold);
-  background: rgba(224, 192, 104, 0.06);
+  background: var(--gold-tint-soft);
 }
 
 .jti-bank-card:hover {
-  border-color: rgba(224, 192, 104, 0.3);
+  border-color: var(--border-strong);
 }
 
 .jti-bank-card.creating {
@@ -591,9 +592,9 @@
 
 .jti-bank-card.creating input {
   padding: 0.3rem 0.5rem;
-  border: 1px solid rgba(224, 192, 104, 0.2);
+  border: 1px solid var(--border);
   border-radius: 4px;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--surface-strong);
   color: var(--text);
   font-size: 0.8rem;
   font-family: inherit;
@@ -649,7 +650,7 @@
   font-size: 0.65rem;
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
-  border: 1px solid rgba(224, 192, 104, 0.2);
+  border: 1px solid var(--border);
   background: transparent;
   color: var(--gold);
   cursor: pointer;
@@ -658,7 +659,7 @@
 }
 
 .jti-bank-activate-btn:hover {
-  background: rgba(224, 192, 104, 0.1);
+  background: var(--gold-tint);
 }
 
 .jti-bank-delete-btn {
@@ -705,7 +706,7 @@
 }
 
 .jti-bank-delete-confirm button.cancel {
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: var(--border-subtle);
   background: transparent;
   color: var(--text-muted);
 }
@@ -719,8 +720,8 @@
   font-size: 0.72rem;
   padding: 0.15rem 0.4rem;
   border-radius: 4px;
-  border: 1px solid rgba(224, 192, 104, 0.3);
-  background: rgba(224, 192, 104, 0.1);
+  border: 1px solid var(--border-strong);
+  background: var(--gold-tint);
   color: var(--gold);
   cursor: pointer;
   font-family: inherit;
@@ -730,7 +731,7 @@
 .jti-bank-create-actions button.cancel {
   display: flex;
   align-items: center;
-  border-color: rgba(255, 255, 255, 0.1);
+  border-color: var(--border-subtle);
   background: transparent;
   color: var(--text-muted);
 }
@@ -741,7 +742,7 @@
   gap: 0.25rem;
   padding: 0.5rem 0.65rem;
   min-width: 100px;
-  border: 1px dashed rgba(224, 192, 104, 0.2);
+  border: 1px dashed var(--border);
   border-radius: 8px;
   background: transparent;
   color: var(--text-muted);
