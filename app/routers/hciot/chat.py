@@ -23,7 +23,6 @@ from app.schemas.chat import (
 )
 from app.services.hciot.main_agent import main_agent
 from app.services.hciot.runtime_settings import get_available_tts_characters
-from app.services.jti.tts_text import to_tts_text
 from app.services.session.session_manager_factory import get_hciot_conversation_logger, get_hciot_session_manager
 from app.services.tts_jobs import hciot_tts_job_manager as _tts_manager
 from app.utils import build_date_query, group_conversations_by_session
@@ -114,7 +113,6 @@ async def chat(request: ChatRequest):
             image_id=result.get("image_id"),
         ) or (None, None)
 
-        result["tts_text"] = to_tts_text(result["message"], language)
         response = ChatResponse(**result, turn_number=final_turn_number)
         return attach_tts_message_id(
             response, 

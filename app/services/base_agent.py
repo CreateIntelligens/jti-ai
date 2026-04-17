@@ -17,7 +17,12 @@ from google.genai import types
 
 from app.models.session import Session
 import app.services.gemini_service as _gemini_service
-from app.services.agent_utils import build_chat_history, normalize_language
+from app.services.agent_utils import (
+    build_chat_history,
+    extract_response_text,
+    normalize_language,
+    strip_citations,
+)
 from app.services.rag.service import get_rag_pipeline
 
 logger = logging.getLogger(__name__)
@@ -30,6 +35,7 @@ class BaseAgent:
     def __init__(self, model_name: str):
         self.model_name = model_name
         self._chat_sessions: dict[str, Any] = {}
+        self._force_tool_configs: dict[str, types.GenerateContentConfig] = {}
 
     # --- 子類必須實作 ---
 
@@ -66,6 +72,16 @@ class BaseAgent:
     def _load_default_runtime_settings(self):
         """Delegate to project-specific load_runtime_settings_from_prompt_manager(None)."""
         raise NotImplementedError
+
+    @property
+    def _rag_search_language(self) -> str | None:
+        """Language to use for RAG search (None means use session.language). 子類可覆寫。"""
+        return None
+
+    @property
+    def _rag_tool_declaration(self) -> types.Tool | None:
+        """Return the RAG tool declaration for this agent, or None if RAG tool is not used."""
+        return None
 
     # --- 共用 prompt / system instruction 邏輯 ---
 
@@ -136,6 +152,29 @@ class BaseAgent:
 
     # --- 共用 session 管理 ---
 
+    def _make_chat_config(self, session: Session) -> types.GenerateContentConfig:
+        tool = self._rag_tool_declaration
+        return types.GenerateContentConfig(
+            system_instruction=[types.Part.from_text(text=self._get_system_instruction(session))],
+            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            tools=[tool] if tool else None,
+        )
+
+    def _get_force_tool_config(self, session: Session) -> types.GenerateContentConfig:
+        """Cached per-session config that forces tool calling."""
+        sid = session.session_id
+        if sid not in self._force_tool_configs:
+            base = self._make_chat_config(session)
+            self._force_tool_configs[sid] = types.GenerateContentConfig(
+                system_instruction=base.system_instruction,
+                thinking_config=base.thinking_config,
+                tools=base.tools,
+                tool_config=types.ToolConfig(
+                    function_calling_config=types.FunctionCallingConfig(mode=types.FunctionCallingConfigMode.ANY),
+                ),
+            )
+        return self._force_tool_configs[sid]
+
     def _get_or_create_chat_session(self, session: Session):
         """Get or create a persistent Gemini chat session."""
         sid = session.session_id
@@ -146,10 +185,7 @@ class BaseAgent:
         if history:
             logger.info("恢復 chat session: %d 筆 (session=%s...)", len(history), sid[:8])
 
-        config = types.GenerateContentConfig(
-            system_instruction=[types.Part.from_text(text=self._get_system_instruction(session))],
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
-        )
+        config = self._make_chat_config(session)
 
         chat_session = _gemini_service.client.chats.create(
             model=self.model_name, config=config, history=history,
@@ -178,11 +214,13 @@ class BaseAgent:
     def remove_session(self, session_id: str):
         """清除記憶體中的 chat session"""
         self._chat_sessions.pop(session_id, None)
+        self._force_tool_configs.pop(session_id, None)
 
     def remove_all_sessions(self):
         """清除所有記憶體中的 chat sessions"""
         count = len(self._chat_sessions)
         self._chat_sessions.clear()
+        self._force_tool_configs.clear()
         if count > 0:
             logger.info("已清除 %d 個 chat sessions", count)
 
@@ -197,43 +235,99 @@ class BaseAgent:
                 types.Content(role="model", parts=[types.Part.from_text(text=model_message)])
             )
 
-    # --- 共用 enriched message 組裝 ---
+    # --- Function-calling loop ---
 
-    def _build_enriched_message(self, session_state: str, user_message: str, language: str, kb_result: str | None) -> str:
-        """組合 session 狀態、知識庫結果、使用者問題為完整 enriched message"""
-        question_label = "User question:" if language == "en" else "使用者問題："
-        question_block = f"{question_label} {user_message}"
+    _MAX_TOOL_ROUNDS = 2
 
-        if kb_result:
-            return (
-                f"{session_state}\n\n"
-                f"<知識庫查詢結果>\n{kb_result}\n</知識庫查詢結果>\n\n"
-                f"{question_block}"
+    async def _run_tool_loop(self, chat_session, enriched: str, session: Session, user_message: str):
+        """Send enriched message with forced tool call, handle function calling loop.
+        Returns (response, citations)."""
+        from app.services.gemini_service import gemini_with_retry, run_sync
+
+        force_config = self._get_force_tool_config(session)
+        response = await run_sync(gemini_with_retry, lambda: chat_session.send_message(enriched, config=force_config))
+
+        citations = None
+        for _ in range(self._MAX_TOOL_ROUNDS):
+            fc_part = self._find_function_call(response)
+            if fc_part is None:
+                break
+
+            tool_name = fc_part.function_call.name
+            tool_args = dict(fc_part.function_call.args) if fc_part.function_call.args else {}
+            logger.info(f"[Tool Call] {tool_name}({tool_args})")
+
+            if tool_name == "search_knowledge":
+                ai_query = tool_args.get("query", user_message)
+                kb_text, raw_citations = await self._execute_rag_tool(ai_query, user_message, session)
+                if raw_citations:
+                    citations = raw_citations
+                tool_result = kb_text
+            else:
+                tool_result = f"Unknown tool: {tool_name}"
+
+            tool_response_part = types.Part.from_function_response(
+                name=tool_name,
+                response={"result": tool_result},
             )
-        return f"{session_state}\n\n{question_block}"
+            response = await run_sync(gemini_with_retry, lambda p=tool_response_part: chat_session.send_message(p))
 
-    # --- 共用 knowledge search ---
+        self._clean_enriched_history(chat_session, user_message)
+        return response, citations
 
-    async def _knowledge_search(self, user_message: str, language: str) -> tuple[str | None, list[dict] | None]:
-        """用本地 RAG Pipeline 查知識庫，distance threshold 過濾不相關結果。"""
+    # --- Function-calling and RAG helpers ---
+
+    @staticmethod
+    def _find_function_call(response) -> Any | None:
+        """Return the first Part with a function_call, or None."""
+        if not response.candidates or not response.candidates[0].content.parts:
+            return None
+        for part in response.candidates[0].content.parts:
+            if hasattr(part, "function_call") and part.function_call and part.function_call.name:
+                return part
+        return None
+
+    async def _execute_rag_tool(self, ai_query: str, user_message: str, session: Session) -> tuple[str, list[dict] | None]:
+        """Run dual RAG search: AI-rewritten query + original user message, merge & dedupe.
+        Skips the second query when ai_query matches user_message."""
         loop = asyncio.get_running_loop()
-        t0 = time.time()
-        try:
-            pipeline = get_rag_pipeline()
-            kb_text, citations = await loop.run_in_executor(
+        pipeline = get_rag_pipeline()
+        
+        # Use _rag_search_language if defined, otherwise session.language
+        search_lang = self._rag_search_language or session.language
+        search_lang = normalize_language(search_lang)
+
+        ai_future = loop.run_in_executor(
+            None,
+            lambda: pipeline.retrieve(ai_query, language=search_lang, source_type=self._rag_source_type, top_k=3),
+        )
+
+        # Skip duplicate query when AI didn't rewrite
+        if ai_query == user_message:
+            _, ai_citations = await ai_future
+            user_citations = None
+        else:
+            user_future = loop.run_in_executor(
                 None,
-                lambda: pipeline.retrieve(
-                    user_message,
-                    language=normalize_language(language),
-                    source_type=self._rag_source_type,
-                    top_k=3,
-                ),
+                lambda: pipeline.retrieve(user_message, language=search_lang, source_type=self._rag_source_type, top_k=3),
             )
-            logger.info(f"[計時] RAG: {(time.time()-t0)*1000:.0f}ms | 結果: {'有' if kb_text else '無'}")
-            return kb_text, citations
-        except Exception as e:
-            logger.error(f"[RAG] 檢索失敗: {e}")
-            return None, None
+            (_, ai_citations), (_, user_citations) = await asyncio.gather(ai_future, user_future)
+
+        # Merge and dedupe by text content
+        seen_texts: set[str] = set()
+        merged: list[dict] = []
+        for c in (ai_citations or []) + (user_citations or []):
+            txt = c.get("text", "")
+            if txt not in seen_texts:
+                seen_texts.add(txt)
+                merged.append(c)
+
+        if not merged:
+            return "知識庫中沒有找到相關資料。", None
+
+        kb_text = "\n---\n".join(c["text"] for c in merged if c.get("text"))
+        logger.info(f"[RAG Dual] ai={len(ai_citations or [])} + user={len(user_citations or [])} → merged={len(merged)}")
+        return kb_text, merged
 
     @staticmethod
     def _clean_enriched_history(chat_session, original_user_message: str):
@@ -248,3 +342,78 @@ class BaseAgent:
                 continue
             content.parts = [types.Part.from_text(text=original_user_message)]
             break
+
+    # --- 核心對話流程 (Template Method) ---
+
+    def _get_session_state(self, session: Session) -> str:
+        """Hook: 取得動態 Session 狀態（會變化的資訊）。"""
+        raise NotImplementedError
+
+    def _get_question_label(self, language: str) -> str:
+        """Hook: 取得問題提示語標籤。"""
+        return "使用者問題："
+
+    def _preprocess_chat_data(self, session: Session, citations: list[dict] | None) -> tuple[list[dict] | None, dict[str, Any]]:
+        """Hook: 在回應完成後，處理 citations 之前。"""
+        return citations, {}
+
+    def _post_process_chat_result(self, session: Session, response_text: str, citations: list[dict] | None, extra_meta: dict[str, Any]) -> dict[str, Any]:
+        """Hook: 在 chat 回應組裝完成後，添加專案特有的欄位 (如 tts_text, image_id)。"""
+        return {}
+
+    def _get_chat_fallback_message(self, language: str) -> str:
+        """回傳 chat 失敗時的預設訊息。"""
+        return "AI目前發生錯誤，請稍後再試。"
+
+    async def chat(self, session_id: str, user_message: str) -> dict[str, Any]:
+        """
+        統一的對話流程 (Function-calling / RAG 版本)：
+        1. 取得 session 並建立 enriched message。
+        2. 執行 _run_tool_loop (會自動處理 RAG 工具調用)。
+        3. 呼叫 _preprocess_chat_data 處理引用與提取元數據。
+        4. 同步歷史至 DB。
+        5. 呼叫 _post_process_chat_result 補全結果。
+        """
+        try:
+            from app.services.gemini_service import client as _gemini_client
+            if not _gemini_client:
+                return {"error": "Gemini client not initialized", "message": "系統未正確初始化，請檢查 API Key 設定。"}
+
+            session = self._session_manager.get_session(session_id)
+            if not session:
+                return {"error": "Session not found", "message": "找不到對話記錄，請重新開始。"}
+
+            chat_session = self._get_or_create_chat_session(session)
+            
+            # 組裝原始 enriched message (用於驅動 RAG 判斷)
+            q_label = self._get_question_label(session.language)
+            enriched = f"{self._get_session_state(session)}\n\n{q_label} {user_message}"
+            
+            t0 = time.time()
+            logger.info(f"[{self.__class__.__name__}] 訊息: {user_message[:50]}...")
+            
+            # 使用基底類別提供的 tool loop 進行 RAG
+            response, citations = await self._run_tool_loop(chat_session, enriched, session, user_message)
+            
+            logger.info(f"[{self.__class__.__name__}] 流程總耗時: {(time.time()-t0)*1000:.0f}ms")
+
+            # 處理中間數據
+            citations, extra_meta = self._preprocess_chat_data(session, citations)
+
+            # 提取文字與同步 DB
+            final_text = strip_citations(extract_response_text(response)) or self._get_chat_fallback_message(session.language)
+            self._sync_history_to_db_background(session_id, user_message, final_text, citations)
+
+            # 組裝結果
+            result = {
+                "message": final_text,
+                "session": session.model_dump(),
+                "tool_calls": [],
+                "citations": citations,
+            }
+            result.update(self._post_process_chat_result(session, final_text, citations, extra_meta))
+            return result
+
+        except Exception as e:
+            logger.error(f"[{self.__class__.__name__}] chat failed: {e}", exc_info=True)
+            return {"error": str(e), "message": f"抱歉，發生錯誤：{str(e)}"}

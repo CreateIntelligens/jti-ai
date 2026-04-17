@@ -334,10 +334,6 @@ async def chat(request: ChatRequest):
         )
         final_turn_number = log_result[1] if log_result else None
 
-        # 非測驗回覆：tts_text 預設等同 message
-        raw_tts = result.get("tts_text") or result.get("message")
-        result["tts_text"] = to_tts_text(raw_tts, session.language)
-
         response_payload = ChatResponse(**result, turn_number=final_turn_number)
         return attach_tts_message_id(response_payload, session.language, _tts_manager)
 

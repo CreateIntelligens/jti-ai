@@ -10,6 +10,8 @@ try:
 except Exception:  # pragma: no cover - fallback when dependency is unavailable
     OpenCC = None  # type: ignore
 
+from app.services.agent_utils import normalize_language
+
 _T2S_CONVERTER = OpenCC("t2s") if OpenCC else None
 
 _DIGIT_MAP = "零一二三四五六七八九"
@@ -117,24 +119,15 @@ def to_tts_text(text: Optional[str], language: str) -> Optional[str]:
     - Non-Chinese languages: keep original text
     - Chinese: convert digits to Chinese reading, then Traditional to Simplified
     """
-    if not text:
-        return text
-
-    normalized_language = (
-        "en"
-        if isinstance(language, str) and language.strip().lower().startswith("en")
-        else "zh"
-    )
-    if normalized_language != "zh":
+    if not text or normalize_language(language) != "zh":
         return text
 
     text = digits_to_chinese(text)
 
-    if not _T2S_CONVERTER:
-        return text
-
-    try:
-        return _T2S_CONVERTER.convert(text)
-    except Exception:
-        return text
+    if _T2S_CONVERTER:
+        try:
+            return _T2S_CONVERTER.convert(text)
+        except Exception:
+            pass
+    return text
 
