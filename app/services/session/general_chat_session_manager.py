@@ -25,18 +25,33 @@ class GeneralChatSessionManager:
         # 建立索引
         self.collection.create_index("session_id", unique=True)
 
+    @staticmethod
+    def _strip_internal_id(doc: Dict[str, Any]) -> Dict[str, Any]:
+        """Remove MongoDB internal fields from a session document."""
+        doc.pop("_id", None)
+        return doc
+
     def create_session(self, session_id: str, store_name: str, model: str, system_instruction: Optional[str] = None) -> Dict[str, Any]:
         """Create or update session."""
         now = datetime.now()
-        doc = {"session_id": session_id, "store_name": store_name, "model": model, "system_instruction": system_instruction, "chat_history": [], "created_at": now, "updated_at": now}
+        doc = {
+            "session_id": session_id,
+            "store_name": store_name,
+            "model": model,
+            "system_instruction": system_instruction,
+            "chat_history": [],
+            "created_at": now,
+            "updated_at": now,
+        }
         self.collection.update_one({"session_id": session_id}, {"$set": doc}, upsert=True)
         return doc
 
     def get_session(self, session_id: str) -> Optional[Dict[str, Any]]:
         """Get session without internal ID."""
         doc = self.collection.find_one({"session_id": session_id})
-        if doc: doc.pop("_id", None)
-        return doc
+        if doc is None:
+            return None
+        return self._strip_internal_id(doc)
 
     def add_message(self, session_id: str, role: str, content: str, citations: Optional[List[Dict]] = None) -> bool:
         """新增訊息到對話歷史"""
@@ -125,9 +140,8 @@ class GeneralChatSessionManager:
             if result.deleted_count > 0:
                 logger.info(f"Deleted general chat session: {session_id}")
                 return True
-            else:
-                logger.warning(f"Session not found for deletion: {session_id}")
-                return False
+            logger.warning(f"Session not found for deletion: {session_id}")
+            return False
         except Exception as e:
             logger.error(f"Failed to delete general chat session: {e}")
             return False
@@ -139,13 +153,7 @@ class GeneralChatSessionManager:
             if store_name is not None:
                 query["store_name"] = store_name
 
-            docs = self.collection.find(query)
-            sessions = []
-            for doc in docs:
-                doc.pop("_id", None)
-                sessions.append(doc)
-
-            return sessions
+            return [self._strip_internal_id(doc) for doc in self.collection.find(query)]
         except Exception as e:
             logger.error(f"Failed to list general chat sessions: {e}")
             return []

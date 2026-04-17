@@ -9,7 +9,7 @@ Session 管理服務
 """
 
 from typing import Dict, List, Optional
-from app.models.session import Session, SessionStep
+from app.models.session import Session
 from .session_state_mixin import SessionStateMixin
 import logging
 
@@ -32,12 +32,10 @@ class SessionManager(SessionStateMixin):
     def get_session(self, session_id: str) -> Optional[Session]:
         """取得 session"""
         session = self._sessions.get(session_id)
-
-        if session is None:
-            logger.warning(f"Session not found: {session_id}")
-            return None
-
-        return session
+        if session is not None:
+            return session
+        logger.warning(f"Session not found: {session_id}")
+        return None
 
     def update_session(self, session: Session) -> Session:
         """更新 session"""
@@ -48,11 +46,11 @@ class SessionManager(SessionStateMixin):
 
     def delete_session(self, session_id: str) -> bool:
         """刪除 session"""
-        if session_id in self._sessions:
-            del self._sessions[session_id]
-            logger.info(f"Deleted session: {session_id}")
-            return True
-        return False
+        session = self._sessions.pop(session_id, None)
+        if session is None:
+            return False
+        logger.info(f"Deleted session: {session_id}")
+        return True
 
     def rebuild_session_from_logs(self, session_id: str, logs: List[Dict]) -> Optional[Session]:
         """In-memory fallback — no persistent logs, always returns None."""
