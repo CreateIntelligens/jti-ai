@@ -31,7 +31,7 @@
   border: 1px solid var(--hciot-border);
   border-radius: 1rem;
   background: var(--hciot-panel-strong);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.02);
 }
 
 .hciot-message.system .hciot-message-bubble {
@@ -94,8 +94,8 @@
 
 .hciot-audio-btn {
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 999px;
   border: 1.5px solid rgba(2, 132, 199, 0.3);
   background: rgba(2, 132, 199, 0.06);
@@ -120,7 +120,7 @@
   background: rgba(2, 132, 199, 0.15);
   border-color: var(--hciot-accent);
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.15);
+  box-shadow: 0 0.25rem 0.75rem rgba(2, 132, 199, 0.15);
 }
 
 .hciot-audio-btn.pending {
@@ -131,7 +131,7 @@
 .hciot-audio-btn.pending::after {
   content: '';
   position: absolute;
-  inset: -3px;
+  inset: -0.1875rem;
   border-radius: 999px;
   border: 2px solid rgba(2, 132, 199, 0.15);
   border-top-color: rgba(2, 132, 199, 0.85);
@@ -186,7 +186,7 @@
   color: var(--hciot-ink);
   font-size: 0.8rem;
   font-weight: 600;
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 0.0625rem 0.125rem rgba(15, 23, 42, 0.08);
   transition: all 0.2s ease;
 }
 
@@ -212,7 +212,7 @@
 .hciot-message-action:focus-visible {
   outline: none;
   border-color: var(--topic-accent, var(--hciot-accent));
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--topic-accent, var(--hciot-accent)) 18%, transparent);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--topic-accent, var(--hciot-accent)) 18%, transparent);
 }
 
 .hciot-message.user .hciot-inline-action {
@@ -270,13 +270,13 @@
   color: var(--hciot-ink);
   border-radius: 0.7rem;
   caret-color: var(--topic-accent, var(--hciot-accent));
-  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.05);
+  box-shadow: inset 0 0.0625rem 0.125rem rgba(15, 23, 42, 0.05);
 }
 
 .hciot-message-edit-textarea:focus {
   border-color: var(--topic-accent, var(--hciot-accent));
   background: var(--hciot-panel-strong);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--topic-accent, var(--hciot-accent)) 16%, transparent);
+  box-shadow: 0 0 0 0.1875rem color-mix(in srgb, var(--topic-accent, var(--hciot-accent)) 16%, transparent);
 }
 
 .hciot-typing-dots {
@@ -309,7 +309,7 @@
 
 .hciot-input-frame:focus-within {
   border-color: var(--topic-accent, var(--hciot-accent));
-  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.15);
+  box-shadow: 0 0 0 0.1875rem rgba(2, 132, 199, 0.15);
 }
 
 .hciot-chat-input {

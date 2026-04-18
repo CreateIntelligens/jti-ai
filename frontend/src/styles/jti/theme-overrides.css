@@ -30,7 +30,7 @@
 .conversation-history-modal.jti-theme .date-picker-input:hover,
 .conversation-history-modal.jti-theme .date-picker-input:focus-within,
 .conversation-history-modal.jti-theme .date-picker-input.active {
-  box-shadow: 0 0 0 2px var(--gold-tint) !important;
+  box-shadow: 0 0 0 0.125rem var(--gold-tint) !important;
   border-color: var(--gold) !important;
 }
 
@@ -46,7 +46,7 @@
 .conversation-history-modal.jti-theme .date-picker-tabs button.active {
   color: var(--gold) !important;
   background: var(--gold-tint-soft) !important;
-  box-shadow: inset 0 -2px 0 var(--gold) !important;
+  box-shadow: inset 0 -0.125rem 0 var(--gold) !important;
 }
 
 .conversation-history-modal.jti-theme .mini-cal-day.selected,
@@ -100,7 +100,7 @@
 
 .conversation-history-modal.jti-theme .turn-resume-btn:hover {
   background: var(--gold-tint-strong) !important;
-  box-shadow: 0 0 12px var(--gold-tint) !important;
+  box-shadow: 0 0 0.75rem var(--gold-tint) !important;
 }
 
 .conversation-history-modal.jti-theme .conversation-spinner {

@@ -15,7 +15,7 @@
   --hciot-accent: #0284c7;
   --hciot-accent-strong: #0369a1;
   --hciot-secondary: #0d9488;
-  --hciot-shadow: 0 10px 40px -10px rgba(2, 132, 199, 0.1);
+  --hciot-shadow: 0 0.625rem 2.5rem -0.625rem rgba(2, 132, 199, 0.1);
 }
 
 [data-theme="dark"] {
@@ -32,7 +32,7 @@
   --hciot-accent: #38bdf8;
   --hciot-accent-strong: #7dd3fc;
   --hciot-secondary: #2dd4bf;
-  --hciot-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+  --hciot-shadow: 0 0.625rem 2.5rem -0.625rem rgba(0, 0, 0, 0.5);
 }
 
 .hciot-shell {
@@ -46,7 +46,7 @@
   --hciot-accent: #0284c7; /* Professional Medical Blue */
   --hciot-accent-strong: #0369a1;
   --hciot-secondary: #0d9488; /* Calming Teal */
-  --hciot-shadow: 0 10px 40px -10px rgba(2, 132, 199, 0.1);
+  --hciot-shadow: 0 0.625rem 2.5rem -0.625rem rgba(2, 132, 199, 0.1);
   
   position: relative;
   display: flex;
@@ -70,7 +70,7 @@
   --hciot-accent: #38bdf8;
   --hciot-accent-strong: #7dd3fc;
   --hciot-secondary: #2dd4bf;
-  --hciot-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.5);
+  --hciot-shadow: 0 0.625rem 2.5rem -0.625rem rgba(0, 0, 0, 0.5);
 }
 
 .hciot-backdrop {
@@ -96,7 +96,7 @@
   padding: 1.25rem 2rem;
   border-bottom: 1px solid var(--hciot-border);
   background: var(--hciot-panel);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(0.75rem);
 }
 
 .hciot-brand {
@@ -115,7 +115,7 @@
   color: #fff;
   font-size: 1.5rem;
   font-weight: 700;
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.2);
+  box-shadow: 0 0.25rem 0.75rem rgba(2, 132, 199, 0.2);
 }
 
 .hciot-brand-kicker {

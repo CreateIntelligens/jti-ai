@@ -5,7 +5,7 @@
   border: 1px solid var(--hciot-border);
   background: var(--hciot-panel);
   box-shadow: var(--hciot-shadow);
-  backdrop-filter: blur(12px);
+  backdrop-filter: blur(0.75rem);
 }
 
 .hciot-empty-state {
