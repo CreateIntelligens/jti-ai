@@ -48,11 +48,9 @@ export default function HciotTopicGrid({
 
   return (
     <section className="hciot-topic-section">
-      <div className="hciot-topic-header">
-        <div>
-          <p className="hciot-topic-kicker">{subheading}</p>
-          <h3 className="hciot-topic-heading">{heading}</h3>
-        </div>
+      <div className="hciot-topic-panel-head">
+        <p className="hciot-topic-kicker">{subheading}</p>
+        <h3 className="hciot-topic-heading">{heading}</h3>
         {disabledMessage ? (
           <div className="hciot-topic-disabled">{disabledMessage}</div>
         ) : null}
@@ -83,15 +81,12 @@ export default function HciotTopicGrid({
 
       {selectedTopic ? (
         <div className="hciot-topic-question-panel">
-          <div className="hciot-topic-question-header">
-            <h4 className="hciot-topic-question-heading">
-              {questionHeading || selectedTopic.labels[language]}
-            </h4>
-          </div>
-
+          <p className="hciot-q-section-head">
+            {questionHeading || `${selectedTopic.labels[language]} · ${language === 'zh' ? '常見問題' : 'Questions'}`}
+          </p>
           <div className="hciot-topic-question-list custom-scrollbar">
             {selectedTopic.questions[language].map((question, index) => {
-              const key = `${selectedTopic.id}-${question}`;
+              const key = `${selectedTopic.id}-${index}`;
               return (
                 <button
                   key={key}
