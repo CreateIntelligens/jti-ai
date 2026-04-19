@@ -3,9 +3,9 @@ import test from 'node:test';
 import { readFile } from 'node:fs/promises';
 
 test('uses a flexible sidebar width and a wrapping input footer for HCIoT chat', async () => {
-  const [layoutCss, componentsCss] = await Promise.all([
+  const [layoutCss, componentsChatCss] = await Promise.all([
     readFile(new URL('../../src/styles/hciot/layout.css', import.meta.url), 'utf8'),
-    readFile(new URL('../../src/styles/hciot/components.css', import.meta.url), 'utf8'),
+    readFile(new URL('../../src/styles/hciot/components-chat.css', import.meta.url), 'utf8'),
   ]);
 
   assert.match(
@@ -17,11 +17,11 @@ test('uses a flexible sidebar width and a wrapping input footer for HCIoT chat',
     /\.hciot-main\s*\{[\s\S]*max-width:\s*90rem;/,
   );
   assert.match(
-    componentsCss,
+    componentsChatCss,
     /\.hciot-input-footer\s*\{[\s\S]*flex-wrap:\s*wrap;/,
   );
   assert.match(
-    componentsCss,
+    componentsChatCss,
     /\.hciot-inline-status\s*\{[\s\S]*flex-wrap:\s*wrap;/,
   );
 });

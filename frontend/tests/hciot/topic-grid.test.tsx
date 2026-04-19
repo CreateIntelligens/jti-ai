@@ -1,11 +1,10 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { expect, it } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import HciotTopicGrid from '../../src/components/hciot/HciotTopicGrid';
 
-test('renders a second-level question list for the selected topic', () => {
+it('renders a second-level question list for the selected topic', () => {
   const topics = [
     {
       id: 'prp',
@@ -36,5 +35,5 @@ test('renders a second-level question list for the selected topic', () => {
     />,
   );
 
-  assert.match(html, /PRP 治療會痛嗎？/);
+  expect(html).toMatch(/PRP 治療會痛嗎？/);
 });

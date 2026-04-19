@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import UploadDialog from '../../src/components/hciot/knowledgeWorkspace/UploadDialog';
+import UploadDialog from '../../src/components/hciot/knowledgeWorkspace/upload/UploadDialog';
 import React from 'react';
 
 describe('UploadDialog', () => {
@@ -10,11 +10,14 @@ describe('UploadDialog', () => {
         open={true}
         language="zh"
         categories={[]}
+        availableImages={[]}
         uploading={false}
         onClose={() => {}}
         onUploadFile={async () => ({ name: 'test.csv' })}
         onUploadComplete={async () => {}}
         onSubmitQA={async () => {}}
+        onUploadImage={async () => ({ image_id: 'img-1', url: '/api/hciot/images/img-1' })}
+        onUploadImageComplete={async () => {}}
       />
     );
 

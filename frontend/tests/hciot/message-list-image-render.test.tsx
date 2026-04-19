@@ -1,5 +1,4 @@
-import assert from 'node:assert/strict';
-import test from 'node:test';
+import { expect, it } from 'vitest';
 import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
@@ -28,7 +27,7 @@ function renderMessages(messages: HciotMessage[]) {
   );
 }
 
-test('renders an inline HCIoT image preview when imageId is present', () => {
+it('renders an inline HCIoT image preview when imageId is present', () => {
   const html = renderMessages([
     {
       text: '這是您的衛教說明。',
@@ -38,5 +37,5 @@ test('renders an inline HCIoT image preview when imageId is present', () => {
     },
   ]);
 
-  assert.match(html, /src="\/api\/hciot\/images\/hciot-demo-image"/);
+  expect(html).toMatch(/src="\/api\/hciot\/images\/hciot-demo-image"/);
 });
