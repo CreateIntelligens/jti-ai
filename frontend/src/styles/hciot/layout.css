@@ -176,11 +176,14 @@
   display: inline-flex;
   align-items: center;
   gap: 0.55rem;
-  padding: 0 0.2rem 0 0.45rem;
-  height: 2.5rem;
+  padding: 0.25rem 0.25rem 0.25rem 0.6rem;
   border: 1px solid var(--hciot-border);
-  border-radius: 0.7rem;
+  border-radius: 0.9rem;
   background: rgba(148, 163, 184, 0.08);
+}
+
+.hciot-voice-select.app-select-trigger {
+  height: 2.25rem;
 }
 
 .hciot-voice-select-label {
