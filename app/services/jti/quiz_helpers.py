@@ -7,11 +7,14 @@ import re
 import logging
 from typing import Any
 
+from app.services.jti.response_assembly import (
+    build_jti_response_fields,
+    format_option_texts,
+)
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 from app.services.jti.main_agent import main_agent
 from app.services.gemini_service import gemini_with_retry, run_sync
 from app.services.gemini_clients import get_default_client
-from app.services.tts_text import to_jti_tts_text
 
 logger = logging.getLogger(__name__)
 
@@ -50,22 +53,6 @@ def _get_or_rebuild_session(session_id: str):
         main_agent.remove_session(session_id)
     return session
 
-
-def _label_options(options: list) -> list[str]:
-    """Return labelled option strings, e.g. ['A. 簡約', 'B. 可愛']."""
-    labels = "ABCDE"
-    return [
-        f"{labels[i]}. {opt.get('text', '')}"
-        for i, opt in enumerate(options)
-        if i < len(labels)
-    ]
-
-
-def _format_options_text(options: list) -> str:
-    """Format options as a newline-separated string for display in messages."""
-    return "\n".join(_label_options(options))
-
-
 async def _pause_quiz_and_respond(
     session_id: str,
     log_user_message: str,
@@ -101,12 +88,56 @@ async def _pause_quiz_and_respond(
     final_turn_number = log_result[1] if log_result else None
 
     return {
-        "message": response_message,
-        "tts_text": to_jti_tts_text(response_message, lang),
+        **build_jti_response_fields(response_message, lang),
         "session": effective_session.model_dump(),
         "tool_calls": [],
         "turn_number": final_turn_number,
     }
+
+
+def _match_exact_label(msg_upper: str, labels: list[str]) -> str | None:
+    """快速判斷：明確的 A-E"""
+    if msg_upper in labels:
+        return msg_upper
+    # 只把「獨立字母」當作答案；避免像 "pause" 這種字串含有 A 而誤判為選 A
+    label_hits = [
+        label
+        for label in labels
+        if re.search(rf"(?<![A-Z]){label}(?![A-Z])", msg_upper)
+    ]
+    return label_hits[0] if len(label_hits) == 1 else None
+
+
+def _match_number_or_sequence(msg: str, options: list) -> str | None:
+    """快速判斷：數字或中文序號"""
+    labels = list("ABCDE")[: len(options)]
+    number_map = {
+        "1": 0, "一": 0, "第一": 0,
+        "2": 1, "二": 1, "第二": 1,
+        "3": 2, "三": 2, "第三": 2,
+        "4": 3, "四": 3, "第四": 3,
+        "5": 4, "五": 4, "第五": 4,
+    }
+    if msg in number_map:
+        idx = number_map[msg]
+        return labels[idx] if idx < len(options) else None
+
+    if msg.isdigit():
+        idx = int(msg) - 1
+        return labels[idx] if 0 <= idx < len(options) else None
+
+    digit_hits = [d for d in "12345"[:len(options)] if d in msg]
+    return labels[int(digit_hits[0]) - 1] if len(digit_hits) == 1 else None
+
+
+def _match_option_text(msg_lower: str, options: list) -> str | None:
+    """快速判斷：包含選項文字"""
+    labels = list("ABCDE")[: len(options)]
+    for idx, opt in enumerate(options):
+        text = opt.get("text", "").lower()
+        if text and text in msg_lower:
+            return labels[idx]
+    return None
 
 
 async def _judge_user_choice(user_message: str, question: dict) -> str | None:
@@ -119,56 +150,21 @@ async def _judge_user_choice(user_message: str, question: dict) -> str | None:
     msg = user_message.strip()
     msg_upper = msg.upper()
     msg_lower = msg.lower()
-
     options = question.get("options", []) if isinstance(question, dict) else []
     labels = list("ABCDE")[: len(options)]
 
-    # 快速判斷：明確的 A-E
-    if msg_upper in labels:
-        logger.info(f"[規則判斷] 明確字母: '{user_message}' -> {msg_upper}")
-        return msg_upper
-    # 只把「獨立字母」當作答案；避免像 "pause" 這種字串含有 A 而誤判為選 A
-    label_hits = [
-        label
-        for label in labels
-        if re.search(rf"(?<![A-Z]){label}(?![A-Z])", msg_upper)
-    ]
-    if len(label_hits) == 1:
-        logger.info(f"[規則判斷] 獨立字母: '{user_message}' -> {label_hits[0]}")
-        return label_hits[0]
+    # 1. 規則判斷
+    if (res := _match_exact_label(msg_upper, labels)):
+        logger.info(f"[規則判斷] 字母匹配: '{user_message}' -> {res}")
+        return res
 
-    # 快速判斷：數字或中文序號
-    number_map = {
-        "1": 0, "一": 0, "第一": 0,
-        "2": 1, "二": 1, "第二": 1,
-        "3": 2, "三": 2, "第三": 2,
-        "4": 3, "四": 3, "第四": 3,
-        "5": 4, "五": 4, "第五": 4,
-    }
-    if msg in number_map and number_map[msg] < len(options):
-        result = labels[number_map[msg]]
-        logger.info(f"[規則判斷] 數字/序號: '{user_message}' -> {result}")
-        return result
-    if msg.isdigit():
-        idx = int(msg) - 1
-        if 0 <= idx < len(options):
-            logger.info(f"[規則判斷] 純數字: '{user_message}' -> {labels[idx]}")
-            return labels[idx]
-    digit_hits = [d for d in ["1", "2", "3", "4", "5"] if d in msg]
-    if len(digit_hits) == 1:
-        idx = int(digit_hits[0]) - 1
-        if 0 <= idx < len(options):
-            logger.info(f"[規則判斷] 包含數字: '{user_message}' -> {labels[idx]}")
-            return labels[idx]
+    if (res := _match_number_or_sequence(msg, options)):
+        logger.info(f"[規則判斷] 數字/序號匹配: '{user_message}' -> {res}")
+        return res
 
-    # 快速判斷：包含選項文字
-    for idx, opt in enumerate(options):
-        text = opt.get("text", "")
-        if text and text.lower() in msg_lower:
-            logger.info(f"[規則判斷] 匹配選項文字: '{user_message}' -> {labels[idx]} ('{text}')")
-            return labels[idx]
-
-    # 用 LLM 判斷（規則判不出時）
+    if (res := _match_option_text(msg_lower, options)):
+        logger.info(f"[規則判斷] 選項文字匹配: '{user_message}' -> {res}")
+        return res
     logger.info(f"[LLM判斷] 規則無法判定，呼叫 LLM: '{user_message}'")
     try:
         client = get_default_client()
@@ -176,7 +172,7 @@ async def _judge_user_choice(user_message: str, question: dict) -> str | None:
         prompt = f"""判斷使用者意圖：作答、或是想暫停/中斷測驗。
 
 題目：{question.get('text', '')}
-{_format_options_text(options)}
+{format_option_texts(options)}
 
 使用者回覆：「{user_message}」
 

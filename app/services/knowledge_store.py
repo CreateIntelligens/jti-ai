@@ -44,20 +44,17 @@ class KnowledgeStore:
         return (language or "zh").strip().lower()
 
     @staticmethod
+    def _normalize_namespace(namespace: str | None) -> str:
+        return (namespace or KnowledgeStore.DEFAULT_NAMESPACE).strip().lower()
+
+    @staticmethod
     def _safe_filename(filename: str) -> str:
         return Path(filename).name
 
     @staticmethod
     def _to_bytes(data: Any) -> bytes:
-        if isinstance(data, Binary):
-            return bytes(data)
-        if isinstance(data, (bytes, bytearray)):
-            return bytes(data)
-        return b""
+        return bytes(data) if isinstance(data, (Binary, bytes, bytearray)) else b""
 
-    @staticmethod
-    def _normalize_namespace(namespace: str | None) -> str:
-        return (namespace or KnowledgeStore.DEFAULT_NAMESPACE).strip().lower()
 
     def _supports_legacy_fallback(self, namespace: str) -> bool:
         return self._normalize_namespace(namespace) == self.DEFAULT_NAMESPACE
@@ -172,18 +169,13 @@ class KnowledgeStore:
         )
 
         if self._supports_legacy_fallback(namespace):
-            legacy_docs = self.collection.find(
-                self._legacy_query(language),
-                self.FILE_METADATA_PROJECTION,
-            ).sort("filename", 1)
             seen = {doc.get("filename", "") for doc in docs}
-            for doc in legacy_docs:
-                filename = doc.get("filename", "")
-                if filename not in seen:
-                    docs.append(doc)
-                    seen.add(filename)
+            legacy_docs = self.collection.find(
+                self._legacy_query(language), self.FILE_METADATA_PROJECTION
+            ).sort("filename", 1)
 
-        docs.sort(key=lambda doc: doc.get("filename", ""))
+            docs.extend(doc for doc in legacy_docs if doc.get("filename", "") not in seen)
+            docs.sort(key=lambda d: d.get("filename", ""))
 
         return [self._metadata_from_doc(doc) for doc in docs]
 

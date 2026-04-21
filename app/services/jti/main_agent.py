@@ -10,6 +10,7 @@ Main Agent - 核心對話邏輯
 import logging
 from typing import Any
 
+from datetime import datetime, timezone
 from google.genai import types
 from app.models.session import Session
 from app.services.session.session_manager_factory import get_session_manager
@@ -24,7 +25,7 @@ from app.services.jti.agent_prompts import (
 from app.services.jti.runtime_settings import (
     load_runtime_settings_from_prompt_manager,
 )
-from app.services.tts_text import to_jti_tts_text
+from app.services.jti.response_assembly import build_jti_tts_text
 
 # 使用工廠函數取得適當的實作（MongoDB 或記憶體）
 session_manager = get_session_manager()
@@ -102,7 +103,6 @@ class MainAgent(BaseAgent):
 
     def _get_session_state(self, session: Session) -> str:
         """取得動態 Session 狀態（會變化的資訊）"""
-        from datetime import datetime, timezone
         template = SESSION_STATE_TEMPLATES.get(session.language, SESSION_STATE_TEMPLATES["zh"])
         not_yet = "Not calculated yet" if session.language == "en" else "尚未計算"
         now = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M")
@@ -118,7 +118,7 @@ class MainAgent(BaseAgent):
         return "User question:" if language == "en" else "使用者問題："
 
     def _post_process_chat_result(self, session: Session, response_text: str, citations: list[dict] | None, extra_meta: dict[str, Any]) -> dict[str, Any]:
-        return {"tts_text": to_jti_tts_text(response_text, session.language)}
+        return {"tts_text": build_jti_tts_text(response_text, session.language)}
 
     def _get_chat_fallback_message(self, language: str) -> str:
         return "AI目前故障 請聯絡"

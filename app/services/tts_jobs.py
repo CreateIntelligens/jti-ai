@@ -11,7 +11,7 @@ import urllib.error
 import urllib.request
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from app.services.tts_text import to_hciot_tts_text, to_jti_tts_text
 
@@ -27,9 +27,15 @@ _CACHE_DIR = Path(os.getenv("TTS_CACHE_DIR", "/app/data/tts_cache"))
 class TtsJobManager:
     """Manage TTS jobs on shared filesystem for multi-worker support."""
 
-    def __init__(self, character: str, replacement: str = "") -> None:
+    def __init__(
+        self,
+        character: str,
+        replacement: str = "",
+        text_formatter: Callable[[str | None, str], str | None] | None = None,
+    ) -> None:
         self.character = character
         self.replacement = replacement
+        self.text_formatter = text_formatter or (lambda text, _language: text)
         self.tts_api_url = _TTS_API_URL
         self.timeout_seconds = _TIMEOUT_SECONDS
         self.cache_ttl_seconds = _CACHE_TTL_SECONDS
@@ -70,8 +76,7 @@ class TtsJobManager:
             raise ValueError("TTS text is empty")
 
         effective_character = character or self.character
-        formatter = to_hciot_tts_text if self.replacement == "hciot" else to_jti_tts_text
-        prepared_text = formatter(raw_text, language) or raw_text
+        prepared_text = self.text_formatter(raw_text, language) or raw_text
         job_id = f"tts_{uuid.uuid4().hex}"
         now = time.time()
 
@@ -145,13 +150,13 @@ class TtsJobManager:
         logger.info("[TTS] ready job=%s elapsed_ms=%.0f bytes=%d content_type=%s", job_id, (now - created_at) * 1000, len(audio_bytes), content_type)
 
     def _generate_job(self, job_id: str, text: str, character: str | None = None) -> None:
-        body: dict[str, Any] = {"text": text, "character": character or self.character}
+        body = {"text": text, "character": character or self.character}
         if self.replacement:
             body["replacement"] = self.replacement
-        payload = json.dumps(body).encode("utf-8")
+
         request = urllib.request.Request(
             self.tts_api_url,
-            data=payload,
+            data=json.dumps(body).encode("utf-8"),
             headers={"Content-Type": "application/json"},
             method="POST",
         )
@@ -190,26 +195,28 @@ class TtsJobManager:
             job_id = meta_path.stem
             try:
                 meta = json.loads(meta_path.read_text())
-            except (json.JSONDecodeError, OSError):
+                updated_at = float(meta.get("updated_at", meta.get("created_at", now)))
+                if now - updated_at > self.cache_ttl_seconds:
+                    self._remove_job_files(job_id)
+                else:
+                    live_jobs.append((job_id, updated_at))
+            except (json.JSONDecodeError, OSError, ValueError):
                 self._remove_job_files(job_id)
-                continue
 
-            updated_at = float(meta.get("updated_at", meta.get("created_at", now)))
-            if now - updated_at > self.cache_ttl_seconds:
+        if len(live_jobs) > self.max_jobs:
+            live_jobs.sort(key=lambda x: x[1])
+            for job_id, _ in live_jobs[: len(live_jobs) - self.max_jobs]:
                 self._remove_job_files(job_id)
-                continue
-
-            live_jobs.append((job_id, updated_at))
-
-        if len(live_jobs) <= self.max_jobs:
-            return
-
-        live_jobs.sort(key=lambda x: x[1])
-        overflow = len(live_jobs) - self.max_jobs
-        for job_id, _ in live_jobs[:overflow]:
-            self._remove_job_files(job_id)
 
 
 # Per-app singletons — characters configurable via env vars
-jti_tts_job_manager = TtsJobManager(character=os.getenv("JTI_TTS_CHARACTER", "hayley"), replacement="jti")
-hciot_tts_job_manager = TtsJobManager(character=(os.getenv("HCIOT_TTS_CHARACTER", "healthy2").split(",")[0]).strip() or "healthy2", replacement="hciot")
+jti_tts_job_manager = TtsJobManager(
+    character=os.getenv("JTI_TTS_CHARACTER", "hayley"),
+    replacement="jti",
+    text_formatter=to_jti_tts_text,
+)
+hciot_tts_job_manager = TtsJobManager(
+    character=(os.getenv("HCIOT_TTS_CHARACTER", "healthy2").split(",")[0]).strip() or "healthy2",
+    replacement="hciot",
+    text_formatter=to_hciot_tts_text,
+)

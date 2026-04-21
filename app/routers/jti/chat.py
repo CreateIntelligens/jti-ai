@@ -27,19 +27,18 @@ from app.schemas.chat import (
     ExportConversationsResponse,
 )
 from app.services.jti.main_agent import main_agent
-from app.services.jti.runtime_quiz_flow import (
-    execute_quiz_start,
+from app.services.jti.response_assembly import (
+    build_jti_quiz_question_fields,
+    build_jti_response_fields,
     extract_option_texts,
-    make_quiz_tts_text,
 )
-from app.services.tts_text import to_jti_tts_text
+from app.services.jti.runtime_quiz_flow import execute_quiz_start
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 
 from app.tools.jti.quiz import get_total_questions
 from app.utils import build_date_query, group_conversations_by_session
 from app.services.jti.quiz_helpers import (
     _get_or_rebuild_session,
-    _format_options_text,
     _pause_quiz_and_respond,
     _judge_user_choice,
     build_session_state,
@@ -176,7 +175,6 @@ async def chat(request: ChatRequest):
                 )))
                 return attach_tts_message_id(pause_response, session.language, _tts_manager)
 
-            options_text = _format_options_text(q.get("options", []))
             logger.info(f"[測驗進度] 第 {current_q_num}/{total_questions} 題 | 題目: {q.get('text', '')[:30]}...")
 
             user_choice = await _judge_user_choice(request.message, q)
@@ -209,8 +207,11 @@ async def chat(request: ChatRequest):
 
                 if is_complete:
                     response_message = tool_result.get("message", "")
-                    raw_tts_text = tool_result.get("tts_text") or response_message
-                    tts_text = to_jti_tts_text(raw_tts_text, updated_session.language)
+                    response_fields = build_jti_response_fields(
+                        response_message,
+                        updated_session.language,
+                        tts_source=tool_result.get("tts_text") or response_message,
+                    )
 
                     # 把測驗結果注入 chat_history，讓後續 LLM 對話能看到
                     main_agent.remove_session(request.session_id)
@@ -218,15 +219,12 @@ async def chat(request: ChatRequest):
                     session_manager.update_session(updated_session)
                 else:
                     q_num = len(updated_session.answers) + 1
-                    next_options_text = _format_options_text(next_q.get("options", []))
-                    if updated_session.language == "en":
-                        response_message = f"Question {q_num}: {next_q.get('text', '')}\n{next_options_text}"
-                    else:
-                        response_message = f"第{q_num}題：{next_q.get('text', '')}\n{next_options_text}"
-                    tts_text = to_jti_tts_text(
-                        make_quiz_tts_text(next_q, q_num, updated_session.language),
+                    response_fields = build_jti_quiz_question_fields(
+                        next_q,
+                        q_num,
                         updated_session.language,
                     )
+                    response_message = response_fields["message"]
 
                 log_result = conversation_logger.log_conversation(
                     session_id=request.session_id,
@@ -241,8 +239,7 @@ async def chat(request: ChatRequest):
 
                 quiz_result = tool_result.get("quiz_result") or {}
                 response_payload = ChatResponse(
-                    message=response_message,
-                    tts_text=tts_text,
+                    **response_fields,
                     options=extract_option_texts(next_q),
                     quiz_result_id=quiz_result.get("quiz_id") if is_complete else None,
                     session=updated_session.model_dump(),
@@ -254,10 +251,15 @@ async def chat(request: ChatRequest):
                 # 無法判斷選項：hardcode 提示
                 if session.language == "en":
                     hint = "Please choose one of the options!"
-                    response_message = f"{hint}\n\nQuestion {current_q_num}: {q.get('text', '')}\n{options_text}"
                 else:
                     hint = "請從選項中選一個喜歡的答案喔！"
-                    response_message = f"{hint}\n\n第{current_q_num}題：{q.get('text', '')}\n{options_text}"
+                response_fields = build_jti_quiz_question_fields(
+                    q,
+                    current_q_num,
+                    session.language,
+                    prefix=hint,
+                )
+                response_message = response_fields["message"]
 
                 logger.info(f"QUIZ 無法判斷選項，hardcode 提示: {request.message}")
 
@@ -275,11 +277,7 @@ async def chat(request: ChatRequest):
                 final_turn_number = log_result[1] if log_result else None
 
                 response_payload = ChatResponse(
-                    message=response_message,
-                    tts_text=to_jti_tts_text(
-                        f"{hint} {make_quiz_tts_text(q, current_q_num, session.language)}",
-                        session.language,
-                    ),
+                    **response_fields,
                     options=extract_option_texts(q),
                     session=session.model_dump(),
                     tool_calls=[],

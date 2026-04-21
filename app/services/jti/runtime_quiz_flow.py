@@ -3,17 +3,17 @@
 from __future__ import annotations
 
 import logging
-from typing import Optional
 
 from fastapi import HTTPException
 
 from app.schemas.chat import ChatResponse
-from app.services.jti.quiz_helpers import (
-    _format_options_text,
-    _label_options,
-    build_session_state,
+from app.services.jti.quiz_helpers import build_session_state
+from app.services.jti.response_assembly import (
+    QUIZ_OPENING,
+    build_jti_quiz_question_fields,
+    build_jti_response_fields,
+    extract_option_texts,
 )
-from app.services.tts_text import to_jti_tts_text
 from app.services.session.session_manager_factory import (
     get_conversation_logger,
     get_session_manager,
@@ -23,29 +23,6 @@ from app.tools.jti.tool_executor import tool_executor
 session_manager = get_session_manager()
 conversation_logger = get_conversation_logger()
 logger = logging.getLogger(__name__)
-
-QUIZ_OPENING = {
-    "zh": "簡單四個問題，幫你找到命定保護殼，如果中途想離開，請輸入「中斷」，即可回到問答模式，讓我們開始測驗吧！",
-    "en": "Just four questions to find your perfect phone case! If you want to leave midway, type pause to return to chat. Let's begin!",
-}
-
-
-def make_quiz_tts_text(q: dict, q_num: int, language: str) -> str:
-    """Build quiz-mode TTS text without options."""
-    text = q.get("text", "")
-    if language == "en":
-        return f"Question {q_num}: {text}"
-    return f"第{q_num}題：{text}"
-
-
-def extract_option_texts(q: Optional[dict]) -> Optional[list[str]]:
-    """Extract labelled option list (e.g. ['A. 簡約', 'B. 可愛']) from a question dict."""
-    if not isinstance(q, dict):
-        return None
-    options = q.get("options", [])
-    if not options:
-        return None
-    return _label_options(options)
 
 
 async def execute_quiz_start(
@@ -76,9 +53,9 @@ async def execute_quiz_start(
             mode="jti",
         )
         final_turn_number = log_result[1] if log_result else None
+        response_fields = build_jti_response_fields(response_message, session.language)
         return ChatResponse(
-            message=response_message,
-            tts_text=to_jti_tts_text(response_message, session.language),
+            **response_fields,
             session=session.model_dump(),
             tool_calls=[],
             turn_number=final_turn_number,
@@ -90,9 +67,9 @@ async def execute_quiz_start(
     if not tool_result.get("success"):
         error_message = tool_result.get("error", "start_quiz failed")
         fallback_lang = updated_session.language if updated_session else session.language
+        response_fields = build_jti_response_fields(error_message, fallback_lang)
         return ChatResponse(
-            message=error_message,
-            tts_text=to_jti_tts_text(error_message, fallback_lang),
+            **response_fields,
             session=updated_session.model_dump() if updated_session else session.model_dump(),
             tool_calls=[],
             error=error_message,
@@ -102,23 +79,13 @@ async def execute_quiz_start(
     q = tool_result.get("current_question") or (
         updated_session.current_question if updated_session else None
     )
-    options_text = _format_options_text(q.get("options", []) if isinstance(q, dict) else [])
     opening = QUIZ_OPENING.get(lang, QUIZ_OPENING["zh"])
-
-    if lang == "en":
-        response_message = f"{opening}\n\nQuestion 1: {q.get('text', '')}\n{options_text}"
-    else:
-        response_message = f"{opening}\n\n第1題：{q.get('text', '')}\n{options_text}"
-
-    raw_tts_text = (
-        f"{opening} {make_quiz_tts_text(q, 1, lang)}" if isinstance(q, dict) else None
-    )
-    tts_text = to_jti_tts_text(raw_tts_text, lang)
+    response_fields = build_jti_quiz_question_fields(q, 1, lang, prefix=opening)
 
     log_result = conversation_logger.log_conversation(
         session_id=session_id,
         user_message=user_message,
-        agent_response=response_message,
+        agent_response=response_fields["message"],
         tool_calls=[{"tool": "start_quiz", "args": {"session_id": session_id}, "result": tool_result}],
         session_state=build_session_state(updated_session or session),
         mode="jti",
@@ -126,8 +93,7 @@ async def execute_quiz_start(
     final_turn_number = log_result[1] if log_result else None
 
     return ChatResponse(
-        message=response_message,
-        tts_text=tts_text,
+        **response_fields,
         options=extract_option_texts(q),
         session=updated_session.model_dump() if updated_session else session.model_dump(),
         tool_calls=[{"tool": "start_quiz", "args": {"session_id": session_id}}],
