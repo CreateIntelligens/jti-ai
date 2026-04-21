@@ -1,10 +1,15 @@
 """
 HCIoT assistant prompts and system rules.
+
+安全護欄（Priority 0 + 敏感議題處理）由 safety_prompts 共用模組注入，
+不包含在可編輯的區塊中。
 """
 
 from __future__ import annotations
 
 from typing import Dict, Optional
+
+from app.services.safety_prompts import SENSITIVE_HANDLING, wrap_with_safety
 
 DEFAULT_MAX_RESPONSE_CHARS = 40
 
@@ -31,12 +36,14 @@ DEFAULT_RESPONSE_RULE_SECTIONS = {
         "scope_limits": """- 你不是醫師，不可做個人化診斷、開立處方、保證療效或取代正式就醫
 - 如果使用者描述的是緊急或危險症狀，必須明確提醒儘快聯絡醫療人員或直接就醫
 - 如果問題明顯和衛教、健康、疾病照護無關（例如天氣、美食、政治、投資、寫程式），應婉拒並引導回衛教主題
-- 使用者提到的其他醫療機構（例如其他醫院名稱）不可視為本院，不可將其他機構的資訊代入本院回答""",
+- 使用者提到的其他醫療機構（例如其他醫院名稱）不可視為本院，不可將其他機構的資訊代入本院回答
+- 若問題屬於「敏感議題處理」章節涵蓋的類別（自我傷害、違法/違禁品等），不得用「與衛教無關」簡單婉拒，必須改依該章節的關懷式處理""",
         "response_style": """- 語言：必須使用繁體中文，禁止英文或其他語言
 - 數字：所有數字一律使用阿拉伯數字，據資料回答不自己轉換
 - 風格：簡潔、穩定、好理解，避免過度口語或浮誇
 - 格式：不要使用表情符號 emoji、不要用特殊符號、不要用 markdown 格式、不要用列表或換行分點
-- 如果知識不足或資料沒有提到，請直接說明不知道，不要猜測""",
+- 如果知識不足或資料沒有提到，請直接說明不知道，不要猜測
+- 敏感議題例外：當回答落入「敏感議題處理」章節時，字數上限可略為放寬，優先完整表達關懷、共情與求助資源，避免因為字數壓縮而變得冷淡或指令化""",
         "knowledge_rules": """- 優先依據醫院提供的衛教資料回答，不可憑印象補充未被資料支持的醫療內容
 - 若使用者追問的是前一輪已查到且一致的衛教資訊，可直接承接上下文回答
 - 如果知識庫沒有相關內容，應誠實說明資料未提及，並建議向醫療專業人員確認
@@ -98,7 +105,8 @@ def _compose_response_rules(
         "role": "## Your Role" if is_en else "## 你的角色",
         "scope": "## Scope Restriction" if is_en else "## 範圍限制",
         "rules": "## Response Rules" if is_en else "## 回應規則",
-        "kb": "## Knowledge Base Usage" if is_en else "## 知識庫使用規則"
+        "kb": "## Knowledge Base Usage" if is_en else "## 知識庫使用規則",
+        "sensitive": "## Sensitive Topics" if is_en else "## 敏感議題處理",
     }
     
     length_rule = (
@@ -106,6 +114,9 @@ def _compose_response_rules(
         if is_en else
         f"- 字數：每次回覆嚴格不超過{limit}字，超過即違規，寧可精簡也不可超過"
     )
+
+    lang = "en" if is_en else "zh"
+    sensitive_block = SENSITIVE_HANDLING[lang]
 
     return f"""{headers['role']}
 
@@ -122,7 +133,11 @@ def _compose_response_rules(
 
 {headers['kb']}
 
-{sections.get('knowledge_rules', '')}"""
+{sections.get('knowledge_rules', '')}
+
+{headers['sensitive']}
+
+{sensitive_block}"""
 
 
 def build_system_instruction(
@@ -134,7 +149,8 @@ def build_system_instruction(
     normalized_lang = "en" if language == "en" else "zh"
     sections = response_rule_sections or DEFAULT_RESPONSE_RULE_SECTIONS[normalized_lang]
     rules = _compose_response_rules(normalized_lang, sections, limit)
-    return f"{persona}\n\n{rules}"
+    safe_persona = wrap_with_safety(persona, normalized_lang)
+    return f"{safe_persona}\n\n{rules}"
 
 
 def build_intent_prompt(query: str) -> str:
@@ -148,4 +164,3 @@ def build_intent_prompt(query: str) -> str:
 使用者訊息：「{query}」
 
 只能回覆 YES 或 NO："""
-

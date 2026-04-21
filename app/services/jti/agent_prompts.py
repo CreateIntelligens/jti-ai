@@ -5,13 +5,16 @@ Main Agent Prompts - 人物設定與系統規則
 - PERSONA: 人物設定（可編輯）
 - RESPONSE_RULE_SECTIONS: 回覆規則分段（可編輯）
 
-系統在執行時會將分段規則組裝成完整 system instruction。
+安全護欄（Priority 0 + 敏感議題處理）由 safety_prompts 共用模組注入，
+不包含在可編輯的區塊中。
 """
 
 from __future__ import annotations
 
 from copy import deepcopy
 from typing import Dict, Optional
+
+from app.services.safety_prompts import SENSITIVE_HANDLING, wrap_with_safety
 
 DEFAULT_MAX_RESPONSE_CHARS = 60
 
@@ -98,7 +101,8 @@ def _compose_response_rules(
         "role": "## Your Role" if is_en else "## 你的角色",
         "scope": "## Scope Restriction (Strictly Follow)" if is_en else "## 範圍限制（嚴格遵守）",
         "rules": "## Response Rules" if is_en else "## 回應規則",
-        "kb": "## Knowledge Base Usage (Most Important)" if is_en else "## 知識庫使用規則（最重要）"
+        "kb": "## Knowledge Base Usage (Most Important)" if is_en else "## 知識庫使用規則（最重要）",
+        "sensitive": "## Sensitive Topics" if is_en else "## 敏感議題處理",
     }
     
     if max_response_chars > 0:
@@ -113,6 +117,9 @@ def _compose_response_rules(
             if is_en else
             "- 字數：不限制（可依情境自然回覆）"
         )
+
+    lang = "en" if is_en else "zh"
+    sensitive_block = SENSITIVE_HANDLING[lang]
 
     return f"""{headers['role']}
 
@@ -129,7 +136,11 @@ def _compose_response_rules(
 
 {headers['kb']}
 
-{sections.get('knowledge_rules', '')}"""
+{sections.get('knowledge_rules', '')}
+
+{headers['sensitive']}
+
+{sensitive_block}"""
 
 
 def get_default_response_rule_sections() -> Dict[str, Dict[str, str]]:
@@ -143,11 +154,12 @@ def build_system_instruction(
     response_rule_sections: Optional[Dict[str, str]] = None,
     max_response_chars: int = DEFAULT_MAX_RESPONSE_CHARS,
 ) -> str:
-    """組合完整 system instruction: persona + 規則。"""
+    """組合完整 system instruction: safety wrap + persona + 規則。"""
     defaults = get_default_response_rule_sections()
     sections = response_rule_sections or defaults.get(language, defaults["zh"])
     rules = _compose_response_rules(language, sections, max_response_chars)
-    return f"{persona}\n\n{rules}"
+    safe_persona = wrap_with_safety(persona, language)
+    return f"{safe_persona}\n\n{rules}"
 
 
 # 動態狀態模板（每次對話會變）
