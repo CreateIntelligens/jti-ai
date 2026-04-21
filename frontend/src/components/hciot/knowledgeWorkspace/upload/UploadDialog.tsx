@@ -15,9 +15,9 @@ import type { ResolvedUploadTopic } from './types';
 type Tab = 'file' | 'qa' | 'image';
 
 const TABS = [
-  { id: 'file' as Tab, labelZh: '上傳知識檔', labelEn: 'Upload Files', icon: Upload },
-  { id: 'qa' as Tab, labelZh: '手動輸入 Q&A', labelEn: 'Manual Q&A', icon: Plus },
-  { id: 'image' as Tab, labelZh: '上傳圖片', labelEn: 'Upload Images', icon: ImageIcon },
+  { id: 'file' as Tab, label: '上傳知識檔', icon: Upload },
+  { id: 'qa' as Tab, label: '手動輸入 Q&A', icon: Plus },
+  { id: 'image' as Tab, label: '上傳圖片', icon: ImageIcon },
 ];
 
 interface UploadDialogProps {
@@ -177,7 +177,7 @@ function TopicSelectorSection({ language, topic }: TopicSelectorSectionProps) {
   return (
     <div className="hciot-qa-topic-section">
       <label className="hciot-qa-topic-label">
-        {language === 'zh' ? '指定科別 / 主題（可選）' : 'Category / Topic (optional)'}
+        指定科別 / 主題（可選）
       </label>
       <div className="hciot-qa-selectors">
         <HciotSelect
@@ -185,9 +185,9 @@ function TopicSelectorSection({ language, topic }: TopicSelectorSectionProps) {
           value={topic.categoryId}
           onChange={topic.handleCategoryChange}
           options={[
-            { value: '', label: language === 'zh' ? '— 不指定 —' : '— None —' },
+            { value: '', label: '— 不指定 —' },
             ...topic.sortedCategories.map((c) => ({ value: c.id, label: c.labels[language] })),
-            { value: NEW_VALUE, label: language === 'zh' ? '＋ 新增科別' : '+ New category' },
+            { value: NEW_VALUE, label: '＋ 新增科別' },
           ]}
         />
         <span className="hciot-file-path-separator">/</span>
@@ -197,10 +197,10 @@ function TopicSelectorSection({ language, topic }: TopicSelectorSectionProps) {
           onChange={topic.handleTopicChange}
           disabled={!topic.categoryId || topic.categoryId === NEW_VALUE}
           options={[
-            { value: '', label: language === 'zh' ? '— 不指定 —' : '— None —' },
+            { value: '', label: '— 不指定 —' },
             ...topic.sortedTopics.map((t) => ({ value: t.id, label: t.labels[language] })),
             ...(topic.categoryId && topic.categoryId !== NEW_VALUE
-              ? [{ value: NEW_VALUE, label: language === 'zh' ? '＋ 新增主題' : '+ New topic' }]
+              ? [{ value: NEW_VALUE, label: '＋ 新增主題' }]
               : []),
           ]}
         />
@@ -210,13 +210,13 @@ function TopicSelectorSection({ language, topic }: TopicSelectorSectionProps) {
         <div className="hciot-qa-new-fields">
           <input
             className="hciot-file-input"
-            placeholder={language === 'zh' ? '新科別中文名稱' : 'New category name (zh)'}
+            placeholder="新科別中文名稱"
             value={topic.newCategoryZh}
             onChange={(e) => topic.setNewCategoryZh(e.target.value)}
           />
           <input
             className="hciot-file-input"
-            placeholder={language === 'zh' ? '新科別英文名稱' : 'New category name (en)'}
+            placeholder="新科別英文名稱"
             value={topic.newCategoryEn}
             onChange={(e) => topic.setNewCategoryEn(e.target.value)}
           />
@@ -227,13 +227,13 @@ function TopicSelectorSection({ language, topic }: TopicSelectorSectionProps) {
         <div className="hciot-qa-new-fields">
           <input
             className="hciot-file-input"
-            placeholder={language === 'zh' ? '新主題中文名稱' : 'New topic name (zh)'}
+            placeholder="新主題中文名稱"
             value={topic.newTopicZh}
             onChange={(e) => topic.setNewTopicZh(e.target.value)}
           />
           <input
             className="hciot-file-input"
-            placeholder={language === 'zh' ? '新主題英文名稱' : 'New topic name (en)'}
+            placeholder="新主題英文名稱"
             value={topic.newTopicEn}
             onChange={(e) => topic.setNewTopicEn(e.target.value)}
           />
@@ -273,7 +273,7 @@ export default function UploadDialog({
     <div className="hciot-qa-overlay" onClick={onClose}>
       <div className="hciot-qa-dialog" onClick={(e) => e.stopPropagation()}>
         <div className="hciot-qa-header">
-          <h3>{language === 'zh' ? '新增內容' : 'Add Content'}</h3>
+          <h3>新增內容</h3>
           <button type="button" className="hciot-qa-close" onClick={onClose}>
             <X size={18} />
           </button>
@@ -290,7 +290,7 @@ export default function UploadDialog({
               aria-selected={tab === item.id}
             >
               <item.icon size={14} />
-              {language === 'zh' ? item.labelZh : item.labelEn}
+              {item.label}
             </button>
           ))}
         </div>

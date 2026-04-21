@@ -108,7 +108,7 @@ def _compose_response_rules(
         "kb": "## Knowledge Base Usage" if is_en else "## 知識庫使用規則",
         "sensitive": "## Sensitive Topics" if is_en else "## 敏感議題處理",
     }
-    
+
     length_rule = (
         f"- Length: keep each response within {limit} words when practical"
         if is_en else

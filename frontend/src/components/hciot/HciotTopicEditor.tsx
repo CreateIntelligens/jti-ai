@@ -24,37 +24,36 @@ function toQuestionLines(value: string): string[] {
   return value.split('\n').map((line) => line.trim()).filter(Boolean);
 }
 
-function getDeleteMessage(confirmDelete: DeleteTarget | null, language: 'zh' | 'en'): string {
+function getDeleteMessage(confirmDelete: DeleteTarget | null, _language: 'zh' | 'en'): string {
   if (!confirmDelete) return '';
   if (confirmDelete.type === 'category') {
-    return language === 'zh' ? '確定刪除此科別及其所有主題？' : 'Delete this category and all its topics?';
+    return '確定刪除此科別及其所有主題？';
   }
-  return language === 'zh' ? '確定刪除此主題？' : 'Delete this topic?';
+  return '確定刪除此主題？';
 }
 
 export default function HciotTopicEditor({ language, categories, onCategoriesChange }: Props) {
-  const isZh = language === 'zh';
   const t = {
-    title: isZh ? '科別與題目' : 'Categories & Topics',
-    topics: isZh ? '主題' : 'topics',
-    questions: isZh ? '題' : 'Q',
-    edit: isZh ? '編輯' : 'Edit',
-    delete: isZh ? '刪除' : 'Delete',
-    rename: isZh ? '改名' : 'Rename',
-    save: isZh ? '儲存' : 'Save',
-    saving: isZh ? '儲存中…' : 'Saving…',
-    cancel: isZh ? '取消' : 'Cancel',
-    addTopic: isZh ? '新增主題' : 'Add topic',
-    addCat: isZh ? '新增科別' : 'Add category',
-    editQs: isZh ? '編輯題目' : 'Edit questions',
-    noQs: isZh ? '尚無題目' : 'No questions yet',
-    qsPlaceholder: isZh ? '每行一題…' : 'One question per line…',
-    catPlaceholderZh: isZh ? '中文' : 'Label (zh)',
-    catPlaceholderEn: isZh ? 'English' : 'Label (en)',
-    newCatZh: isZh ? '科別中文名' : 'Category name (zh)',
-    newCatEn: isZh ? '科別英文名' : 'Category name (en)',
-    newTopicZh: isZh ? '主題中文名' : 'Topic name (zh)',
-    newTopicEn: isZh ? '主題英文名' : 'Topic name (en)',
+    title: '科別與題目',
+    topics: '主題',
+    questions: '題',
+    edit: '編輯',
+    delete: '刪除',
+    rename: '改名',
+    save: '儲存',
+    saving: '儲存中…',
+    cancel: '取消',
+    addTopic: '新增主題',
+    addCat: '新增科別',
+    editQs: '編輯題目',
+    noQs: '尚無題目',
+    qsPlaceholder: '每行一題…',
+    catPlaceholderZh: '中文名稱',
+    catPlaceholderEn: '英文名稱',
+    newCatZh: '科別中文名',
+    newCatEn: '科別英文名',
+    newTopicZh: '主題中文名',
+    newTopicEn: '主題英文名',
   };
 
   const [expandedCatId, setExpandedCatId] = useState<string | null>(null);
@@ -219,7 +218,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
     <div className="hciot-te">
       <div className="hciot-te-header">
         <h4 className="hciot-te-title">
-          {language === 'zh' ? '科別與題目' : 'Categories & Topics'}
+          科別與題目
         </h4>
       </div>
 

@@ -14,11 +14,11 @@ interface ExistingImagePickerProps {
   onSelect: (imageId: string) => void;
 }
 
-function imageReferenceLabel(language: HciotLanguage, image: HciotImage): string {
+function imageReferenceLabel(_language: HciotLanguage, image: HciotImage): string {
   const count = image.reference_count ?? 0;
   return count > 0
-    ? (language === 'zh' ? `被 ${count} 題引用` : `Referenced by ${count} item(s)`)
-    : (language === 'zh' ? '未引用' : 'Unused');
+    ? `被 ${count} 題引用`
+    : '未引用';
 }
 
 export default function ExistingImagePicker({
@@ -120,10 +120,10 @@ export default function ExistingImagePicker({
         <div className="hciot-image-picker-header">
           <div>
             <div className="hciot-image-picker-title">
-              {language === 'zh' ? '選擇既有圖片' : 'Select Existing Image'}
+              選擇既有圖片
             </div>
             <div className="hciot-image-picker-subtitle">
-              {language === 'zh' ? '未引用圖片會優先顯示在上方' : 'Unused images are listed first.'}
+              未引用圖片會優先顯示在上方
             </div>
           </div>
           <button type="button" className="hciot-explorer-icon-button" onClick={onClose}>
@@ -137,7 +137,7 @@ export default function ExistingImagePicker({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder={language === 'zh' ? '搜尋 image id' : 'Search image id'}
+              placeholder="搜尋 image id"
               className="hciot-image-picker-search-input"
             />
           </label>
@@ -147,12 +147,12 @@ export default function ExistingImagePicker({
           {filteredImages.length === 0 ? (
             <div className="hciot-image-picker-empty">
               <ImageIcon size={24} />
-              <div>{language === 'zh' ? '找不到符合條件的圖片' : 'No matching images found'}</div>
+              <div>找不到符合條件的圖片</div>
             </div>
           ) : (
             <>
-              {renderSection(language === 'zh' ? '未引用圖片' : 'Unused', unusedImages)}
-              {renderSection(language === 'zh' ? '其他圖片' : 'Referenced', referencedImages)}
+              {renderSection('未引用圖片', unusedImages)}
+              {renderSection('其他圖片', referencedImages)}
             </>
           )}
         </div>

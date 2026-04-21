@@ -127,7 +127,7 @@ export default function MergedCsvPane({
       for (const [index, row] of preparedRows.entries()) {
         if (!row.pendingImageFile) continue;
         if (!onUploadImage) {
-          throw new Error(language === 'zh' ? '缺少圖片上傳功能' : 'Image upload is unavailable');
+          throw new Error('缺少圖片上傳功能');
         }
 
         preparedRows[index] = {
@@ -214,7 +214,7 @@ export default function MergedCsvPane({
     <div className="hciot-file-editor">
       <div className="hciot-file-header">
         <div>
-          <p className="hciot-file-kicker">Knowledge Explorer</p>
+          <p className="hciot-file-kicker">知識庫</p>
           <h2 className="hciot-file-title">
             <TableIcon size={20} style={{ verticalAlign: '-3px', marginRight: '0.4rem' }} />
             {topicLabel || topicSlug}
@@ -234,7 +234,7 @@ export default function MergedCsvPane({
                 disabled={saving}
               >
                 <X size={15} />
-                <span>{language === 'zh' ? '取消' : 'Cancel'}</span>
+                <span>取消</span>
               </button>
               <button
                 type="button"
@@ -243,7 +243,7 @@ export default function MergedCsvPane({
                 disabled={saving}
               >
                 <Save size={15} />
-                <span>{saving ? (language === 'zh' ? '儲存中...' : 'Saving...') : (language === 'zh' ? '儲存變更' : 'Save Changes')}</span>
+                <span>{saving ? '儲存中...' : '儲存變更'}</span>
               </button>
             </>
           ) : (
@@ -254,7 +254,7 @@ export default function MergedCsvPane({
               disabled={loading || error !== null || rows.length === 0}
             >
               <Edit size={15} />
-              <span>{language === 'zh' ? '編輯題庫' : 'Edit Q&A'}</span>
+              <span>編輯題庫</span>
             </button>
           )}
         </div>

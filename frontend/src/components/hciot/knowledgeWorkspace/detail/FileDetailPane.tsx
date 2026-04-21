@@ -74,9 +74,9 @@ export default function FileDetailPane({
     <div className="hciot-file-editor">
       <div className="hciot-file-header">
         <div>
-          <p className="hciot-file-kicker">Knowledge Explorer</p>
+          <p className="hciot-file-kicker">知識庫</p>
           <h2 className="hciot-file-title">
-            {selectedFile ? getFileLabel(selectedFile) : (language === 'zh' ? '檔案管理' : 'File Manager')}
+            {selectedFile ? getFileLabel(selectedFile) : '檔案管理'}
           </h2>
           <p className="hciot-file-path">{currentPathLabel}</p>
         </div>
@@ -89,7 +89,7 @@ export default function FileDetailPane({
             disabled={!selectedFile || deleting}
           >
             <Download size={15} />
-            <span>{language === 'zh' ? '下載' : 'Download'}</span>
+            <span>下載</span>
           </button>
           <button
             type="button"
@@ -98,7 +98,7 @@ export default function FileDetailPane({
             disabled={!selectedFile || deleting}
           >
             <Trash2 size={15} />
-            <span>{deleting ? (language === 'zh' ? '刪除中...' : 'Deleting...') : (language === 'zh' ? '刪除' : 'Delete')}</span>
+            <span>{deleting ? '刪除中...' : '刪除'}</span>
           </button>
           <button
             type="button"
@@ -107,7 +107,7 @@ export default function FileDetailPane({
             disabled={!selectedFile || saving || uploading || deleting || !hasUnsavedChanges}
           >
             <Save size={15} />
-            <span>{saving ? (language === 'zh' ? '儲存中...' : 'Saving...') : (language === 'zh' ? '儲存變更' : 'Save Changes')}</span>
+            <span>{saving ? '儲存中...' : '儲存變更'}</span>
           </button>
         </div>
       </div>
@@ -121,7 +121,7 @@ export default function FileDetailPane({
           <section className="hciot-file-metadata">
             <div className="hciot-file-metadata-group">
               <label className="hciot-file-metadata-label">
-                {language === 'zh' ? '科別 / 主題' : 'Category / Topic'}
+                科別 / 主題
               </label>
               <div className="hciot-file-metadata-controls">
                 <HciotSelect
@@ -131,7 +131,7 @@ export default function FileDetailPane({
                   disabled={saving}
                   options={[
                     ...categoryOptions.map((category) => ({ value: category.id, label: category.labels[language] })),
-                    { value: NEW_VALUE, label: language === 'zh' ? '＋ 新增科別' : '+ New category' },
+                    { value: NEW_VALUE, label: '＋ 新增科別' },
                   ]}
                 />
 
@@ -147,11 +147,11 @@ export default function FileDetailPane({
                       value: '',
                       label: draft.categoryId
                         ? getNoTopicLabel(language)
-                        : (language === 'zh' ? '先選科別' : 'Select category first'),
+                        : '先選科別',
                     },
                     ...topicOptions.map((topic) => ({ value: topic.id, label: topic.labels[language] })),
                     ...(draft.categoryId
-                      ? [{ value: NEW_VALUE, label: language === 'zh' ? '＋ 新增主題' : '+ New topic' }]
+                      ? [{ value: NEW_VALUE, label: '＋ 新增主題' }]
                       : []),
                   ]}
                 />
@@ -162,7 +162,7 @@ export default function FileDetailPane({
               <div className="hciot-file-inline-create">
                 <input
                   className="hciot-file-input"
-                  placeholder={language === 'zh' ? '新科別名稱' : 'New category name'}
+                  placeholder="新科別名稱"
                   value={draft.categoryLabelZh}
                   onChange={(event) => onDraftChange({ categoryLabelZh: event.target.value })}
                 />
@@ -173,7 +173,7 @@ export default function FileDetailPane({
               <div className="hciot-file-inline-create">
                 <input
                   className="hciot-file-input"
-                  placeholder={language === 'zh' ? '新主題名稱' : 'New topic name'}
+                  placeholder="新主題名稱"
                   value={draft.topicLabelZh}
                   onChange={(event) => onDraftChange({ topicLabelZh: event.target.value })}
                 />
@@ -185,11 +185,11 @@ export default function FileDetailPane({
             <div className="hciot-file-editor-meta">
               <span>{selectedFile.content_type || 'text/plain'}</span>
               <span>{selectedFile.size ? `${Math.max(1, Math.round(selectedFile.size / 1024))} KB` : '0 KB'}</span>
-              <span>{fileEditable ? (language === 'zh' ? '可直接編輯' : 'Editable') : (language === 'zh' ? '僅預覽/下載' : 'Preview only')}</span>
+              <span>{fileEditable ? '可直接編輯' : '僅預覽/下載'}</span>
             </div>
 
             {loadingContent ? (
-              <div className="hciot-file-editor-empty">{language === 'zh' ? '載入內容中...' : 'Loading content...'}</div>
+              <div className="hciot-file-editor-empty">載入內容中...</div>
             ) : fileEditable ? (
               <textarea
                 className="hciot-file-textarea"
@@ -199,8 +199,8 @@ export default function FileDetailPane({
               />
             ) : (
               <div className="hciot-file-editor-empty">
-                <p>{contentMessage || (language === 'zh' ? '此檔案格式不支援線上編輯' : 'This file type is not editable online')}</p>
-                <p>{language === 'zh' ? '你仍然可以調整科別 / 主題關聯並下載檔案。' : 'You can still update category/topic metadata and download the file.'}</p>
+                <p>{contentMessage || '此檔案格式不支援線上編輯'}</p>
+                <p>你仍然可以調整科別 / 主題關聯並下載檔案。</p>
               </div>
             )}
           </section>
@@ -209,12 +209,8 @@ export default function FileDetailPane({
         <div className="hciot-file-empty">
           <FileText size={28} />
           <div>
-            <h3>{language === 'zh' ? '從左側 Explorer 選擇檔案' : 'Select a file from the Explorer'}</h3>
-            <p>
-              {language === 'zh'
-                ? '搜尋、展開科別與主題，右側會直接進入內容編輯。'
-                : 'Search the tree, expand categories and topics, then edit content directly here.'}
-            </p>
+            <h3>從左側檔案樹選擇檔案</h3>
+            <p>搜尋、展開科別與主題，右側會直接進入內容編輯。</p>
           </div>
         </div>
       )}

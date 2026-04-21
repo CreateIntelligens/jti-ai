@@ -82,7 +82,7 @@ export default function HciotTopicGrid({
       {selectedTopic ? (
         <div className="hciot-topic-question-panel">
           <p className="hciot-q-section-head">
-            {questionHeading || `${selectedTopic.labels[language]} · ${language === 'zh' ? '常見問題' : 'Questions'}`}
+            {questionHeading || `${selectedTopic.labels[language]} · 常見問題`}
           </p>
           <div className="hciot-topic-question-list custom-scrollbar">
             {selectedTopic.questions[language].map((question, index) => {

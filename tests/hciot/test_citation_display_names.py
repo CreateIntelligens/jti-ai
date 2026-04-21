@@ -37,79 +37,16 @@ def test_localize_citations_uses_display_name(monkeypatch):
 
 def test_hciot_agent_uses_flash_lite_for_chat():
     agent = HciotMainAgent()
-
-    assert agent.model_name == "gemini-2.0-flash-lite"
-
-
-def test_extract_top_citation_image_id_does_not_fallback_to_other_csv_rows():
-    citations = [
-        {
-            "title": "helicobacter_pylori.csv",
-            "text": "最相關問題\n最相關答案",
-        }
-    ]
-
-    assert HciotMainAgent._extract_top_citation_image_id(citations) is None
+    assert agent.model_name == "gemini-3.1-flash-lite-preview"
 
 
-def test_extract_top_citation_image_id_prefers_dedicated_img_csv_row_value(monkeypatch):
-    fake_store = type(
-        "FakeStore",
-        (),
-        {
-            "get_file": lambda self, language, filename: {
-                "data": b"index,q,a,img\n4,\xe7\x9b\xb8\xe9\x97\x9c\xe6\xa5\xad\xe5\x8b\x99,\xe5\x9b\x9e\xe7\xad\x94,1\n"
-            }
-            if filename == "topic_IMG_1.csv"
-            else None
-        },
-    )()
+def test_extract_image_id_returns_top_citation_id():
+    citations = [{"image_id": "123"}, {"image_id": "456"}]
+    assert HciotMainAgent._extract_image_id(citations) == "123"
 
-    monkeypatch.setattr(
-        "app.services.hciot.main_agent.get_hciot_knowledge_store",
-        lambda: fake_store,
-    )
-
-    citations = [
-        {
-            "title": "topic_IMG_1.csv",
-            "text": "index,q,a,img\n4,相關業務,回答,1",
-        }
-    ]
-
-    assert HciotMainAgent._extract_top_citation_image_id(citations) == "1"
-
-
-def test_extract_top_citation_image_id_returns_none_for_malformed_dedicated_img_csv(monkeypatch):
-    fake_store = type(
-        "FakeStore",
-        (),
-        {
-            "get_file": lambda self, language, filename: {
-                "data": (
-                    b"index,q,a,img\n"
-                    b"1,\xe7\xac\xac\xe4\xb8\x80\xe9\xa1\x8c,\xe7\xac\xac\xe4\xb8\x80\xe7\xad\x94,4\n"
-                    b"2,\xe7\xac\xac\xe4\xba\x8c\xe9\xa1\x8c,\xe7\xac\xac\xe4\xba\x8c\xe7\xad\x94,\n"
-                )
-            }
-            if filename == "topic_IMG_4_IMG_4.csv"
-            else None
-        },
-    )()
-
-    monkeypatch.setattr(
-        "app.services.hciot.main_agent.get_hciot_knowledge_store",
-        lambda: fake_store,
-    )
-
-    citations = [
-        {
-            "title": "topic_IMG_4_IMG_4.csv",
-            "text": "index,q,a,img\n1,第一題,第一答,4\n2,第二題,第二答,",
-        }
-    ]
-
-    assert HciotMainAgent._extract_top_citation_image_id(citations) is None
+def test_extract_image_id_returns_none_if_missing():
+    citations = [{"text": "no image"}]
+    assert HciotMainAgent._extract_image_id(citations) is None
 
 
 async def _fake_concurrent_result(user_message, language, session_id=None):
@@ -141,9 +78,22 @@ async def test_hciot_chat_injects_session_state_into_prompt(monkeypatch):
         },
     )()
 
-    monkeypatch.setattr("app.services.hciot.main_agent._gemini_service.client", object())
+    monkeypatch.setattr("app.services.gemini_service.client", object())
     monkeypatch.setattr("app.services.hciot.main_agent.session_manager.get_session", lambda sid: session)
-    monkeypatch.setattr(agent, "_concurrent_intent_and_search", _fake_concurrent_result)
+    
+    # Mock the new RAG loop
+    mock_response = type("Response", (), {
+        "candidates": [type("Candidate", (), {
+            "content": type("Content", (), {
+                "parts": [type("Part", (), {"text": "繁體回覆"})]
+            })
+        })()]
+    })()
+    async def fake_run_tool_loop(chat_session, enriched, session, user_message):
+        captured["message"] = enriched
+        return mock_response, None
+    monkeypatch.setattr(agent, "_run_tool_loop", fake_run_tool_loop)
+    
     monkeypatch.setattr(agent, "_get_or_create_chat_session", lambda s: FakeChatSession())
     monkeypatch.setattr(agent, "_sync_history_to_db_background", lambda *a, **kw: None)
 

@@ -28,7 +28,7 @@ interface UploadTabBodyProps<T> {
 }
 
 export default function UploadTabBody<T>({
-  language,
+  language: _language,
   dragOver,
   setDragOver,
   onDrop,
@@ -42,11 +42,11 @@ export default function UploadTabBody<T>({
   onUpload,
   onClose,
   dropLabelZh,
-  dropLabelEn,
+  dropLabelEn: _dropLabelEn,
   dropSubZh,
-  dropSubEn,
+  dropSubEn: _dropSubEn,
   countZh,
-  countEn,
+  countEn: _countEn,
   listStyle,
   hint,
 }: UploadTabBodyProps<T>) {
@@ -63,8 +63,8 @@ export default function UploadTabBody<T>({
         onDrop={onDrop}
       >
         <Upload size={24} />
-        <p>{language === 'zh' ? dropLabelZh : dropLabelEn}</p>
-        <span>{language === 'zh' ? dropSubZh : dropSubEn}</span>
+        <p>{dropLabelZh}</p>
+        <span>{dropSubZh}</span>
       </div>
       <input
         ref={inputRef}
@@ -85,11 +85,11 @@ export default function UploadTabBody<T>({
 
       <div className="hciot-qa-footer">
         <span className="hciot-qa-count">
-          {items.length} {language === 'zh' ? countZh : countEn}
+          {items.length} {countZh}
         </span>
         <div className="hciot-qa-footer-actions">
           <button type="button" className="hciot-file-action-button" onClick={onClose}>
-            {language === 'zh' ? '取消' : 'Cancel'}
+            取消
           </button>
           <button
             type="button"
@@ -98,9 +98,7 @@ export default function UploadTabBody<T>({
             onClick={onUpload}
           >
             <Upload size={14} />
-            {isUploading
-              ? (language === 'zh' ? '上傳中...' : 'Uploading...')
-              : (language === 'zh' ? '上傳' : 'Upload')}
+            {isUploading ? '上傳中...' : '上傳'}
           </button>
         </div>
       </div>

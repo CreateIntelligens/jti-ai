@@ -25,8 +25,8 @@ function createEmptyTopicDraft(): Pick<FileMetadataDraft, 'topicId' | 'topicLabe
   };
 }
 
-function getLocalizedText(language: HciotLanguage, zh: string, en: string): string {
-  return language === 'zh' ? zh : en;
+function getLocalizedText(_language: HciotLanguage, zh: string, _en: string): string {
+  return zh;
 }
 
 export default function HciotKnowledgeWorkspace({

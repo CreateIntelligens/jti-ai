@@ -61,7 +61,7 @@ export default function MergedCsvTable({
   const [pickerIndex, setPickerIndex] = useState<number | null>(null);
 
   if (loading) {
-    return <div className="hciot-merged-csv-loading">{language === 'zh' ? '載入整合資料中...' : 'Loading merged data...'}</div>;
+    return <div className="hciot-merged-csv-loading">載入整合資料中...</div>;
   }
 
   if (error) {
@@ -69,7 +69,7 @@ export default function MergedCsvTable({
   }
 
   if (rows.length === 0 && !isEditing) {
-    return <div className="hciot-merged-csv-empty">{language === 'zh' ? '此主題目前沒有 CSV 檔案。' : 'No CSV files found for this topic.'}</div>;
+    return <div className="hciot-merged-csv-empty">此主題目前沒有 CSV 檔案。</div>;
   }
 
   const handleFileChange = (index: number, file: File | null) => {
@@ -104,16 +104,16 @@ export default function MergedCsvTable({
         onSelect={handleSelectExistingImage}
       />
       <div className="hciot-merged-csv-meta">
-        {language === 'zh' ? `已合併 ${sourceFiles.length} 個檔案` : `Merged ${sourceFiles.length} files`}
+        {`已合併 ${sourceFiles.length} 個檔案`}
       </div>
       <div className="hciot-merged-csv-table-wrapper">
         <table className="hciot-merged-csv-table">
           <thead>
             <tr>
-              <th style={{ width: '60px' }}>{language === 'zh' ? '編號' : 'Index'}</th>
-              <th>{language === 'zh' ? '問題 (Q)' : 'Question (Q)'}</th>
-              <th>{language === 'zh' ? '回答 (A)' : 'Answer (A)'}</th>
-              <th style={{ width: '180px' }}>{language === 'zh' ? '圖片 (IMG)' : 'Image (IMG)'}</th>
+              <th style={{ width: '60px' }}>編號</th>
+              <th>問題 (Q)</th>
+              <th>回答 (A)</th>
+              <th style={{ width: '180px' }}>圖片 (IMG)</th>
               {isEditing && <th style={{ width: '60px', textAlign: 'center' }}>-</th>}
             </tr>
           </thead>
@@ -168,7 +168,7 @@ export default function MergedCsvTable({
                                 type="button"
                                 className="hciot-merged-csv-remove-img"
                                 onClick={() => onUpdateRow(i, clearRowImageState())}
-                                title={language === 'zh' ? '移除圖片' : 'Remove image'}
+                                title="移除圖片"
                               >
                                 <X size={12} />
                               </button>
@@ -205,7 +205,7 @@ export default function MergedCsvTable({
                                 disabled={row.imgStatus === 'uploading'}
                               />
                               <Upload size={14} />
-                              <span>{row.imgStatus === 'uploading' ? '...' : (language === 'zh' ? '上傳' : 'Upload')}</span>
+                              <span>{row.imgStatus === 'uploading' ? '...' : '上傳'}</span>
                             </label>
                             <button
                               type="button"
@@ -213,7 +213,7 @@ export default function MergedCsvTable({
                               onClick={() => setPickerIndex(i)}
                             >
                               <ImageIcon size={14} />
-                              <span>{language === 'zh' ? '既有' : 'Existing'}</span>
+                              <span>既有</span>
                             </button>
                           </div>
                         )}
@@ -243,7 +243,7 @@ export default function MergedCsvTable({
                         type="button"
                         className="hciot-explorer-icon-button danger"
                         onClick={() => onDeleteRow(i)}
-                        title={language === 'zh' ? '刪除此列' : 'Delete row'}
+                        title="刪除此列"
                       >
                         <Trash2 size={15} />
                       </button>
@@ -262,7 +262,7 @@ export default function MergedCsvTable({
               onClick={onAddRow}
             >
               <Plus size={15} />
-              <span>{language === 'zh' ? '新增 Q&A' : 'Add Q&A'}</span>
+              <span>新增 Q&A</span>
             </button>
           </div>
         )}

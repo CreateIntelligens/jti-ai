@@ -70,7 +70,7 @@ export default function ExplorerSidebar({
             type="search"
             value={searchQuery}
             onChange={(event) => onSearchChange(event.target.value)}
-            placeholder={language === 'zh' ? '搜尋檔案樹' : 'Filter explorer'}
+            placeholder="搜尋檔案樹"
           />
         </div>
 
@@ -78,7 +78,7 @@ export default function ExplorerSidebar({
           type="button"
           className="hciot-explorer-icon-button"
           onClick={onOpenUploadDialog}
-          title={language === 'zh' ? '新增內容' : 'Add Content'}
+          title="新增內容"
         >
           <Plus size={16} />
         </button>
@@ -86,7 +86,7 @@ export default function ExplorerSidebar({
 
       <div className="hciot-explorer-body">
         {loadingWorkspace ? (
-          <div className="hciot-explorer-empty">{language === 'zh' ? '載入中...' : 'Loading...'}</div>
+          <div className="hciot-explorer-empty">載入中...</div>
         ) : visibleRows.length > 0 ? (
           <div className="hciot-explorer-tree" role="tree">
             {visibleRows.map(({ node, depth }) => {
@@ -132,9 +132,7 @@ export default function ExplorerSidebar({
           </div>
         ) : (
           <div className="hciot-explorer-empty">
-            {searchQuery
-              ? (language === 'zh' ? '找不到符合的節點' : 'No matching nodes')
-              : (language === 'zh' ? '目前沒有知識檔案' : 'No knowledge files yet')}
+            {searchQuery ? '找不到符合的節點' : '目前沒有知識檔案'}
           </div>
         )}
       </div>

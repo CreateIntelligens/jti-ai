@@ -69,19 +69,19 @@ const I18N = {
     remove: '移除',
   },
   en: {
-    csvHint: 'CSV Format Example',
-    downloadSample: 'Download',
-    downloadTitle: 'Download sample CSV',
-    q: 'Question (required)',
-    a: 'Answer',
-    img: 'Image ID (optional, upload image first)',
-    qText1: 'What is hypertension?',
-    aText1: 'A condition where blood pressure is consistently elevated...',
-    qText2: 'How to measure blood pressure?',
-    aText2: 'Please sit quietly for 5 minutes...',
-    duplicate: '(Dup)',
-    duplicateTitle: 'Duplicate filename',
-    remove: 'Remove',
+    csvHint: 'CSV 格式範例',
+    downloadSample: '下載範例',
+    downloadTitle: '下載範例 CSV',
+    q: '問題（必填）',
+    a: '回答',
+    img: '圖片 檔名（選填，不需要副檔名）',
+    qText1: '什麼是高血壓？',
+    aText1: '血壓持續偏高的狀態...',
+    qText2: '如何量血壓？',
+    aText2: '請先靜坐5分鐘...',
+    duplicate: '(重複)',
+    duplicateTitle: '重複檔名',
+    remove: '移除',
   },
 };
 
@@ -207,9 +207,7 @@ export default function FileUploadTab({
       return;
     }
     if (topicSelectionIncomplete) {
-      alert(language === 'zh'
-        ? '新增科別或主題時，請完整填寫中英文名稱'
-        : 'Please enter both zh and en labels for new categories or topics');
+      alert('新增科別或主題時，請完整填寫中英文名稱');
       return;
     }
 
@@ -252,11 +250,11 @@ export default function FileUploadTab({
       isUploading={uploadingLocal || uploading}
       disabled={!canSubmitFile}
       dropLabelZh="點擊或拖放檔案"
-      dropLabelEn="Click or drop files here"
+      dropLabelEn="點擊或拖放檔案"
       dropSubZh="只支援 CSV"
-      dropSubEn="CSV only"
+      dropSubEn="只支援 CSV"
       countZh="個檔案"
-      countEn="file(s)"
+      countEn="個檔案"
       hint={<CsvFormatHint language={language} />}
       onDrop={(event) => {
         event.preventDefault();

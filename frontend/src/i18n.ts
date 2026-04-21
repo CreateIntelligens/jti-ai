@@ -10,7 +10,7 @@ i18n
       zh: { translation: zh },
       en: { translation: en },
     },
-    lng: localStorage.getItem('language') || 'zh', // 從 localStorage 讀取或預設繁中
+    lng: 'zh',
     fallbackLng: 'zh',
     interpolation: {
       escapeValue: false, // React 已經處理 XSS

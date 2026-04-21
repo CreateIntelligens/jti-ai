@@ -118,22 +118,22 @@ export default function HciotKnowledgeTab({
   }, [selectedCategoryId]);
 
   const t = {
-    hint: lang === 'zh' ? '📋 上傳 CSV（含 q 欄位）時，題目將自動匯入指定科別／主題' : '📋 When CSV has a q column, questions auto-import to the selected category/topic',
-    category: lang === 'zh' ? '科別' : 'Category',
-    topic: lang === 'zh' ? '主題' : 'Topic',
-    none: lang === 'zh' ? '— 不指定 —' : '— None —',
-    newCat: lang === 'zh' ? '＋ 新增科別' : '+ New category',
-    newTopic: lang === 'zh' ? '＋ 新增主題' : '+ New topic',
-    zhName: lang === 'zh' ? '中文名稱' : 'Label (zh)',
-    enName: lang === 'zh' ? '英文名稱' : 'Label (en)',
-    topicZh: lang === 'zh' ? '主題中文名' : 'Topic label (zh)',
-    topicEn: lang === 'zh' ? '主題英文名' : 'Topic label (en)',
-    upload: lang === 'zh' ? '點擊或拖放檔案上傳' : 'Click or drag files to upload',
-    uploading: lang === 'zh' ? '上傳中...' : 'Uploading...',
-    formatHint: lang === 'zh' ? '支援 PDF、TXT、Word、CSV 等格式' : 'Supports PDF, TXT, Word, CSV, etc.',
+    hint: '📋 上傳 CSV（含 q 欄位）時，題目將自動匯入指定科別／主題',
+    category: '科別',
+    topic: '主題',
+    none: '— 不指定 —',
+    newCat: '＋ 新增科別',
+    newTopic: '＋ 新增主題',
+    zhName: '中文名稱',
+    enName: '英文名稱',
+    topicZh: '主題中文名',
+    topicEn: '主題英文名',
+    upload: '點擊或拖放檔案上傳',
+    uploading: '上傳中...',
+    formatHint: '支援 PDF、TXT、Word、CSV 等格式',
     fileCount: (count: number) => `共 ${count} 個檔案（${lang === 'zh' ? '中文' : 'English'} 知識庫）`,
-    empty: lang === 'zh' ? '知識庫尚無檔案' : 'No files in knowledge base',
-    confirmDelete: lang === 'zh' ? '確定要刪除此檔案嗎？' : 'Are you sure you want to delete this file?',
+    empty: '知識庫尚無檔案',
+    confirmDelete: '確定要刪除此檔案嗎？',
   };
 
   const buildTopicOpts = (): TopicUploadOpts | undefined => {

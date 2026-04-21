@@ -26,11 +26,11 @@ _config = PersonaRouterConfig(
     },
     default_prompt_names={
         "zh": "預設衛教助手設定",
-        "en": "Default Education Assistant",
+        "en": "預設衛教助手設定",
     },
     custom_prompt_name_prefix={
         "zh": "自訂衛教助手設定",
-        "en": "Custom Education Assistant",
+        "en": "自訂衛教助手設定",
     },
     persona_adapter=FlatPersonaAdapter(attr="hciot_persona_by_prompt"),
     runtime_settings_type=HciotRuntimeSettings,

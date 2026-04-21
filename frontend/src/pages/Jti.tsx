@@ -54,7 +54,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 export default function Jti() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState('');
@@ -62,7 +62,7 @@ export default function Jti() {
   const [statusText, setStatusText] = useState(t('status_ready'));
   const [sessionInfo, setSessionInfo] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [currentLanguage, setCurrentLanguage] = useState(i18n.language);
+  const [currentLanguage, setCurrentLanguage] = useState(localStorage.getItem('language') || 'zh');
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [welcomeContent, setWelcomeContent] = useState<WelcomeContent | null>(null);
@@ -286,7 +286,7 @@ export default function Jti() {
   }, [sessionId, t, clearTtsState]);
 
   const restartConversation = useCallback(async () => {
-    if (messages.length > 0 && !window.confirm(t('restart_confirm'))) {
+    if (messages.some(m => m.type === 'user') && !window.confirm(t('restart_confirm'))) {
       return;
     }
     try {
@@ -295,7 +295,7 @@ export default function Jti() {
     } catch {
       setStatusText(t('status_failed'));
     }
-  }, [currentLanguage, messages.length, t, startNewSession]);
+  }, [currentLanguage, messages, t, startNewSession]);
 
   const silentRestart = useCallback(async () => {
     try {
@@ -307,17 +307,13 @@ export default function Jti() {
   }, [currentLanguage, startNewSession]);
 
   const toggleLanguage = useCallback(async () => {
-    if (messages.length > 0) {
-      const confirmMessage = currentLanguage === 'zh'
-        ? '切換語言將重新開始對話，確定要繼續嗎？'
-        : 'Switching language will restart the conversation. Continue?';
-      if (!window.confirm(confirmMessage)) {
+    if (messages.some(m => m.type === 'user')) {
+      if (!window.confirm('切換語言將重新開始對話，確定要繼續嗎？')) {
         return;
       }
     }
 
     const newLang = currentLanguage === 'zh' ? 'en' : 'zh';
-    i18n.changeLanguage(newLang);
     setCurrentLanguage(newLang);
     localStorage.setItem('language', newLang);
 
@@ -326,7 +322,7 @@ export default function Jti() {
     } catch {
       setStatusText(t('status_failed'));
     }
-  }, [currentLanguage, i18n, messages.length, t, startNewSession]);
+  }, [currentLanguage, messages, t, startNewSession]);
 
   const refreshWelcomeContent = useCallback(async (lang?: string) => {
     const targetLang = (lang || currentLanguage) === 'en' ? 'en' : 'zh';
@@ -600,7 +596,7 @@ export default function Jti() {
             <button
               className="icon-btn text-icon"
               onClick={toggleLanguage}
-              title={currentLanguage === 'zh' ? 'Switch to English' : '切換至繁體中文'}
+              title={currentLanguage === 'zh' ? '切換至英文知識庫' : '切換至中文知識庫'}
               aria-label="Toggle Language"
             >
               {currentLanguage === 'zh' ? 'EN' : '中'}
@@ -702,7 +698,6 @@ export default function Jti() {
 
           // 切換語言（如果有提供且與當前不同）
           if (lang && lang !== currentLanguage) {
-            i18n.changeLanguage(lang);
             setCurrentLanguage(lang);
             localStorage.setItem('language', lang);
           }

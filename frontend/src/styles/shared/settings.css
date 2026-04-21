@@ -20,6 +20,28 @@
   --s-danger: #e57373;
 }
 
+[data-theme="light"] {
+  --s-modal-bg: linear-gradient(135deg, #ffffff, #f7f5ef);
+  --s-modal-solid: #ffffff;
+  --s-border: rgba(184, 143, 70, 0.35);
+  --s-border-subtle: rgba(0, 0, 0, 0.08);
+  --s-border-faint: rgba(0, 0, 0, 0.05);
+  --s-surface: rgba(0, 0, 0, 0.03);
+  --s-surface-hover: rgba(0, 0, 0, 0.06);
+  --s-text: #2a2a2a;
+  --s-text-dim: rgba(0, 0, 0, 0.6);
+  --s-text-faint: rgba(0, 0, 0, 0.4);
+  --s-dashed: rgba(0, 0, 0, 0.15);
+  --s-overlay-bg: rgba(0, 0, 0, 0.35);
+  --s-confirm-bg: #ffffff;
+}
+
+[data-theme="light"] .jti-prompt-content,
+[data-theme="light"] .jti-prompt-input,
+[data-theme="light"] .jti-prompt-textarea {
+  background: rgba(0, 0, 0, 0.04);
+}
+
 .hciot-shell {
   --s-accent: var(--hciot-accent, #0284c7);
   --s-accent-rgb: 2, 132, 199;

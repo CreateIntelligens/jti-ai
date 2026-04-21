@@ -49,7 +49,7 @@ interface QaRowItemProps {
 function QaRowItem({
   index,
   row,
-  language,
+  language: _language,
   previewUrl,
   onUpdate,
   onRemove,
@@ -66,14 +66,14 @@ function QaRowItem({
       <div className="hciot-qa-row-fields">
         <input
           className="hciot-qa-input"
-          placeholder={language === 'zh' ? '問題 (Q)' : 'Question (Q)'}
+          placeholder="問題 (Q)"
           value={row.q}
           onChange={(event) => onUpdate({ q: event.target.value })}
         />
         <div className="hciot-qa-row-fields-inner">
           <textarea
             className="hciot-qa-textarea hciot-qa-textarea-flexible"
-            placeholder={language === 'zh' ? '回答 (A)' : 'Answer (A)'}
+            placeholder="回答 (A)"
             value={row.a}
             onChange={(event) => onUpdate({ a: event.target.value })}
             rows={2}
@@ -102,19 +102,19 @@ function QaRowItem({
                 type="button"
                 className="hciot-qa-image-btn"
                 onClick={onUploadImage}
-                title={language === 'zh' ? '上傳圖片' : 'Upload Image'}
+                title="上傳圖片"
               >
                 <ImageIcon size={14} />
-                {!hasImage && (language === 'zh' ? '上傳' : 'Upload')}
+                {!hasImage && '上傳'}
               </button>
               <button
                 type="button"
                 className="hciot-qa-image-btn"
                 onClick={onChooseExisting}
-                title={language === 'zh' ? '選擇既有圖片' : 'Choose Existing Image'}
+                title="選擇既有圖片"
               >
                 <Table size={14} />
-                {!hasImage && (language === 'zh' ? '既有' : 'Existing')}
+                {!hasImage && '既有'}
               </button>
             </div>
           </div>
@@ -124,7 +124,7 @@ function QaRowItem({
         type="button"
         className="hciot-qa-row-delete"
         onClick={onRemove}
-        title={language === 'zh' ? '移除' : 'Remove'}
+        title="移除"
       >
         <Trash2 size={14} />
       </button>
@@ -300,16 +300,16 @@ export default function QaUploadTab({
           onClick={() => setRows((prev) => [...prev, createEmptyRow()])}
         >
           <Plus size={14} />
-          {language === 'zh' ? '新增一題' : 'Add row'}
+          新增一題
         </button>
 
         <div className="hciot-qa-footer">
           <span className="hciot-qa-count">
-            {validRows.length} {language === 'zh' ? '題有效' : 'valid Q(s)'}
+            {validRows.length} 題有效
           </span>
           <div className="hciot-qa-footer-actions">
             <button type="button" className="hciot-file-action-button" onClick={onClose}>
-              {language === 'zh' ? '取消' : 'Cancel'}
+              取消
             </button>
             <button
               type="button"
@@ -318,9 +318,7 @@ export default function QaUploadTab({
               onClick={() => { void handleSubmit(); }}
             >
               <Upload size={14} />
-              {uploadingLocal || uploading
-                ? (language === 'zh' ? '上傳中...' : 'Uploading...')
-                : (language === 'zh' ? '上傳' : 'Upload')}
+              {uploadingLocal || uploading ? '上傳中...' : '上傳'}
             </button>
           </div>
         </div>

@@ -102,11 +102,11 @@ export default function ImageUploadTab({
       disabled={!canSubmitImage}
       accept="image/*"
       dropLabelZh="點擊或拖放圖片檔案"
-      dropLabelEn="Click or drop image files here"
+      dropLabelEn="點擊或拖放圖片檔案"
       dropSubZh="支援 JPG、PNG、GIF、WEBP (最大 10MB)"
-      dropSubEn="JPG, PNG, GIF, WEBP (Max 10MB)"
+      dropSubEn="支援 JPG、PNG、GIF、WEBP (最大 10MB)"
       countZh="張圖片"
-      countEn="image(s)"
+      countEn="張圖片"
       listStyle={{ maxHeight: '300px', overflowY: 'auto' }}
       onDrop={(event) => {
         event.preventDefault();
@@ -132,7 +132,7 @@ export default function ImageUploadTab({
               <span className="hciot-upload-file-name">{item.file.name}</span>
               <input
                 type="text"
-                placeholder={language === 'zh' ? '自訂 IMG ID (選填)' : 'Custom IMG ID (optional)'}
+                placeholder="自訂 IMG ID (選填)"
                 value={item.imageId}
                 onChange={(event) => setSelectedImages((previous) => previous.map((image, imageIndex) => (
                   imageIndex === index ? { ...image, imageId: event.target.value } : image
@@ -151,7 +151,7 @@ export default function ImageUploadTab({
                   type="button"
                   className="hciot-qa-row-delete"
                   onClick={() => setSelectedImages((previous) => previous.filter((_, imageIndex) => imageIndex !== index))}
-                  title={language === 'zh' ? '移除' : 'Remove'}
+                  title="移除"
                 >
                   <X size={14} />
                 </button>

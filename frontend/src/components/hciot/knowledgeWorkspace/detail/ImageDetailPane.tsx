@@ -13,7 +13,7 @@ interface ImageDetailPaneProps {
 }
 
 export default function ImageDetailPane({
-  language,
+  language: _language,
   selectedImage,
   deleting,
   cleaningUnused,
@@ -27,8 +27,8 @@ export default function ImageDetailPane({
         <div className="hciot-file-empty">
           <ImageIcon size={28} />
           <div>
-            <h3>{language === 'zh' ? '從左側 Explorer 選擇圖片' : 'Select an image from the Explorer'}</h3>
-            <p>{language === 'zh' ? '在右側預覽圖片並查看詳細資訊' : 'Preview the image and view details here.'}</p>
+            <h3>從左側檔案樹選擇圖片</h3>
+            <p>在右側預覽圖片並查看詳細資訊</p>
           </div>
         </div>
       </div>
@@ -38,17 +38,17 @@ export default function ImageDetailPane({
   const referenceCount = selectedImage.reference_count ?? 0;
   const isReferenced = referenceCount > 0;
   const referenceLabel = isReferenced
-    ? (language === 'zh' ? `被 ${referenceCount} 題引用` : `Referenced by ${referenceCount} item(s)`)
-    : (language === 'zh' ? '未被任何題目引用' : 'Unused');
+    ? `被 ${referenceCount} 題引用`
+    : '未被任何題目引用';
   const referenceColor = isReferenced ? '#166534' : '#b45309';
 
   return (
     <div className="hciot-file-editor hciot-image-detail-pane">
       <div className="hciot-file-header">
         <div>
-          <p className="hciot-file-kicker">Knowledge Explorer</p>
+          <p className="hciot-file-kicker">知識庫</p>
           <h2 className="hciot-file-title">{selectedImage.image_id}</h2>
-          <p className="hciot-file-path">{language === 'zh' ? '圖片目錄' : 'Images'}</p>
+          <p className="hciot-file-path">圖片目錄</p>
         </div>
 
         <div className="hciot-file-actions">
@@ -60,8 +60,8 @@ export default function ImageDetailPane({
           >
             <span>
               {cleaningUnused
-                ? (language === 'zh' ? '清理中...' : 'Cleaning...')
-                : (language === 'zh' ? `清理未引用圖片 (${unusedImageCount})` : `Clean Unused (${unusedImageCount})`)}
+                ? '清理中...'
+                : `清理未引用圖片 (${unusedImageCount})`}
             </span>
           </button>
           <button
@@ -71,7 +71,7 @@ export default function ImageDetailPane({
             disabled={deleting}
           >
             <Trash2 size={15} />
-            <span>{deleting ? (language === 'zh' ? '刪除中...' : 'Deleting...') : (language === 'zh' ? '刪除' : 'Delete')}</span>
+            <span>{deleting ? '刪除中...' : '刪除'}</span>
           </button>
         </div>
       </div>

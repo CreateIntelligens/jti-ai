@@ -116,7 +116,9 @@ class HciotMainAgent(BaseAgent):
         """Replace filenames with display names from the knowledge store."""
         if not citations:
             return citations
-        file_map = {f["name"].lower(): f.get("display_name") or f["name"] for f in get_hciot_knowledge_store().list_files(language) if f.get("name")}
+
+        store_files = get_hciot_knowledge_store().list_files(language)
+        file_map = {f["name"].lower(): f.get("display_name") or f["name"] for f in store_files if f.get("name")}
 
         localized = []
         for c in citations:

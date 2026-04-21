@@ -119,8 +119,8 @@ export function flattenExplorerNodes(
   });
 }
 
-export function getNoTopicLabel(language: HciotLanguage): string {
-  return language === 'zh' ? '未指定主題' : 'No Topic';
+export function getNoTopicLabel(_language: HciotLanguage): string {
+  return '未指定主題';
 }
 
 export function getCurrentPathLabel(
@@ -128,13 +128,13 @@ export function getCurrentPathLabel(
   language: HciotLanguage,
 ): string {
   if (!selectedFile) {
-    return language === 'zh' ? '選擇檔案開始編輯' : 'Select a file to start editing';
+    return '選擇檔案開始編輯';
   }
 
   const categoryLabel = selectedFile[`category_label_${language}` as const] || categoryPrefix(selectedFile.topic_id);
   const topicLabel = selectedFile[`topic_label_${language}` as const] || selectedFile.topic_id;
   if (!categoryLabel && !topicLabel) {
-    return language === 'zh' ? '未分類' : 'Uncategorized';
+    return '未分類';
   }
 
   return topicLabel ? `${categoryLabel} / ${topicLabel}` : categoryLabel;
@@ -205,7 +205,7 @@ export function buildExplorerTree(
         childNodes.push({
           key: `merged-csv:${topicId}`,
           kind: 'merged-csv',
-          label: language === 'zh' ? 'Q&A 整合' : `Q&A Merged (${csvFiles.length})`,
+          label: 'Q&A 整合',
           topicId,
           csvCount: csvFiles.length,
         } satisfies ExplorerMergedCsvNode);
@@ -279,7 +279,7 @@ export function buildExplorerTree(
     roots.push({
       key: 'category:__images__',
       kind: 'folder',
-      label: language === 'zh' ? '圖片' : 'Images',
+      label: '圖片',
       tone: 'category',
       children: imageNodes,
     });

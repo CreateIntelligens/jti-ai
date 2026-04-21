@@ -13,8 +13,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, Callable, Dict, Optional, Tuple, Type
 
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Body, Depends, HTTPException
+from pydantic import BaseModel
 
 from app.auth import verify_admin
 import app.deps as deps
@@ -170,24 +170,7 @@ class _UpdateRuntimeSettingsRequestBase(BaseModel):
     max_response_chars: Optional[int] = None
 
 
-def _build_update_runtime_request_model(
-    max_chars_ge: int,
-    max_chars_le: int,
-) -> Type[BaseModel]:
-    """為了套上不同 ge/le 限制，動態子類並覆寫 max_response_chars。"""
-
-    class UpdateRuntimeSettingsRequest(_UpdateRuntimeSettingsRequestBase):
-        max_response_chars: Optional[int] = Field(default=None, ge=max_chars_ge, le=max_chars_le)
-
-    return UpdateRuntimeSettingsRequest
-
-
 def build_persona_router(config: PersonaRouterConfig) -> APIRouter:
-    update_runtime_request_model = _build_update_runtime_request_model(
-        config.max_response_chars_ge,
-        config.max_response_chars_le,
-    )
-
     router = APIRouter(tags=[config.tag], dependencies=[Depends(verify_admin)])
 
     def require_prompt_manager():
@@ -524,7 +507,18 @@ def build_persona_router(config: PersonaRouterConfig) -> APIRouter:
         return {"prompt_id": runtime_prompt_id, "settings": settings.model_dump()}
 
     @router.post("/runtime-settings")
-    def update_runtime_settings(request: update_runtime_request_model, language: str = "zh"):  # type: ignore[valid-type]
+    def update_runtime_settings(
+        request: _UpdateRuntimeSettingsRequestBase = Body(...),
+        language: str = "zh",
+    ):
+        if request.max_response_chars is not None:
+            ge = config.max_response_chars_ge
+            le = config.max_response_chars_le
+            if not ge <= request.max_response_chars <= le:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"max_response_chars must be between {ge} and {le}",
+                )
         pm = require_prompt_manager()
         store_name = store_name_for(language)
         runtime_prompt_id = validate_and_resolve_prompt_id(request.prompt_id, store_name)

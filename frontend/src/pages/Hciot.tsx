@@ -153,7 +153,7 @@ function updateLastUserTurnNumber(
 }
 
 export default function Hciot() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const { theme, toggleTheme } = useTheme();
 
   const [storeName, setStoreName] = useState<string | null>(null);
@@ -166,7 +166,9 @@ export default function Hciot() {
   const [statusText, setStatusText] = useState(t('status_ready'));
   const [sessionInfo, setSessionInfo] = useState('');
   const [isTyping, setIsTyping] = useState(false);
-  const [currentLanguage, setCurrentLanguage] = useState(normalizeHciotLanguage(i18n.language));
+  const [currentLanguage, setCurrentLanguage] = useState(() =>
+    normalizeHciotLanguage(localStorage.getItem('language') || 'zh'),
+  );
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [workspace, setWorkspace] = useState<WorkspaceMode>(() => readStoredWorkspace());
@@ -423,12 +425,12 @@ export default function Hciot() {
 
   const restartConversation = useCallback(async () => {
     if (!storeName) return;
-    if (messages.length > 0 && !window.confirm(t('restart_confirm'))) {
+    if (messages.some((m) => m.type === 'user') && !window.confirm(t('restart_confirm'))) {
       return;
     }
     resetConversationState();
     await startSession(sessionId);
-  }, [messages.length, resetConversationState, sessionId, startSession, storeName, t]);
+  }, [messages, resetConversationState, sessionId, startSession, storeName, t]);
 
   const silentRestartConversation = useCallback(async () => {
     if (!storeName) return;
@@ -437,24 +439,20 @@ export default function Hciot() {
   }, [resetConversationState, sessionId, startSession, storeName]);
 
   const toggleLanguage = useCallback(async () => {
-    if (messages.length > 0) {
-      const confirmMessage = currentLanguage === 'zh'
-        ? t('hciot_language_confirm_zh')
-        : t('hciot_language_confirm_en');
-      if (!window.confirm(confirmMessage)) {
+    if (messages.some((m) => m.type === 'user')) {
+      if (!window.confirm(t('hciot_language_confirm_zh'))) {
         return;
       }
     }
 
     const nextLanguage = currentLanguage === 'zh' ? 'en' : 'zh';
-    i18n.changeLanguage(nextLanguage);
     localStorage.setItem('language', nextLanguage);
     setCurrentLanguage(nextLanguage);
 
     if (storeName) {
       await startSession(sessionId, nextLanguage);
     }
-  }, [currentLanguage, i18n, messages.length, sessionId, startSession, storeName, t]);
+  }, [currentLanguage, messages, sessionId, startSession, storeName, t]);
 
   const sendMessage = useCallback(async (message: string, turnNumber?: number) => {
     if (!message || loading) return;
@@ -611,14 +609,14 @@ export default function Hciot() {
         </div>
 
         <div className="hciot-header-actions">
-          <div className="hciot-view-toggle" role="tablist" aria-label={currentLanguage === 'zh' ? '工作區切換' : 'Workspace switcher'}>
+          <div className="hciot-view-toggle" role="tablist" aria-label="工作區切換">
             <button
               type="button"
               className={`hciot-view-button${workspace === 'chat' ? ' is-active' : ''}`}
               onClick={() => switchWorkspace('chat')}
             >
               <HeartPulse size={16} />
-              <span>{currentLanguage === 'zh' ? '聊天' : 'Chat'}</span>
+              <span>聊天</span>
             </button>
             <button
               type="button"
@@ -626,13 +624,13 @@ export default function Hciot() {
               onClick={() => switchWorkspace('files')}
             >
               <FileText size={16} />
-              <span>{currentLanguage === 'zh' ? '檔案管理' : 'Files'}</span>
+              <span>檔案管理</span>
             </button>
           </div>
           {ttsCharacters.length > 0 && (
             <label className="hciot-voice-select-wrap">
               <span className="hciot-voice-select-label">
-                {currentLanguage === 'zh' ? '聲音' : 'Voice'}
+                聲音
               </span>
               <HciotSelect
                 className="hciot-voice-select"
@@ -683,14 +681,14 @@ export default function Hciot() {
                 subheading={t('hciot_topic_subheading')}
                 questionHeading={
                   selectedTopic
-                    ? `${selectedTopic.labels[currentLanguage]} ${currentLanguage === 'zh' ? '常見問題' : 'Questions'}`
+                    ? `${selectedTopic.labels[currentLanguage]} 常見問題`
                     : undefined
                 }
                 disabledMessage={
                   storeMissing
                     ? t('hciot_store_missing_notice', { store: HCIOT_DEFAULT_STORE_NAME })
                     : topicsError
-                      ? (currentLanguage === 'zh' ? '無法載入題目分類，請稍後再試。' : 'Failed to load topics. Please try again later.')
+                      ? '無法載入題目分類，請稍後再試。'
                       : null
                 }
               />
