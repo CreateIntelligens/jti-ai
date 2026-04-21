@@ -25,6 +25,15 @@ class KnowledgeStore:
 
     COLLECTION_NAME = "knowledge_files"
     DEFAULT_NAMESPACE = "jti"
+    DEFAULT_CONTENT_TYPE = "application/octet-stream"
+    FILE_METADATA_PROJECTION = {
+        "_id": 0,
+        "filename": 1,
+        "display_name": 1,
+        "size": 1,
+        "editable": 1,
+        "created_at": 1,
+    }
 
     def __init__(self):
         self.db = get_mongo_db("jti_app")
@@ -55,12 +64,13 @@ class KnowledgeStore:
 
     def _query(self, language: str, filename: str | None = None, namespace: str = "jti") -> dict[str, Any]:
         """Build standard query filter."""
-        q = {
+        query = {
             "namespace": self._normalize_namespace(namespace),
             "language": self._normalize_language(language),
         }
-        if filename: q["filename"] = self._safe_filename(filename)
-        return q
+        if filename:
+            query["filename"] = self._safe_filename(filename)
+        return query
 
     def _legacy_query(self, language: str, filename: str | None = None) -> dict[str, Any]:
         q: dict[str, Any] = {
@@ -84,6 +94,59 @@ class KnowledgeStore:
             return doc
         return self.collection.find_one(self._legacy_query(language, filename), projection)
 
+    def _build_file_fields(
+        self,
+        *,
+        language: str,
+        filename: str,
+        data: bytes,
+        display_name: str | None,
+        content_type: str,
+        editable: bool,
+        namespace: str,
+    ) -> dict[str, Any]:
+        safe_name = self._safe_filename(filename)
+        return {
+            "namespace": self._normalize_namespace(namespace),
+            "language": self._normalize_language(language),
+            "filename": safe_name,
+            "display_name": display_name or safe_name,
+            "content_type": content_type or self.DEFAULT_CONTENT_TYPE,
+            "size": len(data),
+            "data": Binary(data),
+            "editable": bool(editable),
+        }
+
+    @staticmethod
+    def _build_content_update_fields(data: bytes, namespace: str | None = None) -> dict[str, Any]:
+        update_fields: dict[str, Any] = {
+            "data": Binary(data),
+            "size": len(data),
+            "updated_at": datetime.now(timezone.utc),
+        }
+        if namespace is not None:
+            update_fields["namespace"] = namespace
+        return update_fields
+
+    @staticmethod
+    def _remove_internal_id(doc: dict[str, Any]) -> dict[str, Any]:
+        doc.pop("_id", None)
+        return doc
+
+    def _get_unique_filename(self, language: str, filename: str, namespace: str) -> tuple[str, str, str]:
+        normalized_language = self._normalize_language(language)
+        normalized_namespace = self._normalize_namespace(namespace)
+        candidate_path = Path(self._safe_filename(filename))
+        stem, suffix = candidate_path.stem, candidate_path.suffix
+        candidate = candidate_path.name
+        counter = 1
+
+        while self._filename_exists(normalized_language, candidate, normalized_namespace):
+            candidate = f"{stem}_{counter}{suffix}"
+            counter += 1
+
+        return normalized_language, normalized_namespace, candidate
+
     def _filename_exists(self, language: str, filename: str, namespace: str) -> bool:
         return self._find_one_with_legacy_fallback(language, filename, namespace, {"_id": 1}) is not None
 
@@ -93,7 +156,7 @@ class KnowledgeStore:
             "name": fname,
             "filename": fname,
             "display_name": doc.get("display_name", fname),
-            "content_type": doc.get("content_type", "application/octet-stream"),
+            "content_type": doc.get("content_type", self.DEFAULT_CONTENT_TYPE),
             "size": int(doc.get("size", 0)),
             "editable": bool(doc.get("editable", False)),
             "created_at": doc.get("created_at"),
@@ -101,29 +164,45 @@ class KnowledgeStore:
 
     def list_files(self, language: str, namespace: str = "jti", **kwargs: Any) -> list[dict[str, Any]]:
         """List files for a language with legacy fallback for JTI."""
-        projection = {"_id": 0, "filename": 1, "display_name": 1, "size": 1, "editable": 1, "created_at": 1}
-        docs = list(self.collection.find(self._query(language, namespace=namespace), projection).sort("filename", 1))
+        docs = list(
+            self.collection.find(
+                self._query(language, namespace=namespace),
+                self.FILE_METADATA_PROJECTION,
+            ).sort("filename", 1)
+        )
 
         if self._supports_legacy_fallback(namespace):
-            legacy_docs = self.collection.find(self._legacy_query(language), projection).sort("filename", 1)
-            seen = {d["filename"] for d in docs if "filename" in d}
-            docs.extend(d for d in legacy_docs if d.get("filename") not in seen)
-            docs.sort(key=lambda d: d.get("filename", ""))
+            legacy_docs = self.collection.find(
+                self._legacy_query(language),
+                self.FILE_METADATA_PROJECTION,
+            ).sort("filename", 1)
+            seen = {doc.get("filename", "") for doc in docs}
+            for doc in legacy_docs:
+                filename = doc.get("filename", "")
+                if filename not in seen:
+                    docs.append(doc)
+                    seen.add(filename)
 
-        return [self._metadata_from_doc(d) for d in docs]
+        docs.sort(key=lambda doc: doc.get("filename", ""))
+
+        return [self._metadata_from_doc(doc) for doc in docs]
 
     def get_file(self, language: str, filename: str, namespace: str = "jti") -> Optional[dict[str, Any]]:
         """Get full file document including binary data."""
         doc = self._find_one_with_legacy_fallback(language, filename, namespace)
-        if doc:
-            doc.pop("_id", None)
-            doc["data"] = self._to_bytes(doc.get("data"))
+        if not doc:
+            return None
+
+        self._remove_internal_id(doc)
+        doc["data"] = self._to_bytes(doc.get("data"))
         return doc
 
     def get_file_data(self, language: str, filename: str, namespace: str = "jti") -> Optional[bytes]:
         """Get file binary data only."""
         doc = self._find_one_with_legacy_fallback(language, filename, namespace, {"_id": 0, "data": 1})
-        return self._to_bytes(doc.get("data")) if doc else None
+        if not doc:
+            return None
+        return self._to_bytes(doc.get("data"))
 
     def save_file(
         self,
@@ -136,22 +215,22 @@ class KnowledgeStore:
         namespace: str = "jti",
     ) -> dict[str, Any]:
         """Upsert file by namespace + language + filename."""
-        safe_name = self._safe_filename(filename)
-        normalized_namespace = self._normalize_namespace(namespace)
         now = datetime.now(timezone.utc)
+        file_fields = self._build_file_fields(
+            language=language,
+            filename=filename,
+            data=data,
+            display_name=display_name,
+            content_type=content_type,
+            editable=editable,
+            namespace=namespace,
+        )
 
         updated = self.collection.find_one_and_update(
-            self._query(language, filename, normalized_namespace),
+            self._query(language, filename, file_fields["namespace"]),
             {
                 "$set": {
-                    "namespace": normalized_namespace,
-                    "language": self._normalize_language(language),
-                    "filename": safe_name,
-                    "display_name": display_name or safe_name,
-                    "content_type": content_type or "application/octet-stream",
-                    "size": len(data),
-                    "data": Binary(data),
-                    "editable": bool(editable),
+                    **file_fields,
                     "updated_at": now,
                 },
                 "$setOnInsert": {"created_at": now},
@@ -163,8 +242,7 @@ class KnowledgeStore:
         if not updated:
             raise RuntimeError("save_file failed: no document returned")
 
-        updated.pop("_id", None)
-        return self._metadata_from_doc(updated)
+        return self._metadata_from_doc(self._remove_internal_id(updated))
 
     def insert_file(
         self,
@@ -178,50 +256,43 @@ class KnowledgeStore:
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Insert new file; if duplicated, append _{n} suffix."""
-        lang = self._normalize_language(language)
-        base_name = self._safe_filename(filename)
-        normalized_namespace = self._normalize_namespace(namespace)
-        path = Path(base_name)
-        stem, suffix = path.stem, path.suffix
-        candidate = base_name
-        counter = 1
-
-        while self._filename_exists(lang, candidate, normalized_namespace):
-            candidate = f"{stem}_{counter}{suffix}"
-            counter += 1
+        lang, normalized_namespace, candidate = self._get_unique_filename(language, filename, namespace)
 
         now = datetime.now(timezone.utc)
         doc = {
-            "namespace": normalized_namespace,
-            "language": lang,
-            "filename": candidate,
-            "display_name": display_name or candidate,
-            "content_type": content_type or "application/octet-stream",
-            "size": len(data),
-            "data": Binary(data),
-            "editable": bool(editable),
+            **self._build_file_fields(
+                language=lang,
+                filename=candidate,
+                data=data,
+                display_name=display_name,
+                content_type=content_type,
+                editable=editable,
+                namespace=normalized_namespace,
+            ),
             "created_at": now,
             "updated_at": now,
         }
 
         self.collection.insert_one(doc)
-        doc.pop("_id", None)
-        return self._metadata_from_doc(doc)
+        return self._metadata_from_doc(self._remove_internal_id(doc))
 
     def delete_file(self, language: str, filename: str, namespace: str = "jti", **kwargs: Any) -> bool:
         """Delete file by namespace + language + filename."""
         normalized_namespace = self._normalize_namespace(namespace)
         result = self.collection.delete_one(self._query(language, filename, normalized_namespace))
-        if result.deleted_count == 0 and self._supports_legacy_fallback(normalized_namespace):
+        if result.deleted_count > 0:
+            return True
+
+        if self._supports_legacy_fallback(normalized_namespace):
             result = self.collection.delete_one(self._legacy_query(language, filename))
         return result.deleted_count > 0
 
     def delete_by_namespace(self, namespace: str, language: str | None = None) -> int:
         """Delete all files in a namespace (optionally filtered by language)."""
-        q: dict[str, Any] = {"namespace": self._normalize_namespace(namespace)}
+        query: dict[str, Any] = {"namespace": self._normalize_namespace(namespace)}
         if language is not None:
-            q["language"] = self._normalize_language(language)
-        result = self.collection.delete_many(q)
+            query["language"] = self._normalize_language(language)
+        result = self.collection.delete_many(query)
         return result.deleted_count
 
     def update_file_content(
@@ -235,33 +306,19 @@ class KnowledgeStore:
         normalized_namespace = self._normalize_namespace(namespace)
         updated = self.collection.find_one_and_update(
             self._query(language, filename, normalized_namespace),
-            {
-                "$set": {
-                    "data": Binary(new_data),
-                    "size": len(new_data),
-                    "updated_at": datetime.now(timezone.utc),
-                }
-            },
+            {"$set": self._build_content_update_fields(new_data)},
             return_document=ReturnDocument.AFTER,
         )
         if not updated and self._supports_legacy_fallback(normalized_namespace):
             updated = self.collection.find_one_and_update(
                 self._legacy_query(language, filename),
-                {
-                    "$set": {
-                        "namespace": self.DEFAULT_NAMESPACE,
-                        "data": Binary(new_data),
-                        "size": len(new_data),
-                        "updated_at": datetime.now(timezone.utc),
-                    }
-                },
+                {"$set": self._build_content_update_fields(new_data, namespace=self.DEFAULT_NAMESPACE)},
                 return_document=ReturnDocument.AFTER,
             )
         if not updated:
             return None
 
-        updated.pop("_id", None)
-        return self._metadata_from_doc(updated)
+        return self._metadata_from_doc(self._remove_internal_id(updated))
 
 
 _knowledge_store: Optional[KnowledgeStore] = None
