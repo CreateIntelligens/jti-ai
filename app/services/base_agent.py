@@ -158,6 +158,7 @@ class BaseAgent:
             system_instruction=[types.Part.from_text(text=self._get_system_instruction(session))],
             thinking_config=types.ThinkingConfig(thinking_budget=0),
             tools=[tool] if tool else None,
+            temperature=0.7,
         )
 
     def _get_force_tool_config(self, session: Session) -> types.GenerateContentConfig:
@@ -169,6 +170,7 @@ class BaseAgent:
                 system_instruction=base.system_instruction,
                 thinking_config=base.thinking_config,
                 tools=base.tools,
+                temperature=0.7,
                 tool_config=types.ToolConfig(
                     function_calling_config=types.FunctionCallingConfig(mode=types.FunctionCallingConfigMode.ANY),
                 ),
