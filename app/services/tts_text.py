@@ -11,6 +11,7 @@ except Exception:  # pragma: no cover - fallback when dependency is unavailable
     OpenCC = None  # type: ignore
 
 from app.services.agent_utils import normalize_language
+from app.services.safety_numbers import TTS_SPOKEN_SHORT_CODES
 
 _T2S_CONVERTER = OpenCC("t2s") if OpenCC else None
 
@@ -18,7 +19,9 @@ _DIGIT_MAP = "零一二三四五六七八九"
 _UNITS = ["", "十", "百", "千"]
 _BIG_UNITS = ["", "萬", "億"]
 _DIGIT_PATTERN = re.compile(r"\d+(?:\.\d+)?")
-_HOTLINE_PATTERN = re.compile(r"(?<!\d)(110|113|119|165|1922|1925|1995)(?!\d)")
+_HOTLINE_PATTERN = re.compile(
+    rf"(?<!\d)({'|'.join(sorted(TTS_SPOKEN_SHORT_CODES, key=len, reverse=True))})(?!\d)"
+)
 _LIANG_PATTERN = re.compile(r"二([百千萬億])")
 _PHONE_PATTERN = re.compile(r"\(?\d+\)?[\-\s]?\d[\d\-\s]{4,}\d")
 _YEAR_PATTERN = re.compile(r"(\d{4})年")
@@ -43,10 +46,10 @@ def _prepare_zh_tts_text(
     if not text or normalize_language(language) != "zh":
         return text
 
-    prepared_text = _replace_hotlines_with_spoken_digits(text)
+    prepared = _replace_hotlines_with_spoken_digits(text)
     if convert_digits:
-        prepared_text = digits_to_chinese(prepared_text)
-    return _to_simplified_chinese(prepared_text)
+        prepared = digits_to_chinese(prepared)
+    return _to_simplified_chinese(prepared)
 
 
 def _int_to_chinese(n: int) -> str:
