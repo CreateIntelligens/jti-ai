@@ -24,7 +24,7 @@ from app.services.jti.agent_prompts import (
 from app.services.jti.runtime_settings import (
     load_runtime_settings_from_prompt_manager,
 )
-from app.services.jti.tts_text import to_tts_text
+from app.services.tts_text import to_jti_tts_text
 
 # 使用工廠函數取得適當的實作（MongoDB 或記憶體）
 session_manager = get_session_manager()
@@ -118,7 +118,7 @@ class MainAgent(BaseAgent):
         return "User question:" if language == "en" else "使用者問題："
 
     def _post_process_chat_result(self, session: Session, response_text: str, citations: list[dict] | None, extra_meta: dict[str, Any]) -> dict[str, Any]:
-        return {"tts_text": to_tts_text(response_text, session.language)}
+        return {"tts_text": to_jti_tts_text(response_text, session.language)}
 
     def _get_chat_fallback_message(self, language: str) -> str:
         return "AI目前故障 請聯絡"

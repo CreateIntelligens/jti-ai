@@ -32,7 +32,7 @@ from app.services.jti.runtime_quiz_flow import (
     extract_option_texts,
     make_quiz_tts_text,
 )
-from app.services.jti.tts_text import to_tts_text
+from app.services.tts_text import to_jti_tts_text
 from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 
 from app.tools.jti.quiz import get_total_questions
@@ -210,7 +210,7 @@ async def chat(request: ChatRequest):
                 if is_complete:
                     response_message = tool_result.get("message", "")
                     raw_tts_text = tool_result.get("tts_text") or response_message
-                    tts_text = to_tts_text(raw_tts_text, updated_session.language)
+                    tts_text = to_jti_tts_text(raw_tts_text, updated_session.language)
 
                     # 把測驗結果注入 chat_history，讓後續 LLM 對話能看到
                     main_agent.remove_session(request.session_id)
@@ -223,7 +223,7 @@ async def chat(request: ChatRequest):
                         response_message = f"Question {q_num}: {next_q.get('text', '')}\n{next_options_text}"
                     else:
                         response_message = f"第{q_num}題：{next_q.get('text', '')}\n{next_options_text}"
-                    tts_text = to_tts_text(
+                    tts_text = to_jti_tts_text(
                         make_quiz_tts_text(next_q, q_num, updated_session.language),
                         updated_session.language,
                     )
@@ -276,7 +276,7 @@ async def chat(request: ChatRequest):
 
                 response_payload = ChatResponse(
                     message=response_message,
-                    tts_text=to_tts_text(
+                    tts_text=to_jti_tts_text(
                         f"{hint} {make_quiz_tts_text(q, current_q_num, session.language)}",
                         session.language,
                     ),

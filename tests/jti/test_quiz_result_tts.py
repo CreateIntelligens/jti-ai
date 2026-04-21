@@ -7,7 +7,7 @@ from tests.support.app_test_support import get_test_app
 
 app = get_test_app()
 from app.models.session import Session, SessionStep
-from app.services.jti.tts_text import to_tts_text
+from app.services.tts_text import to_jti_tts_text
 
 
 class TestJtiQuizResultTts(unittest.TestCase):
@@ -63,7 +63,7 @@ class TestJtiQuizResultTts(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["message"], tool_result["message"])
-        self.assertEqual(payload["tts_text"], to_tts_text(tool_result["tts_text"], "zh"))
+        self.assertEqual(payload["tts_text"], to_jti_tts_text(tool_result["tts_text"], "zh"))
 
 
 if __name__ == "__main__":

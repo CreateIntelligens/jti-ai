@@ -13,7 +13,7 @@ from app.services.jti.quiz_helpers import (
     _label_options,
     build_session_state,
 )
-from app.services.jti.tts_text import to_tts_text
+from app.services.tts_text import to_jti_tts_text
 from app.services.session.session_manager_factory import (
     get_conversation_logger,
     get_session_manager,
@@ -78,7 +78,7 @@ async def execute_quiz_start(
         final_turn_number = log_result[1] if log_result else None
         return ChatResponse(
             message=response_message,
-            tts_text=to_tts_text(response_message, session.language),
+            tts_text=to_jti_tts_text(response_message, session.language),
             session=session.model_dump(),
             tool_calls=[],
             turn_number=final_turn_number,
@@ -92,7 +92,7 @@ async def execute_quiz_start(
         fallback_lang = updated_session.language if updated_session else session.language
         return ChatResponse(
             message=error_message,
-            tts_text=to_tts_text(error_message, fallback_lang),
+            tts_text=to_jti_tts_text(error_message, fallback_lang),
             session=updated_session.model_dump() if updated_session else session.model_dump(),
             tool_calls=[],
             error=error_message,
@@ -113,7 +113,7 @@ async def execute_quiz_start(
     raw_tts_text = (
         f"{opening} {make_quiz_tts_text(q, 1, lang)}" if isinstance(q, dict) else None
     )
-    tts_text = to_tts_text(raw_tts_text, lang)
+    tts_text = to_jti_tts_text(raw_tts_text, lang)
 
     log_result = conversation_logger.log_conversation(
         session_id=session_id,

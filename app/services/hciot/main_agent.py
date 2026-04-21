@@ -26,7 +26,7 @@ from app.services.hciot.runtime_settings import (
 )
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.session.session_manager_factory import get_hciot_session_manager
-from app.services.jti.tts_text import to_tts_text
+from app.services.tts_text import to_hciot_tts_text
 
 session_manager = get_hciot_session_manager()
 logger = logging.getLogger(__name__)
@@ -141,7 +141,7 @@ class HciotMainAgent(BaseAgent):
     def _post_process_chat_result(self, session: Session, response_text: str, citations: list[dict] | None, extra_meta: dict[str, Any]) -> dict[str, Any]:
         return {
             "image_id": extra_meta.get("image_id"),
-            "tts_text": to_tts_text(response_text, session.language),
+            "tts_text": to_hciot_tts_text(response_text, session.language),
         }
 
     def _get_chat_fallback_message(self, language: str) -> str:

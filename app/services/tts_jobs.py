@@ -13,7 +13,7 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from app.services.jti.tts_text import to_tts_text
+from app.services.tts_text import to_hciot_tts_text, to_jti_tts_text
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,8 @@ class TtsJobManager:
             raise ValueError("TTS text is empty")
 
         effective_character = character or self.character
-        prepared_text = to_tts_text(raw_text, language) or raw_text
+        formatter = to_hciot_tts_text if self.replacement == "hciot" else to_jti_tts_text
+        prepared_text = formatter(raw_text, language) or raw_text
         job_id = f"tts_{uuid.uuid4().hex}"
         now = time.time()
 

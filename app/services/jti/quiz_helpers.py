@@ -11,7 +11,7 @@ from app.services.session.session_manager_factory import get_session_manager, ge
 from app.services.jti.main_agent import main_agent
 from app.services.gemini_service import gemini_with_retry, run_sync
 from app.services.gemini_clients import get_default_client
-from app.services.jti.tts_text import to_tts_text
+from app.services.tts_text import to_jti_tts_text
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +102,7 @@ async def _pause_quiz_and_respond(
 
     return {
         "message": response_message,
-        "tts_text": to_tts_text(response_message, lang),
+        "tts_text": to_jti_tts_text(response_message, lang),
         "session": effective_session.model_dump(),
         "tool_calls": [],
         "turn_number": final_turn_number,
