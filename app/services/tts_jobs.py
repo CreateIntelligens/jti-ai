@@ -13,8 +13,6 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable
 
-from app.services.tts_text import to_hciot_tts_text, to_jti_tts_text
-
 logger = logging.getLogger(__name__)
 
 _TTS_API_URL = os.getenv("TTS_API_URL", "http://10.9.0.35:8001/tts")
@@ -30,11 +28,11 @@ class TtsJobManager:
     def __init__(
         self,
         character: str,
-        replacement: str = "",
+        api_replacement: str = "",
         text_formatter: Callable[[str | None, str], str | None] | None = None,
     ) -> None:
         self.character = character
-        self.replacement = replacement
+        self.api_replacement = api_replacement
         self.text_formatter = text_formatter or (lambda text, _language: text)
         self.tts_api_url = _TTS_API_URL
         self.timeout_seconds = _TIMEOUT_SECONDS
@@ -151,8 +149,8 @@ class TtsJobManager:
 
     def _generate_job(self, job_id: str, text: str, character: str | None = None) -> None:
         body = {"text": text, "character": character or self.character}
-        if self.replacement:
-            body["replacement"] = self.replacement
+        if self.api_replacement:
+            body["replacement"] = self.api_replacement
 
         request = urllib.request.Request(
             self.tts_api_url,
@@ -207,16 +205,3 @@ class TtsJobManager:
             live_jobs.sort(key=lambda x: x[1])
             for job_id, _ in live_jobs[: len(live_jobs) - self.max_jobs]:
                 self._remove_job_files(job_id)
-
-
-# Per-app singletons — characters configurable via env vars
-jti_tts_job_manager = TtsJobManager(
-    character=os.getenv("JTI_TTS_CHARACTER", "hayley"),
-    replacement="jti",
-    text_formatter=to_jti_tts_text,
-)
-hciot_tts_job_manager = TtsJobManager(
-    character=(os.getenv("HCIOT_TTS_CHARACTER", "healthy2").split(",")[0]).strip() or "healthy2",
-    replacement="hciot",
-    text_formatter=to_hciot_tts_text,
-)

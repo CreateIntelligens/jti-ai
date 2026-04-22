@@ -2,7 +2,8 @@
 
 import unittest
 
-from app.services.tts_text import to_hciot_tts_text, to_jti_tts_text
+from app.services.hciot.tts import to_hciot_tts_text
+from app.services.jti.tts import to_jti_tts_text
 
 
 class TestTtsText(unittest.TestCase):

@@ -7,7 +7,7 @@ from app.services.jti.response_assembly import (
     build_jti_response_fields,
     extract_option_texts,
 )
-from app.services.tts_text import to_jti_tts_text
+from app.services.jti.tts import to_jti_tts_text
 
 
 class TestJtiResponseAssembly(unittest.TestCase):

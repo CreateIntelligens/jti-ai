@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class MongoSessionManager(SessionStateMixin):
     """MongoDB Session 管理器"""
 
-    def __init__(self, db_name: str = "jti_app"):
+    def __init__(self, db_name: str):
         self.db = get_mongo_db(db_name)
         self.sessions_collection = self.db["sessions"]
         self._pending: Dict[str, Session] = {}  # lazy write 暫存，尚未寫入 MongoDB

@@ -6,6 +6,7 @@ import logging
 
 from fastapi import HTTPException
 
+import app.deps as deps
 from app.schemas.chat import ChatResponse
 from app.services.jti.quiz_helpers import build_session_state
 from app.services.jti.response_assembly import (
@@ -14,14 +15,8 @@ from app.services.jti.response_assembly import (
     build_jti_response_fields,
     extract_option_texts,
 )
-from app.services.session.session_manager_factory import (
-    get_conversation_logger,
-    get_session_manager,
-)
 from app.tools.jti.tool_executor import tool_executor
 
-session_manager = get_session_manager()
-conversation_logger = get_conversation_logger()
 logger = logging.getLogger(__name__)
 
 
@@ -30,6 +25,8 @@ async def execute_quiz_start(
     user_message: str = "[API] quiz_start",
 ) -> ChatResponse:
     """Start a quiz for both direct API and keyword-triggered chat flow."""
+    session_manager = deps.get_jti_session_manager()
+    conversation_logger = deps.get_jti_conversation_logger()
     session = session_manager.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")

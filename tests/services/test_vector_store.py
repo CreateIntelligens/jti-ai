@@ -19,7 +19,7 @@ class TestVectorStore(unittest.TestCase):
     def test_lancedb_insert_and_search(self):
         mock_db = MagicMock()
         mock_lancedb.connect.return_value = mock_db
-        mock_db.table_names.return_value = ["knowledge"]
+        mock_db.list_tables.return_value.tables = ["knowledge"]
         mock_table = MagicMock()
         mock_db.open_table.return_value = mock_table
         
@@ -50,7 +50,7 @@ class TestVectorStore(unittest.TestCase):
         mock_collection = MagicMock()
         mock_db.__getitem__.return_value = mock_collection
         
-        backup = MongoDBBackup()
+        backup = MongoDBBackup(db_name="jti_app")
         
         chunks = [
             {"text": "hello", "vector": [0.1]*1024, "file_id": "f1", "source_language": "zh", "chunk_index": 0},

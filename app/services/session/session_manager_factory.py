@@ -11,6 +11,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
+JTI_DB_NAME = "jti_app"
 HCIOT_DB_NAME = "hciot_app"
 
 # lazy singleton cache
@@ -50,23 +51,23 @@ def _get_or_create(
     return None
 
 
-def get_session_manager():
+def get_jti_session_manager():
     from .mongo_session_manager import MongoSessionManager
     from .session_manager import SessionManager
     return _get_or_create(
         "session_manager",
-        mongo_factory=MongoSessionManager,
+        mongo_factory=lambda: MongoSessionManager(db_name=JTI_DB_NAME),
         fallback_factory=SessionManager,
         label="SessionManager",
     )
 
 
-def get_conversation_logger():
+def get_jti_conversation_logger():
     from app.services.logging.mongo_conversation_logger import MongoConversationLogger
     from app.services.logging.conversation_logger import ConversationLogger
     return _get_or_create(
         "conversation_logger",
-        mongo_factory=MongoConversationLogger,
+        mongo_factory=lambda: MongoConversationLogger(db_name=JTI_DB_NAME),
         fallback_factory=ConversationLogger,
         label="ConversationLogger",
     )
@@ -101,6 +102,6 @@ def get_general_chat_session_manager():
     from app.services.session.general_chat_session_manager import GeneralChatSessionManager
     return _get_or_create(
         "general_chat_session_manager",
-        mongo_factory=GeneralChatSessionManager,
+        mongo_factory=lambda: GeneralChatSessionManager(db_name=JTI_DB_NAME),
         label="GeneralChatSessionManager",
     )

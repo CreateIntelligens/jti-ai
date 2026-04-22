@@ -9,8 +9,8 @@ logger = logging.getLogger(__name__)
 class MongoDBBackup:
     COLLECTION_NAME = "vector_backup"
 
-    def __init__(self):
-        self.db = get_mongo_db("jti_app")
+    def __init__(self, db_name: str):
+        self.db = get_mongo_db(db_name)
         self.collection = self.db[self.COLLECTION_NAME]
         # Create index for upserts
         try:
@@ -57,5 +57,5 @@ _mongodb_backup: Optional[MongoDBBackup] = None
 def get_mongodb_backup() -> MongoDBBackup:
     global _mongodb_backup
     if _mongodb_backup is None:
-        _mongodb_backup = MongoDBBackup()
+        _mongodb_backup = MongoDBBackup(db_name="jti_app")
     return _mongodb_backup

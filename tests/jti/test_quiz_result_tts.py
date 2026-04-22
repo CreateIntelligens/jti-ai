@@ -1,5 +1,5 @@
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi.testclient import TestClient
 from tests.support.app_test_support import get_test_app
@@ -7,7 +7,7 @@ from tests.support.app_test_support import get_test_app
 
 app = get_test_app()
 from app.models.session import Session, SessionStep
-from app.services.tts_text import to_jti_tts_text
+from app.services.jti.tts import to_jti_tts_text
 
 
 class TestJtiQuizResultTts(unittest.TestCase):
@@ -42,14 +42,13 @@ class TestJtiQuizResultTts(unittest.TestCase):
             "tts_text": "你是探險家。渴望冒險 探索每一刻驚喜，你總是勇於嘗試新鮮刺激的挑戰。",
             "quiz_result": {"quiz_id": "explorer"},
         }
-
         with (
             patch("app.routers.jti.chat._get_or_rebuild_session", return_value=initial_session),
             patch("app.routers.jti.chat._judge_user_choice", new=AsyncMock(return_value="a")),
             patch("app.routers.jti.chat.get_total_questions", return_value=1),
-            patch("app.routers.jti.chat.session_manager.get_session", return_value=completed_session),
-            patch("app.routers.jti.chat.session_manager.update_session", return_value=completed_session),
-            patch("app.routers.jti.chat.conversation_logger.log_conversation", return_value=("log", 1)),
+            patch("app.services.session.session_manager.SessionManager.get_session", return_value=completed_session),
+            patch("app.services.session.session_manager.SessionManager.update_session", return_value=completed_session),
+            patch("app.services.logging.conversation_logger.ConversationLogger.log_conversation", return_value=("log", 1)),
             patch("app.routers.jti.chat.main_agent.remove_session"),
             patch("app.routers.jti.chat.attach_tts_message_id", side_effect=lambda response, language, manager: response),
             patch("app.tools.jti.tool_executor.tool_executor.execute", new=AsyncMock(return_value=tool_result)),
@@ -93,14 +92,13 @@ class TestJtiQuizResultTts(unittest.TestCase):
             "tts_text": "",
             "quiz_result": {"quiz_id": "explorer"},
         }
-
         with (
             patch("app.routers.jti.chat._get_or_rebuild_session", return_value=initial_session),
             patch("app.routers.jti.chat._judge_user_choice", new=AsyncMock(return_value="a")),
             patch("app.routers.jti.chat.get_total_questions", return_value=1),
-            patch("app.routers.jti.chat.session_manager.get_session", return_value=completed_session),
-            patch("app.routers.jti.chat.session_manager.update_session", return_value=completed_session),
-            patch("app.routers.jti.chat.conversation_logger.log_conversation", return_value=("log", 1)),
+            patch("app.services.session.session_manager.SessionManager.get_session", return_value=completed_session),
+            patch("app.services.session.session_manager.SessionManager.update_session", return_value=completed_session),
+            patch("app.services.logging.conversation_logger.ConversationLogger.log_conversation", return_value=("log", 1)),
             patch("app.routers.jti.chat.main_agent.remove_session"),
             patch("app.routers.jti.chat.attach_tts_message_id", side_effect=lambda response, language, manager: response),
             patch("app.tools.jti.tool_executor.tool_executor.execute", new=AsyncMock(return_value=tool_result)),

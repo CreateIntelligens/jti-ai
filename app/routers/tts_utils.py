@@ -7,6 +7,7 @@ endpoints that are identical across JTI and HCIoT routers.
 
 import logging
 import re
+from collections.abc import Callable
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException
@@ -92,12 +93,16 @@ class TtsCreateRequest(BaseModel):
 # Endpoint factory
 # ---------------------------------------------------------------------------
 
-def register_tts_endpoints(router: APIRouter, manager: TtsJobManager) -> None:
+def register_tts_endpoints(
+    router: APIRouter,
+    get_manager: Callable[[], TtsJobManager],
+) -> None:
     """Mount GET ``/tts/{tts_message_id}`` and POST ``/tts`` on *router*."""
 
     @router.get("/tts/{tts_message_id}")
     async def get_tts_audio(tts_message_id: str):
         """Get pre-generated TTS audio by message id."""
+        manager = get_manager()
         job = manager.get_job(tts_message_id)
         if not job:
             raise HTTPException(status_code=404, detail="TTS audio not found")
@@ -131,6 +136,7 @@ def register_tts_endpoints(router: APIRouter, manager: TtsJobManager) -> None:
 
         language = (request.language or "zh").strip().lower() or "zh"
         character = (request.character or "").strip() or None
+        manager = get_manager()
         tts_message_id = queue_tts_generation(text, language, manager, character=character)
         if not tts_message_id:
             raise HTTPException(status_code=500, detail="Failed to queue TTS generation")

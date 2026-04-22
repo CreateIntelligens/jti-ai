@@ -36,10 +36,10 @@ class ConversationLogger:
         session_id: str,
         user_message: str,
         agent_response: str,
+        mode: str,
         tool_calls: Optional[List[Dict]] = None,
         session_state: Optional[Dict] = None,
         error: Optional[str] = None,
-        mode: str = "jti",
         responded_at: Optional[datetime] = None,
         citations: Optional[List[Dict]] = None,
         image_id: Optional[str] = None,
@@ -54,8 +54,11 @@ class ConversationLogger:
             tool_calls: 工具呼叫記錄
             session_state: Session 狀態
             error: 錯誤訊息（如果有）
-            mode: 對話模式 (jti 或 general)
+            mode: 對話模式 (jti / general / hciot)
         """
+        if not mode:
+            raise ValueError("mode is required")
+
         try:
             timestamp = datetime.now(_TZ_TAIPEI)
 

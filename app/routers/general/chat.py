@@ -22,6 +22,14 @@ import app.deps as deps
 router = APIRouter(prefix="/api/chat", tags=["General Chat"])
 
 
+def _get_conversation_logger():
+    return deps.get_jti_conversation_logger()
+
+
+def _get_general_session_manager():
+    return deps.get_general_chat_session_manager()
+
+
 @router.delete("/history", response_model=DeleteConversationResponse)
 def delete_general_conversations(request: DeleteConversationRequest, auth: dict = Depends(verify_auth)):
     """批量刪除對話紀錄
@@ -33,11 +41,13 @@ def delete_general_conversations(request: DeleteConversationRequest, auth: dict 
     - 對話日誌 (conversation logs)
     - General chat session (MongoDB)
     """
+    conversation_logger = _get_conversation_logger()
+    general_session_manager = _get_general_session_manager()
     total_logs = 0
     deleted_count = 0
     for sid in request.session_ids:
-        total_logs += deps.conversation_logger.delete_session_logs(sid)
-        if deps.general_session_manager and deps.general_session_manager.delete_session(sid):
+        total_logs += conversation_logger.delete_session_logs(sid)
+        if general_session_manager and general_session_manager.delete_session(sid):
             deleted_count += 1
 
     return {
@@ -69,6 +79,7 @@ def get_general_conversations(
     回傳該知識庫的所有對話（按 session 分組，含摘要），分頁由前端處理
     """
     try:
+        conversation_logger = _get_conversation_logger()
         if not store_name:
             raise HTTPException(status_code=400, detail="未指定知識庫")
 
@@ -81,13 +92,13 @@ def get_general_conversations(
                 ts_filter["$lte"] = datetime.strptime(date_to + " 23:59:59", "%Y-%m-%d %H:%M:%S")
             query["timestamp"] = ts_filter
 
-        session_ids, total_sessions = deps.conversation_logger.get_paginated_session_ids(
+        session_ids, total_sessions = conversation_logger.get_paginated_session_ids(
             query=query,
             page=1,
             page_size=100000
         )
 
-        all_conversations = deps.conversation_logger.get_logs_for_sessions(session_ids)
+        all_conversations = conversation_logger.get_logs_for_sessions(session_ids)
 
         session_list = group_conversations_as_summary(all_conversations)
 
@@ -122,6 +133,7 @@ def export_general_conversations(
     - session_ids: (可選) 指定一個或多個 Session ID（用逗號分隔），只匯出指定的 sessions
     """
     try:
+        conversation_logger = _get_conversation_logger()
         if not store_name:
             raise HTTPException(status_code=400, detail="未指定知識庫")
 
@@ -132,7 +144,7 @@ def export_general_conversations(
             total_conversations = 0
 
             for session_id in session_id_list:
-                conversations = deps.conversation_logger.get_session_logs(session_id)
+                conversations = conversation_logger.get_session_logs(session_id)
                 conversations = [
                     c for c in conversations
                     if c.get("mode") == "general" and c.get("session_snapshot", {}).get("store") == store_name
@@ -158,7 +170,7 @@ def export_general_conversations(
                 "total_sessions": len(sessions)
             }
         else:
-            all_conversations = deps.conversation_logger.get_session_logs_by_mode("general")
+            all_conversations = conversation_logger.get_session_logs_by_mode("general")
 
             store_conversations = [
                 c for c in all_conversations
@@ -197,7 +209,8 @@ def get_general_conversation_detail(
     - session_id: Session ID
     """
     try:
-        conversations = deps.conversation_logger.get_session_logs(session_id)
+        conversation_logger = _get_conversation_logger()
+        conversations = conversation_logger.get_session_logs(session_id)
         conversations = [c for c in conversations if c.get("mode") == "general"]
 
         store_name = "unknown"

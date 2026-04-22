@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 class GeneralChatSessionManager:
     """一般知識庫 Chat Session 管理器"""
 
-    def __init__(self):
-        self.db = get_mongo_db("jti_app")
+    def __init__(self, db_name: str):
+        self.db = get_mongo_db(db_name)
         self.collection = self.db["general_chat_sessions"]
 
         # 建立索引

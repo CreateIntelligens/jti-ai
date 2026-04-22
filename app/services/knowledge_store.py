@@ -24,7 +24,6 @@ class KnowledgeStore:
     """Knowledge file storage backed by MongoDB."""
 
     COLLECTION_NAME = "knowledge_files"
-    DEFAULT_NAMESPACE = "jti"
     DEFAULT_CONTENT_TYPE = "application/octet-stream"
     FILE_METADATA_PROJECTION = {
         "_id": 0,
@@ -35,8 +34,8 @@ class KnowledgeStore:
         "created_at": 1,
     }
 
-    def __init__(self):
-        self.db = get_mongo_db("jti_app")
+    def __init__(self, db_name: str):
+        self.db = get_mongo_db(db_name)
         self.collection = self.db[self.COLLECTION_NAME]
 
     @staticmethod
@@ -44,8 +43,11 @@ class KnowledgeStore:
         return (language or "zh").strip().lower()
 
     @staticmethod
-    def _normalize_namespace(namespace: str | None) -> str:
-        return (namespace or KnowledgeStore.DEFAULT_NAMESPACE).strip().lower()
+    def _normalize_namespace(namespace: str) -> str:
+        normalized = namespace.strip().lower()
+        if not normalized:
+            raise ValueError("namespace is required")
+        return normalized
 
     @staticmethod
     def _safe_filename(filename: str) -> str:
@@ -55,11 +57,13 @@ class KnowledgeStore:
     def _to_bytes(data: Any) -> bytes:
         return bytes(data) if isinstance(data, (Binary, bytes, bytearray)) else b""
 
-
-    def _supports_legacy_fallback(self, namespace: str) -> bool:
-        return self._normalize_namespace(namespace) == self.DEFAULT_NAMESPACE
-
-    def _query(self, language: str, filename: str | None = None, namespace: str = "jti") -> dict[str, Any]:
+    def _query(
+        self,
+        language: str,
+        filename: str | None = None,
+        *,
+        namespace: str,
+    ) -> dict[str, Any]:
         """Build standard query filter."""
         query = {
             "namespace": self._normalize_namespace(namespace),
@@ -68,28 +72,6 @@ class KnowledgeStore:
         if filename:
             query["filename"] = self._safe_filename(filename)
         return query
-
-    def _legacy_query(self, language: str, filename: str | None = None) -> dict[str, Any]:
-        q: dict[str, Any] = {
-            "namespace": {"$exists": False},
-            "language": self._normalize_language(language),
-        }
-        if filename is not None:
-            q["filename"] = self._safe_filename(filename)
-        return q
-
-    def _find_one_with_legacy_fallback(
-        self,
-        language: str,
-        filename: str,
-        namespace: str,
-        projection: Optional[dict[str, Any]] = None,
-    ) -> Optional[dict[str, Any]]:
-        query = self._query(language, filename, namespace)
-        doc = self.collection.find_one(query, projection)
-        if doc or not self._supports_legacy_fallback(namespace):
-            return doc
-        return self.collection.find_one(self._legacy_query(language, filename), projection)
 
     def _build_file_fields(
         self,
@@ -145,7 +127,7 @@ class KnowledgeStore:
         return normalized_language, normalized_namespace, candidate
 
     def _filename_exists(self, language: str, filename: str, namespace: str) -> bool:
-        return self._find_one_with_legacy_fallback(language, filename, namespace, {"_id": 1}) is not None
+        return self.collection.find_one(self._query(language, filename, namespace=namespace), {"_id": 1}) is not None
 
     def _metadata_from_doc(self, doc: dict[str, Any]) -> dict[str, Any]:
         fname = doc.get("filename", "")
@@ -159,8 +141,8 @@ class KnowledgeStore:
             "created_at": doc.get("created_at"),
         }
 
-    def list_files(self, language: str, namespace: str = "jti", **kwargs: Any) -> list[dict[str, Any]]:
-        """List files for a language with legacy fallback for JTI."""
+    def list_files(self, language: str, namespace: str, **kwargs: Any) -> list[dict[str, Any]]:
+        """List files for a language."""
         docs = list(
             self.collection.find(
                 self._query(language, namespace=namespace),
@@ -168,20 +150,11 @@ class KnowledgeStore:
             ).sort("filename", 1)
         )
 
-        if self._supports_legacy_fallback(namespace):
-            seen = {doc.get("filename", "") for doc in docs}
-            legacy_docs = self.collection.find(
-                self._legacy_query(language), self.FILE_METADATA_PROJECTION
-            ).sort("filename", 1)
-
-            docs.extend(doc for doc in legacy_docs if doc.get("filename", "") not in seen)
-            docs.sort(key=lambda d: d.get("filename", ""))
-
         return [self._metadata_from_doc(doc) for doc in docs]
 
-    def get_file(self, language: str, filename: str, namespace: str = "jti") -> Optional[dict[str, Any]]:
+    def get_file(self, language: str, filename: str, namespace: str) -> Optional[dict[str, Any]]:
         """Get full file document including binary data."""
-        doc = self._find_one_with_legacy_fallback(language, filename, namespace)
+        doc = self.collection.find_one(self._query(language, filename, namespace=namespace))
         if not doc:
             return None
 
@@ -189,9 +162,9 @@ class KnowledgeStore:
         doc["data"] = self._to_bytes(doc.get("data"))
         return doc
 
-    def get_file_data(self, language: str, filename: str, namespace: str = "jti") -> Optional[bytes]:
+    def get_file_data(self, language: str, filename: str, namespace: str) -> Optional[bytes]:
         """Get file binary data only."""
-        doc = self._find_one_with_legacy_fallback(language, filename, namespace, {"_id": 0, "data": 1})
+        doc = self.collection.find_one(self._query(language, filename, namespace=namespace), {"_id": 0, "data": 1})
         if not doc:
             return None
         return self._to_bytes(doc.get("data"))
@@ -204,7 +177,8 @@ class KnowledgeStore:
         display_name: Optional[str] = None,
         content_type: str = "application/octet-stream",
         editable: bool = True,
-        namespace: str = "jti",
+        *,
+        namespace: str,
     ) -> dict[str, Any]:
         """Upsert file by namespace + language + filename."""
         now = datetime.now(timezone.utc)
@@ -219,7 +193,7 @@ class KnowledgeStore:
         )
 
         updated = self.collection.find_one_and_update(
-            self._query(language, filename, file_fields["namespace"]),
+            self._query(language, filename, namespace=file_fields["namespace"]),
             {
                 "$set": {
                     **file_fields,
@@ -244,7 +218,8 @@ class KnowledgeStore:
         display_name: Optional[str] = None,
         content_type: str = "application/octet-stream",
         editable: bool = True,
-        namespace: str = "jti",
+        *,
+        namespace: str,
         **kwargs: Any,
     ) -> dict[str, Any]:
         """Insert new file; if duplicated, append _{n} suffix."""
@@ -268,15 +243,12 @@ class KnowledgeStore:
         self.collection.insert_one(doc)
         return self._metadata_from_doc(self._remove_internal_id(doc))
 
-    def delete_file(self, language: str, filename: str, namespace: str = "jti", **kwargs: Any) -> bool:
+    def delete_file(self, language: str, filename: str, namespace: str, **kwargs: Any) -> bool:
         """Delete file by namespace + language + filename."""
         normalized_namespace = self._normalize_namespace(namespace)
-        result = self.collection.delete_one(self._query(language, filename, normalized_namespace))
-        if result.deleted_count > 0:
-            return True
-
-        if self._supports_legacy_fallback(normalized_namespace):
-            result = self.collection.delete_one(self._legacy_query(language, filename))
+        result = self.collection.delete_one(
+            self._query(language, filename, namespace=normalized_namespace)
+        )
         return result.deleted_count > 0
 
     def delete_by_namespace(self, namespace: str, language: str | None = None) -> int:
@@ -292,33 +264,111 @@ class KnowledgeStore:
         language: str,
         filename: str,
         new_data: bytes,
-        namespace: str = "jti",
+        namespace: str,
     ) -> Optional[dict[str, Any]]:
         """Update binary content only."""
         normalized_namespace = self._normalize_namespace(namespace)
         updated = self.collection.find_one_and_update(
-            self._query(language, filename, normalized_namespace),
+            self._query(language, filename, namespace=normalized_namespace),
             {"$set": self._build_content_update_fields(new_data)},
             return_document=ReturnDocument.AFTER,
         )
-        if not updated and self._supports_legacy_fallback(normalized_namespace):
-            updated = self.collection.find_one_and_update(
-                self._legacy_query(language, filename),
-                {"$set": self._build_content_update_fields(new_data, namespace=self.DEFAULT_NAMESPACE)},
-                return_document=ReturnDocument.AFTER,
-            )
         if not updated:
             return None
 
         return self._metadata_from_doc(self._remove_internal_id(updated))
 
 
+class NamespacedKnowledgeStore:
+    """Thin wrapper that binds a generic KnowledgeStore to one namespace."""
+
+    def __init__(self, store: KnowledgeStore, namespace: str) -> None:
+        self.store = store
+        self.namespace = namespace
+
+    def list_files(self, language: str, **kwargs: Any) -> list[dict[str, Any]]:
+        return self.store.list_files(language, namespace=self.namespace, **kwargs)
+
+    def get_file(self, language: str, filename: str) -> Optional[dict[str, Any]]:
+        return self.store.get_file(language, filename, namespace=self.namespace)
+
+    def get_file_data(self, language: str, filename: str) -> Optional[bytes]:
+        return self.store.get_file_data(language, filename, namespace=self.namespace)
+
+    def save_file(
+        self,
+        language: str,
+        filename: str,
+        data: bytes,
+        display_name: Optional[str] = None,
+        content_type: str = "application/octet-stream",
+        editable: bool = True,
+    ) -> dict[str, Any]:
+        return self.store.save_file(
+            language=language,
+            filename=filename,
+            data=data,
+            display_name=display_name,
+            content_type=content_type,
+            editable=editable,
+            namespace=self.namespace,
+        )
+
+    def insert_file(
+        self,
+        language: str,
+        filename: str,
+        data: bytes,
+        display_name: Optional[str] = None,
+        content_type: str = "application/octet-stream",
+        editable: bool = True,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        return self.store.insert_file(
+            language=language,
+            filename=filename,
+            data=data,
+            display_name=display_name,
+            content_type=content_type,
+            editable=editable,
+            namespace=self.namespace,
+            **kwargs,
+        )
+
+    def delete_file(self, language: str, filename: str, **kwargs: Any) -> bool:
+        return self.store.delete_file(language, filename, namespace=self.namespace, **kwargs)
+
+    def update_file_content(
+        self,
+        language: str,
+        filename: str,
+        new_data: bytes,
+    ) -> Optional[dict[str, Any]]:
+        return self.store.update_file_content(
+            language,
+            filename,
+            new_data,
+            namespace=self.namespace,
+        )
+
+
 _knowledge_store: Optional[KnowledgeStore] = None
+_namespaced_stores: dict[str, NamespacedKnowledgeStore] = {}
 
 
 def get_knowledge_store() -> KnowledgeStore:
     """Return singleton knowledge store."""
     global _knowledge_store
     if _knowledge_store is None:
-        _knowledge_store = KnowledgeStore()
+        _knowledge_store = KnowledgeStore(db_name="jti_app")
     return _knowledge_store
+
+
+def get_namespaced_knowledge_store(namespace: str) -> NamespacedKnowledgeStore:
+    """Return a singleton wrapper bound to one namespace."""
+    normalized = KnowledgeStore._normalize_namespace(namespace)
+    store = _namespaced_stores.get(normalized)
+    if store is None:
+        store = NamespacedKnowledgeStore(get_knowledge_store(), normalized)
+        _namespaced_stores[normalized] = store
+    return store

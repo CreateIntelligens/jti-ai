@@ -8,10 +8,12 @@ from app.services.rag.chunker import SemanticChunker
 from app.services.embedding.service import get_embedding_service
 from app.services.vector_store.lancedb import get_lancedb_store
 from app.services.vector_store.mongodb_backup import get_mongodb_backup
-from app.services.knowledge_store import get_knowledge_store
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
+from app.services.jti.knowledge_store import get_jti_knowledge_store
 
 logger = logging.getLogger(__name__)
+_SUPPORTED_KNOWLEDGE_EXTENSIONS = (".csv", ".txt", ".md", ".docx")
+
 
 class BackfillService:
     """Handles incremental document indexing into the local vector store."""
@@ -76,28 +78,41 @@ class BackfillService:
         """Computes SHA256 hash of file content."""
         return hashlib.sha256(data).hexdigest()
 
+    @staticmethod
+    def _is_supported_knowledge_file(filename: str) -> bool:
+        return filename.lower().endswith(_SUPPORTED_KNOWLEDGE_EXTENSIONS)
+
+    @staticmethod
+    def _iter_store_files(store, language: str, fetch_data):
+        for file_info in store.list_files(language):
+            filename = file_info.get("filename") or file_info.get("name", "")
+            if not BackfillService._is_supported_knowledge_file(filename):
+                continue
+
+            data = fetch_data(store, language, filename)
+            if data:
+                yield filename, file_info.get("display_name", filename), data
+
+    @staticmethod
+    def _fetch_hciot_file_data(store, language: str, filename: str) -> bytes | None:
+        doc = store.get_file(language, filename)
+        if not doc:
+            return None
+        return doc.get("data")
+
+    @staticmethod
+    def _fetch_jti_file_data(store, language: str, filename: str) -> bytes | None:
+        return store.get_file_data(language, filename)
+
     def _get_files_and_data(self, source_type: str, language: str):
         """Yields (filename, display_name, data_bytes) from the correct MongoDB store."""
         if source_type == "hciot":
             store = get_hciot_knowledge_store()
-            files = store.list_files(language)
-            for f in files:
-                filename = f.get("filename") or f.get("name", "")
-                if not filename.lower().endswith(('.csv', '.txt', '.md', '.docx')):
-                    continue
-                doc = store.get_file(language, filename)
-                if doc and doc.get("data"):
-                    yield filename, f.get("display_name", filename), doc["data"]
-        else:
-            store = get_knowledge_store()
-            files = store.list_files(language, namespace="jti")
-            for f in files:
-                filename = f.get("filename") or f.get("name", "")
-                if not filename.lower().endswith(('.csv', '.txt', '.md', '.docx')):
-                    continue
-                data = store.get_file_data(language, filename, namespace="jti")
-                if data:
-                    yield filename, f.get("display_name", filename), data
+            yield from self._iter_store_files(store, language, self._fetch_hciot_file_data)
+            return
+
+        store = get_jti_knowledge_store()
+        yield from self._iter_store_files(store, language, self._fetch_jti_file_data)
 
     def run_backfill(self, source_type: str, language: str):
         """Runs incremental backfill for a specific source and language."""

@@ -11,10 +11,10 @@ _TZ_TAIPEI = timezone(timedelta(hours=8))
 from fastapi import APIRouter, HTTPException, Depends
 import logging
 
+import app.deps as deps
 from app.auth import verify_admin, verify_auth
 from app.models.session import SessionStep
 from app.routers.tts_utils import attach_tts_message_id, register_tts_endpoints
-from app.services.tts_jobs import jti_tts_job_manager as _tts_manager
 from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
@@ -33,7 +33,6 @@ from app.services.jti.response_assembly import (
     extract_option_texts,
 )
 from app.services.jti.runtime_quiz_flow import execute_quiz_start
-from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 
 from app.tools.jti.quiz import get_total_questions
 from app.utils import build_date_query, group_conversations_by_session
@@ -43,6 +42,7 @@ from app.services.jti.quiz_helpers import (
     _judge_user_choice,
     build_session_state,
 )
+from app.tools.jti.tool_executor import tool_executor
 
 
 _OPENING_MESSAGE: dict[str, str] = {
@@ -50,8 +50,6 @@ _OPENING_MESSAGE: dict[str, str] = {
     "en": "Hi! I'm Lady X. Got any questions, or want to take a quiz?",
 }
 
-session_manager = get_session_manager()
-conversation_logger = get_conversation_logger()
 logger = logging.getLogger(__name__)
 
 runtime_router = APIRouter(prefix="/api/jti", tags=["JTI Chat"], dependencies=[Depends(verify_auth)])
@@ -68,7 +66,19 @@ admin_history_router = APIRouter(
 )
 router = runtime_router
 
-register_tts_endpoints(runtime_router, _tts_manager)
+def _get_session_manager():
+    return deps.get_jti_session_manager()
+
+
+def _get_conversation_logger():
+    return deps.get_jti_conversation_logger()
+
+
+def _get_tts_manager():
+    return deps.get_jti_tts_job_manager()
+
+
+register_tts_endpoints(runtime_router, _get_tts_manager)
 
 
 # === Endpoints ===
@@ -77,6 +87,7 @@ register_tts_endpoints(runtime_router, _tts_manager)
 async def create_session(request: CreateSessionRequest):
     """建立新的 JTI 對話 Session"""
     try:
+        session_manager = _get_session_manager()
         if request.previous_session_id:
             main_agent.remove_session(request.previous_session_id)
             logger.info(f"Cleaned up previous chat session: {request.previous_session_id[:8]}...")
@@ -110,6 +121,8 @@ async def chat(request: ChatRequest):
        - **不走知識庫，鎖定作答**
     """
     try:
+        session_manager = _get_session_manager()
+        conversation_logger = _get_conversation_logger()
         session = _get_or_rebuild_session(request.session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
@@ -173,7 +186,7 @@ async def chat(request: ChatRequest):
                     log_user_message=request.message,
                     session=session,
                 )))
-                return attach_tts_message_id(pause_response, session.language, _tts_manager)
+                return attach_tts_message_id(pause_response, session.language, _get_tts_manager())
 
             logger.info(f"[測驗進度] 第 {current_q_num}/{total_questions} 題 | 題目: {q.get('text', '')[:30]}...")
 
@@ -186,10 +199,9 @@ async def chat(request: ChatRequest):
                     log_user_message=request.message,
                     session=session,
                 )))
-                return attach_tts_message_id(pause_response, session.language, _tts_manager)
+                return attach_tts_message_id(pause_response, session.language, _get_tts_manager())
 
             if user_choice:
-                from app.tools.jti.tool_executor import tool_executor
                 tool_result = await tool_executor.execute("submit_answer", {
                     "session_id": request.session_id,
                     "user_choice": user_choice
@@ -246,7 +258,7 @@ async def chat(request: ChatRequest):
                     tool_calls=[{k: v for k, v in call.items() if k != "result"} for call in tool_calls],
                     turn_number=final_turn_number,
                 )
-                return attach_tts_message_id(response_payload, updated_session.language, _tts_manager)
+                return attach_tts_message_id(response_payload, updated_session.language, _get_tts_manager())
             else:
                 # 無法判斷選項：hardcode 提示
                 if session.language == "en":
@@ -283,7 +295,7 @@ async def chat(request: ChatRequest):
                     tool_calls=[],
                     turn_number=final_turn_number
                 )
-                return attach_tts_message_id(response_payload, session.language, _tts_manager)
+                return attach_tts_message_id(response_payload, session.language, _get_tts_manager())
 
         # ========== 非 QUIZ 狀態 ==========
         start_keywords = [
@@ -309,7 +321,7 @@ async def chat(request: ChatRequest):
             if request.turn_number:
                 conversation_logger.delete_turns_from(request.session_id, request.turn_number)
             quiz_response = await execute_quiz_start(request.session_id, user_message=request.message)
-            return attach_tts_message_id(quiz_response, session.language, _tts_manager)
+            return attach_tts_message_id(quiz_response, session.language, _get_tts_manager())
 
         # 一般對話：走 LLM
         result = await main_agent.chat(
@@ -333,7 +345,7 @@ async def chat(request: ChatRequest):
         final_turn_number = log_result[1] if log_result else None
 
         response_payload = ChatResponse(**result, turn_number=final_turn_number)
-        return attach_tts_message_id(response_payload, session.language, _tts_manager)
+        return attach_tts_message_id(response_payload, session.language, _get_tts_manager())
 
     except HTTPException:
         raise
@@ -360,6 +372,7 @@ async def get_conversations(
     """取得對話歷史"""
     mode = "jti"
     try:
+        conversation_logger = _get_conversation_logger()
         if session_id:
             conversations = conversation_logger.get_session_logs(session_id)
             conversations = [c for c in conversations if c.get("mode") == mode]
@@ -384,6 +397,8 @@ async def get_conversations(
 @admin_history_router.delete("", response_model=DeleteConversationResponse)
 async def delete_conversations(request: DeleteConversationRequest):
     """批量刪除對話紀錄"""
+    session_manager = _get_session_manager()
+    conversation_logger = _get_conversation_logger()
     total_logs = 0
     deleted_count = 0
     for sid in request.session_ids:
@@ -413,6 +428,7 @@ async def export_conversations(
     """匯出對話歷史為 JSON 格式"""
     mode = "jti"
     try:
+        conversation_logger = _get_conversation_logger()
         if session_ids:
             session_id_list = [sid.strip() for sid in session_ids.split(',') if sid.strip()]
             sessions = []

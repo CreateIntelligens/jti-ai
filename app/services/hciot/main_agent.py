@@ -11,6 +11,7 @@ import os
 from typing import Any
 
 from google.genai import types
+import app.deps as deps
 
 from app.models.session import Session
 from app.services.agent_utils import normalize_language
@@ -25,11 +26,12 @@ from app.services.hciot.runtime_settings import (
     load_runtime_settings_from_prompt_manager,
 )
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
-from app.services.session.session_manager_factory import get_hciot_session_manager
-from app.services.tts_text import to_hciot_tts_text
-
-session_manager = get_hciot_session_manager()
+from app.services.hciot.tts import to_hciot_tts_text
 logger = logging.getLogger(__name__)
+
+
+def _get_session_manager():
+    return deps.get_hciot_session_manager()
 
 # ---------------------------------------------------------------------------
 # RAG function declaration for Gemini function calling
@@ -60,7 +62,7 @@ class HciotMainAgent(BaseAgent):
 
     @property
     def _session_manager(self):
-        return session_manager
+        return _get_session_manager()
 
     @property
     def _persona_map_attr(self) -> str:

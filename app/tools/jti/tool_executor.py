@@ -7,6 +7,7 @@ Tool 執行器
 from typing import Dict, Any, Optional
 import logging
 from google.genai import types
+import app.deps as deps
 from app.tools.jti.quiz import (
     generate_quiz,
     generate_random_quiz,
@@ -15,12 +16,12 @@ from app.tools.jti.quiz import (
     complete_selected_questions,
 )
 from app.tools.jti.quiz_results import calculate_quiz_result as calc_quiz_result
-from app.services.session.session_manager_factory import get_session_manager
-
-# 使用 factory 取得正確的 session manager（MongoDB 或記憶體版）
-session_manager = get_session_manager()
 
 logger = logging.getLogger(__name__)
+
+
+def _get_session_manager():
+    return deps.get_jti_session_manager()
 
 
 class ToolExecutor:
@@ -131,6 +132,7 @@ class ToolExecutor:
 
     async def _execute_quiz_response(self, args: Dict) -> Dict:
         """統一處理測驗互動（開始測驗 或 回答題目）"""
+        session_manager = _get_session_manager()
         session_id = args.get("session_id")
         action = args.get("action")
         user_choice = args.get("user_choice", "")
@@ -175,6 +177,7 @@ class ToolExecutor:
 
     async def _execute_start_quiz(self, args: Dict) -> Dict:
         """開始測驗"""
+        session_manager = _get_session_manager()
         session_id = args.get("session_id")
 
         if not session_id:
@@ -222,6 +225,7 @@ class ToolExecutor:
 
     async def _execute_get_question(self, args: Dict) -> Dict:
         """取得當前題目"""
+        session_manager = _get_session_manager()
         session_id = args.get("session_id")
 
         if not session_id:
@@ -257,6 +261,7 @@ class ToolExecutor:
 
     async def _execute_submit_answer(self, args: Dict) -> Dict:
         """提交答案"""
+        session_manager = _get_session_manager()
         session_id = args.get("session_id")
 
         # 檢查是否來自 LLM（有 user_choice）還是內部呼叫（有 question_id + option_id）
@@ -420,6 +425,7 @@ Format:
 
     async def _execute_calculate_quiz_result(self, args: Dict) -> Dict:
         """計算測驗結果"""
+        session_manager = _get_session_manager()
         session_id = args.get("session_id")
 
         if not session_id:

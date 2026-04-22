@@ -10,6 +10,7 @@ _TZ_TAIPEI = timezone(timedelta(hours=8))
 
 from fastapi import APIRouter, Depends, HTTPException
 
+import app.deps as deps
 from app.auth import verify_admin, verify_auth
 from app.routers.tts_utils import attach_tts_message_id, register_tts_endpoints
 from app.schemas.chat import (
@@ -23,8 +24,6 @@ from app.schemas.chat import (
 )
 from app.services.hciot.main_agent import main_agent
 from app.services.hciot.runtime_settings import get_available_tts_characters
-from app.services.session.session_manager_factory import get_hciot_conversation_logger, get_hciot_session_manager
-from app.services.tts_jobs import hciot_tts_job_manager as _tts_manager
 from app.utils import build_date_query, group_conversations_by_session
 
 
@@ -33,8 +32,6 @@ _OPENING_MESSAGE: dict[str, str] = {
     "en": "Hello, welcome to Yuanfu Hospital. I'm Xiao Yuan, the smart AI assistant. Feel free to ask me about outpatient information, health education, or any medical questions. Happy to help!",
 }
 
-session_manager = get_hciot_session_manager()
-conversation_logger = get_hciot_conversation_logger()
 logger = logging.getLogger(__name__)
 
 
@@ -52,18 +49,30 @@ admin_history_router = APIRouter(
 )
 router = runtime_router
 
+def _get_session_manager():
+    return deps.get_hciot_session_manager()
+
+
+def _get_conversation_logger():
+    return deps.get_hciot_conversation_logger()
+
+
+def _get_tts_manager():
+    return deps.get_hciot_tts_job_manager()
+
 @runtime_router.get("/tts/characters")
 async def get_tts_characters():
     """Return available TTS character voices."""
     return {"characters": get_available_tts_characters()}
 
 
-register_tts_endpoints(runtime_router, _tts_manager)
+register_tts_endpoints(runtime_router, _get_tts_manager)
 
 
 @runtime_router.post("/chat/start", response_model=CreateSessionResponse)
 async def create_session(request: CreateSessionRequest):
     try:
+        session_manager = _get_session_manager()
         if request.previous_session_id:
             main_agent.remove_session(request.previous_session_id)
             logger.info("Cleaned up previous HCIoT session: %s...", request.previous_session_id[:8])
@@ -81,6 +90,8 @@ async def create_session(request: CreateSessionRequest):
 @runtime_router.post("/chat/message", response_model=ChatResponse)
 async def chat(request: ChatRequest):
     try:
+        session_manager = _get_session_manager()
+        conversation_logger = _get_conversation_logger()
         session = session_manager.get_session(request.session_id)
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
@@ -117,7 +128,7 @@ async def chat(request: ChatRequest):
         return attach_tts_message_id(
             response, 
             language, 
-            _tts_manager, 
+            _get_tts_manager(), 
             character=request.tts_character.strip() if request.tts_character else None
         )
     except HTTPException:
@@ -136,6 +147,7 @@ async def get_conversations(
 ):
     mode = "hciot"
     try:
+        conversation_logger = _get_conversation_logger()
         # Single-session detail request (used by ConversationHistoryModal resume)
         if session_id:
             conversations = [c for c in conversation_logger.get_session_logs(session_id) if c.get("mode") == mode]
@@ -154,6 +166,8 @@ async def get_conversations(
 @compat_history_router.delete("/history", response_model=DeleteConversationResponse)
 @admin_history_router.delete("", response_model=DeleteConversationResponse)
 async def delete_conversations(request: DeleteConversationRequest):
+    session_manager = _get_session_manager()
+    conversation_logger = _get_conversation_logger()
     total_logs = 0
     deleted_count = 0
     for sid in request.session_ids:
@@ -182,6 +196,7 @@ async def export_conversations(
 ):
     mode = "hciot"
     try:
+        conversation_logger = _get_conversation_logger()
         if session_ids:
             session_id_list = [sid.strip() for sid in session_ids.split(",") if sid.strip()]
             sessions = []

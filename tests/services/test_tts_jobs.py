@@ -7,12 +7,22 @@ import sys
 from types import SimpleNamespace
 
 
-def _reload_tts_jobs(tmp_path, monkeypatch):
+def _reload_module(module_name: str, tmp_path, monkeypatch):
     monkeypatch.setenv("TTS_CACHE_DIR", str(tmp_path / "tts-cache"))
-    sys.modules.pop("app.services.tts_jobs", None)
-    import app.services.tts_jobs as tts_jobs_module
+    sys.modules.pop(module_name, None)
+    module = importlib.import_module(module_name)
+    return importlib.reload(module)
 
-    return importlib.reload(tts_jobs_module)
+
+def _reload_tts_jobs(tmp_path, monkeypatch):
+    return _reload_module("app.services.tts_jobs", tmp_path, monkeypatch)
+
+
+def _assert_manager_binding(manager, tts_jobs, formatter, api_replacement: str, get_manager) -> None:
+    assert isinstance(manager, tts_jobs.TtsJobManager)
+    assert manager.text_formatter is formatter
+    assert manager.api_replacement == api_replacement
+    assert get_manager() is manager
 
 
 def test_tts_job_manager_uses_injected_text_formatter(tmp_path, monkeypatch):
@@ -45,7 +55,7 @@ def test_tts_job_manager_uses_injected_text_formatter(tmp_path, monkeypatch):
 
     manager = tts_jobs.TtsJobManager(
         character="demo",
-        replacement="jti",
+        api_replacement="jti",
         text_formatter=formatter,
     )
 
@@ -61,8 +71,25 @@ def test_tts_job_manager_uses_injected_text_formatter(tmp_path, monkeypatch):
     assert captured["started"] is True
 
 
-def test_tts_job_manager_singletons_bind_app_specific_formatters(tmp_path, monkeypatch):
+def test_app_tts_modules_bind_expected_managers_and_formatters(tmp_path, monkeypatch):
     tts_jobs = _reload_tts_jobs(tmp_path, monkeypatch)
+    jti_tts = _reload_module("app.services.jti.tts", tmp_path, monkeypatch)
+    hciot_tts = _reload_module("app.services.hciot.tts", tmp_path, monkeypatch)
 
-    assert tts_jobs.jti_tts_job_manager.text_formatter is tts_jobs.to_jti_tts_text
-    assert tts_jobs.hciot_tts_job_manager.text_formatter is tts_jobs.to_hciot_tts_text
+    jti_manager = jti_tts.get_jti_tts_job_manager()
+    _assert_manager_binding(
+        jti_manager,
+        tts_jobs,
+        jti_tts.to_jti_tts_text,
+        "jti",
+        jti_tts.get_jti_tts_job_manager,
+    )
+
+    hciot_manager = hciot_tts.get_hciot_tts_job_manager()
+    _assert_manager_binding(
+        hciot_manager,
+        tts_jobs,
+        hciot_tts.to_hciot_tts_text,
+        "hciot",
+        hciot_tts.get_hciot_tts_job_manager,
+    )

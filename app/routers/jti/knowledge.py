@@ -24,7 +24,7 @@ from app.routers.knowledge_utils import (
     sync_to_rag,
     write_docx_text,
 )
-from app.services.knowledge_store import get_knowledge_store
+from app.services.jti.knowledge_store import get_jti_knowledge_store
 
 logger = logging.getLogger(__name__)
 
@@ -60,7 +60,7 @@ def _extract_upload_text_for_validation(filename: str, file_bytes: bytes) -> str
 @router.get("/files/")
 def list_knowledge_files(language: str = "zh"):
     """列出知識庫中的檔案"""
-    store = get_knowledge_store()
+    store = get_jti_knowledge_store()
     files = store.list_files(language)
     return {"files": files, "language": language}
 
@@ -72,7 +72,7 @@ def list_knowledge_files(language: str = "zh"):
 def get_file_content(filename: str, language: str = "zh"):
     """讀取檔案內容（僅支援文字檔）"""
     safe_name = safe_filename(filename)
-    store = get_knowledge_store()
+    store = get_jti_knowledge_store()
     doc = store.get_file(language, safe_name)
     if not doc:
         raise HTTPException(status_code=404, detail="檔案不存在")
@@ -113,7 +113,7 @@ def get_file_content(filename: str, language: str = "zh"):
 def download_file(filename: str, language: str = "zh"):
     """下載知識庫檔案"""
     safe_name = safe_filename(filename)
-    store = get_knowledge_store()
+    store = get_jti_knowledge_store()
     doc = store.get_file(language, safe_name)
     if not doc:
         raise HTTPException(status_code=404, detail="檔案不存在")
@@ -146,7 +146,7 @@ async def update_file_content(
     if ext not in EDITABLE_EXTENSIONS:
         raise HTTPException(status_code=400, detail="此檔案格式不支援線上編輯")
 
-    store = get_knowledge_store()
+    store = get_jti_knowledge_store()
     doc = store.get_file(language, safe_name)
     if not doc:
         raise HTTPException(status_code=404, detail="檔案不存在")
@@ -193,7 +193,7 @@ async def upload_knowledge_file(
     if text_content is not None:
         _reject_core_markers(text_content)
 
-    store = get_knowledge_store()
+    store = get_jti_knowledge_store()
     saved = store.insert_file(
         language=language,
         filename=safe_name,
@@ -222,7 +222,7 @@ async def delete_knowledge_file(
 ):
     """刪除檔案"""
     safe_name = safe_filename(filename)
-    store = get_knowledge_store()
+    store = get_jti_knowledge_store()
     deleted = store.delete_file(language, safe_name)
     if not deleted:
         raise HTTPException(status_code=404, detail="檔案不存在")

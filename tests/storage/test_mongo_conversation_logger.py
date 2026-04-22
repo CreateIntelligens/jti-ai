@@ -27,7 +27,7 @@ class TestMongoConversationLogger(unittest.TestCase):
         self.mock_conversations = MagicMock()
         self.mock_db.__getitem__.return_value = self.mock_conversations
 
-        self.logger = MongoConversationLogger()
+        self.logger = MongoConversationLogger(db_name="jti_app")
 
     def test_log_conversation_first_turn(self):
         """測試記錄對話（第一輪）"""
@@ -84,6 +84,21 @@ class TestMongoConversationLogger(unittest.TestCase):
         call_args = self.mock_conversations.insert_one.call_args
         log_entry = call_args[0][0]
         self.assertEqual(log_entry["turn_number"], 3)  # 2 + 1
+
+    def test_log_conversation_requires_mode(self):
+        with self.assertRaises(TypeError):
+            self.logger.log_conversation(
+                session_id="test-123",
+                user_message="開始測驗",
+                agent_response="好的，開始測驗",
+            )
+        with self.assertRaises(ValueError):
+            self.logger.log_conversation(
+                session_id="test-123",
+                user_message="開始測驗",
+                agent_response="好的，開始測驗",
+                mode="",
+            )
 
     def test_get_session_logs(self):
         """測試取得 session 的所有日誌"""

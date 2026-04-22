@@ -68,7 +68,7 @@ class TestRebuildSessionFromLogs(unittest.TestCase):
         self.addCleanup(patcher.stop)
         self.mock_sessions = MagicMock()
         mock_db.__getitem__.return_value = self.mock_sessions
-        self.manager = MongoSessionManager()
+        self.manager = MongoSessionManager(db_name="jti_app")
 
     def test_empty_logs_returns_none(self):
         """Empty logs should return None"""

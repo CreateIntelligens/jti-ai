@@ -1,4 +1,4 @@
-"""Helpers for preparing app-specific TTS text."""
+"""Generic helpers for preparing zh TTS text."""
 
 from __future__ import annotations
 
@@ -37,7 +37,7 @@ def _to_simplified_chinese(text: str) -> str:
     return text
 
 
-def _prepare_zh_tts_text(
+def prepare_tts_text(
     text: Optional[str],
     language: str,
     *,
@@ -138,13 +138,3 @@ def digits_to_chinese(text: str) -> str:
     text = _YEAR_PATTERN.sub(_year_to_digits, text)
     result = _DIGIT_PATTERN.sub(_replace_digit, text)
     return _LIANG_PATTERN.sub(r"兩\1", result)
-
-
-def to_jti_tts_text(text: Optional[str], language: str) -> Optional[str]:
-    """Prepare JTI TTS text with number-to-Chinese conversion for zh responses."""
-    return _prepare_zh_tts_text(text, language, convert_digits=True)
-
-
-def to_hciot_tts_text(text: Optional[str], language: str) -> Optional[str]:
-    """Prepare HCIoT TTS text without JTI-specific number conversion."""
-    return _prepare_zh_tts_text(text, language, convert_digits=False)

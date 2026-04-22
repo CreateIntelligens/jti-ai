@@ -29,9 +29,9 @@ class TestHciotApiRoutes(unittest.TestCase):
         session = SimpleNamespace(language="zh")
 
         with (
-            patch("app.routers.hciot.chat.session_manager.get_session", side_effect=[session, session]),
+            patch("app.services.session.session_manager.SessionManager.get_session", side_effect=[session, session]),
             patch("app.routers.hciot.chat.main_agent.chat", new=AsyncMock(return_value={"message": "您好"})),
-            patch("app.routers.hciot.chat.conversation_logger.log_conversation", return_value=("log", 1)),
+            patch("app.services.logging.conversation_logger.ConversationLogger.log_conversation", return_value=("log", 1)),
             patch(
                 "app.routers.hciot.chat.attach_tts_message_id",
                 side_effect=lambda response, language, manager, character=None: response,

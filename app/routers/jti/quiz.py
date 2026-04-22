@@ -7,6 +7,7 @@ import logging
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
+import app.deps as deps
 from app.auth import verify_auth
 from app.models.session import SessionStep
 from app.schemas.chat import ChatResponse
@@ -15,12 +16,14 @@ from app.services.jti.quiz_helpers import (
     _pause_quiz_and_respond,
 )
 from app.services.jti.runtime_quiz_flow import execute_quiz_start
-from app.services.session.session_manager_factory import get_session_manager
 
-session_manager = get_session_manager()
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["JTI Quiz"], dependencies=[Depends(verify_auth)])
+
+
+def _get_session_manager():
+    return deps.get_jti_session_manager()
 
 
 class QuizActionRequest(BaseModel):
@@ -31,6 +34,7 @@ class QuizActionRequest(BaseModel):
 async def quiz_start(request: QuizActionRequest):
     """直接開始測驗（不依賴自然語言判斷）"""
     try:
+        session_manager = _get_session_manager()
         s = session_manager.get_session(request.session_id)
         if s and s.step.value == "DONE":
             s.step = SessionStep.WELCOME

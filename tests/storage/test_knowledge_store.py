@@ -5,7 +5,7 @@ from unittest.mock import MagicMock, patch
 
 mock_db = MagicMock()
 
-from app.services.knowledge_store import KnowledgeStore
+from app.services.knowledge_store import KnowledgeStore, NamespacedKnowledgeStore
 
 
 class FakeCursor(list):
@@ -18,12 +18,12 @@ class TestKnowledgeStoreNamespace(unittest.TestCase):
         patcher = patch("app.services.knowledge_store.get_mongo_db", return_value=mock_db)
         patcher.start()
         self.addCleanup(patcher.stop)
-        self.store = KnowledgeStore()
+        self.store = KnowledgeStore(db_name="jti_app")
         self.col = self.store.collection
         self.col.reset_mock(return_value=True, side_effect=True)
 
     def test_query_includes_namespace_default(self):
-        q = self.store._query("zh", "test.txt")
+        q = self.store._query("zh", "test.txt", namespace="jti")
         assert q == {"namespace": "jti", "language": "zh", "filename": "test.txt"}
 
     def test_query_includes_namespace_custom(self):
@@ -40,11 +40,9 @@ class TestKnowledgeStoreNamespace(unittest.TestCase):
         call_args = self.col.find.call_args[0][0]
         assert call_args["namespace"] == "general"
 
-    def test_list_files_default_namespace(self):
-        self.col.find.return_value.sort.return_value = []
-        self.store.list_files("zh")
-        call_args = self.col.find.call_args_list[0][0][0]
-        assert call_args["namespace"] == "jti"
+    def test_query_requires_namespace(self):
+        with self.assertRaises(TypeError):
+            self.store._query("zh", "test.txt")
 
     def test_delete_file_passes_namespace(self):
         self.col.delete_one.return_value.deleted_count = 1
@@ -101,59 +99,20 @@ class TestKnowledgeStoreNamespace(unittest.TestCase):
         call_args = self.col.find_one.call_args[0][0]
         assert call_args["namespace"] == "general"
 
-    def test_get_file_falls_back_to_legacy_jti(self):
-        self.col.find_one.side_effect = [
-            None,
-            {"filename": "legacy.txt", "display_name": "legacy.txt", "data": b"legacy"},
-        ]
-        doc = self.store.get_file("zh", "legacy.txt")
-        assert doc is not None
-        assert doc["data"] == b"legacy"
-        assert self.col.find_one.call_args_list[1][0][0] == {
-            "namespace": {"$exists": False},
-            "language": "zh",
-            "filename": "legacy.txt",
-        }
-
-    def test_hciot_get_file_does_not_fall_back_to_legacy(self):
-        self.col.find_one.return_value = None
-        result = self.store.get_file("zh", "test.txt", namespace="hciot")
-        assert result is None
-        assert self.col.find_one.call_count == 1
-
-    def test_list_files_merges_legacy_jti_docs(self):
-        self.col.find.side_effect = [
-            FakeCursor([{"filename": "new.txt", "display_name": "new.txt", "size": 3, "editable": True}]),
-            FakeCursor(
-                [
-                    {"filename": "legacy.txt", "display_name": "legacy.txt", "size": 5, "editable": True},
-                    {"filename": "new.txt", "display_name": "new.txt", "size": 99, "editable": True},
-                ]
-            ),
-        ]
-        files = self.store.list_files("zh")
-        assert [f["name"] for f in files] == ["legacy.txt", "new.txt"]
-
-    def test_insert_file_checks_legacy_duplicate_for_jti(self):
-        self.col.find_one.side_effect = [
-            None,
-            {"_id": "legacy-doc"},
-            None,
-            None,
-        ]
-        self.col.insert_one.return_value = MagicMock()
-        result = self.store.insert_file(
-            language="zh",
-            filename="test.txt",
-            data=b"hello",
-        )
-        assert result["filename"] == "test_1.txt"
-
     def test_update_file_content_passes_namespace(self):
         self.col.find_one_and_update.return_value = None
         self.store.update_file_content("zh", "test.txt", b"new", namespace="general")
         call_args = self.col.find_one_and_update.call_args[0][0]
         assert call_args["namespace"] == "general"
+
+    def test_namespaced_store_binds_namespace_for_calls(self):
+        namespaced = NamespacedKnowledgeStore(self.store, "jti")
+        self.col.find.side_effect = [FakeCursor([]), FakeCursor([])]
+
+        namespaced.list_files("zh")
+
+        first_call_args = self.col.find.call_args_list[0][0][0]
+        assert first_call_args["namespace"] == "jti"
 
 
 if __name__ == "__main__":

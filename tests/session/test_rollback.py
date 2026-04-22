@@ -9,7 +9,7 @@ class TestRollback(unittest.TestCase):
         mock_get_db.return_value = self.mock_db
         self.mock_conversations = MagicMock()
         self.mock_db.__getitem__.return_value = self.mock_conversations
-        self.logger = MongoConversationLogger()
+        self.logger = MongoConversationLogger(db_name="jti_app")
 
     def test_delete_turns_from(self):
         # Setup

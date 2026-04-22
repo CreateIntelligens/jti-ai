@@ -28,7 +28,7 @@ class TestMongoSessionManager(unittest.TestCase):
         self.mock_db.__getitem__.return_value = self.mock_sessions
 
         from app.services.session.mongo_session_manager import MongoSessionManager
-        self.manager = MongoSessionManager()
+        self.manager = MongoSessionManager(db_name="jti_app")
 
     def _make_valid_mock_doc(self, **overrides):
         """建立有效的 mock document（使用正確的 enum 值）"""

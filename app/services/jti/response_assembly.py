@@ -8,17 +8,12 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from app.services.tts_text import to_jti_tts_text
+from app.services.jti.tts import to_jti_tts_text
 
 QUIZ_OPENING = {
     "zh": "簡單四個問題，幫你找到命定保護殼，如果中途想離開，請輸入「中斷」，即可回到問答模式，讓我們開始測驗吧！",
     "en": "Just four questions to find your perfect phone case! If you want to leave midway, type pause to return to chat. Let's begin!",
 }
-
-
-def build_jti_tts_text(text: Optional[str], language: str) -> Optional[str]:
-    """Normalize raw JTI text for TTS output."""
-    return to_jti_tts_text(text, language)
 
 
 def label_option_texts(options: list[dict[str, Any]]) -> list[str]:
@@ -69,7 +64,7 @@ def build_jti_response_fields(
     raw_tts = message if tts_source is None else tts_source
     return {
         "message": message,
-        "tts_text": build_jti_tts_text(raw_tts, language),
+        "tts_text": to_jti_tts_text(raw_tts, language),
     }
 
 

@@ -7,19 +7,24 @@ import re
 import logging
 from typing import Any
 
+import app.deps as deps
 from app.services.jti.response_assembly import (
     build_jti_response_fields,
     format_option_texts,
 )
-from app.services.session.session_manager_factory import get_session_manager, get_conversation_logger
 from app.services.jti.main_agent import main_agent
 from app.services.gemini_service import gemini_with_retry, run_sync
 from app.services.gemini_clients import get_default_client
 
 logger = logging.getLogger(__name__)
 
-session_manager = get_session_manager()
-conversation_logger = get_conversation_logger()
+
+def _get_session_manager():
+    return deps.get_jti_session_manager()
+
+
+def _get_conversation_logger():
+    return deps.get_jti_conversation_logger()
 
 
 def build_session_state(session) -> dict:
@@ -36,6 +41,8 @@ def build_session_state(session) -> dict:
 
 def _get_or_rebuild_session(session_id: str):
     """取得 session，若已過期則嘗試從 conversation logs 重建"""
+    session_manager = _get_session_manager()
+    conversation_logger = _get_conversation_logger()
     session = session_manager.get_session(session_id)
     if session:
         return session
@@ -60,6 +67,8 @@ async def _pause_quiz_and_respond(
     turn_number_hint: int | None = None
 ):
     """暫停測驗並回應（returns dict, caller wraps in ChatResponse）"""
+    session_manager = _get_session_manager()
+    conversation_logger = _get_conversation_logger()
     updated_session = session_manager.pause_quiz(session_id)
 
     # 用固定文案，不走 AI（避免 AI 從 chat history 撈出測驗中被忽略的問題來回答）

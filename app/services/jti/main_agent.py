@@ -12,11 +12,10 @@ from typing import Any
 
 from datetime import datetime, timezone
 from google.genai import types
+import app.deps as deps
 from app.models.session import Session
-from app.services.session.session_manager_factory import get_session_manager
 from app.services.agent_utils import normalize_language
 from app.services.base_agent import BaseAgent
-from app.tools.jti.tool_executor import ToolExecutor
 from app.services.jti.agent_prompts import (
     PERSONA,
     SESSION_STATE_TEMPLATES,
@@ -25,12 +24,13 @@ from app.services.jti.agent_prompts import (
 from app.services.jti.runtime_settings import (
     load_runtime_settings_from_prompt_manager,
 )
-from app.services.jti.response_assembly import build_jti_tts_text
-
-# 使用工廠函數取得適當的實作（MongoDB 或記憶體）
-session_manager = get_session_manager()
+from app.services.jti.tts import to_jti_tts_text
 
 logger = logging.getLogger(__name__)
+
+
+def _get_session_manager():
+    return deps.get_jti_session_manager()
 
 # ---------------------------------------------------------------------------
 # RAG function declaration for Gemini function calling
@@ -64,14 +64,11 @@ class MainAgent(BaseAgent):
 
     @property
     def _session_manager(self):
-        return session_manager
+        return _get_session_manager()
 
     @property
     def _persona_map_attr(self) -> str:
         return "jti_profiles_by_prompt"
-
-    # 重用 ToolExecutor 的 _format_options（避免重複定義）
-    _format_options_text = staticmethod(ToolExecutor._format_options)
 
     @staticmethod
     def _get_store_name_for_language(language: str) -> str:
@@ -113,12 +110,11 @@ class MainAgent(BaseAgent):
             now=now,
         )
 
-
     def _get_question_label(self, language: str) -> str:
         return "User question:" if language == "en" else "使用者問題："
 
     def _post_process_chat_result(self, session: Session, response_text: str, citations: list[dict] | None, extra_meta: dict[str, Any]) -> dict[str, Any]:
-        return {"tts_text": build_jti_tts_text(response_text, session.language)}
+        return {"tts_text": to_jti_tts_text(response_text, session.language)}
 
     def _get_chat_fallback_message(self, language: str) -> str:
         return "AI目前故障 請聯絡"

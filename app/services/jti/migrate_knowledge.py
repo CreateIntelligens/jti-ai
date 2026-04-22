@@ -11,14 +11,14 @@ import mimetypes
 import os
 from pathlib import Path
 
-from app.services.knowledge_store import get_knowledge_store
+from app.services.jti.knowledge_store import get_jti_knowledge_store
 
 EDITABLE_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".yaml", ".yml", ".docx"}
 
 
 def migrate_knowledge() -> int:
     root = Path(os.getenv("KB_ROOT", "data/knowledge"))
-    store = get_knowledge_store()
+    store = get_jti_knowledge_store()
     languages = ("zh", "en")
 
     if not root.exists():

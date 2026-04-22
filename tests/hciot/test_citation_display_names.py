@@ -77,9 +77,14 @@ async def test_hciot_chat_injects_session_state_into_prompt(monkeypatch):
             "model_dump": lambda self: {"session_id": "sid-123"},
         },
     )()
+    fake_session_manager = type(
+        "FakeSessionManager",
+        (),
+        {"get_session": lambda self, sid: session},
+    )()
 
     monkeypatch.setattr("app.services.gemini_service.client", object())
-    monkeypatch.setattr("app.services.hciot.main_agent.session_manager.get_session", lambda sid: session)
+    monkeypatch.setattr("app.services.hciot.main_agent._get_session_manager", lambda: fake_session_manager)
     
     # Mock the new RAG loop
     mock_response = type("Response", (), {

@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class MongoConversationLogger:
     """MongoDB 對話日誌記錄器"""
 
-    def __init__(self, keep_file_logs: bool = True, db_name: str = "jti_app"):
+    def __init__(self, db_name: str, keep_file_logs: bool = True):
         """初始化日誌記錄器
 
         Args:
@@ -49,10 +49,10 @@ class MongoConversationLogger:
         session_id: str,
         user_message: str,
         agent_response: str,
+        mode: str,
         tool_calls: Optional[List[Dict]] = None,
         session_state: Optional[Dict] = None,
         error: Optional[str] = None,
-        mode: str = "jti",
         responded_at: Optional[datetime] = None,
         citations: Optional[List[Dict]] = None,
         image_id: Optional[str] = None,
@@ -66,11 +66,14 @@ class MongoConversationLogger:
             tool_calls: 工具呼叫記錄
             session_state: Session 狀態快照
             error: 錯誤訊息（如果有）
-            mode: 模式 ("jti" 或 "general")
+            mode: 模式 ("jti" / "general" / "hciot")
 
         Returns:
             (document_id, turn_number) 的 tuple，若失敗返回 None
         """
+        if not mode:
+            raise ValueError("mode is required")
+
         try:
             # 獲取該 session 現有的對話輪次
             last_turn = self.conversations_collection.find_one(

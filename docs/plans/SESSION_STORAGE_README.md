@@ -124,15 +124,23 @@ python -m pytest tests/storage/test_mongo_conversation_logger.py -v
 使用工廠模式自動選擇合適的實現：
 
 ```python
-from app.services.session_manager_factory import get_session_manager, get_conversation_logger
+from app.services.session.session_manager_factory import (
+    get_jti_conversation_logger,
+    get_jti_session_manager,
+)
 
 # 自動根據 USE_MONGO_SESSION 選擇
-session_manager = get_session_manager()
-conversation_logger = get_conversation_logger()
+session_manager = get_jti_session_manager()
+conversation_logger = get_jti_conversation_logger()
 
 # 使用方式與原有代碼相同
 session = session_manager.create_session(mode=GameMode.COLOR, language="zh")
-conversation_logger.log_conversation(session_id, "jti", user_msg, ai_msg)
+conversation_logger.log_conversation(
+    session_id=session_id,
+    user_message=user_msg,
+    agent_response=ai_msg,
+    mode="jti",
+)
 ```
 
 ## 📊 API 參考

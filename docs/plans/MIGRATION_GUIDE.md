@@ -52,10 +52,13 @@ from app.services.session_manager import session_manager
 from app.services.conversation_logger import conversation_logger
 
 # 新方式（使用工廠）
-from app.services.session_manager_factory import get_session_manager, get_conversation_logger
+from app.services.session.session_manager_factory import (
+    get_jti_conversation_logger,
+    get_jti_session_manager,
+)
 
-session_manager = get_session_manager()
-conversation_logger = get_conversation_logger()
+session_manager = get_jti_session_manager()
+conversation_logger = get_jti_conversation_logger()
 ```
 
 ### 步驟 4: 測試連接
@@ -231,7 +234,7 @@ docker-compose restart backend
 ### 步驟 3: 驗證（可選）
 
 ```bash
-python -c "from app.services.session_manager_factory import get_session_manager; print(get_session_manager())"
+python -c "from app.services.session.session_manager_factory import get_jti_session_manager; print(get_jti_session_manager())"
 ```
 
 應該輸出：`<SessionManager object>` (記憶體版本)

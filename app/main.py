@@ -347,7 +347,7 @@ def health_check():
     checks["api_key_manager"] = deps.api_key_manager is not None
 
     # 4. General Session Manager (MongoDB persistence)
-    checks["general_session_manager"] = deps.general_session_manager is not None
+    checks["general_session_manager"] = deps.get_general_chat_session_manager() is not None
 
     all_ok = all(checks.values())
     status_code = 200 if all_ok else 503
