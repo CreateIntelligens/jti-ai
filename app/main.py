@@ -62,11 +62,24 @@ def _configure_warning_filters() -> None:
         warnings.filterwarnings("ignore", message=message)
 
 
+class _AccessLogNoiseFilter(logging.Filter):
+    """Drop noisy access log entries: /health checks and TTS polling 202s."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        msg = record.getMessage()
+        if "/health" in msg:
+            return False
+        if "/tts/tts_" in msg and " 202" in msg:
+            return False
+        return True
+
+
 def _configure_uvicorn_logging() -> None:
     for logger_name in _UVICORN_LOGGERS:
         uvicorn_logger = logging.getLogger(logger_name)
         for handler in uvicorn_logger.handlers:
             handler.setFormatter(TimestampFormatter("%(levelprefix)s %(message)s"))
+    logging.getLogger("uvicorn.access").addFilter(_AccessLogNoiseFilter())
 
 
 def _configure_runtime() -> None:

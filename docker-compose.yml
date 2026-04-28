@@ -3,7 +3,6 @@ services:
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
-    user: "1000:1000"
     env_file:
       - .env
     volumes:

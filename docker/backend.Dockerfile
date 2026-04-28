@@ -16,7 +16,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /build
 COPY requirements.txt .
-RUN pip wheel --wheel-dir=/wheels -r requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip wheel --wheel-dir=/wheels -r requirements.txt
 
 # ---------- Stage 2: deps ----------
 # 從 wheels 安裝到獨立 prefix，之後整包 copy 到 runner
@@ -41,6 +42,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         libgomp1 \
+        gosu \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -g 1000 appuser \
     && useradd -m -u 1000 -g appuser appuser
@@ -51,6 +53,8 @@ WORKDIR /app
 RUN mkdir -p /app/data/lancedb /app/logs /home/appuser/.cache/huggingface \
     && chown -R appuser:appuser /app /home/appuser/.cache
 
-USER appuser
+COPY docker/backend-entrypoint.sh /usr/local/bin/backend-entrypoint.sh
+RUN chmod +x /usr/local/bin/backend-entrypoint.sh
 
-CMD uvicorn app.main:app --host 0.0.0.0 --port ${BACKEND_PORT} --workers 1
+ENTRYPOINT ["/usr/local/bin/backend-entrypoint.sh"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8008", "--workers", "1"]
