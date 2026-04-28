@@ -33,6 +33,7 @@ from app.services.jti.response_assembly import (
     extract_option_texts,
 )
 from app.services.jti.runtime_quiz_flow import execute_quiz_start
+from app.services.jti.tts import to_jti_tts_text
 
 from app.tools.jti.quiz import get_total_questions
 from app.utils import build_date_query, group_conversations_by_session
@@ -78,7 +79,7 @@ def _get_tts_manager():
     return deps.get_jti_tts_job_manager()
 
 
-register_tts_endpoints(runtime_router, _get_tts_manager)
+register_tts_endpoints(runtime_router, _get_tts_manager, text_formatter=to_jti_tts_text)
 
 
 # === Endpoints ===

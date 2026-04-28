@@ -24,6 +24,7 @@ from app.schemas.chat import (
 )
 from app.services.hciot.main_agent import main_agent
 from app.services.hciot.runtime_settings import get_available_tts_characters
+from app.services.hciot.tts import to_hciot_tts_text
 from app.utils import build_date_query, group_conversations_by_session
 
 
@@ -66,7 +67,7 @@ async def get_tts_characters():
     return {"characters": get_available_tts_characters()}
 
 
-register_tts_endpoints(runtime_router, _get_tts_manager)
+register_tts_endpoints(runtime_router, _get_tts_manager, text_formatter=to_hciot_tts_text)
 
 
 @runtime_router.post("/chat/start", response_model=CreateSessionResponse)

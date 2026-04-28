@@ -18,14 +18,13 @@ def _reload_tts_jobs(tmp_path, monkeypatch):
     return _reload_module("app.services.tts_jobs", tmp_path, monkeypatch)
 
 
-def _assert_manager_binding(manager, tts_jobs, formatter, api_replacement: str, get_manager) -> None:
+def _assert_manager_binding(manager, tts_jobs, api_replacement: str, get_manager) -> None:
     assert isinstance(manager, tts_jobs.TtsJobManager)
-    assert manager.text_formatter is formatter
     assert manager.api_replacement == api_replacement
     assert get_manager() is manager
 
 
-def test_tts_job_manager_uses_injected_text_formatter(tmp_path, monkeypatch):
+def test_tts_job_manager_passes_text_through_unchanged(tmp_path, monkeypatch):
     tts_jobs = _reload_tts_jobs(tmp_path, monkeypatch)
     captured: dict[str, object] = {}
 
@@ -47,49 +46,33 @@ def test_tts_job_manager_uses_injected_text_formatter(tmp_path, monkeypatch):
 
     monkeypatch.setattr(tts_jobs.threading, "Thread", DummyThread)
 
-    formatter_calls = []
-
-    def formatter(text: str | None, language: str):
-        formatter_calls.append((text, language))
-        return f"formatted::{text}::{language}"
-
-    manager = tts_jobs.TtsJobManager(
-        character="demo",
-        api_replacement="jti",
-        text_formatter=formatter,
-    )
+    manager = tts_jobs.TtsJobManager(character="demo", api_replacement="jti")
 
     job_id = manager.create_job(text="hello", language="zh")
 
     assert job_id == "tts_abc123"
-    assert formatter_calls == [("hello", "zh")]
     assert captured["thread"] == {
         "target": manager._generate_job,
-        "args": ("tts_abc123", "formatted::hello::zh", "demo"),
+        "args": ("tts_abc123", "hello", "demo"),
         "daemon": True,
     }
     assert captured["started"] is True
 
 
-def test_app_tts_modules_bind_expected_managers_and_formatters(tmp_path, monkeypatch):
+def test_app_tts_modules_bind_expected_managers(tmp_path, monkeypatch):
     tts_jobs = _reload_tts_jobs(tmp_path, monkeypatch)
     jti_tts = _reload_module("app.services.jti.tts", tmp_path, monkeypatch)
     hciot_tts = _reload_module("app.services.hciot.tts", tmp_path, monkeypatch)
 
-    jti_manager = jti_tts.get_jti_tts_job_manager()
     _assert_manager_binding(
-        jti_manager,
+        jti_tts.get_jti_tts_job_manager(),
         tts_jobs,
-        jti_tts.to_jti_tts_text,
         "jti",
         jti_tts.get_jti_tts_job_manager,
     )
-
-    hciot_manager = hciot_tts.get_hciot_tts_job_manager()
     _assert_manager_binding(
-        hciot_manager,
+        hciot_tts.get_hciot_tts_job_manager(),
         tts_jobs,
-        hciot_tts.to_hciot_tts_text,
         "hciot",
         hciot_tts.get_hciot_tts_job_manager,
     )

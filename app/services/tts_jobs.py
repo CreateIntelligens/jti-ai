@@ -11,7 +11,7 @@ import urllib.error
 import urllib.request
 import uuid
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +29,9 @@ class TtsJobManager:
         self,
         character: str,
         api_replacement: str = "",
-        text_formatter: Callable[[str | None, str], str | None] | None = None,
     ) -> None:
         self.character = character
         self.api_replacement = api_replacement
-        self.text_formatter = text_formatter or (lambda text, _language: text)
         self.tts_api_url = _TTS_API_URL
         self.timeout_seconds = _TIMEOUT_SECONDS
         self.cache_ttl_seconds = _CACHE_TTL_SECONDS
@@ -74,7 +72,7 @@ class TtsJobManager:
             raise ValueError("TTS text is empty")
 
         effective_character = character or self.character
-        prepared_text = self.text_formatter(raw_text, language) or raw_text
+        prepared_text = raw_text
         job_id = f"tts_{uuid.uuid4().hex}"
         now = time.time()
 

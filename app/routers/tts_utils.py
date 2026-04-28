@@ -96,6 +96,7 @@ class TtsCreateRequest(BaseModel):
 def register_tts_endpoints(
     router: APIRouter,
     get_manager: Callable[[], TtsJobManager],
+    text_formatter: Optional[Callable[[Optional[str], str], Optional[str]]] = None,
 ) -> None:
     """Mount GET ``/tts/{tts_message_id}`` and POST ``/tts`` on *router*."""
 
@@ -137,7 +138,8 @@ def register_tts_endpoints(
         language = (request.language or "zh").strip().lower() or "zh"
         character = (request.character or "").strip() or None
         manager = get_manager()
-        tts_message_id = queue_tts_generation(text, language, manager, character=character)
+        prepared = text_formatter(text, language) if text_formatter else text
+        tts_message_id = queue_tts_generation(prepared or text, language, manager, character=character)
         if not tts_message_id:
             raise HTTPException(status_code=500, detail="Failed to queue TTS generation")
 

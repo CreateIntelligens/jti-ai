@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+import os
 import re
 from typing import Optional
 
@@ -10,10 +12,21 @@ try:
 except Exception:  # pragma: no cover - fallback when dependency is unavailable
     OpenCC = None  # type: ignore
 
+try:
+    import httpx as _httpx  # type: ignore
+except Exception:  # pragma: no cover
+    _httpx = None  # type: ignore
+
 from app.services.agent_utils import normalize_language
 from app.services.safety_numbers import TTS_SPOKEN_SHORT_CODES
 
+logger = logging.getLogger(__name__)
+
 _T2S_CONVERTER = OpenCC("t2s") if OpenCC else None
+
+# Set NORMALIZE_API_URL to enable the normalize API for digit conversion + OpenCC.
+# Leave empty (or unset) to use the local regex fallback.
+_NORMALIZE_API_URL = os.getenv("NORMALIZE_API_URL", "").strip()
 
 _DIGIT_MAP = "零一二三四五六七八九"
 _UNITS = ["", "十", "百", "千"]
@@ -37,6 +50,35 @@ def _to_simplified_chinese(text: str) -> str:
     return text
 
 
+def _normalize_via_api(text: str) -> Optional[str]:
+    """Call the normalize API and return the simplified (digits+opencc) result.
+
+    Returns None if NORMALIZE_API_URL is not set, the API is unreachable,
+    or the response is unexpected.
+    """
+    if not _NORMALIZE_API_URL or not _httpx:
+        return None
+    try:
+        response = _httpx.post(
+            _NORMALIZE_API_URL,
+            json={"text": text},
+            timeout=5.0,
+        )
+        response.raise_for_status()
+        return response.json().get("simplified")
+    except Exception as exc:
+        logger.warning("normalize API failed, falling back to regex: %s", exc)
+        return None
+
+
+def _prepare_with_regex(text: str, *, convert_digits: bool) -> str:
+    """Prepare TTS text using the local regex pipeline."""
+    prepared = _replace_hotlines_with_spoken_digits(text)
+    if convert_digits:
+        prepared = digits_to_chinese(prepared)
+    return _to_simplified_chinese(prepared)
+
+
 def prepare_tts_text(
     text: Optional[str],
     language: str,
@@ -46,10 +88,12 @@ def prepare_tts_text(
     if not text or normalize_language(language) != "zh":
         return text
 
-    prepared = _replace_hotlines_with_spoken_digits(text)
     if convert_digits:
-        prepared = digits_to_chinese(prepared)
-    return _to_simplified_chinese(prepared)
+        result = _normalize_via_api(text)
+        if result is not None:
+            return result
+
+    return _prepare_with_regex(text, convert_digits=convert_digits)
 
 
 def _int_to_chinese(n: int) -> str:
