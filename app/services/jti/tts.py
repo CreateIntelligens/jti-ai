@@ -12,7 +12,7 @@ from app.services.tts_text import prepare_tts_text
 
 def to_jti_tts_text(text: Optional[str], language: str) -> Optional[str]:
     """Prepare JTI TTS text for zh responses."""
-    return prepare_tts_text(text, language, convert_digits=True)
+    return prepare_tts_text(text, language)
 
 
 @lru_cache(maxsize=1)

@@ -65,35 +65,30 @@ def _normalize_via_api(text: str) -> Optional[str]:
             timeout=5.0,
         )
         response.raise_for_status()
-        return response.json().get("simplified")
+        result = response.json().get("simplified")
+        logger.info("normalize API hit: %r -> %r", text[:40], (result or "")[:40])
+        return result
     except Exception as exc:
         logger.warning("normalize API failed, falling back to regex: %s", exc)
         return None
 
 
-def _prepare_with_regex(text: str, *, convert_digits: bool) -> str:
+def _prepare_with_regex(text: str) -> str:
     """Prepare TTS text using the local regex pipeline."""
     prepared = _replace_hotlines_with_spoken_digits(text)
-    if convert_digits:
-        prepared = digits_to_chinese(prepared)
+    prepared = digits_to_chinese(prepared)
     return _to_simplified_chinese(prepared)
 
 
-def prepare_tts_text(
-    text: Optional[str],
-    language: str,
-    *,
-    convert_digits: bool,
-) -> Optional[str]:
+def prepare_tts_text(text: Optional[str], language: str) -> Optional[str]:
     if not text or normalize_language(language) != "zh":
         return text
 
-    if convert_digits:
-        result = _normalize_via_api(text)
-        if result is not None:
-            return result
+    result = _normalize_via_api(text)
+    if result is not None:
+        return result
 
-    return _prepare_with_regex(text, convert_digits=convert_digits)
+    return _prepare_with_regex(text)
 
 
 def _int_to_chinese(n: int) -> str:
