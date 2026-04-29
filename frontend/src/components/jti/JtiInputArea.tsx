@@ -38,7 +38,7 @@ export default function JtiInputArea({
               onChange={(e) => setUserInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder={loading ? t('status_ready') : t('input_placeholder')}
-              disabled={loading || !sessionId}
+              disabled={!sessionId}
               autoComplete="off"
               spellCheck={false}
             />
@@ -52,16 +52,12 @@ export default function JtiInputArea({
           <button
             type="submit"
             className="send-button"
-            disabled={loading || !sessionId || !userInput.trim()}
+            disabled={!sessionId || !userInput.trim()}
             aria-label="發送訊息"
           >
-            {loading ? (
-              <span className="button-spinner"></span>
-            ) : (
-              <svg className="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-                <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
-              </svg>
-            )}
+            <svg className="send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+              <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+            </svg>
           </button>
         </div>
       </form>

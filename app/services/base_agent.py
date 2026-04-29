@@ -258,30 +258,27 @@ class BaseAgent:
         force_config = self._get_force_tool_config(session)
         response = await run_sync(gemini_with_retry, lambda: chat_session.send_message(enriched, config=force_config))
 
-        citations = None
+        citations: list[dict] | None = None
         for _ in range(self._MAX_TOOL_ROUNDS):
-            fc_part = self._find_function_call(response)
-            if fc_part is None:
+            fc_parts = self._find_function_calls(response)
+            if not fc_parts:
                 break
 
-            tool_name = fc_part.function_call.name
-            tool_args = dict(fc_part.function_call.args) if fc_part.function_call.args else {}
-            logger.info(f"[Tool Call] {tool_name}({tool_args})")
-
-            if tool_name == "search_knowledge":
-                ai_query = tool_args.get("query", user_message)
-                kb_text, raw_citations = await self._execute_rag_tool(ai_query, user_message, session)
-                if raw_citations:
-                    citations = raw_citations
-                tool_result = kb_text
-            else:
-                tool_result = f"Unknown tool: {tool_name}"
-
-            tool_response_part = types.Part.from_function_response(
-                name=tool_name,
-                response={"result": tool_result},
+            results = await asyncio.gather(
+                *[self._dispatch_tool_call(fc_part, user_message, session) for fc_part in fc_parts]
             )
-            response = await run_sync(gemini_with_retry, lambda p=tool_response_part: chat_session.send_message(p))
+
+            response_parts = []
+            for tool_name, tool_result, raw_citations in results:
+                citations = self._merge_citations(citations, raw_citations or [])
+                response_parts.append(
+                    types.Part.from_function_response(
+                        name=tool_name,
+                        response={"result": tool_result},
+                    )
+                )
+
+            response = await run_sync(gemini_with_retry, lambda pp=response_parts: chat_session.send_message(pp))
 
         self._clean_enriched_history(chat_session, user_message)
         return response, citations
@@ -289,14 +286,68 @@ class BaseAgent:
     # --- Function-calling and RAG helpers ---
 
     @staticmethod
-    def _find_function_call(response) -> Any | None:
-        """Return the first Part with a function_call, or None."""
+    def _find_function_calls(response) -> list:
+        """Return all Parts that contain a named function_call."""
         if not response.candidates or not response.candidates[0].content.parts:
-            return None
-        for part in response.candidates[0].content.parts:
-            if hasattr(part, "function_call") and part.function_call and part.function_call.name:
-                return part
-        return None
+            return []
+        return [
+            part for part in response.candidates[0].content.parts
+            if hasattr(part, "function_call") and part.function_call and part.function_call.name
+        ]
+
+    async def _dispatch_tool_call(
+        self,
+        fc_part,
+        user_message: str,
+        session: Session,
+    ) -> tuple[str, str, list[dict] | None]:
+        """Execute one model-requested tool call and return a Gemini function response payload."""
+        tool_name = fc_part.function_call.name
+        tool_args = dict(fc_part.function_call.args) if fc_part.function_call.args else {}
+
+        if tool_name != "search_knowledge":
+            logger.info(f"[Tool Call] {tool_name}({tool_args})")
+            return tool_name, f"Unknown tool: {tool_name}", None
+
+        queries = self._extract_search_queries(tool_args, fallback=user_message)
+        logger.info(f"[Tool Call] search_knowledge(queries={queries})")
+
+        sub_results = await asyncio.gather(
+            *[self._execute_rag_tool(query, user_message, session) for query in queries]
+        )
+        tool_result, citations = self._format_search_results(queries, sub_results)
+        return tool_name, tool_result, citations
+
+    @staticmethod
+    def _extract_search_queries(tool_args: dict, fallback: str) -> list[str]:
+        raw_queries = tool_args.get("queries") or []
+        queries = [q.strip() for q in raw_queries if isinstance(q, str) and q.strip()]
+        deduped = list(dict.fromkeys(queries))
+        return deduped or [fallback]
+
+    def _format_search_results(
+        self,
+        queries: list[str],
+        sub_results: list[tuple[str, list[dict] | None]],
+    ) -> tuple[str, list[dict] | None]:
+        merged_citations: list[dict] | None = None
+        sections: list[str] = []
+        for query, (kb_text, raw_citations) in zip(queries, sub_results):
+            sections.append(f"[查詢: {query}]\n{kb_text}")
+            merged_citations = self._merge_citations(merged_citations, raw_citations or [])
+        return "\n\n---\n\n".join(sections), merged_citations
+
+    @staticmethod
+    def _merge_citations(existing: list[dict] | None, new: list[dict]) -> list[dict]:
+        """Merge two citation lists, deduping by (uri, text) tuple."""
+        base = list(existing) if existing else []
+        seen = {(c.get("uri"), c.get("text")) for c in base}
+        for c in new:
+            key = (c.get("uri"), c.get("text"))
+            if key not in seen:
+                seen.add(key)
+                base.append(c)
+        return base
 
     async def _execute_rag_tool(self, ai_query: str, user_message: str, session: Session) -> tuple[str, list[dict] | None]:
         """Run dual RAG search: AI-rewritten query + original user message, merge & dedupe.

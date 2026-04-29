@@ -10,6 +10,28 @@ from google.genai import types
 CORE_MARKER_PATTERN = re.compile(r"\[CORE:\s*([^\]]+?)\]", flags=re.IGNORECASE)
 
 
+def build_search_knowledge_decl(
+    domain_description: str,
+    queries_description: str,
+) -> types.FunctionDeclaration:
+    """Build a `search_knowledge` FunctionDeclaration with domain-specific descriptions."""
+    return types.FunctionDeclaration(
+        name="search_knowledge",
+        description=domain_description,
+        parameters=types.Schema(
+            type=types.Type.OBJECT,
+            properties={
+                "queries": types.Schema(
+                    type=types.Type.ARRAY,
+                    items=types.Schema(type=types.Type.STRING),
+                    description=queries_description,
+                ),
+            },
+            required=["queries"],
+        ),
+    )
+
+
 def normalize_language(language: str) -> str:
     """將語言代碼正規化為 'en' 或 'zh'。"""
     if isinstance(language, str) and language.strip().lower().startswith("en"):

@@ -455,7 +455,7 @@ export default function Hciot() {
   }, [currentLanguage, messages, sessionId, startSession, storeName, t]);
 
   const sendMessage = useCallback(async (message: string, turnNumber?: number) => {
-    if (!message || loading) return;
+    if (!message) return;
 
     setEditingTurn(null);
     if (turnNumber === undefined) {
@@ -513,7 +513,7 @@ export default function Hciot() {
       setLoading(false);
       focusSoon(inputRef);
     }
-  }, [loading, selectedTtsCharacter, sessionId, startSession, t]);
+  }, [selectedTtsCharacter, sessionId, startSession, t]);
 
   const handleRegenerate = async (turnNumber: number) => {
     if (!sessionId || loading) return;
@@ -558,7 +558,7 @@ export default function Hciot() {
   const handleSubmit = (event: { preventDefault(): void }) => {
     event.preventDefault();
     const trimmed = userInput.trim();
-    if (trimmed && !loading) {
+    if (trimmed) {
       void sendMessage(trimmed);
     }
   };
@@ -568,7 +568,7 @@ export default function Hciot() {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
       const trimmed = userInput.trim();
-      if (trimmed && !loading) {
+      if (trimmed) {
         void sendMessage(trimmed);
       }
     }
@@ -719,7 +719,6 @@ export default function Hciot() {
 
             <HciotInputArea
               userInput={userInput}
-              loading={loading}
               sessionId={sessionId}
               statusText={statusText}
               sessionInfo={sessionInfo}

@@ -1,5 +1,49 @@
 # Changelog
 
+## [Unreleased] - 2026-04-29
+
+### RAG / AI 基礎設施
+
+- Self-hosted RAG 成為主要檢索路徑：BAAI/bge-m3 + FlagEmbedding 產生 embedding，LanceDB 做本地向量檢索，MongoDB 做知識庫與向量備份
+- FastAPI lifespan 會背景 warm up embedding model，並自動 backfill JTI/HCIoT 的中英文知識庫
+- 知識庫上傳、更新、刪除後會排程同步 RAG；CSV 以 row 為 chunk，並保留 `img` 欄位解析出的 `image_id`
+- `/v1/chat/completions` 改為 OpenAI-compatible 入口，會先查本地 RAG，再用 Gemini 產生回答
+- RAG 檢索新增 distance threshold，可用 `RAG_DISTANCE_THRESHOLD` 調整結果過濾
+
+### 應用切分與後端整理
+
+- JTI、HCIoT 的 service wiring 已拆開：各自擁有 session manager、conversation logger、knowledge store 與 TTS manager
+- 共用 persona router factory、safety prompts、緊急電話讀法與知識庫工具，減少跨 app 分支邏輯
+- MongoDB session/conversation storage 測試補強，包含 rollback、session rebuild、分頁與匯出流程
+
+### HCIoT 工作台
+
+- HCIoT 知識庫工作台支援 topic/category 管理，CSV 上傳可帶 topic metadata，並自動從 `q` 欄位同步題目
+- 新增 topic 合併 CSV API 與前端整合預覽，支援同 topic 多個 CSV 合併檢視與編輯
+- 圖片改由 MongoDB image store 管理，支援上傳、列表、刪除、引用次數統計與未使用圖片清理
+- 圖片引用統一使用 `image_id`，前端以 `normalizeImageId()` 和 `/api/hciot/images/{image_id}` 載入
+- HCIoT TTS 角色選擇移到主要頁面，送出訊息時可指定 voice
+
+### JTI
+
+- JTI 回應組裝、測驗流程、quiz bank/result store 與 TTS 文本產生已模組化
+- 題庫與測驗結果管理支援多 bank/set、啟用切換、CSV 匯入匯出與 metadata 編輯
+- 知識庫上傳/編輯會拒絕 `[CORE: ...]` 標記，避免把內部優先權語法寫入可檢索內容
+
+### TTS
+
+- TTS job manager 改為 shared file-based cache，支援 pending/ready/failed metadata、TTL prune 與 job 上限
+- JTI/HCIoT 共用中文 TTS normalization：優先呼叫 `NORMALIZE_API_URL`，失敗或未設定時 fallback 到本地 regex + OpenCC
+- 中文 TTS fallback 會處理 hotline、電話、年份與三位數以上數字轉中文讀法
+
+### Docker / Frontend / 維運
+
+- Backend Dockerfile 採 builder -> deps -> runner 多階段建置，runtime 以非 root `appuser` 執行
+- Backend entrypoint 會修正 bind-mounted `data`、`logs`、Hugging Face cache 權限，降低 Docker 權限摩擦
+- Frontend container 內 nginx 維持單一公開 port，代理 `/api`、`/v1`、`/docs`、`/health` 到 backend，其他路由給 Vite
+- 過濾 `/health` 與 TTS polling 202 access logs，降低開發與營運 log 噪音
+- Pin `FlagEmbedding==1.3.5`，穩定 BGE-m3 embedding 依賴組合
+
 ## [0.1.0] - 2026-04-14
 
 ### JTI — 命定前蓋測驗

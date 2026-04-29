@@ -14,7 +14,7 @@ from google.genai import types
 import app.deps as deps
 
 from app.models.session import Session
-from app.services.agent_utils import normalize_language
+from app.services.agent_utils import build_search_knowledge_decl, normalize_language
 from app.services.base_agent import BaseAgent
 from app.services.hciot.agent_prompts import (
     PERSONA,
@@ -36,18 +36,14 @@ def _get_session_manager():
 # ---------------------------------------------------------------------------
 # RAG function declaration for Gemini function calling
 # ---------------------------------------------------------------------------
-_SEARCH_KNOWLEDGE_DECL = types.FunctionDeclaration(
-    name="search_knowledge",
-    description="搜尋醫院衛教知識庫，查詢疾病、治療、照護、檢查、藥物、手術、復健等相關資料。",
-    parameters=types.Schema(
-        type=types.Type.OBJECT,
-        properties={
-            "query": types.Schema(
-                type=types.Type.STRING,
-                description="搜尋查詢語句，必須使用繁體中文，應為完整的問題描述（包含上下文），而非模糊的代名詞。即使使用者用英文提問，query 也必須翻譯成中文。",
-            ),
-        },
-        required=["query"],
+_SEARCH_KNOWLEDGE_DECL = build_search_knowledge_decl(
+    domain_description=(
+        "搜尋醫院衛教知識庫，查詢疾病、治療、照護、檢查、藥物、手術、復健等相關資料。"
+        "若使用者一次提出多個獨立主題的問題，請在同一次呼叫中將每個獨立問題各自填入 queries 陣列。"
+    ),
+    queries_description=(
+        "使用者問題拆解後的獨立查詢列表，必須使用繁體中文，每一筆應為完整的問題描述（包含上下文）。"
+        "若使用者只有一個問題，仍以單元素陣列回傳。即使使用者用英文提問，每筆 query 也必須翻譯成中文。"
     ),
 )
 

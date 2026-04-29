@@ -363,7 +363,7 @@ export default function Jti() {
   useAutoResize(inputRef, userInput);
 
   const sendMessage = useCallback(async (message: string, turnNumber?: number) => {
-    if (!message || !sessionId || loading) return;
+    if (!message || !sessionId) return;
 
     setEditingTurn(null);
 
@@ -490,7 +490,7 @@ export default function Jti() {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [sessionId, loading, warmupTtsAudio, currentLanguage, t, clearTtsState]);
+  }, [sessionId, warmupTtsAudio, currentLanguage, t, clearTtsState]);
 
   const handleRegenerate = async (turnNumber: number) => {
     if (!sessionId || loading) return;
@@ -538,7 +538,7 @@ export default function Jti() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const msg = userInput.trim();
-    if (msg && !loading) sendMessage(msg);
+    if (msg) sendMessage(msg);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -546,7 +546,7 @@ export default function Jti() {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       const msg = userInput.trim();
-      if (msg && !loading) sendMessage(msg);
+      if (msg) sendMessage(msg);
     }
   };
 
