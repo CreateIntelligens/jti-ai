@@ -1,6 +1,6 @@
 import type { HciotLanguage } from '../../../../config/hciotTopics';
 import type { HciotImage, HciotKnowledgeFile, HciotTopicCategory } from '../../../../services/api/hciot';
-import { NO_TOPIC_KEY, categoryPrefix, getFileLabel, sortByLabel,} from '../topicUtils';
+import { NO_TOPIC_KEY, categoryPrefix, getFileLabel, sortByLabel } from '../topicUtils';
 
 export interface ExplorerFolderNode {
   key: string;
@@ -8,6 +8,7 @@ export interface ExplorerFolderNode {
   label: string;
   children: ExplorerNode[];
   tone?: 'category' | 'topic';
+  topicId?: string;
 }
 
 export interface ExplorerFileNode {
@@ -252,6 +253,7 @@ export function buildExplorerTree(
         kind: 'folder',
         label: topicLabel,
         tone: 'topic',
+        topicId: topicId === NO_TOPIC_KEY ? undefined : topicId,
         children: childNodes,
       } satisfies ExplorerFolderNode;
     });

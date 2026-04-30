@@ -7,16 +7,15 @@ import {
   FolderOpen,
   Plus,
   Search,
+  Trash2,
   Image as ImageIcon,
   Table as TableIcon,
 } from 'lucide-react';
 
-import type { HciotLanguage } from '../../../../config/hciotTopics';
-import type { ExplorerRow } from './explorerTree';
+import type { ExplorerNode, ExplorerRow } from './explorerTree';
 import { isFolderNode } from './explorerTree';
 
 interface ExplorerSidebarProps {
-  language: HciotLanguage;
   sidebarCollapsed: boolean;
   loadingWorkspace: boolean;
   searchQuery: string;
@@ -35,10 +34,46 @@ interface ExplorerSidebarProps {
   onSelectImage: (fileName: string) => void;
   onSelectMergedCsv: (topicId: string) => void;
   onOpenUploadDialog: () => void;
+  onDeleteTopic?: (topicId: string, topicLabel: string) => void;
+}
+
+function getDeletableTopicId(node: ExplorerNode): string | null {
+  if (isFolderNode(node)) {
+    return node.tone === 'topic' && node.topicId ? node.topicId : null;
+  }
+
+  return node.kind === 'merged-csv' ? node.topicId : null;
+}
+
+function getNodeIconTone(node: ExplorerNode): string {
+  if (isFolderNode(node)) {
+    return node.tone || 'category';
+  }
+
+  if (node.kind === 'merged-csv') {
+    return 'merged';
+  }
+
+  return 'file';
+}
+
+function renderNodeIcon(node: ExplorerNode, isExpanded: boolean) {
+  if (isFolderNode(node)) {
+    return isExpanded ? <FolderOpen size={15} /> : <Folder size={15} />;
+  }
+
+  if (node.kind === 'merged-csv') {
+    return <TableIcon size={15} />;
+  }
+
+  if (node.kind === 'image') {
+    return <ImageIcon size={15} />;
+  }
+
+  return <FileText size={15} />;
 }
 
 export default function ExplorerSidebar({
-  language,
   sidebarCollapsed,
   loadingWorkspace,
   searchQuery,
@@ -56,6 +91,7 @@ export default function ExplorerSidebar({
   onSelectImage,
   onSelectMergedCsv,
   onOpenUploadDialog,
+  onDeleteTopic,
 }: ExplorerSidebarProps) {
   return (
     <aside
@@ -98,35 +134,57 @@ export default function ExplorerSidebar({
                 Boolean(deferredSearchQuery) || visibleExpandedKeys.has(node.key)
               );
 
+              const deletableTopicId = getDeletableTopicId(node);
+              const nodeIconTone = getNodeIconTone(node);
+
               return (
-                <button
+                <div
                   key={node.key}
-                  type="button"
-                  className={`hciot-explorer-row${isSelected ? ' is-selected' : ''}`}
+                  className={`hciot-explorer-row-wrap${isSelected ? ' is-selected' : ''}`}
                   style={{ '--row-depth': depth } as CSSProperties}
-                  onClick={() => {
-                    if (node.kind === 'file') onSelectFile(node.file.name);
-                    else if (node.kind === 'image') onSelectImage(node.image.image_id);
-                    else if (node.kind === 'merged-csv') onSelectMergedCsv(node.topicId);
-                    else onToggleExpanded(node.key);
-                  }}
-                  role="treeitem"
-                  aria-expanded={isFolderNode(node) ? isExpanded : undefined}
                 >
-                  <span className="hciot-explorer-row-indent" />
-                  <span className="hciot-explorer-row-caret">
-                    {isFolderNode(node) ? (
-                      isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
-                    ) : null}
-                  </span>
-                  <span className={`hciot-explorer-row-icon tone-${isFolderNode(node) ? node.tone || 'category' : node.kind === 'merged-csv' ? 'merged' : 'file'}`}>
-                    {isFolderNode(node)
-                      ? (isExpanded ? <FolderOpen size={15} /> : <Folder size={15} />)
-                      : node.kind === 'merged-csv' ? <TableIcon size={15} />
-                        : node.kind === 'image' ? <ImageIcon size={15} /> : <FileText size={15} />}
-                  </span>
-                  <span className="hciot-explorer-row-label">{node.label}</span>
-                </button>
+                  <button
+                    type="button"
+                    className={`hciot-explorer-row${isSelected ? ' is-selected' : ''}`}
+                    onClick={() => {
+                      if (node.kind === 'file') {
+                        onSelectFile(node.file.name);
+                      } else if (node.kind === 'image') {
+                        onSelectImage(node.image.image_id);
+                      } else if (node.kind === 'merged-csv') {
+                        onSelectMergedCsv(node.topicId);
+                      } else {
+                        onToggleExpanded(node.key);
+                      }
+                    }}
+                    role="treeitem"
+                    aria-expanded={isFolderNode(node) ? isExpanded : undefined}
+                  >
+                    <span className="hciot-explorer-row-indent" />
+                    <span className="hciot-explorer-row-caret">
+                      {isFolderNode(node) ? (
+                        isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
+                      ) : null}
+                    </span>
+                    <span className={`hciot-explorer-row-icon tone-${nodeIconTone}`}>
+                      {renderNodeIcon(node, isExpanded)}
+                    </span>
+                    <span className="hciot-explorer-row-label">{node.label}</span>
+                  </button>
+                  {deletableTopicId && onDeleteTopic && (
+                    <button
+                      type="button"
+                      className="hciot-explorer-row-delete"
+                      title="刪除整個主題"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteTopic(deletableTopicId, node.label);
+                      }}
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>

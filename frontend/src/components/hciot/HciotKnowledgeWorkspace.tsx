@@ -377,6 +377,45 @@ export default function HciotKnowledgeWorkspace({
     }
   };
 
+  const handleDeleteTopic = async (topicId: string, topicLabel: string) => {
+    const targets = files.filter((f) => f.topic_id === topicId);
+    if (!targets.length) return;
+    const confirmed = window.confirm(text(
+      `確定要刪除主題「${topicLabel}」？無法復原。`,
+      `Delete topic "${topicLabel}"? This cannot be undone.`,
+    ));
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      const results = await Promise.allSettled(
+        targets.map((f) => api.deleteHciotKnowledgeFile(f.name, language))
+      );
+      const failed = results.filter((r) => r.status === 'rejected').length;
+      if (selectedMergedTopicId === topicId) {
+        setSelectedMergedTopicId(null);
+      }
+      const targetNames = new Set(targets.map((f) => f.name));
+      if (selectedFileName && targetNames.has(selectedFileName)) {
+        setSelectedFileName(null);
+      }
+      await refreshWorkspace();
+      if (failed) {
+        alert(text(
+          `主題「${topicLabel}」刪除完成，但有 ${failed} 個檔案失敗`,
+          `Topic "${topicLabel}" deleted with ${failed} file failures`,
+        ));
+      } else {
+        showStatus(text(`主題「${topicLabel}」已刪除`, `Topic "${topicLabel}" deleted`));
+      }
+    } catch (error) {
+      console.error('Failed to delete HCIoT topic:', error);
+      alert(getErrorMessage(error));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const handleDeleteImage = async () => {
     if (!selectedImage) return;
     const referenceCount = selectedImage.reference_count ?? 0;
@@ -646,7 +685,6 @@ export default function HciotKnowledgeWorkspace({
       className={`hciot-files-workspace${active ? ' is-active' : ''}${sidebarExpanded ? ' is-sidebar-expanded' : ''}`}
     >
       <ExplorerSidebar
-        language={language}
         sidebarCollapsed={sidebarCollapsed}
         loadingWorkspace={loadingWorkspace}
         searchQuery={searchQuery}
@@ -665,6 +703,7 @@ export default function HciotKnowledgeWorkspace({
         onSelectImage={handleSelectImage}
         onSelectMergedCsv={handleSelectMergedCsv}
         onOpenUploadDialog={() => setQaDialogOpen(true)}
+        onDeleteTopic={handleDeleteTopic}
       />
 
       <UploadDialog
@@ -702,6 +741,7 @@ export default function HciotKnowledgeWorkspace({
           onRefreshWorkspace={() => refreshWorkspace()}
           onUploadImage={api.uploadHciotImage}
           onDeleteImage={api.deleteHciotImage}
+          onDeleteTopic={handleDeleteTopic}
         />
       ) : (
         <FileDetailPane

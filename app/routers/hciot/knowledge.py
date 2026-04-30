@@ -394,6 +394,28 @@ async def update_file_metadata(
     }
 
 
+def _xlsx_to_csv_bytes(xlsx_bytes: bytes) -> bytes:
+    """Convert all sheets of an xlsx file into a single CSV (sheets separated by a blank row)."""
+    import csv
+    import io
+
+    import openpyxl
+
+    workbook = openpyxl.load_workbook(io.BytesIO(xlsx_bytes), read_only=True, data_only=True)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+
+    try:
+        for worksheet in workbook.worksheets:
+            for row in worksheet.iter_rows(values_only=True):
+                writer.writerow(["" if value is None else value for value in row])
+            writer.writerow([])  # blank row between sheets
+    finally:
+        workbook.close()
+
+    return buffer.getvalue().encode("utf-8")
+
+
 @router.post("/upload/")
 async def upload_knowledge_file(
     background_tasks: BackgroundTasks,
@@ -411,6 +433,10 @@ async def upload_knowledge_file(
     file_bytes = await file.read()
 
     ext = Path(safe_name).suffix.lower()
+    if ext == ".xlsx":
+        file_bytes = _xlsx_to_csv_bytes(file_bytes)
+        safe_name = Path(safe_name).with_suffix(".csv").name
+        ext = ".csv"
     editable = ext in EDITABLE_EXTENSIONS
     content_type = file.content_type or mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
     if ext == ".csv":

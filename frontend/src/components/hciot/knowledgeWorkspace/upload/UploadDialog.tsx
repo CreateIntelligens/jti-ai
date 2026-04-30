@@ -36,6 +36,25 @@ interface UploadDialogProps {
 }
 
 const DEFAULT_CATEGORY = 'other';
+const LS_CATEGORY_KEY = 'hciot_upload_category';
+const LS_TOPIC_KEY = 'hciot_upload_topic';
+
+interface SavedTopicSelection {
+  categoryId: string;
+  topicId: string;
+}
+
+function readSavedTopicSelection(categories: HciotTopicCategory[]): SavedTopicSelection {
+  const savedCategory = localStorage.getItem(LS_CATEGORY_KEY);
+  const category = categories.find((item) => item.id === savedCategory) ?? categories[0];
+  const categoryId = category?.id ?? DEFAULT_CATEGORY;
+  const savedTopic = localStorage.getItem(LS_TOPIC_KEY);
+  const topicId = savedTopic && category?.topics.some((topic) => topic.id === savedTopic)
+    ? savedTopic
+    : '';
+
+  return { categoryId, topicId };
+}
 
 function resolveTopicInfo(
   categoryId: string,
@@ -98,15 +117,15 @@ function useTopicSelection(categories: HciotTopicCategory[], language: HciotLang
   const [newTopicEn, setNewTopicEn] = useState('');
 
   useEffect(() => {
-    if (open) {
-      setCategoryId(DEFAULT_CATEGORY);
-      setTopicId('');
-      setNewCategoryZh('');
-      setNewCategoryEn('');
-      setNewTopicZh('');
-      setNewTopicEn('');
-    }
-  }, [open]);
+    if (!open || !categories.length) return;
+    const savedSelection = readSavedTopicSelection(categories);
+    setCategoryId(savedSelection.categoryId);
+    setTopicId(savedSelection.topicId);
+    setNewCategoryZh('');
+    setNewCategoryEn('');
+    setNewTopicZh('');
+    setNewTopicEn('');
+  }, [open, categories]);
 
   const sortedCategories = useMemo(
     () => [...categories].sort((a, b) => sortByLabel(a.labels[language], b.labels[language])),
@@ -154,6 +173,8 @@ function useTopicSelection(categories: HciotTopicCategory[], language: HciotLang
       if (value !== NEW_VALUE) {
         setNewCategoryZh('');
         setNewCategoryEn('');
+        localStorage.setItem(LS_CATEGORY_KEY, value);
+        localStorage.removeItem(LS_TOPIC_KEY);
       }
     },
     handleTopicChange: (value: string) => {
@@ -161,6 +182,7 @@ function useTopicSelection(categories: HciotTopicCategory[], language: HciotLang
       if (value !== NEW_VALUE) {
         setNewTopicZh('');
         setNewTopicEn('');
+        localStorage.setItem(LS_TOPIC_KEY, value);
       }
     },
     hasIncompleteNewLabels,
@@ -171,6 +193,37 @@ function useTopicSelection(categories: HciotTopicCategory[], language: HciotLang
 interface TopicSelectorSectionProps {
   language: HciotLanguage;
   topic: ReturnType<typeof useTopicSelection>;
+}
+
+interface LocalizedNameInputProps {
+  language: HciotLanguage;
+  zhPlaceholder: string;
+  enPlaceholder: string;
+  zhValue: string;
+  enValue: string;
+  onZhChange: (value: string) => void;
+  onEnChange: (value: string) => void;
+}
+
+function LocalizedNameInput({
+  language,
+  zhPlaceholder,
+  enPlaceholder,
+  zhValue,
+  enValue,
+  onZhChange,
+  onEnChange,
+}: LocalizedNameInputProps) {
+  const isZh = language === 'zh';
+
+  return (
+    <input
+      className="hciot-file-input"
+      placeholder={isZh ? zhPlaceholder : enPlaceholder}
+      value={isZh ? zhValue : enValue}
+      onChange={(event) => (isZh ? onZhChange : onEnChange)(event.target.value)}
+    />
+  );
 }
 
 function TopicSelectorSection({ language, topic }: TopicSelectorSectionProps) {
@@ -185,7 +238,6 @@ function TopicSelectorSection({ language, topic }: TopicSelectorSectionProps) {
           value={topic.categoryId}
           onChange={topic.handleCategoryChange}
           options={[
-            { value: '', label: '— 不指定 —' },
             ...topic.sortedCategories.map((c) => ({ value: c.id, label: c.labels[language] })),
             { value: NEW_VALUE, label: '＋ 新增科別' },
           ]}
@@ -208,34 +260,28 @@ function TopicSelectorSection({ language, topic }: TopicSelectorSectionProps) {
 
       {topic.categoryId === NEW_VALUE && (
         <div className="hciot-qa-new-fields">
-          <input
-            className="hciot-file-input"
-            placeholder="新科別中文名稱"
-            value={topic.newCategoryZh}
-            onChange={(e) => topic.setNewCategoryZh(e.target.value)}
-          />
-          <input
-            className="hciot-file-input"
-            placeholder="新科別英文名稱"
-            value={topic.newCategoryEn}
-            onChange={(e) => topic.setNewCategoryEn(e.target.value)}
+          <LocalizedNameInput
+            language={language}
+            zhPlaceholder="新科別中文名稱"
+            enPlaceholder="New category name (English)"
+            zhValue={topic.newCategoryZh}
+            enValue={topic.newCategoryEn}
+            onZhChange={topic.setNewCategoryZh}
+            onEnChange={topic.setNewCategoryEn}
           />
         </div>
       )}
 
       {topic.topicId === NEW_VALUE && (
         <div className="hciot-qa-new-fields">
-          <input
-            className="hciot-file-input"
-            placeholder="新主題中文名稱"
-            value={topic.newTopicZh}
-            onChange={(e) => topic.setNewTopicZh(e.target.value)}
-          />
-          <input
-            className="hciot-file-input"
-            placeholder="新主題英文名稱"
-            value={topic.newTopicEn}
-            onChange={(e) => topic.setNewTopicEn(e.target.value)}
+          <LocalizedNameInput
+            language={language}
+            zhPlaceholder="新主題中文名稱"
+            enPlaceholder="New topic name (English)"
+            zhValue={topic.newTopicZh}
+            enValue={topic.newTopicEn}
+            onZhChange={topic.setNewTopicZh}
+            onEnChange={topic.setNewTopicEn}
           />
         </div>
       )}

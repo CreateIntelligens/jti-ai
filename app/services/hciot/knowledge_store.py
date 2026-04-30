@@ -96,6 +96,16 @@ class HciotKnowledgeStore:
         query["filename"] = {"$not": {"$regex": r"\.csv$", "$options": "i"}}
         return self.collection.count_documents(query, limit=1) > 0
 
+    def iter_csv_files_with_data(self, language: str):
+        """Yield (filename, data_bytes) for every CSV in the language. Single
+        Mongo query, used by reference-counting and reindex hot paths to avoid
+        an N+1 of get_file() calls."""
+        query = self._query(language)
+        query["filename"] = {"$regex": r"\.csv$", "$options": "i"}
+        cursor = self.collection.find(query, {"filename": 1, "data": 1}).sort("filename", 1)
+        for doc in cursor:
+            yield doc.get("filename") or "", self._to_bytes(doc.get("data"))
+
     def get_topic_csv_files(self, language: str, topic_id: str) -> list[dict[str, Any]]:
         query = self._query(language)
         query["topic_id"] = topic_id

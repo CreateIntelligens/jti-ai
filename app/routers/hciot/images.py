@@ -1,14 +1,14 @@
 """HCIoT image serving from MongoDB."""
 
-import csv
-import io
 import mimetypes
+import re
 from pathlib import PurePosixPath
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import Response
 
 from app.auth import verify_admin
+from app.services.hciot.csv_utils import _parse_csv_rows
 from app.services.hciot.image_store import get_hciot_image_store
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 
@@ -20,11 +20,31 @@ _EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp")
 _KNOWLEDGE_LANGUAGES = ("zh", "en")
 
 
+def _canonicalize_image_id(image_id: str) -> str:
+    """Single source of truth for image_id normalization, shared by GET-image
+    lookup and reference counting so the two stay in sync."""
+    return PurePosixPath(image_id).stem.replace(" ", "")
+
+
 def _candidate_image_ids(image_id: str) -> list[str]:
     normalized = PurePosixPath(image_id).stem
-    candidate_ids = [normalized]
-    if normalized.upper().startswith("IMG_") and len(normalized) > 4:
-        candidate_ids.append(normalized[4:])
+    canonical = _canonicalize_image_id(image_id)
+    # also try inserting a space before opening parenthesis: PRP(1) -> PRP (1)
+    spaced = re.sub(r"(\S)\(", r"\1 (", canonical)
+
+    seen: set[str] = set()
+    candidate_ids: list[str] = []
+
+    for candidate in [normalized, canonical, spaced]:
+        if candidate and candidate not in seen:
+            seen.add(candidate)
+            candidate_ids.append(candidate)
+
+        stripped = candidate[4:] if candidate.upper().startswith("IMG_") and len(candidate) > 4 else None
+        if stripped and stripped not in seen:
+            seen.add(stripped)
+            candidate_ids.append(stripped)
+
     return candidate_ids
 
 
@@ -44,33 +64,34 @@ def _build_image_reference_counts(image_ids: set[str]) -> dict[str, int]:
         return {}
 
     counts = {image_id: 0 for image_id in image_ids}
+    # canonicalized lookup so "PRP(1)" in CSV can match "PRP (1)" stored in DB
+    canonical_to_id: dict[str, str] = {}
+    for image_id in image_ids:
+        canonical_to_id.setdefault(_canonicalize_image_id(image_id), image_id)
+
     store = get_hciot_knowledge_store()
 
     for language in _KNOWLEDGE_LANGUAGES:
-        for file_meta in store.list_files(language):
-            filename = file_meta.get("name") or file_meta.get("filename") or ""
-            if not filename.lower().endswith(".csv"):
+        for _filename, data in store.iter_csv_files_with_data(language):
+            if not data:
+                continue
+            parsed = _parse_csv_rows(data)
+            if not parsed:
+                continue
+            fieldnames, parsed_rows = parsed
+            if "img" not in fieldnames:
                 continue
 
-            doc = store.get_file(language, filename)
-            if not doc or not doc.get("data"):
-                continue
-
-            try:
-                text = doc["data"].decode("utf-8-sig")
-            except UnicodeDecodeError:
-                continue
-
-            reader = csv.DictReader(io.StringIO(text))
-            if not reader.fieldnames or "img" not in reader.fieldnames:
-                continue
-
-            for row in reader:
+            for row in parsed_rows:
                 reference = _normalize_csv_image_reference(row.get("img") or "")
                 if not reference:
                     continue
                 if reference in counts:
                     counts[reference] += 1
+                    continue
+                canonical_match = canonical_to_id.get(_canonicalize_image_id(reference))
+                if canonical_match:
+                    counts[canonical_match] += 1
                     continue
                 if reference.upper().startswith("IMG_"):
                     fallback_reference = reference[4:]
@@ -136,7 +157,7 @@ async def upload_image(
     if file.size and file.size > MAX_IMAGE_SIZE:
         raise HTTPException(status_code=413, detail="File too large. Max 10MB allowed.")
 
-    actual_image_id = image_id or parsed.stem
+    actual_image_id = _canonicalize_image_id(image_id or parsed.stem)
     store = get_hciot_image_store()
 
     contents = await file.read()

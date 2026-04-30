@@ -139,6 +139,46 @@
   gap: 0.15rem;
 }
 
+.hciot-explorer-row-wrap {
+  --row-depth: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.hciot-explorer-row-wrap > .hciot-explorer-row {
+  flex: 1;
+  min-width: 0;
+}
+
+.hciot-explorer-row-delete {
+  position: absolute;
+  right: 0.3rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--hciot-ink-soft);
+  cursor: pointer;
+}
+
+.hciot-explorer-row-wrap:hover .hciot-explorer-row-delete {
+  display: inline-flex;
+}
+
+.hciot-explorer-row-delete:hover {
+  border-color: rgba(220, 38, 38, 0.25);
+  background: rgba(220, 38, 38, 0.08);
+  color: rgb(220, 38, 38);
+}
+
 .hciot-explorer-row {
   --row-depth: 0;
   display: grid;

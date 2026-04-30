@@ -114,6 +114,7 @@ export default function MergedCsvTable({
               <th>問題 (Q)</th>
               <th>回答 (A)</th>
               <th style={{ width: '180px' }}>圖片 (IMG)</th>
+              <th style={{ width: '180px' }}>網址 (URL)</th>
               {isEditing && <th style={{ width: '60px', textAlign: 'center' }}>-</th>}
             </tr>
           </thead>
@@ -235,6 +236,18 @@ export default function MergedCsvTable({
                         )}
                         <span className="hciot-merged-csv-img-text hidden">{row.img}</span>
                       </div>
+                    ) : null}
+                  </td>
+                  <td style={{ wordBreak: 'break-all' }}>
+                    {isEditing ? (
+                      <textarea
+                        className="hciot-file-textarea"
+                        style={{ minHeight: '60px', padding: '4px' }}
+                        value={row.url || ''}
+                        onChange={(e) => onUpdateRow(i, { url: e.target.value })}
+                      />
+                    ) : row.url ? (
+                      <a href={row.url} target="_blank" rel="noopener noreferrer">{row.url}</a>
                     ) : null}
                   </td>
                   {isEditing && (

@@ -38,6 +38,29 @@ def extract_questions_from_csv(file_bytes: bytes) -> list[str] | None:
     return questions if questions else None
 
 
+_FIELD_ALIASES: dict[str, list[str]] = {
+    "q": ["q", "question", "問題", "问题", "題目", "题目"],
+    "a": ["a", "answer", "答案", "回答", "回覆", "解答", "說明", "内容", "內容"],
+    "img": ["img", "image", "圖片", "图片", "圖片 (image)", "image (圖片)"],
+    "url": ["url", "link", "網址", "网址", "連結", "链接"],
+    "index": ["index"],
+}
+_QA_CONTENT_FIELDS = ("q", "a", "img", "url")
+
+
+def _normalize_fieldname(raw: str) -> str:
+    key = raw.strip().lower()
+    for canonical, aliases in _FIELD_ALIASES.items():
+        if key in aliases:
+            return canonical
+    # Substring fallback only for multi-char aliases — single-letter aliases
+    # like "q"/"a" would otherwise match unrelated headers ("category", "date").
+    for canonical, aliases in _FIELD_ALIASES.items():
+        if any(len(alias) >= 2 and alias in key for alias in aliases):
+            return canonical
+    return raw.strip()
+
+
 def _parse_csv_rows(file_bytes: bytes) -> tuple[list[str], list[dict[str, str]]] | None:
     try:
         text = file_bytes.decode("utf-8-sig")
@@ -48,8 +71,19 @@ def _parse_csv_rows(file_bytes: bytes) -> tuple[list[str], list[dict[str, str]]]
     if reader.fieldnames is None:
         return None
 
-    fieldnames = list(reader.fieldnames)
-    rows = [{name: row.get(name, "") for name in fieldnames} for row in reader]
+    fieldnames: list[str] = []
+    first_raw_for: dict[str, str] = {}
+    for raw in reader.fieldnames:
+        canonical = _normalize_fieldname(raw)
+        if canonical in first_raw_for:
+            continue
+        first_raw_for[canonical] = raw
+        fieldnames.append(canonical)
+
+    rows = [
+        {canonical: row.get(first_raw_for[canonical], "") for canonical in fieldnames}
+        for row in reader
+    ]
     return fieldnames, rows
 
 
@@ -62,7 +96,7 @@ def _rows_to_csv_bytes(fieldnames: list[str], rows: list[dict[str, str]]) -> byt
 
 
 def _has_meaningful_qa_content(row: dict[str, str]) -> bool:
-    return any((row.get(key) or "").strip() for key in ("q", "a", "img"))
+    return any((row.get(key) or "").strip() for key in _QA_CONTENT_FIELDS)
 
 
 def _split_image_name_and_suffix(raw: str) -> tuple[str, str]:
@@ -147,11 +181,24 @@ def split_qa_csv_by_image(file_bytes: bytes, filename: str) -> list[tuple[str, b
     if main_rows:
         uploads.append((path.name, _rows_to_csv_bytes(fieldnames, main_rows)))
 
+    used_names: set[str] = {name for name, _ in uploads}
     for index, (row, img_value) in enumerate(image_rows, start=1):
         fragment = _image_filename_fragment(img_value, index)
-        uploads.append(
-            (f"{path.stem}_{fragment}{suffix}", _rows_to_csv_bytes(fieldnames, [row]))
-        )
+        base = f"{path.stem}_{fragment}{suffix}"
+        # Disambiguate when multiple rows share the same image fragment
+        # (e.g. several Q&As referring to the same image) — otherwise these
+        # would later get renamed to _1/_2 by the storage layer with no hint
+        # of which row they came from.
+        candidate = base
+        counter = 1
+        while candidate in used_names:
+            stem = f"{path.stem}_{fragment}_row{index}"
+            if counter > 1:
+                stem = f"{stem}_{counter}"
+            candidate = f"{stem}{suffix}"
+            counter += 1
+        used_names.add(candidate)
+        uploads.append((candidate, _rows_to_csv_bytes(fieldnames, [row])))
 
     return uploads
 
@@ -159,25 +206,21 @@ def split_qa_csv_by_image(file_bytes: bytes, filename: str) -> list[tuple[str, b
 def merge_csv_files(csv_contents: list[bytes], source_filenames: list[str] | None = None) -> list[dict]:
     """Parse multiple CSV bytes into unified list and sort by index.
 
-    Returns a list of dicts with keys: index, q, a, img, source_file.
+    Returns a list of dicts with keys: index, q, a, img, url, source_file.
     When *source_filenames* is provided each row carries the filename it
     originated from so callers can map edits back to the correct file.
     """
     rows = []
     for idx, file_bytes in enumerate(csv_contents):
-        try:
-            text = file_bytes.decode("utf-8-sig")
-        except UnicodeDecodeError:
+        parsed = _parse_csv_rows(file_bytes)
+        if parsed is None:
             continue
-
-        reader = csv.DictReader(io.StringIO(text))
-        if reader.fieldnames is None:
-            continue
+        _, parsed_rows = parsed
 
         src = source_filenames[idx] if source_filenames and idx < len(source_filenames) else None
 
-        for row in reader:
-            # Clean image field: Excel exported CSVs often contain hyperlinks 
+        for row in parsed_rows:
+            # Clean image field: Excel exported CSVs often contain hyperlinks
             # like 'IMG=images/photo.png' - extract just 'photo.png'
             img_val = (row.get("img") or "").strip()
             if "=" in img_val:
@@ -190,10 +233,11 @@ def merge_csv_files(csv_contents: list[bytes], source_filenames: list[str] | Non
                 "q": (row.get("q") or "").strip(),
                 "a": (row.get("a") or "").strip(),
                 "img": img_val,
+                "url": (row.get("url") or "").strip(),
                 "source_file": src,
             }
             # Only add if there's non-meta content
-            if any(merged_row[k] for k in ["q", "a", "img"]):
+            if any(merged_row[k] for k in _QA_CONTENT_FIELDS):
                 rows.append(merged_row)
 
     def sort_key(item):

@@ -43,7 +43,7 @@ export function sortByLabel(left: string, right: string): number {
 export function buildLabels(zh: string, en: string): HciotLabels | null {
   const zhLabel = zh.trim();
   const enLabel = en.trim();
-  if (!zhLabel || !enLabel) {
+  if (!zhLabel && !enLabel) {
     return null;
   }
 

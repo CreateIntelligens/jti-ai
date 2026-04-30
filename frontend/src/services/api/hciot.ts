@@ -443,6 +443,7 @@ export interface HciotMergedCsvRow {
   q: string;
   a: string;
   img: string;
+  url?: string;
   source_file?: string;
 }
 

@@ -1,8 +1,10 @@
-import { useEffect, useState } from 'react';
-import { Table as TableIcon, Edit, Save, X } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
+import { Table as TableIcon, Download, Edit, Save, Trash2, X } from 'lucide-react';
 
 import type { HciotLanguage } from '../../../../config/hciotTopics';
 import { getHciotTopicMergedCsv, deleteHciotKnowledgeFile, updateHciotKnowledgeFileContent, type HciotImage, type HciotMergedCsvRow } from '../../../../services/api/hciot';
+import { buildCsvString } from '../../../../utils/csv';
+import { downloadBlob } from '../../../../utils/download';
 import { extractUploadedImageId, rollbackUploadedImages, type DeleteImageHandler, type UploadedImageResult } from '../imageUpload';
 import { getErrorMessage } from '../topicUtils';
 import MergedCsvTable, { type EditableMergedCsvRow } from './MergedCsvTable';
@@ -16,27 +18,28 @@ interface MergedCsvPaneProps {
   onRefreshWorkspace?: () => Promise<void> | void;
   onUploadImage?: (file: File) => Promise<UploadedImageResult>;
   onDeleteImage?: DeleteImageHandler;
+  onDeleteTopic?: (topicId: string, topicLabel: string) => void;
 }
+
+const SAVE_CSV_HEADER = ['index', 'q', 'a', 'img', 'url'];
+const DOWNLOAD_CSV_HEADER = ['q', 'a', 'img', 'url'];
 
 function toCsvString(rows: HciotMergedCsvRow[]): string {
-  const header = ['index', 'q', 'a', 'img'];
-  const escape = (val: any) => {
-    const str = val == null ? '' : String(val);
-    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-      return `"${str.replace(/"/g, '""')}"`;
-    }
-    return `"${str}"`;
-  };
-
-  const lines = [
-    header.map(escape).join(','),
-    ...rows.map((r, i) => [i + 1, r.q, r.a, r.img].map(escape).join(','))
-  ];
-  return lines.join('\n');
+  return buildCsvString(
+    SAVE_CSV_HEADER,
+    rows.map((row, index) => [index + 1, row.q, row.a, row.img, row.url || '']),
+  );
 }
 
-function hasMeaningfulRowContent(row: Pick<HciotMergedCsvRow, 'q' | 'a' | 'img'>): boolean {
-  return Boolean(row.q.trim() || row.a.trim() || row.img?.trim());
+function toDownloadCsvString(rows: HciotMergedCsvRow[]): string {
+  return buildCsvString(
+    DOWNLOAD_CSV_HEADER,
+    rows.map((row) => [row.q, row.a, row.img, row.url || '']),
+  );
+}
+
+function hasMeaningfulRowContent(row: Pick<HciotMergedCsvRow, 'q' | 'a' | 'img' | 'url'>): boolean {
+  return Boolean(row.q.trim() || row.a.trim() || row.img?.trim() || row.url?.trim());
 }
 
 export default function MergedCsvPane({
@@ -48,6 +51,7 @@ export default function MergedCsvPane({
   onRefreshWorkspace,
   onUploadImage,
   onDeleteImage,
+  onDeleteTopic,
 }: MergedCsvPaneProps) {
   const topicSlug = topicId.includes('/') ? topicId.split('/').pop() : topicId;
 
@@ -59,13 +63,13 @@ export default function MergedCsvPane({
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const applyMergedCsvResponse = (response: { rows: EditableMergedCsvRow[]; source_files: string[] }) => {
+  const applyMergedCsvResponse = useCallback((response: { rows: EditableMergedCsvRow[]; source_files: string[] }) => {
     setRows(response.rows);
     setSourceFiles(response.source_files);
     setError(null);
-  };
+  }, []);
 
-  const fetchCsv = async () => {
+  const fetchCsv = useCallback(async () => {
     setLoading(true);
     try {
       const response = await getHciotTopicMergedCsv(topicId, language);
@@ -75,7 +79,7 @@ export default function MergedCsvPane({
     } finally {
       setLoading(false);
     }
-  };
+  }, [applyMergedCsvResponse, language, topicId]);
 
   useEffect(() => {
     setIsEditing(false);
@@ -95,7 +99,7 @@ export default function MergedCsvPane({
       });
 
     return () => { active = false; };
-  }, [topicId, language]);
+  }, [applyMergedCsvResponse, topicId, language]);
 
   useEffect(() => {
     if (!isEditing) return;
@@ -109,7 +113,7 @@ export default function MergedCsvPane({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isEditing, topicId, language]); // added topicId/language to ensure it uses fresh fetchCsv if somehow changed
+  }, [fetchCsv, isEditing]);
 
   const handleSave = async () => {
     if (!sourceFiles.length) return;
@@ -206,8 +210,14 @@ export default function MergedCsvPane({
   const handleAddRow = () => {
     setRows(prev => [
       ...prev,
-      { index: String(prev.length + 1), q: '', a: '', img: '' }
+      { index: String(prev.length + 1), q: '', a: '', img: '', url: '' }
     ]);
+  };
+
+  const handleDownload = () => {
+    const filename = `${topicLabel || topicSlug || 'topic'}.csv`;
+    const blob = new Blob([toDownloadCsvString(rows)], { type: 'text/csv;charset=utf-8' });
+    downloadBlob(blob, filename);
   };
 
   return (
@@ -247,15 +257,37 @@ export default function MergedCsvPane({
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              className="hciot-file-action-button"
-              onClick={() => setIsEditing(true)}
-              disabled={loading || error !== null || rows.length === 0}
-            >
-              <Edit size={15} />
-              <span>編輯題庫</span>
-            </button>
+            <>
+              <button
+                type="button"
+                className="hciot-file-action-button"
+                onClick={handleDownload}
+                disabled={loading || error !== null || rows.length === 0}
+              >
+                <Download size={15} />
+                <span>下載</span>
+              </button>
+              {onDeleteTopic && (
+                <button
+                  type="button"
+                  className="hciot-file-action-button danger"
+                  onClick={() => onDeleteTopic(topicId, topicLabel || topicSlug || topicId)}
+                  disabled={loading}
+                >
+                  <Trash2 size={15} />
+                  <span>刪除主題</span>
+                </button>
+              )}
+              <button
+                type="button"
+                className="hciot-file-action-button primary"
+                onClick={() => setIsEditing(true)}
+                disabled={loading || error !== null || rows.length === 0}
+              >
+                <Edit size={15} />
+                <span>編輯題庫</span>
+              </button>
+            </>
           )}
         </div>
       </div>
@@ -265,14 +297,14 @@ export default function MergedCsvPane({
       ) : null}
 
       <section className="hciot-file-editor-panel hciot-merged-panel">
-      <MergedCsvTable
-        language={language}
-        rows={rows}
-        sourceFiles={sourceFiles}
-        availableImages={availableImages}
-        loading={loading}
-        error={error}
-        isEditing={isEditing}
+        <MergedCsvTable
+          language={language}
+          rows={rows}
+          sourceFiles={sourceFiles}
+          availableImages={availableImages}
+          loading={loading}
+          error={error}
+          isEditing={isEditing}
           onUpdateRow={handleUpdateRow}
           onDeleteRow={handleDeleteRow}
           onAddRow={handleAddRow}
