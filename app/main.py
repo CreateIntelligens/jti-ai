@@ -63,13 +63,23 @@ def _configure_warning_filters() -> None:
 
 
 class _AccessLogNoiseFilter(logging.Filter):
-    """Drop noisy access log entries: /health checks and TTS polling 202s."""
+    """Drop noisy access log entries from polling endpoints and health checks."""
+
+    # Successful GETs the frontend polls frequently — they spam the log without
+    # any operational signal. Only filter the 200 case so real failures still surface.
+    _QUIET_GET_PATHS = (
+        "/api/hciot/topics",
+        "/api/stores",
+        "/api/keys/count",
+    )
 
     def filter(self, record: logging.LogRecord) -> bool:
         msg = record.getMessage()
         if "/health" in msg:
             return False
         if "/tts/tts_" in msg and " 202" in msg:
+            return False
+        if " 200" in msg and any(f"GET {p} " in msg for p in self._QUIET_GET_PATHS):
             return False
         return True
 

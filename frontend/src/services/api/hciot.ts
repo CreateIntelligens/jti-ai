@@ -459,14 +459,3 @@ export async function getHciotTopicMergedCsv(topicId: string, language: string =
   });
 }
 
-export interface HciotRagReindexResponse {
-  started: boolean;
-  languages: string[];
-}
-
-export async function reindexHciotRag(force: boolean = true): Promise<HciotRagReindexResponse> {
-  return fetchAdminJson<HciotRagReindexResponse>(
-    '/knowledge/reindex',
-    jsonRequest('POST', { force }),
-  );
-}

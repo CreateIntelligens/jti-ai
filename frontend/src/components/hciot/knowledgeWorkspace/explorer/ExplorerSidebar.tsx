@@ -1,4 +1,4 @@
-import { useState, type CSSProperties } from 'react';
+import { type CSSProperties } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -6,8 +6,6 @@ import {
   Folder,
   FolderOpen,
   Plus,
-  RefreshCw,
-  Loader2,
   Search,
   Trash2,
   Image as ImageIcon,
@@ -37,7 +35,6 @@ interface ExplorerSidebarProps {
   onSelectMergedCsv: (topicId: string) => void;
   onOpenUploadDialog: () => void;
   onDeleteTopic?: (topicId: string, topicLabel: string) => void;
-  onReindexRag?: () => Promise<void> | void;
 }
 
 function getDeletableTopicId(node: ExplorerNode): string | null {
@@ -76,16 +73,6 @@ function renderNodeIcon(node: ExplorerNode, isExpanded: boolean) {
   return <FileText size={15} />;
 }
 
-function getErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  if (typeof error === 'string') {
-    return error;
-  }
-  return '重新索引失敗';
-}
-
 export default function ExplorerSidebar({
   sidebarCollapsed,
   loadingWorkspace,
@@ -105,32 +92,7 @@ export default function ExplorerSidebar({
   onSelectMergedCsv,
   onOpenUploadDialog,
   onDeleteTopic,
-  onReindexRag,
 }: ExplorerSidebarProps) {
-  const [reindexing, setReindexing] = useState(false);
-
-  const handleReindexRag = async () => {
-    if (!onReindexRag || reindexing) {
-      return;
-    }
-
-    const confirmed = window.confirm(
-      '重新索引知識庫？\n\n知識庫內容更新期間，HCIoT 回答服務會暫停約 1 分鐘。請避開使用尖峰時段再執行。',
-    );
-    if (!confirmed) {
-      return;
-    }
-
-    setReindexing(true);
-    try {
-      await onReindexRag();
-    } catch (error) {
-      alert(getErrorMessage(error));
-    } finally {
-      setReindexing(false);
-    }
-  };
-
   return (
     <aside
       className={`hciot-explorer${sidebarCollapsed ? ' is-collapsed' : ''}`}
@@ -159,22 +121,6 @@ export default function ExplorerSidebar({
             <Plus size={16} />
           </button>
 
-          {onReindexRag && (
-            <button
-              type="button"
-              className="hciot-explorer-icon-button reindex"
-              onClick={() => void handleReindexRag()}
-              title="重新索引知識庫，期間服務約暫停 1 分鐘"
-              aria-label="重新索引 RAG"
-              disabled={reindexing}
-            >
-              {reindexing ? (
-                <Loader2 size={16} style={{ animation: 'spin 1s linear infinite' }} />
-              ) : (
-                <RefreshCw size={16} />
-              )}
-            </button>
-          )}
         </div>
       </div>
 
