@@ -38,6 +38,24 @@ export async function fetchFiles(storeName: string): Promise<FileItem[]> {
   return handleResponse<FileItem[]>(response);
 }
 
+export async function uploadStoreFile(storeName: string, file: File): Promise<FileItem> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const response = await fetchWithUserGeminiKey(`${API_BASE}/stores/${storeName}/files`, {
+    method: 'POST',
+    body: formData,
+  });
+  return handleResponse<FileItem>(response);
+}
+
+export async function deleteStoreFile(storeName: string, fileName: string): Promise<void> {
+  const response = await fetchWithUserGeminiKey(
+    `${API_BASE}/stores/${storeName}/files/${encodeURIComponent(fileName)}`,
+    { method: 'DELETE' },
+  );
+  await handleResponse<void>(response);
+}
+
 // ========== Knowledge Management ==========
 
 function knowledgeParams(appTarget: AppTarget, language: string): URLSearchParams {

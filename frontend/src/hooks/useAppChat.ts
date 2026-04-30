@@ -335,12 +335,12 @@ export function useAppChat() {
       alert('請先選擇知識庫');
       return;
     }
-    if (!managedContext) {
-      alert('此知識庫不支援直接上傳，請透過知識庫管理功能操作');
-      return;
-    }
     try {
-      await api.uploadManagedKnowledgeFile(managedContext.appTarget, managedContext.language, file);
+      if (managedContext) {
+        await api.uploadManagedKnowledgeFile(managedContext.appTarget, managedContext.language, file);
+      } else if (currentStore) {
+        await api.uploadStoreFile(currentStore, file);
+      }
       await refreshFiles(currentTarget);
       showStatus('文件上傳成功');
     } catch (e) {
@@ -350,12 +350,12 @@ export function useAppChat() {
 
   const handleDeleteFile = async (fileName: string) => {
     if (!currentTarget || !confirm('確定刪除此文件？')) return;
-    if (!managedContext) {
-      alert('此知識庫不支援直接刪除，請透過知識庫管理功能操作');
-      return;
-    }
     try {
-      await api.deleteManagedKnowledgeFile(managedContext.appTarget, fileName, managedContext.language);
+      if (managedContext) {
+        await api.deleteManagedKnowledgeFile(managedContext.appTarget, fileName, managedContext.language);
+      } else if (currentStore) {
+        await api.deleteStoreFile(currentStore, fileName);
+      }
       await refreshFiles(currentTarget);
       showStatus('文件已刪除');
     } catch (e) {

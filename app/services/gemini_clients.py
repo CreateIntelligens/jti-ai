@@ -7,6 +7,7 @@ Gemini Multi-Key Registry
     from app.services.gemini_clients import get_default_client
 """
 
+import hashlib
 import logging
 import os
 
@@ -22,6 +23,10 @@ _clients: list[genai.Client] = []
 
 # key index → 顯示名稱
 _key_names: list[str] = []
+
+# Browser-supplied user keys are never persisted. Cache clients by hash only.
+_user_key_clients: dict[str, genai.Client] = {}
+
 
 def _parse_key_token(token: str, index: int) -> tuple[str, str]:
     """解析 'name:key' 或 'key' 格式，回傳 (name, api_key)。"""
@@ -77,6 +82,19 @@ def get_client_by_index(key_index: int) -> genai.Client:
     if 0 <= key_index < len(_clients):
         return _clients[key_index]
     return get_default_client()
+
+
+def get_client_for_api_key(api_key: str) -> genai.Client:
+    """Return a Gemini client for a browser-supplied API key without storing the raw key."""
+    normalized = (api_key or "").strip()
+    if not normalized:
+        return get_default_client()
+    key_hash = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+    client = _user_key_clients.get(key_hash)
+    if client is None:
+        client = genai.Client(api_key=normalized)
+        _user_key_clients[key_hash] = client
+    return client
 
 
 def get_key_count() -> int:

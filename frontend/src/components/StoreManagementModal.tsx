@@ -13,6 +13,14 @@ interface StoreManagementModalProps {
   onRefresh: () => void;
 }
 
+function storeMeta(store: Store): string {
+  if (store.managed_app) {
+    const language = store.managed_language === 'en' ? 'English' : '中文';
+    return `固定 · ${store.managed_app.toUpperCase()} / ${language}`;
+  }
+  return `一般 · ${store.file_count ?? 0} 個檔案`;
+}
+
 export default function StoreManagementModal({
   isOpen,
   onClose,
@@ -49,11 +57,13 @@ export default function StoreManagementModal({
     }
   };
 
-  const handleDelete = async (storeName: string) => {
-    if (!confirm(`確定要刪除知識庫「${storeName}」嗎？此操作無法復原。`)) {
+  const handleDelete = async (store: Store) => {
+    if (store.managed_app) return;
+    const label = store.display_name || store.name;
+    if (!confirm(`確定要刪除知識庫「${label}」嗎？此操作無法復原。`)) {
       return;
     }
-    await onDeleteStore(storeName);
+    await onDeleteStore(store.name);
   };
 
   return (
@@ -80,7 +90,7 @@ export default function StoreManagementModal({
                   value={selectedKeyIndex}
                   onChange={e => setSelectedKeyIndex(Number(e.target.value))}
                   style={{ minWidth: '120px' }}
-                  title="選擇使用哪個專案 key 建立"
+                  title="選擇這個知識庫使用哪把 Gemini key"
                 >
                   {keyNames.map((name, i) => (
                     <option key={i} value={i}>{name}</option>
@@ -112,19 +122,22 @@ export default function StoreManagementModal({
                           ◆ 使用中
                         </span>
                       )}
-                      {keyNames.length > 1 && typeof store.key_index === 'number' && (
-                        <span style={{ marginLeft: '0.5rem', color: '#8090b0', fontSize: '0.8em' }}>
-                          {keyNames[store.key_index] ?? `Key #${store.key_index + 1}`}
-                        </span>
-                      )}
+                      <span style={{ display: 'block', color: '#8090b0', fontSize: '0.8em', marginTop: '0.25rem' }}>
+                        {storeMeta(store)}
+                        {!store.managed_app && keyNames.length > 1 && typeof store.key_index === 'number' && (
+                          <> · {keyNames[store.key_index] ?? `Key #${store.key_index + 1}`}</>
+                        )}
+                      </span>
                     </span>
-                    <button
-                      onClick={() => handleDelete(store.name)}
-                      className="danger small"
-                      disabled={store.name === currentStore}
-                    >
-                      ✕ 刪除
-                    </button>
+                    {!store.managed_app && (
+                      <button
+                        onClick={() => handleDelete(store)}
+                        className="danger small"
+                        disabled={store.name === currentStore}
+                      >
+                        ✕ 刪除
+                      </button>
+                    )}
                   </li>
                 ))}
               </ul>
@@ -133,6 +146,9 @@ export default function StoreManagementModal({
         </div>
 
         <div className="modal-actions">
+          <button onClick={onRefresh} className="secondary">
+            重新整理
+          </button>
           <button onClick={onClose} className="secondary">
             關閉
           </button>

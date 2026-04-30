@@ -9,12 +9,16 @@ import uuid
 from datetime import datetime
 from typing import Any, Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException, Request
 from google.genai import types
 from pydantic import BaseModel
 
-from app.auth import verify_auth
-from app.routers.general.stores import resolve_key_index_for_store, resolve_managed_store
+from app.auth import extract_user_gemini_api_key, verify_auth
+from app.routers.general.stores import (
+    hash_user_gemini_api_key,
+    resolve_key_index_for_store,
+    resolve_store_config,
+)
 from app.schemas.chat import (
     DeleteConversationRequest,
     DeleteConversationResponse,
@@ -24,7 +28,7 @@ from app.schemas.chat import (
 )
 from app.services import gemini_service
 from app.services.agent_utils import strip_citations
-from app.services.gemini_clients import get_client_by_index
+from app.services.gemini_clients import get_client_by_index, get_client_for_api_key
 from app.utils import group_conversations_by_session, group_conversations_as_summary
 import app.deps as deps
 
@@ -127,9 +131,13 @@ def _truncate_session(session: dict[str, Any], keep_turns: int) -> None:
     session["chat_history"] = session.get("chat_history", [])[: keep_turns * 2]
 
 
-def _resolve_request_store(req: ChatStartRequest, auth: dict) -> str:
+def _resolve_request_store(
+    req: ChatStartRequest,
+    auth: dict,
+    owner_key_hash: str | None = None,
+) -> str:
     requested = auth.get("store_name") if auth.get("role") == "user" else req.store_name
-    config = resolve_managed_store(requested)
+    config = resolve_store_config(requested, owner_key_hash)
     if config is None:
         raise HTTPException(status_code=404, detail="Knowledge store not found")
     return config.name
@@ -175,27 +183,47 @@ def _extract_response_text(response: Any) -> str:
     return "\n".join(parts)
 
 
-def _generate_rag_answer(*, message: str, session: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
-    config = resolve_managed_store(session.get("store_name"))
+def _generate_rag_answer(
+    *,
+    message: str,
+    session: dict[str, Any],
+    user_gemini_api_key: str | None = None,
+) -> tuple[str, list[dict[str, Any]]]:
+    config = resolve_store_config(
+        session.get("store_name"),
+        hash_user_gemini_api_key(user_gemini_api_key),
+    )
     if config is None:
         raise HTTPException(status_code=404, detail="Knowledge store not found")
-    if not gemini_service.client:
+    if not user_gemini_api_key and not gemini_service.client:
         raise HTTPException(status_code=500, detail="Gemini API key not configured")
 
-    client = get_client_by_index(resolve_key_index_for_store(config.name))
+    client = (
+        get_client_for_api_key(user_gemini_api_key)
+        if user_gemini_api_key
+        else get_client_by_index(resolve_key_index_for_store(config.name))
+    )
 
     from app.services.rag.service import get_rag_pipeline
+
+    if config.managed_app:
+        rag_language = config.managed_language
+        rag_source_type = f"{config.managed_app}_knowledge"
+        response_language = "English" if config.managed_language == "en" else "繁體中文"
+    else:
+        rag_language = config.name
+        rag_source_type = "general_knowledge"
+        response_language = "繁體中文"
 
     pipeline = get_rag_pipeline()
     kb_text, citations = pipeline.retrieve(
         message,
-        language=config.managed_language,
-        source_type=f"{config.managed_app}_knowledge",
+        language=rag_language,
+        source_type=rag_source_type,
         top_k=5,
     )
 
     history_text = _format_history(session.get("chat_history", []))
-    response_language = "English" if config.managed_language == "en" else "繁體中文"
     sections = [
         f"請使用{response_language}回答。",
     ]
@@ -224,13 +252,18 @@ def _generate_rag_answer(*, message: str, session: dict[str, Any]) -> tuple[str,
 
 
 @router.post("/start")
-def start_chat(req: ChatStartRequest, auth: dict = Depends(verify_auth)):
+def start_chat(req: ChatStartRequest, request: Request, auth: dict = Depends(verify_auth)):
     """Start a generic homepage chat session backed by local RAG."""
     if req.previous_session_id:
         _delete_session(req.previous_session_id)
         logging.info("Cleaned up previous general session: %s...", req.previous_session_id[:8])
 
-    store_name = _resolve_request_store(req, auth)
+    user_gemini_api_key = extract_user_gemini_api_key(request)
+    store_name = _resolve_request_store(
+        req,
+        auth,
+        hash_user_gemini_api_key(user_gemini_api_key),
+    )
     session_id = _new_session_id(store_name)
     system_instruction = _get_system_instruction(store_name, auth)
     _create_session(
@@ -248,15 +281,17 @@ def start_chat(req: ChatStartRequest, auth: dict = Depends(verify_auth)):
 
 
 @router.post("/message")
-def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
+def send_message(req: ChatMessageRequest, request: Request, auth: dict = Depends(verify_auth)):
     """Send a message to a generic homepage chat session."""
+    user_gemini_api_key = extract_user_gemini_api_key(request)
+    owner_key_hash = hash_user_gemini_api_key(user_gemini_api_key)
     session: dict[str, Any] | None = None
     if req.session_id:
         session = _get_session(req.session_id)
 
     if session is None:
         start_req = ChatStartRequest(store_name=auth.get("store_name"))
-        store_name = _resolve_request_store(start_req, auth)
+        store_name = _resolve_request_store(start_req, auth, owner_key_hash)
         session = _create_session(
             session_id=_new_session_id(store_name),
             store_name=store_name,
@@ -272,7 +307,11 @@ def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
         except Exception:
             logging.exception("Failed to truncate general conversation logs")
 
-    answer, citations = _generate_rag_answer(message=req.message, session=session)
+    answer, citations = _generate_rag_answer(
+        message=req.message,
+        session=session,
+        user_gemini_api_key=user_gemini_api_key,
+    )
     _add_session_message(session, "user", req.message)
     _add_session_message(session, "model", answer, citations)
 
