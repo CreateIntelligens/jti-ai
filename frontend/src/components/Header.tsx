@@ -61,7 +61,7 @@ export default function Header({
         >
           {sidebarOpen ? '◧' : '◨'}
         </button>
-        <h1>File Search Gemini</h1>
+        <h1>AI360 Knowledge Base</h1>
         {status && <div className="status" role="status" aria-live="polite">{status}</div>}
       </div>
       <div className="header-actions">
