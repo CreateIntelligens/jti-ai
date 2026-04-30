@@ -321,6 +321,32 @@
   color: var(--text-primary) !important;
 }
 
+[data-theme="light"] .app-select-trigger.store-key-select,
+[data-theme="light"] .store-key-static {
+  background: rgba(255, 255, 255, 0.94);
+  border-color: rgba(15, 118, 110, 0.18);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .store-key-select-content {
+  background: rgba(255, 255, 255, 0.98);
+  border-color: rgba(15, 118, 110, 0.18);
+  box-shadow: 0 0.75rem 1.75rem rgba(15, 23, 42, 0.14);
+}
+
+[data-theme="light"] .store-key-select-content .app-select-item {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .store-key-select-content .app-select-item:hover,
+[data-theme="light"] .store-key-select-content .app-select-item[data-highlighted] {
+  background: rgba(15, 118, 110, 0.08);
+}
+
+[data-theme="light"] .store-key-select-content .app-select-item[data-state="checked"] {
+  color: var(--crystal-teal);
+}
+
 /* ==================== PROMPT MODAL TABS (LIGHT) ==================== */
 [data-theme="light"] .prompt-modal-tabs {
   background: rgba(15, 118, 110, 0.05);

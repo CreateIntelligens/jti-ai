@@ -56,7 +56,8 @@ function hasProjectKeyIndex(store: Store): store is Store & { key_index: number 
 }
 
 export function getProjectFilterOptions(keyNames: string[], storeList: Store[]): Array<{ value: string; label: string }> {
-  if (keyNames.length <= 1 || !storeList.some(hasProjectKeyIndex)) return [];
+  void storeList;
+  if (keyNames.length <= 1) return [];
   return [
     { value: 'all', label: '全部專案' },
     ...keyNames.map((name, i) => ({
@@ -67,7 +68,6 @@ export function getProjectFilterOptions(keyNames: string[], storeList: Store[]):
 }
 
 export function filterStoresByProject(storeList: Store[], projectFilter: string): Store[] {
-  if (!storeList.some(hasProjectKeyIndex)) return storeList;
   if (projectFilter === 'all') return storeList;
   const [, keyIndexText] = projectFilter.split(':');
   const keyIndex = Number(keyIndexText);

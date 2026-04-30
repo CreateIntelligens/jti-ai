@@ -67,7 +67,6 @@ export default function App() {
     <>
       <div className="app-container">
         <Header
-          status={status}
           onToggleSidebar={toggleSidebar}
           sidebarOpen={sidebarOpen}
           onOpenStoreManagement={() => setStoreModalOpen(true)}
@@ -149,6 +148,11 @@ export default function App() {
           // General 模式目前不處理語言切換（沒有多語言支援）
         }}
       />
+      {status && (
+        <div className="status-toast" role="status" aria-live="polite">
+          {status}
+        </div>
+      )}
     </>
   );
 }

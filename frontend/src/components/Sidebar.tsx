@@ -5,6 +5,8 @@ import type { FileItem, KnowledgeTarget, AppTarget, KnowledgeLanguage } from '..
 import AppSelect from './AppSelect';
 import * as api from '../services/api';
 
+const PROJECT_SELECT_FALLBACK_OPTIONS = [{ value: 'all', label: '全部專案' }];
+
 interface SidebarProps {
   isOpen: boolean;
   projectFilter: string;
@@ -55,6 +57,11 @@ export default function Sidebar({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const fileViewRequestIdRef = useRef(0);
   const currentTargetIdRef = useRef<string | null>(currentTargetId);
+  const hasProjectFilterOptions = projectFilterOptions.length > 0;
+  const projectSelectOptions = hasProjectFilterOptions
+    ? projectFilterOptions
+    : PROJECT_SELECT_FALLBACK_OPTIONS;
+  const projectSelectValue = hasProjectFilterOptions ? projectFilter : 'all';
 
   useEffect(() => {
     currentTargetIdRef.current = currentTargetId;
@@ -177,9 +184,9 @@ export default function Sidebar({
           <div className="bento-select-wrapper" title="專案">
             <FolderKanban className="bento-icon" size={16} />
             <AppSelect
-              value={projectFilter}
+              value={projectSelectValue}
               onChange={onProjectFilterChange}
-              options={projectFilterOptions}
+              options={projectSelectOptions}
               className="w-full bento-minimal-select"
             />
           </div>

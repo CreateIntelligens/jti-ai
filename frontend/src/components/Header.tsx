@@ -1,10 +1,19 @@
 import { useState } from 'react';
-import { RefreshCw, History, KeyRound, Database, Sun, Moon, Loader2 } from 'lucide-react';
+import {
+  Database,
+  History,
+  KeyRound,
+  Loader2,
+  Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
+  RefreshCw,
+  Sun,
+} from 'lucide-react';
 
 import reindexRag from '../services/api/general';
 
 interface HeaderProps {
-  status: string;
   onToggleSidebar: () => void;
   sidebarOpen: boolean;
   onOpenStoreManagement: () => void;
@@ -19,7 +28,6 @@ interface HeaderProps {
 }
 
 export default function Header({
-  status,
   onToggleSidebar,
   sidebarOpen,
   onOpenStoreManagement,
@@ -36,7 +44,7 @@ export default function Header({
 
   const handleReindexRag = async () => {
     if (isReindexing) return;
-    const confirmed = window.confirm('重新索引所有 RAG 資料？這會重算所有檔案的 embedding，約需 30 秒。');
+    const confirmed = window.confirm('重建知識庫索引會重新整理 embedding，期間服務可能暫停約 1 分鐘。是否繼續？');
     if (!confirmed) return;
 
     setIsReindexing(true);
@@ -59,10 +67,9 @@ export default function Header({
           aria-label={sidebarOpen ? '關閉側邊欄' : '開啟側邊欄'}
           aria-expanded={sidebarOpen}
         >
-          {sidebarOpen ? '◧' : '◨'}
+          {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
         </button>
         <h1>AI360 Knowledge Base</h1>
-        {status && <div className="status" role="status" aria-live="polite">{status}</div>}
       </div>
       <div className="header-actions">
         <button
@@ -83,7 +90,8 @@ export default function Header({
           disabled={!canRestartChat}
           title={canRestartChat ? '重新開始對話' : '目前沒有可重新開始的知識庫'}
         >
-          <RefreshCw size={14} /> 重新開始
+          <RefreshCw size={14} />
+          <span className="header-link-label">重新開始</span>
         </button>
         <button
           onClick={onOpenConversationHistory}
@@ -92,7 +100,8 @@ export default function Header({
           disabled={!canOpenConversationHistory}
           title={canOpenConversationHistory ? '查看對話歷史' : '目前沒有可查看歷史的知識庫'}
         >
-          <History size={14} /> 對話歷史
+          <History size={14} />
+          <span className="header-link-label">歷史</span>
         </button>
         <button
           onClick={onOpenUserApiKeySettings}
@@ -100,39 +109,41 @@ export default function Header({
           aria-label="設定你的 API Key"
           title={`目前使用中的 Gemini Key：${activeGeminiKeyName}`}
         >
-          <KeyRound size={14} /> API Key：{activeGeminiKeyName}
+          <KeyRound size={14} />
+          <span className="header-link-label">Key：{activeGeminiKeyName}</span>
         </button>
         <button
           onClick={handleReindexRag}
-          className='header-link secondary'
-          aria-label='重新索引 RAG'
-          title='重新索引 RAG'
+          className="header-link secondary"
+          aria-label="重建索引"
+          title="重建知識庫索引"
           disabled={isReindexing}
           aria-busy={isReindexing}
         >
           {isReindexing ? (
-            <Loader2 size={14} aria-hidden='true'>
+            <Loader2 size={14} aria-hidden="true">
               <animateTransform
-                attributeName='transform'
-                attributeType='XML'
-                type='rotate'
-                from='0 12 12'
-                to='360 12 12'
-                dur='1s'
-                repeatCount='indefinite'
+                attributeName="transform"
+                attributeType="XML"
+                type="rotate"
+                from="0 12 12"
+                to="360 12 12"
+                dur="1s"
+                repeatCount="indefinite"
               />
             </Loader2>
           ) : (
-            <RefreshCw size={14} aria-hidden='true' />
+            <RefreshCw size={14} aria-hidden="true" />
           )}
-          重新索引 RAG
+          <span className="header-link-label">重建索引</span>
         </button>
         <button
           onClick={onOpenStoreManagement}
           className="header-link secondary"
           aria-label="開啟知識庫管理"
         >
-          <Database size={14} /> 知識庫管理
+          <Database size={14} />
+          <span className="header-link-label">知識庫</span>
         </button>
       </div>
     </header>

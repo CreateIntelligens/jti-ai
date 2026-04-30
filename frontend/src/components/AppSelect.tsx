@@ -11,6 +11,7 @@ interface AppSelectProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  title?: string;
   className?: string;
   contentClassName?: string;
   disabled?: boolean;
@@ -27,6 +28,7 @@ export default function AppSelect({
   value,
   onChange,
   placeholder = '—',
+  title,
   className = '',
   contentClassName = '',
   disabled = false,
@@ -37,7 +39,7 @@ export default function AppSelect({
       onValueChange={(v) => onChange(fromRadix(v))}
       disabled={disabled}
     >
-      <RadixSelect.Trigger className={`app-select-trigger ${className}`}>
+      <RadixSelect.Trigger className={`app-select-trigger ${className}`} title={title}>
         <RadixSelect.Value placeholder={placeholder} />
         <RadixSelect.Icon className="app-select-icon">
           <ChevronDown size={14} />

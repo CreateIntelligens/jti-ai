@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { Pencil, RotateCcw, SendHorizontal } from 'lucide-react';
 import type { Message } from '../types';
 import CitationsList from './CitationsList';
 
@@ -94,8 +95,8 @@ export default function ChatArea({
       <div className="chat-history custom-scrollbar" role="log" aria-live="polite" aria-label="對話歷史">
         {messages.length === 0 ? (
           <div className="empty-state">
-            <h3>✧ 開始對話 ✧</h3>
-            <p>選擇一個知識庫並提出問題</p>
+            <h3>開始對話</h3>
+            <p>選擇知識庫後輸入問題</p>
           </div>
         ) : (
           messages.map((msg, idx) => (
@@ -150,7 +151,7 @@ export default function ChatArea({
                             title="編輯並重送"
                             aria-label="編輯訊息"
                           >
-                            &#9998;
+                            <Pencil size={14} />
                           </button>
                         )}
                         {msg.role === 'model' && onRegenerate && (
@@ -160,7 +161,7 @@ export default function ChatArea({
                             title="重新生成"
                             aria-label="重新生成回覆"
                           >
-                            &#8635;
+                            <RotateCcw size={14} />
                           </button>
                         )}
                       </div>
@@ -183,7 +184,7 @@ export default function ChatArea({
           value={input}
           onChange={e => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={disabled ? '請先選擇知識庫...' : '輸入訊息... (Enter 傳送, Shift+Enter 換行)'}
+          placeholder={disabled ? '請先選擇知識庫' : '輸入訊息...'}
           disabled={disabled}
           aria-label="訊息輸入框"
         />
@@ -192,7 +193,8 @@ export default function ChatArea({
           disabled={disabled || !input.trim()}
           aria-label="傳送訊息"
         >
-          ⬡ 傳送
+          <SendHorizontal size={16} />
+          <span>傳送</span>
         </button>
       </form>
     </main>

@@ -254,7 +254,7 @@ def _managed_store_payload(config: ManagedStoreConfig) -> dict[str, Any]:
         "created_at": None,
         "managed_app": config.managed_app,
         "managed_language": config.managed_language,
-        "key_index": None,
+        "key_index": resolve_key_index_for_store(config.name),
     }
 
 

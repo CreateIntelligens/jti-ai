@@ -119,6 +119,10 @@
   box-shadow: 0 0.5rem 1.5rem rgba(255, 107, 157, 0.4), 0 0 1.875rem rgba(255, 107, 157, 0.2);
 }
 
+.input-area button {
+  padding: 0 1.25rem;
+}
+
 .app-content button.small,
 .modal button.small,
 .overlay button.small {
@@ -297,6 +301,89 @@
   font-weight: 500;
   box-shadow: none !important;
   color: #e0e6ff;
+}
+
+.app-select-trigger.store-key-select {
+  height: var(--store-create-control-height);
+  min-width: 0;
+  width: 100%;
+  min-height: var(--store-create-control-height);
+  padding: 0 1rem !important;
+  background: rgba(15, 20, 35, 0.82);
+  border-color: rgba(61, 217, 211, 0.32);
+  border-radius: 0.75rem;
+  color: #e0e6ff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.store-create-row {
+  --store-create-control-height: 3.125rem;
+
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(7.5rem, 9rem) auto;
+  align-items: center;
+  gap: 1rem;
+}
+
+.store-create-row input {
+  height: var(--store-create-control-height);
+  min-width: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: var(--store-create-control-height);
+}
+
+.store-create-row button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: var(--store-create-control-height);
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.store-key-static {
+  display: inline-flex;
+  align-items: center;
+  height: var(--store-create-control-height);
+  min-width: 0;
+  width: 100%;
+  padding: 0 1rem;
+  border: 1px solid rgba(61, 217, 211, 0.32);
+  border-radius: 0.75rem;
+  background: rgba(15, 20, 35, 0.72);
+  color: #e0e6ff;
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.store-key-select-content {
+  background: rgba(15, 20, 35, 0.98);
+  border-color: rgba(61, 217, 211, 0.35);
+}
+
+.store-key-select-content .app-select-item {
+  color: #e0e6ff;
+}
+
+.store-key-select-content .app-select-item:hover,
+.store-key-select-content .app-select-item[data-highlighted] {
+  background: rgba(61, 217, 211, 0.12);
+}
+
+.store-key-select-content .app-select-item[data-state="checked"] {
+  color: var(--crystal-cyan);
+}
+
+@media (max-width: 42rem) {
+  .store-create-row {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* ==========================================================================

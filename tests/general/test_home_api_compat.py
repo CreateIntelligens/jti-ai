@@ -96,9 +96,17 @@ class FakeKnowledgeStore:
 
 
 def test_home_can_load_knowledge_store_list():
+    from app.routers.general import stores as store_routes
+
+    key_indexes = {"JTI": 2, "HCIOT": 3}
+    original_resolver = store_routes.gemini_clients.resolve_key_index_by_keyword
+    store_routes.gemini_clients.resolve_key_index_by_keyword = lambda keyword: key_indexes[keyword]
     client = TestClient(app)
 
-    response = client.get("/api/stores", headers={"Origin": "http://testserver"})
+    try:
+        response = client.get("/api/stores", headers={"Origin": "http://testserver"})
+    finally:
+        store_routes.gemini_clients.resolve_key_index_by_keyword = original_resolver
 
     assert response.status_code == 200
     stores = response.json()
@@ -111,7 +119,7 @@ def test_home_can_load_knowledge_store_list():
     assert stores[0]["managed_app"] == "jti"
     assert stores[0]["managed_language"] == "zh"
     assert all("file_count" in store for store in stores)
-    assert all(store["key_index"] is None for store in stores)
+    assert [store["key_index"] for store in stores] == [2, 2, 3, 3]
 
 
 def test_home_can_load_key_count_without_matching_key_id_route(monkeypatch):
