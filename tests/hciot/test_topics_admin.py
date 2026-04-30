@@ -10,6 +10,7 @@ from app.routers.hciot import topics_admin
 class FakeStore:
     def __init__(self):
         self.topics: dict[str, dict] = {}
+        self.categories: list[dict] = []
 
     def get_topic(self, topic_id: str):
         topic = self.topics.get(topic_id)
@@ -23,6 +24,9 @@ class FakeStore:
             return False
         self.topics[topic_id].update(data)
         return True
+
+    def list_categories(self):
+        return self.categories
 
 
 def test_create_topic_preserves_blank_label_fields_without_auto_translation():
@@ -60,3 +64,36 @@ def test_update_topic_preserves_blank_label_fields_without_auto_translation():
 
     assert result["labels"] == {"zh": "PRP", "en": ""}
     assert result["category_labels"] == {"zh": "骨科", "en": ""}
+
+
+def test_public_topics_places_common_questions_first():
+    store = FakeStore()
+    store.categories = [
+        {
+            "id": "ortho",
+            "labels": {"zh": "骨科", "en": "Orthopedics"},
+            "topics": [
+                {
+                    "id": "ortho/prp",
+                    "labels": {"zh": "PRP 治療", "en": "PRP Therapy"},
+                    "questions": {"zh": [], "en": []},
+                },
+                {
+                    "id": "ortho/faq",
+                    "labels": {"zh": "常見問題", "en": "FAQ"},
+                    "questions": {"zh": [], "en": []},
+                },
+            ],
+        },
+        {
+            "id": "faq",
+            "labels": {"zh": "常見問題", "en": "FAQ"},
+            "topics": [],
+        },
+    ]
+
+    with patch.object(topics_admin, "get_hciot_topic_store", return_value=store):
+        result = topics_admin.list_topics()
+
+    assert [category["id"] for category in result["categories"]] == ["faq", "ortho"]
+    assert [topic["id"] for topic in result["categories"][1]["topics"]] == ["ortho/faq", "ortho/prp"]

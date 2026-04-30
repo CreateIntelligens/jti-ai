@@ -11,8 +11,30 @@ from app.services.hciot.topic_store import get_hciot_topic_store
 router = APIRouter(tags=["HCIoT Topics"], dependencies=[Depends(verify_admin)])
 
 _STRIP_FIELDS = {"_id", "created_at", "updated_at"}
+_FIRST_TOPIC_LABELS = {
+    "常見問題",
+    "faq",
+    "common questions",
+    "frequently asked questions",
+}
 
 public_router = APIRouter(tags=["HCIoT Topics"])
+
+
+def _is_first_topic_label(labels: dict | None) -> bool:
+    if not isinstance(labels, dict):
+        return False
+    return any(
+        str(label).strip().casefold() in _FIRST_TOPIC_LABELS
+        for label in labels.values()
+    )
+
+
+def _with_common_questions_first(items: list[dict]) -> list[dict]:
+    return sorted(
+        items,
+        key=lambda item: 0 if _is_first_topic_label(item.get("labels")) else 1,
+    )
 
 
 @public_router.get("/topics")
@@ -24,7 +46,8 @@ def list_topics():
             {k: v for k, v in t.items() if k not in _STRIP_FIELDS}
             for t in cat.get("topics", [])
         ]
-    return {"categories": categories}
+        cat["topics"] = _with_common_questions_first(cat["topics"])
+    return {"categories": _with_common_questions_first(categories)}
 
 
 # ========== Request Models ==========

@@ -37,7 +37,25 @@ export function slugify(text: string): string {
 }
 
 export function sortByLabel(left: string, right: string): number {
+  const leftPriority = labelSortPriority(left);
+  const rightPriority = labelSortPriority(right);
+  if (leftPriority !== rightPriority) {
+    return leftPriority - rightPriority;
+  }
+
   return left.localeCompare(right, undefined, { numeric: true, sensitivity: 'base' });
+}
+
+const FIRST_TOPIC_LABELS = new Set([
+  '常見問題',
+  'faq',
+  'common questions',
+  'frequently asked questions',
+]);
+
+function labelSortPriority(label: string): number {
+  const normalized = label.normalize('NFKC').trim().toLowerCase();
+  return FIRST_TOPIC_LABELS.has(normalized) ? 0 : 1;
 }
 
 export function buildLabels(zh: string, en: string): HciotLabels | null {
