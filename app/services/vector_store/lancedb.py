@@ -22,6 +22,11 @@ class LanceDBStore:
             os.makedirs(self.uri, exist_ok=True)
             self._db = lancedb.connect(self.uri)
 
+    # Columns the current code expects to write. New entries here are auto-added
+    # to existing tables on boot, so a code-side schema bump no longer requires
+    # manual add_columns() per environment.
+    _EXPECTED_STRING_COLUMNS = ("image_id", "url")
+
     @property
     def table(self):
         """Lazy-loaded LanceDB table with auto-initialization."""
@@ -31,7 +36,19 @@ class LanceDBStore:
                     self._ensure_db()
                     if self.table_name in self._db.list_tables().tables:
                         self._table = self._db.open_table(self.table_name)
+                        self._migrate_schema(self._table)
         return self._table
+
+    def _migrate_schema(self, table) -> None:
+        existing = {f.name for f in table.schema}
+        missing = [c for c in self._EXPECTED_STRING_COLUMNS if c not in existing]
+        if not missing:
+            return
+        try:
+            table.add_columns({col: "''" for col in missing})
+            logger.info(f"[LanceDB] Migrated schema, added columns: {missing}")
+        except Exception as e:
+            logger.error(f"[LanceDB] Schema migration failed for columns {missing}: {e}")
 
     def search(
         self,
@@ -95,6 +112,18 @@ class LanceDBStore:
             if source_language:
                 where += f" AND source_language = '{source_language}'"
             self.table.delete(where)
+
+    def list_file_ids(self, source_type: str, source_language: str) -> set[str]:
+        """All file_ids currently indexed under (source_type, source_language)."""
+        if self.table is None:
+            return set()
+        try:
+            where = f"source_type = '{source_type}' AND source_language = '{source_language}'"
+            rows = self.table.search().where(where).select(["file_id"]).limit(100000).to_list()
+            return {r["file_id"] for r in rows if r.get("file_id")}
+        except Exception as e:
+            logger.warning(f"LanceDB list_file_ids failed: {e}")
+            return set()
 
     def get_stats(self) -> Dict[str, Any]:
         if self.table:

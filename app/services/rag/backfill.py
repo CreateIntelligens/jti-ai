@@ -163,7 +163,9 @@ class BackfillService:
         yield from self._iter_store_files(store, language, self._fetch_jti_file_data)
 
     def run_backfill(self, source_type: str, language: str, force: bool = False):
-        """Runs incremental backfill for a specific source and language."""
+        """Runs incremental backfill for a specific source and language.
+        When force=True also prunes orphans (file_ids in vector store / mongo
+        backup that no longer have a source file in mongo)."""
         try:
             items = list(self._get_files_and_data(source_type, language))
         except Exception as e:
@@ -183,14 +185,34 @@ class BackfillService:
                 topic_info=BackfillService._extract_topic_info(file_info),
             )
 
+        if force:
+            self._prune_orphans(source_type, language, {f for f, *_ in items})
+
+    def _prune_orphans(self, source_type: str, language: str, live_files: set[str]) -> None:
+        """Remove file_ids from LanceDB / mongodb_backup that aren't in live_files.
+        Only safe to call after a full force-reindex of the same (source, language)."""
+        full_source_type = f"{source_type}_knowledge"
+        indexed = self.lancedb_store.list_file_ids(full_source_type, language)
+        indexed |= self.mongodb_backup.list_file_ids(full_source_type, language)
+        orphans = indexed - live_files
+        if not orphans:
+            return
+        logger.info(f"[Backfill] Pruning {len(orphans)} orphan file_ids in {source_type}/{language}")
+        for orphan in orphans:
+            self.delete_from_rag(source_type, orphan, language=language)
+
     def delete_from_rag(self, source_type: str, filename: str, language: str | None = None):
-        """Removes a file's chunks from the local RAG store."""
+        """Removes a file's chunks from the local RAG store and its mongo mirror."""
         full_source_type = f"{source_type}_knowledge"
         try:
             self.lancedb_store.delete_by_file(filename, full_source_type, source_language=language)
-            logger.info(f"[RAG] Removed {filename} from {full_source_type}")
         except Exception as e:
             logger.error(f"[RAG] Failed to delete {filename} from LanceDB: {e}")
+        try:
+            self.mongodb_backup.delete_by_file(filename, full_source_type)
+        except Exception as e:
+            logger.error(f"[RAG] Failed to delete {filename} from mongodb_backup: {e}")
+        logger.info(f"[RAG] Removed {filename} from {full_source_type}")
 
     def index_single_file(self, source_type: str, language: str, filename: str, data: bytes, metadata: Optional[Dict] = None, force: bool = False, topic_info: Optional[Dict[str, str]] = None):
         """Indexes a single file into the local RAG store. Skips if content is unchanged unless force=True.

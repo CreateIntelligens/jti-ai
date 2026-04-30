@@ -52,6 +52,17 @@ class MongoDBBackup:
         except Exception as e:
             logger.error(f"MongoDB Backup Delete failed: {e}")
 
+    def list_file_ids(self, source_type: str, source_language: str) -> set[str]:
+        """All file_ids currently mirrored under (source_type, source_language)."""
+        try:
+            return set(self.collection.distinct(
+                "file_id",
+                {"source_type": source_type, "source_language": source_language},
+            ))
+        except Exception as e:
+            logger.warning(f"MongoDB Backup list_file_ids failed: {e}")
+            return set()
+
 _mongodb_backup: Optional[MongoDBBackup] = None
 
 def get_mongodb_backup() -> MongoDBBackup:
