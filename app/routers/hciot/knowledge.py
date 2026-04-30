@@ -2,8 +2,10 @@
 HCIoT knowledge management API.
 """
 
+import asyncio
 import logging
 import mimetypes
+import time
 import uuid
 from pathlib import Path
 
@@ -25,6 +27,7 @@ from app.routers.knowledge_utils import (
 from app.services.hciot.csv_utils import extract_questions_from_csv, merge_csv_files, normalize_qa_csv_rows, split_qa_csv_by_image
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.hciot.topic_store import get_hciot_topic_store
+from app.services.rag.backfill import get_backfill_service
 from app.utils import get_other_language
 
 logger = logging.getLogger(__name__)
@@ -32,6 +35,45 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["HCIoT Knowledge"], dependencies=[Depends(verify_admin)])
 
 SOURCE_TYPE = "hciot"
+RAG_REINDEX_LANGUAGES = ["zh", "en"]
+
+
+class ReindexRequest(BaseModel):
+    force: bool = True
+
+
+def _run_rag_reindex_language(language: str, force: bool) -> str:
+    get_backfill_service().run_backfill(source_type=SOURCE_TYPE, language=language, force=force)
+    return language
+
+
+async def _run_hciot_rag_reindex(force: bool) -> None:
+    loop = asyncio.get_running_loop()
+    started_at = time.time()
+    tasks = [
+        loop.run_in_executor(None, _run_rag_reindex_language, language, force)
+        for language in RAG_REINDEX_LANGUAGES
+    ]
+    results = await asyncio.gather(*tasks, return_exceptions=True)
+
+    completed: list[str] = []
+    failed: list[str] = []
+    for language, result in zip(RAG_REINDEX_LANGUAGES, results):
+        if isinstance(result, Exception):
+            failed.append(language)
+            logger.error("[HCIoT RAG] Re-index failed for %s: %s", language, result)
+            continue
+        completed.append(result)
+        logger.info("[HCIoT RAG] Re-index completed for %s", result)
+
+    elapsed = time.time() - started_at
+    logger.info(
+        "[HCIoT RAG] Re-index finished in %.1fs (force=%s, completed=%s, failed=%s)",
+        elapsed,
+        force,
+        completed,
+        failed,
+    )
 
 
 def _schedule_rag_sync(
@@ -215,6 +257,17 @@ def list_knowledge_files(language: str = "zh"):
         files = store.list_files("zh")
         effective_language = "zh"
     return {"files": files, "language": effective_language}
+
+
+@router.post("/reindex", status_code=202)
+async def reindex_rag(
+    background_tasks: BackgroundTasks,
+    req: ReindexRequest | None = None,
+    force: bool = True,
+):
+    effective_force = req.force if req is not None else force
+    background_tasks.add_task(_run_hciot_rag_reindex, effective_force)
+    return {"started": True, "languages": RAG_REINDEX_LANGUAGES}
 
 
 @router.get("/files/{filename}/content")

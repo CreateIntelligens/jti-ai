@@ -204,7 +204,7 @@ class BackfillService:
                 return
         
         try:
-            text = data.decode("utf-8", errors="ignore").strip()
+            text = data.decode("utf-8-sig", errors="ignore").strip()
             if not text:
                 return
 

@@ -231,6 +231,7 @@ export default function HciotKnowledgeWorkspace({
         }
       });
 
+
     return () => {
       cancelled = true;
     };
@@ -680,6 +681,12 @@ export default function HciotKnowledgeWorkspace({
     }
   };
 
+
+  const handleReindexRag = async () => {
+    await api.reindexHciotRag();
+    showStatus('重新索引已啟動');
+  };
+
   return (
     <section
       className={`hciot-files-workspace${active ? ' is-active' : ''}${sidebarExpanded ? ' is-sidebar-expanded' : ''}`}
@@ -703,6 +710,7 @@ export default function HciotKnowledgeWorkspace({
         onSelectImage={handleSelectImage}
         onSelectMergedCsv={handleSelectMergedCsv}
         onOpenUploadDialog={() => setQaDialogOpen(true)}
+        onReindexRag={handleReindexRag}
         onDeleteTopic={handleDeleteTopic}
       />
 

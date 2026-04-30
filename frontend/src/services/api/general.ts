@@ -277,3 +277,22 @@ export async function deleteConversations(mode: 'jti' | 'hciot' | 'general', ses
   });
   await handleResponse<void>(response);
 }
+
+// ========== RAG Admin ==========
+
+export type RagSourceType = 'hciot' | 'jti' | 'all';
+
+export interface ReindexRagResponse {
+  started: boolean;
+  source_types: string[];
+  languages: string[];
+}
+
+async function reindexRag(sourceType: RagSourceType): Promise<ReindexRagResponse> {
+  const query = new URLSearchParams({ source_type: sourceType });
+  const response = await fetchAsAdmin(API_BASE + '/admin/rag/reindex?' + query.toString(), {
+    method: 'POST',
+  });
+  return handleResponse<ReindexRagResponse>(response);
+}
+export default reindexRag;

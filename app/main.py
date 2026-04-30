@@ -103,6 +103,7 @@ from .routers.jti import chat as jti_chat, quiz as jti_quiz, prompts as jti_prom
 from .routers.general import chat, prompts, api_keys, knowledge_admin
 from .routers.hciot import chat as hciot_chat, prompts as hciot_prompts, knowledge as hciot_knowledge, images as hciot_images
 from .routers.hciot import topics_admin as hciot_topics_admin
+from .routers.admin_rag import router as admin_rag_router
 from .services.mongo_client import get_mongo_client
 import app.deps as deps
 
@@ -381,6 +382,7 @@ def index():
 
 
 # ========== Include Routers ==========
+app.include_router(admin_rag_router)
 app.include_router(jti_chat.runtime_router)
 app.include_router(jti_chat.compat_history_router)
 app.include_router(jti_chat.admin_history_router)
