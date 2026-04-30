@@ -5,7 +5,7 @@ export interface Store {
   created_at?: string;
   managed_app?: AppTarget | null;
   managed_language?: KnowledgeLanguage | null;
-  key_index?: number;
+  key_index?: number | null;
 }
 
 export type AppTarget = 'jti' | 'hciot';

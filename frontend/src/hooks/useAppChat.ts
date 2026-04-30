@@ -51,8 +51,12 @@ function getManagedKnowledgeContext(target: KnowledgeTarget | null): {
   };
 }
 
-function getProjectFilterOptions(keyNames: string[]): Array<{ value: string; label: string }> {
-  if (keyNames.length <= 1) return [];
+function hasProjectKeyIndex(store: Store): store is Store & { key_index: number } {
+  return typeof store.key_index === 'number' && Number.isInteger(store.key_index);
+}
+
+export function getProjectFilterOptions(keyNames: string[], storeList: Store[]): Array<{ value: string; label: string }> {
+  if (keyNames.length <= 1 || !storeList.some(hasProjectKeyIndex)) return [];
   return [
     { value: 'all', label: '全部專案' },
     ...keyNames.map((name, i) => ({
@@ -62,12 +66,13 @@ function getProjectFilterOptions(keyNames: string[]): Array<{ value: string; lab
   ];
 }
 
-function filterStoresByProject(storeList: Store[], projectFilter: string): Store[] {
+export function filterStoresByProject(storeList: Store[], projectFilter: string): Store[] {
+  if (!storeList.some(hasProjectKeyIndex)) return storeList;
   if (projectFilter === 'all') return storeList;
   const [, keyIndexText] = projectFilter.split(':');
   const keyIndex = Number(keyIndexText);
   if (Number.isNaN(keyIndex)) return storeList;
-  return storeList.filter((store) => (store.key_index ?? 0) === keyIndex);
+  return storeList.filter((store) => hasProjectKeyIndex(store) && store.key_index === keyIndex);
 }
 
 async function fetchFilesForTarget(target: KnowledgeTarget): Promise<FileItem[]> {
@@ -109,7 +114,7 @@ export function useAppChat() {
   const currentTargetIdRef = useRef<string | null>(null);
   const filesRequestIdRef = useRef(0);
 
-  const projectFilterOptions = getProjectFilterOptions(keyNames);
+  const projectFilterOptions = getProjectFilterOptions(keyNames, stores);
   const filteredStores = filterStoresByProject(stores, projectFilter);
   const knowledgeTargets = buildKnowledgeTargets(filteredStores);
   const currentTarget = findKnowledgeTarget(currentTargetId, filteredStores);

@@ -17,6 +17,7 @@ _MODULES_TO_RESET = (
     "app.tools.jti.tool_executor",
     "app.routers.jti.chat",
     "app.routers.hciot.chat",
+    "app.routers.general.stores",
     "app.routers.general.chat",
     "app.main",
 )

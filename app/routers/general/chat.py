@@ -2,13 +2,19 @@
 General Chat API Endpoints
 """
 
+import hashlib
 import logging
+import os
+import uuid
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter, HTTPException, Depends
+from google.genai import types
+from pydantic import BaseModel
 
 from app.auth import verify_auth
+from app.routers.general.stores import resolve_key_index_for_store, resolve_managed_store
 from app.schemas.chat import (
     DeleteConversationRequest,
     DeleteConversationResponse,
@@ -16,10 +22,26 @@ from app.schemas.chat import (
     GeneralConversationsBySessionResponse,
     GeneralConversationsResponse,
 )
+from app.services import gemini_service
+from app.services.agent_utils import strip_citations
+from app.services.gemini_clients import get_client_by_index
 from app.utils import group_conversations_by_session, group_conversations_as_summary
 import app.deps as deps
 
 router = APIRouter(prefix="/api/chat", tags=["General Chat"])
+_IN_MEMORY_SESSIONS: dict[str, dict[str, Any]] = {}
+
+
+class ChatStartRequest(BaseModel):
+    store_name: Optional[str] = None
+    model: str = os.getenv("GEMINI_MODEL_NAME", "gemini-3.1-flash-lite-preview")
+    previous_session_id: Optional[str] = None
+
+
+class ChatMessageRequest(BaseModel):
+    message: str
+    session_id: Optional[str] = None
+    turn_number: Optional[int] = None
 
 
 def _get_conversation_logger():
@@ -28,6 +50,249 @@ def _get_conversation_logger():
 
 def _get_general_session_manager():
     return deps.get_general_chat_session_manager()
+
+
+def _new_session_id(store_name: str) -> str:
+    session_key = f"{store_name}:{uuid.uuid4().hex}"
+    return hashlib.sha256(session_key.encode()).hexdigest()
+
+
+def _get_session(session_id: str) -> dict[str, Any] | None:
+    manager = _get_general_session_manager()
+    if manager:
+        return manager.get_session(session_id)
+    return _IN_MEMORY_SESSIONS.get(session_id)
+
+
+def _create_session(
+    *,
+    session_id: str,
+    store_name: str,
+    model: str,
+    system_instruction: str | None,
+) -> dict[str, Any]:
+    manager = _get_general_session_manager()
+    if manager:
+        return manager.create_session(
+            session_id=session_id,
+            store_name=store_name,
+            model=model,
+            system_instruction=system_instruction,
+        )
+
+    session = {
+        "session_id": session_id,
+        "store_name": store_name,
+        "model": model,
+        "system_instruction": system_instruction,
+        "chat_history": [],
+    }
+    _IN_MEMORY_SESSIONS[session_id] = session
+    return session
+
+
+def _delete_session(session_id: str | None) -> None:
+    if not session_id:
+        return
+    manager = _get_general_session_manager()
+    if manager:
+        manager.delete_session(session_id)
+    _IN_MEMORY_SESSIONS.pop(session_id, None)
+
+
+def _add_session_message(
+    session: dict[str, Any],
+    role: str,
+    content: str,
+    citations: Optional[list[dict[str, Any]]] = None,
+) -> None:
+    manager = _get_general_session_manager()
+    session_id = session["session_id"]
+    if manager:
+        manager.add_message(session_id, role, content, citations)
+        return
+
+    entry: dict[str, Any] = {"role": role, "content": content}
+    if citations:
+        entry["citations"] = citations
+    session.setdefault("chat_history", []).append(entry)
+
+
+def _truncate_session(session: dict[str, Any], keep_turns: int) -> None:
+    manager = _get_general_session_manager()
+    session_id = session["session_id"]
+    if manager:
+        manager.truncate_history(session_id, keep_turns)
+        return
+    session["chat_history"] = session.get("chat_history", [])[: keep_turns * 2]
+
+
+def _resolve_request_store(req: ChatStartRequest, auth: dict) -> str:
+    requested = auth.get("store_name") if auth.get("role") == "user" else req.store_name
+    config = resolve_managed_store(requested)
+    if config is None:
+        raise HTTPException(status_code=404, detail="Knowledge store not found")
+    return config.name
+
+
+def _get_system_instruction(store_name: str, auth: dict) -> str | None:
+    if not deps.prompt_manager:
+        return None
+
+    if auth.get("role") == "user" and auth.get("prompt_index") is not None:
+        prompts = deps.prompt_manager.list_prompts(store_name)
+        prompt_index = auth["prompt_index"]
+        if 0 <= prompt_index < len(prompts):
+            return prompts[prompt_index].content
+
+    active_prompt = deps.prompt_manager.get_active_prompt(store_name)
+    return active_prompt.content if active_prompt else None
+
+
+def _format_history(history: list[dict[str, Any]]) -> str:
+    lines = []
+    for item in history[-8:]:
+        role = "使用者" if item.get("role") == "user" else "助理"
+        content = str(item.get("content") or "").strip()
+        if content:
+            lines.append(f"{role}: {content}")
+    return "\n".join(lines)
+
+
+def _extract_response_text(response: Any) -> str:
+    text = getattr(response, "text", None)
+    if isinstance(text, str):
+        return text
+
+    candidates = getattr(response, "candidates", None) or []
+    parts = []
+    for candidate in candidates:
+        content = getattr(candidate, "content", None)
+        for part in getattr(content, "parts", None) or []:
+            part_text = getattr(part, "text", None)
+            if isinstance(part_text, str):
+                parts.append(part_text)
+    return "\n".join(parts)
+
+
+def _generate_rag_answer(*, message: str, session: dict[str, Any]) -> tuple[str, list[dict[str, Any]]]:
+    config = resolve_managed_store(session.get("store_name"))
+    if config is None:
+        raise HTTPException(status_code=404, detail="Knowledge store not found")
+    if not gemini_service.client:
+        raise HTTPException(status_code=500, detail="Gemini API key not configured")
+
+    client = get_client_by_index(resolve_key_index_for_store(config.name))
+
+    from app.services.rag.service import get_rag_pipeline
+
+    pipeline = get_rag_pipeline()
+    kb_text, citations = pipeline.retrieve(
+        message,
+        language=config.managed_language,
+        source_type=f"{config.managed_app}_knowledge",
+        top_k=5,
+    )
+
+    history_text = _format_history(session.get("chat_history", []))
+    response_language = "English" if config.managed_language == "en" else "繁體中文"
+    sections = [
+        f"請使用{response_language}回答。",
+    ]
+    if kb_text:
+        sections.append(f"<知識庫查詢結果>\n{kb_text}\n</知識庫查詢結果>")
+    if history_text:
+        sections.append(f"<對話紀錄>\n{history_text}\n</對話紀錄>")
+    sections.append(f"使用者問題：{message}")
+
+    config_kwargs: dict[str, Any] = {}
+    system_instruction = session.get("system_instruction")
+    if system_instruction:
+        config_kwargs["system_instruction"] = system_instruction
+
+    response = gemini_service.gemini_with_retry(
+        lambda: client.models.generate_content(
+            model=session.get("model") or os.getenv("GEMINI_MODEL_NAME", "gemini-3.1-flash-lite-preview"),
+            contents="\n\n".join(sections),
+            config=types.GenerateContentConfig(
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
+                **config_kwargs,
+            ),
+        )
+    )
+    return strip_citations(_extract_response_text(response)).strip(), citations or []
+
+
+@router.post("/start")
+def start_chat(req: ChatStartRequest, auth: dict = Depends(verify_auth)):
+    """Start a generic homepage chat session backed by local RAG."""
+    if req.previous_session_id:
+        _delete_session(req.previous_session_id)
+        logging.info("Cleaned up previous general session: %s...", req.previous_session_id[:8])
+
+    store_name = _resolve_request_store(req, auth)
+    session_id = _new_session_id(store_name)
+    system_instruction = _get_system_instruction(store_name, auth)
+    _create_session(
+        session_id=session_id,
+        store_name=store_name,
+        model=req.model,
+        system_instruction=system_instruction,
+    )
+
+    return {
+        "ok": True,
+        "prompt_applied": system_instruction is not None,
+        "session_id": session_id,
+    }
+
+
+@router.post("/message")
+def send_message(req: ChatMessageRequest, auth: dict = Depends(verify_auth)):
+    """Send a message to a generic homepage chat session."""
+    session: dict[str, Any] | None = None
+    if req.session_id:
+        session = _get_session(req.session_id)
+
+    if session is None:
+        start_req = ChatStartRequest(store_name=auth.get("store_name"))
+        store_name = _resolve_request_store(start_req, auth)
+        session = _create_session(
+            session_id=_new_session_id(store_name),
+            store_name=store_name,
+            model=start_req.model,
+            system_instruction=_get_system_instruction(store_name, auth),
+        )
+
+    if req.turn_number is not None:
+        keep_turns = max(req.turn_number - 1, 0)
+        _truncate_session(session, keep_turns)
+        try:
+            _get_conversation_logger().delete_turns_from(session["session_id"], req.turn_number)
+        except Exception:
+            logging.exception("Failed to truncate general conversation logs")
+
+    answer, citations = _generate_rag_answer(message=req.message, session=session)
+    _add_session_message(session, "user", req.message)
+    _add_session_message(session, "model", answer, citations)
+
+    log_result = _get_conversation_logger().log_conversation(
+        session_id=session["session_id"],
+        user_message=req.message,
+        agent_response=answer,
+        tool_calls=[],
+        session_state={"store": session["store_name"]},
+        mode="general",
+        citations=citations,
+    )
+    turn_number = log_result[1] if log_result else None
+
+    return {
+        "answer": answer,
+        "session_id": session["session_id"],
+        "turn_number": turn_number,
+        "citations": citations,
+    }
 
 
 @router.delete("/history", response_model=DeleteConversationResponse)

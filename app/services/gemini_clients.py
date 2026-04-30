@@ -108,6 +108,15 @@ def get_client_for_store(store_name: str) -> genai.Client:
     return _store_to_client.get(store_name) or get_default_client()
 
 
+def resolve_key_index_by_keyword(keyword: str) -> int:
+    """Return the index of the first key whose name contains keyword (case-insensitive). Falls back to 0."""
+    kw = keyword.lower()
+    for i, name in enumerate(_key_names):
+        if kw in name.lower():
+            return i
+    return 0
+
+
 def get_default_client() -> genai.Client:
     """回傳第一把 key 的 client。"""
     if _clients:

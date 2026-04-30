@@ -100,7 +100,7 @@ from google.genai.errors import ClientError
 from .auth import verify_auth, _extract_bearer_token
 from .services.agent_utils import strip_citations
 from .routers.jti import chat as jti_chat, quiz as jti_quiz, prompts as jti_prompts, knowledge as jti_knowledge, quiz_bank as jti_quiz_bank
-from .routers.general import chat, prompts, api_keys, knowledge_admin
+from .routers.general import chat, prompts, stores, api_keys, knowledge_admin
 from .routers.hciot import chat as hciot_chat, prompts as hciot_prompts, knowledge as hciot_knowledge, images as hciot_images
 from .routers.hciot import topics_admin as hciot_topics_admin
 from .routers.admin_rag import router as admin_rag_router
@@ -407,4 +407,5 @@ app.include_router(hciot_topics_admin.router, prefix="/api/hciot-admin/topics")
 app.include_router(chat.router)
 app.include_router(prompts.router)  # before stores (more specific path patterns)
 app.include_router(knowledge_admin.router)
+app.include_router(stores.router)
 app.include_router(api_keys.router)

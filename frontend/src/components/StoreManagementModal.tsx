@@ -112,7 +112,7 @@ export default function StoreManagementModal({
                           ◆ 使用中
                         </span>
                       )}
-                      {keyNames.length > 1 && store.key_index !== undefined && (
+                      {keyNames.length > 1 && typeof store.key_index === 'number' && (
                         <span style={{ marginLeft: '0.5rem', color: '#8090b0', fontSize: '0.8em' }}>
                           {keyNames[store.key_index] ?? `Key #${store.key_index + 1}`}
                         </span>

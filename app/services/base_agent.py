@@ -17,12 +17,14 @@ from google.genai import types
 
 from app.models.session import Session
 import app.services.gemini_service as _gemini_service
+from app.routers.general.stores import resolve_key_index_for_store
 from app.services.agent_utils import (
     build_chat_history,
     extract_response_text,
     normalize_language,
     strip_citations,
 )
+from app.services.gemini_clients import get_client_by_index
 from app.services.rag.service import get_rag_pipeline
 
 logger = logging.getLogger(__name__)
@@ -192,7 +194,9 @@ class BaseAgent:
 
         config = self._make_chat_config(session)
 
-        chat_session = _gemini_service.client.chats.create(
+        store_name = self._get_store_name_for_language(session.language)
+        client = get_client_by_index(resolve_key_index_for_store(store_name))
+        chat_session = client.chats.create(
             model=self.model_name, config=config, history=history,
         )
         self._chat_sessions[sid] = chat_session
