@@ -78,6 +78,7 @@ class RAGPipeline:
                 "text": r.get("text", ""),
                 "_distance": float(r.get("_distance", 999)),
                 **({"image_id": r["image_id"]} if r.get("image_id") else {}),
+                **({"url": r["url"]} if r.get("url") else {}),
             } for r in results]
 
             distances = [f"{r['_distance']:.3f}" for r in results]

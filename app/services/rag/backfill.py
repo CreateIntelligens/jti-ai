@@ -65,11 +65,11 @@ class BackfillService:
     _NON_EMBEDDED_FIELDS = frozenset({"img", "url", "index"})
 
     @staticmethod
-    def _chunk_csv_by_row(text: str, topic_prefix: str = "") -> list[tuple[str, str | None]]:
-        """CSV 每一行當作一個 chunk。回傳 (chunk_text, image_id) tuples。
+    def _chunk_csv_by_row(text: str, topic_prefix: str = "") -> list[tuple[str, str | None, str]]:
+        """CSV 每一行當作一個 chunk。回傳 (chunk_text, image_id, url) tuples。
         topic_prefix 會被前綴到每個 chunk_text，讓 embedding 帶有 topic 語意。"""
         reader = csv.DictReader(io.StringIO(text))
-        results: list[tuple[str, str | None]] = []
+        results: list[tuple[str, str | None, str]] = []
         for row in reader:
             parts = [
                 f"{k}: {v}"
@@ -81,7 +81,8 @@ class BackfillService:
             body = ", ".join(parts)
             chunk_text = f"{topic_prefix}{body}" if topic_prefix else body
             image_id = BackfillService._normalize_image_id(row.get("img", ""))
-            results.append((chunk_text, image_id))
+            url = (row.get("url") or "").strip()
+            results.append((chunk_text, image_id, url))
         return results
 
     @staticmethod
@@ -214,12 +215,14 @@ class BackfillService:
 
             if filename.lower().endswith(".csv"):
                 csv_rows = self._chunk_csv_by_row(text, topic_prefix=topic_prefix)
-                chunks_text = [t for t, _ in csv_rows]
-                image_ids = [img for _, img in csv_rows]
+                chunks_text = [t for t, _, _ in csv_rows]
+                image_ids = [img for _, img, _ in csv_rows]
+                urls = [u for _, _, u in csv_rows]
             else:
                 raw_chunks = self.chunker.chunk_text(text)
                 chunks_text = [f"{topic_prefix}{c}" if topic_prefix else c for c in raw_chunks]
                 image_ids = [None] * len(chunks_text)
+                urls = [""] * len(chunks_text)
             if not chunks_text:
                 return
 
@@ -241,8 +244,9 @@ class BackfillService:
                 "chunk_index": i,
                 "file_fingerprint": fingerprint,
                 "image_id": img_id or "",
+                "url": url or "",
                 "metadata": base_metadata
-            } for i, (txt, vec, img_id) in enumerate(zip(chunks_text, embeddings, image_ids))]
+            } for i, (txt, vec, img_id, url) in enumerate(zip(chunks_text, embeddings, image_ids, urls))]
                 
             # Atomic Replace in current LanceDB table
             self.lancedb_store.delete_by_file(filename, full_source_type, source_language=language)

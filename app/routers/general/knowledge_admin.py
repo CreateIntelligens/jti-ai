@@ -19,7 +19,8 @@ from app.routers.knowledge_utils import (
     sync_to_rag,
     write_docx_text,
 )
-from app.services.knowledge_store import get_knowledge_store
+from app.services.hciot.knowledge_store import get_hciot_knowledge_store
+from app.services.jti.knowledge_store import get_jti_knowledge_store
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,14 @@ def _safe_filename(name: str) -> str:
     return Path(name).name
 
 
+def _store_for(namespace: str):
+    """Route to the correct app-specific knowledge store. JTI and HCIoT live in
+    separate Mongo databases; the generic homepage endpoint dispatches here."""
+    if namespace == "hciot":
+        return get_hciot_knowledge_store()
+    return get_jti_knowledge_store()
+
+
 
 
 class UpdateContentRequest(BaseModel):
@@ -54,8 +63,8 @@ def list_knowledge_files(
     auth: dict = Depends(verify_auth),
 ):
     namespace = _normalize_app_name(app_name)
-    store = get_knowledge_store()
-    files = store.list_files(language, namespace=namespace)
+    store = _store_for(namespace)
+    files = store.list_files(language)
     return {"files": files, "language": language, "app": namespace}
 
 
@@ -68,8 +77,8 @@ def get_file_content(
 ):
     namespace = _normalize_app_name(app_name)
     safe_name = _safe_filename(filename)
-    store = get_knowledge_store()
-    doc = store.get_file(language, safe_name, namespace=namespace)
+    store = _store_for(namespace)
+    doc = store.get_file(language, safe_name)
     if not doc:
         raise HTTPException(status_code=404, detail="檔案不存在")
 
@@ -113,8 +122,8 @@ def download_file(
 ):
     namespace = _normalize_app_name(app_name)
     safe_name = _safe_filename(filename)
-    store = get_knowledge_store()
-    doc = store.get_file(language, safe_name, namespace=namespace)
+    store = _store_for(namespace)
+    doc = store.get_file(language, safe_name)
     if not doc:
         raise HTTPException(status_code=404, detail="檔案不存在")
 
@@ -138,8 +147,8 @@ async def update_file_content(
     if ext not in EDITABLE_EXTENSIONS:
         raise HTTPException(status_code=400, detail="此檔案格式不支援線上編輯")
 
-    store = get_knowledge_store()
-    doc = store.get_file(language, safe_name, namespace=namespace)
+    store = _store_for(namespace)
+    doc = store.get_file(language, safe_name)
     if not doc:
         raise HTTPException(status_code=404, detail="檔案不存在")
 
@@ -152,7 +161,7 @@ async def update_file_content(
     else:
         new_bytes = req.content.encode("utf-8")
 
-    updated = store.update_file_content(language, safe_name, new_bytes, namespace=namespace)
+    updated = store.update_file_content(language, safe_name, new_bytes)
     if not updated:
         raise HTTPException(status_code=404, detail="檔案不存在")
 
@@ -180,7 +189,7 @@ async def upload_knowledge_file(
     editable = ext in EDITABLE_EXTENSIONS
     content_type = file.content_type or mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
 
-    store = get_knowledge_store()
+    store = _store_for(namespace)
     saved = store.insert_file(
         language=language,
         filename=safe_name,
@@ -188,7 +197,6 @@ async def upload_knowledge_file(
         display_name=safe_name,
         content_type=content_type,
         editable=editable,
-        namespace=namespace,
     )
 
     rag_synced = False
@@ -216,8 +224,8 @@ def delete_knowledge_file(
 ):
     namespace = _normalize_app_name(app_name)
     safe_name = _safe_filename(filename)
-    store = get_knowledge_store()
-    doc = store.get_file(language, safe_name, namespace=namespace)
+    store = _store_for(namespace)
+    doc = store.get_file(language, safe_name)
     if not doc:
         raise HTTPException(status_code=404, detail="檔案不存在")
 
@@ -227,7 +235,7 @@ def delete_knowledge_file(
         logger.warning("[Knowledge] RAG delete failed for %s/%s: %s", namespace, safe_name, e)
         raise HTTPException(status_code=502, detail="RAG 同步刪除失敗，Mongo 未刪除")
 
-    deleted = store.delete_file(language, safe_name, namespace=namespace)
+    deleted = store.delete_file(language, safe_name)
     if not deleted:
         raise HTTPException(status_code=404, detail="檔案不存在")
 

@@ -110,6 +110,13 @@ class HciotMainAgent(BaseAgent):
         return citations[0].get("image_id") or None
 
     @staticmethod
+    def _extract_url(citations: list[dict] | None) -> str | None:
+        """Return url only if the top-ranked citation carries one."""
+        if not citations:
+            return None
+        return citations[0].get("url") or None
+
+    @staticmethod
     def _localize_citations(language: str, citations: list[dict] | None) -> list[dict] | None:
         """Replace filenames with display names from the knowledge store."""
         if not citations:
@@ -136,11 +143,13 @@ class HciotMainAgent(BaseAgent):
     def _preprocess_chat_data(self, session: Session, citations: list[dict] | None) -> tuple[list[dict] | None, dict[str, Any]]:
         localized = self._localize_citations(session.language, citations)
         image_id = self._extract_image_id(localized)
-        return localized, {"image_id": image_id}
+        url = self._extract_url(localized)
+        return localized, {"image_id": image_id, "url": url}
 
     def _post_process_chat_result(self, session: Session, response_text: str, citations: list[dict] | None, extra_meta: dict[str, Any]) -> dict[str, Any]:
         return {
             "image_id": extra_meta.get("image_id"),
+            "url": extra_meta.get("url"),
             "tts_text": to_hciot_tts_text(response_text, session.language),
         }
 
