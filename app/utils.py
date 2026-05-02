@@ -6,9 +6,16 @@ from datetime import datetime
 from typing import Optional
 
 
-def build_date_query(mode: str, date_from: Optional[str], date_to: Optional[str]) -> dict:
+def build_date_query(
+    mode: str,
+    date_from: Optional[str],
+    date_to: Optional[str],
+    extras: Optional[dict] = None,
+) -> dict:
     """Build a MongoDB query dict filtered by mode and optional date range."""
     query: dict = {"mode": mode}
+    if extras:
+        query.update(extras)
     if date_from or date_to:
         ts_filter: dict = {}
         if date_from:

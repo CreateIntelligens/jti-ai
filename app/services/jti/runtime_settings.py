@@ -148,7 +148,7 @@ def load_runtime_settings_from_prompt_manager(
     if not prompt_manager:
         return get_default_runtime_settings()
 
-    store_prompts = prompt_manager._load_store_prompts(store_name)
+    store_prompts = prompt_manager.get_store_prompts(store_name)
     runtime_prompt_id = _resolve_runtime_prompt_id(store_prompts, prompt_id)
     raw = _load_raw_runtime_settings(store_prompts, runtime_prompt_id)
 
@@ -169,7 +169,7 @@ def save_runtime_settings_to_prompt_manager(
     store_name: str = JTI_STORE_NAME,
 ) -> str:
     """Persist runtime settings in PromptManager under JTI store document."""
-    store_prompts = prompt_manager._load_store_prompts(store_name)
+    store_prompts = prompt_manager.get_store_prompts(store_name)
     runtime_prompt_id = _resolve_runtime_prompt_id(store_prompts, prompt_id)
 
     profiles_map = _get_profiles_map(store_prompts)
@@ -180,5 +180,5 @@ def save_runtime_settings_to_prompt_manager(
     profiles_map[runtime_prompt_id] = profile
 
     store_prompts.jti_profiles_by_prompt = profiles_map
-    prompt_manager._save_store_prompts(store_prompts)
+    prompt_manager.save_store_prompts(store_prompts)
     return runtime_prompt_id

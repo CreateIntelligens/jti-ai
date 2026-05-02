@@ -74,7 +74,7 @@ class PromptManager:
 
         log(f"[PromptManager] 已連接 MongoDB: {self.DB_NAME}.{self.COLLECTION_NAME}")
 
-    def _load_store_prompts(self, store_name: str) -> StorePrompts:
+    def get_store_prompts(self, store_name: str) -> StorePrompts:
         """載入 Store 的 prompts"""
         doc = self.collection.find_one({"store_name": store_name})
 
@@ -85,7 +85,7 @@ class PromptManager:
         doc.pop("_id", None)
         return StorePrompts(**doc)
 
-    def _save_store_prompts(self, store_prompts: StorePrompts):
+    def save_store_prompts(self, store_prompts: StorePrompts):
         """保存 Store 的 prompts"""
         data = store_prompts.model_dump(exclude_none=True)
         # active_prompt_id must be explicitly persisted even when None,
@@ -98,14 +98,15 @@ class PromptManager:
             upsert=True
         )
 
+
     def list_prompts(self, store_name: str) -> List[Prompt]:
         """列出 Store 的所有 prompts"""
-        store_prompts = self._load_store_prompts(store_name)
+        store_prompts = self.get_store_prompts(store_name)
         return store_prompts.prompts
 
     def get_prompt(self, store_name: str, prompt_id: str) -> Optional[Prompt]:
         """取得特定 prompt"""
-        store_prompts = self._load_store_prompts(store_name)
+        store_prompts = self.get_store_prompts(store_name)
 
         for prompt in store_prompts.prompts:
             if prompt.id == prompt_id:
@@ -115,7 +116,7 @@ class PromptManager:
 
     def get_active_prompt(self, store_name: str) -> Optional[Prompt]:
         """取得當前啟用的 prompt"""
-        store_prompts = self._load_store_prompts(store_name)
+        store_prompts = self.get_store_prompts(store_name)
 
         if not store_prompts.active_prompt_id:
             return None
@@ -136,7 +137,7 @@ class PromptManager:
         Raises:
             ValueError: 超過最大數量限制
         """
-        store_prompts = self._load_store_prompts(store_name)
+        store_prompts = self.get_store_prompts(store_name)
 
         # 檢查數量限制
         if len(store_prompts.prompts) >= self.MAX_PROMPTS_PER_STORE:
@@ -150,7 +151,7 @@ class PromptManager:
         if len(store_prompts.prompts) == 1:
             store_prompts.active_prompt_id = new_prompt.id
 
-        self._save_store_prompts(store_prompts)
+        self.save_store_prompts(store_prompts)
         log(f"[PromptManager] 建立 Prompt: {name} (store: {store_name})")
 
         return new_prompt
@@ -171,7 +172,7 @@ class PromptManager:
         Raises:
             ValueError: Prompt 不存在
         """
-        store_prompts = self._load_store_prompts(store_name)
+        store_prompts = self.get_store_prompts(store_name)
 
         for i, prompt in enumerate(store_prompts.prompts):
             if prompt.id == prompt_id:
@@ -182,7 +183,7 @@ class PromptManager:
                 prompt.updated_at = datetime.utcnow().isoformat()
 
                 store_prompts.prompts[i] = prompt
-                self._save_store_prompts(store_prompts)
+                self.save_store_prompts(store_prompts)
                 log(f"[PromptManager] 更新 Prompt: {prompt_id}")
 
                 return prompt
@@ -199,7 +200,7 @@ class PromptManager:
         Raises:
             ValueError: Prompt 不存在
         """
-        store_prompts = self._load_store_prompts(store_name)
+        store_prompts = self.get_store_prompts(store_name)
 
         # 找到並刪除 prompt
         original_length = len(store_prompts.prompts)
@@ -214,7 +215,7 @@ class PromptManager:
                 store_prompts.prompts[0].id if store_prompts.prompts else None
             )
 
-        self._save_store_prompts(store_prompts)
+        self.save_store_prompts(store_prompts)
         log(f"[PromptManager] 刪除 Prompt: {prompt_id}")
 
     def set_active_prompt(self, store_name: str, prompt_id: str):
@@ -227,21 +228,21 @@ class PromptManager:
         Raises:
             ValueError: Prompt 不存在
         """
-        store_prompts = self._load_store_prompts(store_name)
+        store_prompts = self.get_store_prompts(store_name)
 
         # 檢查 prompt 是否存在
         if not any(p.id == prompt_id for p in store_prompts.prompts):
             raise ValueError(f"Prompt {prompt_id} 不存在")
 
         store_prompts.active_prompt_id = prompt_id
-        self._save_store_prompts(store_prompts)
+        self.save_store_prompts(store_prompts)
         log(f"[PromptManager] 設定啟用 Prompt: {prompt_id}")
 
     def clear_active_prompt(self, store_name: str):
         """取消啟用的 prompt（不使用任何 prompt）"""
-        store_prompts = self._load_store_prompts(store_name)
+        store_prompts = self.get_store_prompts(store_name)
         store_prompts.active_prompt_id = None
-        self._save_store_prompts(store_prompts)
+        self.save_store_prompts(store_prompts)
         log(f"[PromptManager] 取消啟用 Prompt: {store_name}")
 
     def delete_store_prompts(self, store_name: str):

@@ -128,7 +128,7 @@ def load_runtime_settings_from_prompt_manager(
     if not prompt_manager:
         return get_default_runtime_settings()
 
-    store_prompts = prompt_manager._load_store_prompts(store_name)
+    store_prompts = prompt_manager.get_store_prompts(store_name)
     runtime_prompt_id = _resolve_runtime_prompt_id(store_prompts, prompt_id)
     raw = _load_raw_runtime_settings(store_prompts, runtime_prompt_id)
 
@@ -147,7 +147,7 @@ def save_runtime_settings_to_prompt_manager(
     prompt_id: Optional[str] = None,
     store_name: str = HCIOT_STORE_NAME,
 ) -> str:
-    store_prompts = prompt_manager._load_store_prompts(store_name)
+    store_prompts = prompt_manager.get_store_prompts(store_name)
     runtime_prompt_id = _resolve_runtime_prompt_id(store_prompts, prompt_id)
 
     runtime_map = getattr(store_prompts, "hciot_runtime_settings_by_prompt", None)
@@ -155,5 +155,5 @@ def save_runtime_settings_to_prompt_manager(
         runtime_map = {}
     runtime_map[runtime_prompt_id] = settings.model_dump()
     store_prompts.hciot_runtime_settings_by_prompt = runtime_map
-    prompt_manager._save_store_prompts(store_prompts)
+    prompt_manager.save_store_prompts(store_prompts)
     return runtime_prompt_id

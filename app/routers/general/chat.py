@@ -29,7 +29,7 @@ from app.schemas.chat import (
 from app.services import gemini_service
 from app.services.agent_utils import extract_response_text, strip_citations
 from app.services.gemini_clients import get_client_by_index, get_client_for_api_key
-from app.utils import group_conversations_by_session, group_conversations_as_summary
+from app.utils import build_date_query, group_conversations_by_session, group_conversations_as_summary
 import app.deps as deps
 
 router = APIRouter(prefix="/api/chat", tags=["General Chat"])
@@ -371,14 +371,10 @@ def get_general_conversations(
         if not store_name:
             raise HTTPException(status_code=400, detail="未指定知識庫")
 
-        query: dict = {"mode": "general", "session_snapshot.store": store_name}
-        if date_from or date_to:
-            ts_filter: dict = {}
-            if date_from:
-                ts_filter["$gte"] = datetime.strptime(date_from, "%Y-%m-%d")
-            if date_to:
-                ts_filter["$lte"] = datetime.strptime(date_to + " 23:59:59", "%Y-%m-%d %H:%M:%S")
-            query["timestamp"] = ts_filter
+        query = build_date_query(
+            "general", date_from, date_to,
+            extras={"session_snapshot.store": store_name},
+        )
 
         session_ids, total_sessions = conversation_logger.get_paginated_session_ids(
             query=query,

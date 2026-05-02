@@ -108,7 +108,7 @@ class BaseAgent:
         prompt_id = active.id
         persona = active.content
 
-        store_prompts = prompt_manager._load_store_prompts(store_name)
+        store_prompts = prompt_manager.get_store_prompts(store_name)
         persona_map = getattr(store_prompts, self._persona_map_attr, None)
         if not isinstance(persona_map, dict):
             return prompt_manager, store_name, prompt_id, persona

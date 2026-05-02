@@ -36,14 +36,14 @@ def _init_jti_default_prompt(prompt_manager) -> None:
 
         if has_old_default:
             # 移除舊的 system_default，預設人物設定改為從程式碼讀取
-            store_prompts = prompt_manager._load_store_prompts(store_name)
+            store_prompts = prompt_manager.get_store_prompts(store_name)
             store_prompts.prompts = [
                 p for p in store_prompts.prompts if p.id != SYSTEM_DEFAULT_PROMPT_ID
             ]
             # 如果啟用的是 system_default，清除啟用狀態（回到使用程式碼預設）
             if store_prompts.active_prompt_id == SYSTEM_DEFAULT_PROMPT_ID:
                 store_prompts.active_prompt_id = None
-            prompt_manager._save_store_prompts(store_prompts)
+            prompt_manager.save_store_prompts(store_prompts)
             logger.debug("Cleaned legacy default prompt from store=%s", store_name)
 
 
@@ -82,7 +82,7 @@ def _migrate_jti_profile_storage(prompt_manager) -> None:
         return
 
     for store_name in JTI_STORES:
-        store_prompts = prompt_manager._load_store_prompts(store_name)
+        store_prompts = prompt_manager.get_store_prompts(store_name)
 
         raw_profiles = getattr(store_prompts, "jti_profiles_by_prompt", None)
         profiles_map: Dict[str, Dict] = raw_profiles if isinstance(raw_profiles, dict) else {}
@@ -141,7 +141,7 @@ def _migrate_jti_profile_storage(prompt_manager) -> None:
 
         if changed:
             store_prompts.jti_profiles_by_prompt = profiles_map
-            prompt_manager._save_store_prompts(store_prompts)
+            prompt_manager.save_store_prompts(store_prompts)
             logger.debug("Migrated JTI profiles for store=%s", store_name)
 
 
