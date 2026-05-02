@@ -107,11 +107,19 @@ class APIKeyManager:
         if not doc:
             return None
 
-        # 更新最後使用時間
-        self.collection.update_one(
-            {"key_hash": key_hash},
-            {"$set": {"last_used_at": datetime.utcnow().isoformat()}}
-        )
+        now = datetime.utcnow()
+        last_used = doc.get("last_used_at")
+        last_used_dt = None
+        if isinstance(last_used, str):
+            try:
+                last_used_dt = datetime.fromisoformat(last_used)
+            except ValueError:
+                last_used_dt = None
+        if last_used_dt is None or (now - last_used_dt).total_seconds() >= 60:
+            self.collection.update_one(
+                {"key_hash": key_hash},
+                {"$set": {"last_used_at": now.isoformat()}}
+            )
 
         doc.pop("_id", None)
         return APIKey(**doc)

@@ -204,9 +204,7 @@ class OpenAIChatMessage(BaseModel):
     role: str
     content: str
 
-# Supported Gemini models
-SUPPORTED_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-3.1-flash-lite-preview"]
-DEFAULT_MODEL = os.getenv("GEMINI_MODEL_NAME", "gemini-2.5-flash")
+from app.models_config import DEFAULT_MODEL, SUPPORTED_MODELS  # noqa: E402
 
 class OpenAIChatRequest(BaseModel):
     model: str = DEFAULT_MODEL

@@ -37,7 +37,6 @@ class BaseAgent:
     def __init__(self, model_name: str):
         self.model_name = model_name
         self._chat_sessions: dict[str, Any] = {}
-        self._force_tool_configs: dict[str, types.GenerateContentConfig] = {}
 
     # --- 子類必須實作 ---
 
@@ -164,20 +163,17 @@ class BaseAgent:
         )
 
     def _get_force_tool_config(self, session: Session) -> types.GenerateContentConfig:
-        """Cached per-session config that forces tool calling."""
-        sid = session.session_id
-        if sid not in self._force_tool_configs:
-            base = self._make_chat_config(session)
-            self._force_tool_configs[sid] = types.GenerateContentConfig(
-                system_instruction=base.system_instruction,
-                thinking_config=base.thinking_config,
-                tools=base.tools,
-                temperature=0.7,
-                tool_config=types.ToolConfig(
-                    function_calling_config=types.FunctionCallingConfig(mode=types.FunctionCallingConfigMode.ANY),
-                ),
-            )
-        return self._force_tool_configs[sid]
+        """Per-session config that forces tool calling."""
+        base = self._make_chat_config(session)
+        return types.GenerateContentConfig(
+            system_instruction=base.system_instruction,
+            thinking_config=base.thinking_config,
+            tools=base.tools,
+            temperature=0.7,
+            tool_config=types.ToolConfig(
+                function_calling_config=types.FunctionCallingConfig(mode=types.FunctionCallingConfigMode.ANY),
+            ),
+        )
 
     def _get_or_create_chat_session(self, session: Session):
         """Get or create a persistent Gemini chat session."""
@@ -222,13 +218,11 @@ class BaseAgent:
     def remove_session(self, session_id: str):
         """清除記憶體中的 chat session"""
         self._chat_sessions.pop(session_id, None)
-        self._force_tool_configs.pop(session_id, None)
 
     def remove_all_sessions(self):
         """清除所有記憶體中的 chat sessions"""
         count = len(self._chat_sessions)
         self._chat_sessions.clear()
-        self._force_tool_configs.clear()
         if count > 0:
             logger.info("已清除 %d 個 chat sessions", count)
 

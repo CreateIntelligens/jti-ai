@@ -29,7 +29,7 @@ from app.schemas.chat import (
 from app.services import gemini_service
 from app.services.agent_utils import extract_response_text, strip_citations
 from app.services.gemini_clients import get_client_by_index, get_client_for_api_key
-from app.utils import build_date_query, group_conversations_by_session, group_conversations_as_summary
+from app.utils import build_date_query, export_sessions_by_ids, group_conversations_by_session, group_conversations_as_summary
 import app.deps as deps
 
 router = APIRouter(prefix="/api/chat", tags=["General Chat"])
@@ -38,7 +38,7 @@ _IN_MEMORY_SESSIONS: dict[str, dict[str, Any]] = {}
 
 class ChatStartRequest(BaseModel):
     store_name: Optional[str] = None
-    model: str = os.getenv("GEMINI_MODEL_NAME", "gemini-3.1-flash-lite-preview")
+    model: str = os.getenv("GEMINI_MODEL_NAME", "") or "gemini-3.1-flash-lite-preview"
     previous_session_id: Optional[str] = None
 
 
@@ -422,29 +422,9 @@ def export_general_conversations(
             raise HTTPException(status_code=400, detail="未指定知識庫")
 
         if session_ids:
-            session_id_list = [sid.strip() for sid in session_ids.split(',') if sid.strip()]
-
-            sessions = []
-            total_conversations = 0
-
-            for session_id in session_id_list:
-                conversations = conversation_logger.get_session_logs(session_id)
-                conversations = [
-                    c for c in conversations
-                    if c.get("mode") == "general" and c.get("session_snapshot", {}).get("store") == store_name
-                ]
-
-                if conversations:
-                    sessions.append({
-                        "session_id": session_id,
-                        "conversations": conversations,
-                        "first_message_time": conversations[0].get("timestamp") if conversations else None,
-                        "total": len(conversations)
-                    })
-                    total_conversations += len(conversations)
-
-            sessions.sort(key=lambda x: x["first_message_time"] or "", reverse=True)
-
+            sessions, total_conversations = export_sessions_by_ids(
+                conversation_logger, session_ids, "general", store_filter=store_name,
+            )
             return {
                 "exported_at": datetime.utcnow().isoformat(),
                 "store_name": store_name,

@@ -6,6 +6,41 @@ from datetime import datetime
 from typing import Optional
 
 
+def export_sessions_by_ids(
+    logger,
+    session_ids: str,
+    mode: str,
+    store_filter: Optional[str] = None,
+) -> tuple[list[dict], int]:
+    """Build session-grouped export payload from a comma-separated session_ids string.
+
+    Returns (sessions_list, total_conversations). Each session dict has
+    session_id, conversations, first_message_time, total. Sorted by
+    first_message_time desc.
+    """
+    session_id_list = [sid.strip() for sid in session_ids.split(",") if sid.strip()]
+    sessions: list[dict] = []
+    total_conversations = 0
+    for session_id in session_id_list:
+        conversations = logger.get_session_logs(session_id)
+        conversations = [c for c in conversations if c.get("mode") == mode]
+        if store_filter is not None:
+            conversations = [
+                c for c in conversations
+                if c.get("session_snapshot", {}).get("store") == store_filter
+            ]
+        if conversations:
+            sessions.append({
+                "session_id": session_id,
+                "conversations": conversations,
+                "first_message_time": conversations[0].get("timestamp"),
+                "total": len(conversations),
+            })
+            total_conversations += len(conversations)
+    sessions.sort(key=lambda x: x["first_message_time"] or "", reverse=True)
+    return sessions, total_conversations
+
+
 def build_date_query(
     mode: str,
     date_from: Optional[str],

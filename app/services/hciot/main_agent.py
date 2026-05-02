@@ -50,8 +50,11 @@ _SEARCH_KNOWLEDGE_DECL = build_search_knowledge_decl(
 _RAG_TOOL = types.Tool(function_declarations=[_SEARCH_KNOWLEDGE_DECL])
 
 
+from app.models_config import CHAT_MODEL as _DEFAULT_CHAT_MODEL
+
+
 class HciotMainAgent(BaseAgent):
-    CHAT_MODEL = "gemini-3.1-flash-lite-preview"
+    CHAT_MODEL = _DEFAULT_CHAT_MODEL
 
     def __init__(self):
         super().__init__(model_name=self.CHAT_MODEL)

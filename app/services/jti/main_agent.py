@@ -49,11 +49,14 @@ _SEARCH_KNOWLEDGE_DECL = build_search_knowledge_decl(
 _RAG_TOOL = types.Tool(function_declarations=[_SEARCH_KNOWLEDGE_DECL])
 
 
+from app.models_config import CHAT_MODEL as _DEFAULT_CHAT_MODEL
+
+
 class MainAgent(BaseAgent):
     """主要對話 Agent"""
 
     # JTI 用固定的 flash-lite，避免較強的 model 自行進行測驗流程
-    CHAT_MODEL = "gemini-3.1-flash-lite-preview"
+    CHAT_MODEL = _DEFAULT_CHAT_MODEL
 
     def __init__(self):
         super().__init__(model_name=self.CHAT_MODEL)

@@ -10,6 +10,7 @@ Gemini Multi-Key Registry
 import hashlib
 import logging
 import os
+from collections import OrderedDict
 
 from google import genai
 
@@ -24,8 +25,9 @@ _clients: list[genai.Client] = []
 # key index → 顯示名稱
 _key_names: list[str] = []
 
-# Browser-supplied user keys are never persisted. Cache clients by hash only.
-_user_key_clients: dict[str, genai.Client] = {}
+# Browser-supplied user keys are never persisted. Cache clients by hash with LRU eviction.
+_USER_KEY_CACHE_MAX = 128
+_user_key_clients: "OrderedDict[str, genai.Client]" = OrderedDict()
 
 
 def _parse_key_token(token: str, index: int) -> tuple[str, str]:
@@ -94,6 +96,10 @@ def get_client_for_api_key(api_key: str) -> genai.Client:
     if client is None:
         client = genai.Client(api_key=normalized)
         _user_key_clients[key_hash] = client
+        if len(_user_key_clients) > _USER_KEY_CACHE_MAX:
+            _user_key_clients.popitem(last=False)
+    else:
+        _user_key_clients.move_to_end(key_hash)
     return client
 
 

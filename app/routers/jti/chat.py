@@ -36,7 +36,7 @@ from app.services.jti.runtime_quiz_flow import execute_quiz_start
 from app.services.jti.tts import to_jti_tts_text
 
 from app.tools.jti.quiz import get_total_questions
-from app.utils import build_date_query, group_conversations_by_session
+from app.utils import build_date_query, export_sessions_by_ids, group_conversations_by_session
 from app.services.jti.quiz_helpers import (
     _get_or_rebuild_session,
     _pause_quiz_and_respond,
@@ -431,21 +431,7 @@ async def export_conversations(
     try:
         conversation_logger = _get_conversation_logger()
         if session_ids:
-            session_id_list = [sid.strip() for sid in session_ids.split(',') if sid.strip()]
-            sessions = []
-            total_conversations = 0
-            for session_id in session_id_list:
-                conversations = conversation_logger.get_session_logs(session_id)
-                conversations = [c for c in conversations if c.get("mode") == mode]
-                if conversations:
-                    sessions.append({
-                        "session_id": session_id,
-                        "conversations": conversations,
-                        "first_message_time": conversations[0].get("timestamp"),
-                        "total": len(conversations)
-                    })
-                    total_conversations += len(conversations)
-            sessions.sort(key=lambda x: x["first_message_time"] or "", reverse=True)
+            sessions, total_conversations = export_sessions_by_ids(conversation_logger, session_ids, mode)
             return {"exported_at": datetime.now(_TZ_TAIPEI).isoformat(), "mode": mode, "sessions": sessions, "total_conversations": total_conversations, "total_sessions": len(sessions)}
 
         if date_from or date_to:
