@@ -19,6 +19,29 @@ from app.services.gemini_clients import get_default_client
 logger = logging.getLogger(__name__)
 
 
+QUIZ_START_KEYWORDS = (
+    '測驗', '心理測驗', '前蓋測驗', '命定前蓋', '開始測驗', '玩測驗', '試試測驗',
+    '再測', '重測', '重新測', '再來一次', '再測一次', '重新開始',
+    '來測', '測一下', '測看看', '想測', '做測',
+    '繼續測驗', '回到測驗',
+    'quiz', 'start quiz', 'again', 'retry', 'redo',
+)
+QUIZ_NEGATIVE_KEYWORDS = (
+    '不想', '不要', '不用', '不玩', '跳過', '算了', '不了',
+    "don't", "dont", "no ", "not ", "skip", "pass", "never",
+)
+
+
+def is_quiz_start_intent(message: str) -> bool:
+    """Detect quiz-start intent: has any start keyword and no rejection keyword."""
+    msg = (message or "").lower()
+    has_start = any(kw in msg for kw in QUIZ_START_KEYWORDS)
+    if not has_start:
+        return False
+    has_reject = any(kw in msg for kw in QUIZ_NEGATIVE_KEYWORDS)
+    return not has_reject
+
+
 def _get_session_manager():
     return deps.get_jti_session_manager()
 

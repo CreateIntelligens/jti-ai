@@ -8,6 +8,7 @@ includes conversational context.
 
 import logging
 import os
+import time
 from typing import Any
 
 from google.genai import types
@@ -48,6 +49,23 @@ _SEARCH_KNOWLEDGE_DECL = build_search_knowledge_decl(
 )
 
 _RAG_TOOL = types.Tool(function_declarations=[_SEARCH_KNOWLEDGE_DECL])
+
+_FILE_MAP_TTL_SEC = 60.0
+_file_map_cache: dict[str, tuple[float, dict[str, str]]] = {}
+
+
+def _get_file_map(language: str) -> dict[str, str]:
+    now = time.monotonic()
+    cached = _file_map_cache.get(language)
+    if cached and now - cached[0] < _FILE_MAP_TTL_SEC:
+        return cached[1]
+    store_files = get_hciot_knowledge_store().list_files(language)
+    file_map = {
+        f["name"].lower(): f.get("display_name") or f["name"]
+        for f in store_files if f.get("name")
+    }
+    _file_map_cache[language] = (now, file_map)
+    return file_map
 
 
 from app.models_config import CHAT_MODEL as _DEFAULT_CHAT_MODEL
@@ -125,8 +143,7 @@ class HciotMainAgent(BaseAgent):
         if not citations:
             return citations
 
-        store_files = get_hciot_knowledge_store().list_files(language)
-        file_map = {f["name"].lower(): f.get("display_name") or f["name"] for f in store_files if f.get("name")}
+        file_map = _get_file_map(language)
 
         localized = []
         for c in citations:

@@ -42,6 +42,7 @@ from app.services.jti.quiz_helpers import (
     _pause_quiz_and_respond,
     _judge_user_choice,
     build_session_state,
+    is_quiz_start_intent,
 )
 from app.tools.jti.tool_executor import tool_executor
 
@@ -299,21 +300,8 @@ async def chat(request: ChatRequest):
                 return attach_tts_message_id(response_payload, session.language, _get_tts_manager())
 
         # ========== 非 QUIZ 狀態 ==========
-        start_keywords = [
-            '測驗', '心理測驗', '前蓋測驗', '命定前蓋', '開始測驗', '玩測驗', '試試測驗',
-            '再測', '重測', '重新測', '再來一次', '再測一次', '重新開始',
-            '來測', '測一下', '測看看', '想測', '做測',
-            '繼續測驗', '回到測驗',
-            'quiz', 'start quiz', 'again', 'retry', 'redo',
-        ]
-        negative_keywords = ['不想', '不要', '不用', '不玩', '跳過', '算了', '不了', "don't", "dont", "no ", "not ", "skip", "pass", "never"]
-        msg_lower = request.message.lower()
-
-        has_start_intent = any(kw in msg_lower for kw in start_keywords)
-        has_rejection = any(kw in msg_lower for kw in negative_keywords)
-        should_start_quiz = has_start_intent and not has_rejection
-
-        logger.info(f"[DEBUG] 測驗判斷: has_start={has_start_intent}, has_rejection={has_rejection}, should_start={should_start_quiz}")
+        should_start_quiz = is_quiz_start_intent(request.message)
+        logger.info(f"[DEBUG] 測驗判斷: should_start={should_start_quiz}")
 
         if should_start_quiz and session.step.value in ("DONE", "WELCOME"):
             if session.step.value == "DONE":
