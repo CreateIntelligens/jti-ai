@@ -27,24 +27,15 @@ from app.schemas.chat import (
     ExportConversationsResponse,
 )
 from app.services.jti.main_agent import main_agent
-from app.services.jti.response_assembly import (
-    build_jti_quiz_question_fields,
-    build_jti_response_fields,
-    extract_option_texts,
-)
-from app.services.jti.runtime_quiz_flow import execute_quiz_start
+from app.services.jti.runtime_quiz_flow import execute_quiz_start, handle_quiz_message
 from app.services.jti.tts import to_jti_tts_text
 
-from app.tools.jti.quiz import get_total_questions
 from app.utils import build_date_query, export_sessions_by_ids, group_conversations_by_session
 from app.services.jti.quiz_helpers import (
     _get_or_rebuild_session,
-    _pause_quiz_and_respond,
-    _judge_user_choice,
     build_session_state,
     is_quiz_start_intent,
 )
-from app.tools.jti.tool_executor import tool_executor
 
 
 _OPENING_MESSAGE: dict[str, str] = {
@@ -177,127 +168,9 @@ async def chat(request: ChatRequest):
                 logger.warning(f"Failed to delete logs from turn {request.turn_number}")
 
         # ========== QUIZ 狀態：後端完全接管 ==========
-        if session.step.value == "QUIZ" and session.current_question:
-            q = session.current_question
-            total_questions = get_total_questions(session.language)
-            current_q_num = len(session.answers) + 1
-
-            if request.message.strip() == "中斷":
-                pause_response = ChatResponse(**(await _pause_quiz_and_respond(
-                    session_id=request.session_id,
-                    log_user_message=request.message,
-                    session=session,
-                )))
-                return attach_tts_message_id(pause_response, session.language, _get_tts_manager())
-
-            logger.info(f"[測驗進度] 第 {current_q_num}/{total_questions} 題 | 題目: {q.get('text', '')[:30]}...")
-
-            user_choice = await _judge_user_choice(request.message, q)
-            logger.info(f"[答題判斷] 使用者回答: '{request.message}' -> 判定選項: {user_choice}")
-
-            if user_choice == "PAUSE":
-                pause_response = ChatResponse(**(await _pause_quiz_and_respond(
-                    session_id=request.session_id,
-                    log_user_message=request.message,
-                    session=session,
-                )))
-                return attach_tts_message_id(pause_response, session.language, _get_tts_manager())
-
-            if user_choice:
-                tool_result = await tool_executor.execute("submit_answer", {
-                    "session_id": request.session_id,
-                    "user_choice": user_choice
-                })
-                tool_calls = [{"tool": "submit_answer", "args": {"user_choice": user_choice}, "result": tool_result}]
-
-                updated_session = session_manager.get_session(request.session_id)
-                logger.info(f"[答題結果] 選項: {user_choice} | 已答: {len(updated_session.answers)}/{total_questions} 題")
-                if updated_session.quiz_scores:
-                    scores_str = " | ".join([f"{k}:{v}" for k, v in sorted(updated_session.quiz_scores.items(), key=lambda x: -x[1])])
-                    logger.info(f"[當前分數] {scores_str}")
-
-                is_complete = tool_result.get("is_complete")
-                next_q = tool_result.get("next_question") if not is_complete else None
-
-                if is_complete:
-                    response_message = tool_result.get("message", "")
-                    response_fields = build_jti_response_fields(
-                        response_message,
-                        updated_session.language,
-                        tts_source=tool_result.get("tts_text") or response_message,
-                    )
-
-                    # 把測驗結果注入 chat_history，讓後續 LLM 對話能看到
-                    main_agent.remove_session(request.session_id)
-                    updated_session.chat_history.append({"role": "assistant", "content": response_message})
-                    session_manager.update_session(updated_session)
-                else:
-                    q_num = len(updated_session.answers) + 1
-                    response_fields = build_jti_quiz_question_fields(
-                        next_q,
-                        q_num,
-                        updated_session.language,
-                    )
-                    response_message = response_fields["message"]
-
-                log_result = conversation_logger.log_conversation(
-                    session_id=request.session_id,
-                    user_message=request.message,
-                    agent_response=response_message,
-                    tool_calls=tool_calls,
-                    session_state=build_session_state(updated_session),
-                    mode="jti"
-                )
-                final_turn_number = log_result[1] if log_result else None
-                logger.info(f"QUIZ 作答成功: {request.message} -> {user_choice}")
-
-                quiz_result = tool_result.get("quiz_result") or {}
-                response_payload = ChatResponse(
-                    **response_fields,
-                    options=extract_option_texts(next_q),
-                    quiz_result_id=quiz_result.get("quiz_id") if is_complete else None,
-                    session=updated_session.model_dump(),
-                    tool_calls=[{k: v for k, v in call.items() if k != "result"} for call in tool_calls],
-                    turn_number=final_turn_number,
-                )
-                return attach_tts_message_id(response_payload, updated_session.language, _get_tts_manager())
-            else:
-                # 無法判斷選項：hardcode 提示
-                if session.language == "en":
-                    hint = "Please choose one of the options!"
-                else:
-                    hint = "請從選項中選一個喜歡的答案喔！"
-                response_fields = build_jti_quiz_question_fields(
-                    q,
-                    current_q_num,
-                    session.language,
-                    prefix=hint,
-                )
-                response_message = response_fields["message"]
-
-                logger.info(f"QUIZ 無法判斷選項，hardcode 提示: {request.message}")
-
-                if request.turn_number:
-                    conversation_logger.delete_turns_from(request.session_id, request.turn_number)
-
-                log_result = conversation_logger.log_conversation(
-                    session_id=request.session_id,
-                    user_message=request.message,
-                    agent_response=response_message,
-                    tool_calls=[],
-                    session_state=build_session_state(session),
-                    mode="jti"
-                )
-                final_turn_number = log_result[1] if log_result else None
-
-                response_payload = ChatResponse(
-                    **response_fields,
-                    options=extract_option_texts(q),
-                    session=session.model_dump(),
-                    tool_calls=[],
-                    turn_number=final_turn_number
-                )
-                return attach_tts_message_id(response_payload, session.language, _get_tts_manager())
+        quiz_result = await handle_quiz_message(session, request)
+        if quiz_result:
+            return quiz_result
 
         # ========== 非 QUIZ 狀態 ==========
         should_start_quiz = is_quiz_start_intent(request.message)
