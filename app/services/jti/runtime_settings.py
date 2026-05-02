@@ -2,10 +2,18 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
 from pydantic import BaseModel, Field
 
+from app.services._shared.runtime_settings_base import (
+    NestedProfileRuntimeSettingsAdapter,
+    RULE_SECTION_FIELDS as _RULE_SECTION_FIELDS,
+    SYSTEM_DEFAULT_PROMPT_ID as _SYSTEM_DEFAULT_PROMPT_ID,
+    RuleSections,
+    RuntimeSettingsRepo,
+    WelcomeBlock,
+)
 from app.services.jti.agent_prompts import (
     DEFAULT_MAX_RESPONSE_CHARS,
     PERSONA,
@@ -14,21 +22,11 @@ from app.services.jti.agent_prompts import (
 )
 
 JTI_STORE_NAME = "__jti__"
-SYSTEM_DEFAULT_PROMPT_ID = "system_default"
+JTI_PROFILES_ATTR = "jti_profiles_by_prompt"
 PROFILE_PERSONA_KEY = "persona"
 PROFILE_RUNTIME_KEY = "runtime_settings"
-
-
-class RuleSections(BaseModel):
-    role_scope: str
-    scope_limits: str
-    response_style: str
-    knowledge_rules: str
-
-
-class WelcomeBlock(BaseModel):
-    title: str
-    description: str
+RULE_SECTION_FIELDS = _RULE_SECTION_FIELDS
+SYSTEM_DEFAULT_PROMPT_ID = _SYSTEM_DEFAULT_PROMPT_ID
 
 
 class JtiRuntimeSettings(BaseModel):
@@ -48,20 +46,9 @@ class JtiRuntimeSettings(BaseModel):
     max_response_chars: int = Field(default=DEFAULT_MAX_RESPONSE_CHARS, ge=0, le=600)
 
 
-RULE_SECTION_FIELDS = ("role_scope", "scope_limits", "response_style", "knowledge_rules")
-
-
 def get_default_runtime_settings() -> JtiRuntimeSettings:
     """Return default runtime settings."""
     return JtiRuntimeSettings()
-
-
-def _resolve_runtime_prompt_id(store_prompts, prompt_id: Optional[str]) -> str:
-    """Resolve runtime profile id. Falls back to active prompt, then system default."""
-    if isinstance(prompt_id, str) and prompt_id.strip():
-        return prompt_id
-    active_prompt_id = getattr(store_prompts, "active_prompt_id", None)
-    return active_prompt_id or SYSTEM_DEFAULT_PROMPT_ID
 
 
 def _default_persona_pair() -> Dict[str, str]:
@@ -72,71 +59,19 @@ def _default_persona_pair() -> Dict[str, str]:
     }
 
 
-def _get_profiles_map(store_prompts) -> Dict[str, Dict[str, Any]]:
-    raw_profiles = getattr(store_prompts, "jti_profiles_by_prompt", None)
-    return raw_profiles if isinstance(raw_profiles, dict) else {}
-
-
-def _load_raw_runtime_settings(store_prompts, prompt_id: str) -> Optional[Dict[str, Any]]:
-    """Load raw runtime settings from unified per-prompt profile map.
-
-    Falls back to system default profile if the requested prompt has no settings.
-    """
-    profiles = _get_profiles_map(store_prompts)
-
-    for pid in (prompt_id, SYSTEM_DEFAULT_PROMPT_ID):
-        profile = profiles.get(pid)
-        if isinstance(profile, dict):
-            raw = profile.get(PROFILE_RUNTIME_KEY)
-            if isinstance(raw, dict):
-                return raw
-
-    return None
-
-
-def _normalize_runtime_settings(raw: Optional[Dict[str, Any]]) -> JtiRuntimeSettings:
-    """Merge persisted raw settings with defaults and coerce into schema."""
-    settings = get_default_runtime_settings().model_dump()
-
-    if not isinstance(raw, dict):
-        return JtiRuntimeSettings(**settings)
-
-    # 新格式：分段規則
-    raw_sections = raw.get("response_rule_sections")
-    if isinstance(raw_sections, dict):
-        for lang in ("zh", "en"):
-            section_data = raw_sections.get(lang)
-            if isinstance(section_data, dict):
-                for field in RULE_SECTION_FIELDS:
-                    value = section_data.get(field)
-                    if isinstance(value, str) and value.strip():
-                        settings["response_rule_sections"][lang][field] = value
-
-    # 舊格式相容：response_rules[lang] 單一大字串，放入 response_style
-    raw_legacy_rules = raw.get("response_rules")
-    if isinstance(raw_legacy_rules, dict):
-        for lang in ("zh", "en"):
-            value = raw_legacy_rules.get(lang)
-            if isinstance(value, str) and value.strip():
-                settings["response_rule_sections"][lang]["response_style"] = value
-
-    raw_welcome = raw.get("welcome")
-    if isinstance(raw_welcome, dict):
-        for lang in ("zh", "en"):
-            block = raw_welcome.get(lang)
-            if isinstance(block, dict):
-                title = block.get("title")
-                description = block.get("description")
-                if isinstance(title, str) and title.strip():
-                    settings["welcome"][lang]["title"] = title
-                if isinstance(description, str) and description.strip():
-                    settings["welcome"][lang]["description"] = description
-
-    raw_limit = raw.get("max_response_chars")
-    if isinstance(raw_limit, int):
-        settings["max_response_chars"] = raw_limit
-
-    return JtiRuntimeSettings(**settings)
+_runtime_settings_repo = RuntimeSettingsRepo[JtiRuntimeSettings](
+    store_name=JTI_STORE_NAME,
+    settings_type=JtiRuntimeSettings,
+    default_settings_factory=get_default_runtime_settings,
+    default_max_response_chars=DEFAULT_MAX_RESPONSE_CHARS,
+    storage_adapter=NestedProfileRuntimeSettingsAdapter(
+        attr=JTI_PROFILES_ATTR,
+        runtime_key=PROFILE_RUNTIME_KEY,
+        persona_key=PROFILE_PERSONA_KEY,
+        default_persona_factory=_default_persona_pair,
+    ),
+    include_legacy_response_rules=True,
+)
 
 
 def load_runtime_settings_from_prompt_manager(
@@ -145,21 +80,11 @@ def load_runtime_settings_from_prompt_manager(
     store_name: str = JTI_STORE_NAME,
 ) -> JtiRuntimeSettings:
     """Load effective runtime settings from PromptManager."""
-    if not prompt_manager:
-        return get_default_runtime_settings()
-
-    store_prompts = prompt_manager.get_store_prompts(store_name)
-    runtime_prompt_id = _resolve_runtime_prompt_id(store_prompts, prompt_id)
-    raw = _load_raw_runtime_settings(store_prompts, runtime_prompt_id)
-
-    try:
-        settings = _normalize_runtime_settings(raw)
-        # 預設人物設定固定使用程式碼預設值，避免被歷史資料覆蓋。
-        if runtime_prompt_id == SYSTEM_DEFAULT_PROMPT_ID:
-            settings.max_response_chars = DEFAULT_MAX_RESPONSE_CHARS
-        return settings
-    except Exception:
-        return get_default_runtime_settings()
+    return _runtime_settings_repo.load_from_prompt_manager(
+        prompt_manager,
+        prompt_id,
+        store_name=store_name,
+    )
 
 
 def save_runtime_settings_to_prompt_manager(
@@ -169,16 +94,9 @@ def save_runtime_settings_to_prompt_manager(
     store_name: str = JTI_STORE_NAME,
 ) -> str:
     """Persist runtime settings in PromptManager under JTI store document."""
-    store_prompts = prompt_manager.get_store_prompts(store_name)
-    runtime_prompt_id = _resolve_runtime_prompt_id(store_prompts, prompt_id)
-
-    profiles_map = _get_profiles_map(store_prompts)
-    existing = profiles_map.get(runtime_prompt_id)
-    profile = existing if isinstance(existing, dict) else {}
-    profile.setdefault(PROFILE_PERSONA_KEY, _default_persona_pair())
-    profile[PROFILE_RUNTIME_KEY] = settings.model_dump()
-    profiles_map[runtime_prompt_id] = profile
-
-    store_prompts.jti_profiles_by_prompt = profiles_map
-    prompt_manager.save_store_prompts(store_prompts)
-    return runtime_prompt_id
+    return _runtime_settings_repo.save_to_prompt_manager(
+        prompt_manager,
+        settings,
+        prompt_id,
+        store_name=store_name,
+    )
