@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 
 import { normalizeHciotLanguage } from '../config/hciotTopics';
+import { useTransientStatus } from '../hooks/useTransientStatus';
 import * as api from '../services/api';
+import { toErrorMessage } from '../utils/errors';
 import JtiPersonaTab from './jti/JtiPersonaTab';
 
 interface Prompt {
@@ -43,7 +45,7 @@ export default function HciotSettingsModal({
   const [cloning, setCloning] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [successMsg, showSuccessMsg] = useTransientStatus();
   const [runtimeSettings, setRuntimeSettings] = useState<api.HciotRuntimeSettings | null>(null);
   const [runtimePromptId, setRuntimePromptId] = useState<string>(SYSTEM_DEFAULT_ID);
   const [defaultRuntimeSettings, setDefaultRuntimeSettings] = useState<api.HciotRuntimeSettings | null>(null);
@@ -149,10 +151,9 @@ export default function HciotSettingsModal({
       const latestActivePromptId = await loadPrompts();
       await refreshRuntimeSettings(latestActivePromptId);
       onPromptChange();
-      setSuccessMsg('✅ 已複製預設衛教助手設定並啟用');
-      setTimeout(() => setSuccessMsg(null), 3000);
+      showSuccessMsg('✅ 已複製預設衛教助手設定並啟用');
     } catch (error) {
-      alert(`複製失敗: ${error instanceof Error ? error.message : String(error)}`);
+      alert(`複製失敗: ${toErrorMessage(error)}`);
     } finally {
       setCloning(false);
     }
@@ -176,7 +177,7 @@ export default function HciotSettingsModal({
       onPromptChange();
     } catch (error) {
       await refreshRuntimeSettings(await loadPrompts());
-      alert(`設定失敗: ${error instanceof Error ? error.message : String(error)}`);
+      alert(`設定失敗: ${toErrorMessage(error)}`);
     }
   };
 
@@ -205,7 +206,7 @@ export default function HciotSettingsModal({
       }
       cancelEdit();
     } catch (error) {
-      alert(`更新失敗: ${error instanceof Error ? error.message : String(error)}`);
+      alert(`更新失敗: ${toErrorMessage(error)}`);
     }
   };
 
@@ -239,10 +240,9 @@ export default function HciotSettingsModal({
       if (wasActive) {
         onPromptChange();
       }
-      setSuccessMsg('✅ 已刪除衛教助手設定');
-      setTimeout(() => setSuccessMsg(null), 3000);
+      showSuccessMsg('✅ 已刪除衛教助手設定');
     } catch (error) {
-      alert(`刪除失敗: ${error instanceof Error ? error.message : String(error)}`);
+      alert(`刪除失敗: ${toErrorMessage(error)}`);
     } finally {
       setDeleting(false);
     }
@@ -265,10 +265,9 @@ export default function HciotSettingsModal({
       if (promptId === activePromptId) {
         onPromptChange();
       }
-      setSuccessMsg('✅ 已更新回覆規則');
-      setTimeout(() => setSuccessMsg(null), 3000);
+      showSuccessMsg('✅ 已更新回覆規則');
     } catch (error) {
-      alert(`儲存設定失敗: ${error instanceof Error ? error.message : String(error)}`);
+      alert(`儲存設定失敗: ${toErrorMessage(error)}`);
     } finally {
       setSavingRuntimeSettings(false);
     }

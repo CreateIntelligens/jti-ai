@@ -17,6 +17,8 @@ import {
   type HciotTopic,
 } from '../config/hciotTopics';
 import { useAutoResize } from '../hooks/useAutoResize';
+import { useEnterToSubmit } from '../hooks/useEnterToSubmit';
+import { useFocusOnOpen } from '../hooks/useFocusOnOpen';
 import { useScrollToBottom } from '../hooks/useScrollToBottom';
 import { useTheme } from '../hooks/useTheme';
 import * as api from '../services/api';
@@ -351,13 +353,7 @@ export default function Hciot() {
     writeStoredWorkspace(nextWorkspace);
   }, []);
 
-  useEffect(() => {
-    if (editingTurn !== null && editTextareaRef.current) {
-      editTextareaRef.current.focus();
-      const end = editTextareaRef.current.value.length;
-      editTextareaRef.current.setSelectionRange(end, end);
-    }
-  }, [editingTurn]);
+  useFocusOnOpen(editTextareaRef, editingTurn !== null);
 
   const resetConversationState = useCallback(() => {
     setLoading(false);
@@ -542,13 +538,25 @@ export default function Hciot() {
     setEditingTurn(null);
   };
 
+  const submitEditedMessage = useCallback(() => {
+    if (editingTurn !== null && editText.trim()) {
+      void handleEditAndResend(editingTurn, editText.trim());
+    }
+  }, [editText, editingTurn, handleEditAndResend]);
+
+  const submitUserInput = useCallback(() => {
+    const trimmed = userInput.trim();
+    if (trimmed) {
+      void sendMessage(trimmed);
+    }
+  }, [sendMessage, userInput]);
+
+  const handleEditEnterSubmit = useEnterToSubmit(submitEditedMessage);
+  const handleEnterSubmit = useEnterToSubmit(submitUserInput);
+
   const handleEditKeyDown = (event: React.KeyboardEvent, turnNumber: number) => {
-    if (event.nativeEvent.isComposing) return;
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      if (editText.trim()) {
-        void handleEditAndResend(turnNumber, editText.trim());
-      }
+    if (turnNumber === editingTurn) {
+      handleEditEnterSubmit(event);
     }
     if (event.key === 'Escape') {
       setEditingTurn(null);
@@ -564,14 +572,7 @@ export default function Hciot() {
   };
 
   const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (event.nativeEvent.isComposing) return;
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      const trimmed = userInput.trim();
-      if (trimmed) {
-        void sendMessage(trimmed);
-      }
-    }
+    handleEnterSubmit(event);
   };
 
   const handleSelectTopic = (topic: HciotTopic) => {

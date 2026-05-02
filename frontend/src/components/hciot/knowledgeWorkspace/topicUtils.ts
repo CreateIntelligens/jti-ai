@@ -4,6 +4,7 @@ import type {
   HciotLabels,
   HciotTopicCategory,
 } from '../../../services/api/hciot';
+import { toErrorMessage } from '../../../utils/errors';
 
 export const NO_TOPIC_KEY = '__no_topic__';
 export const NEW_VALUE = '__new__';
@@ -173,7 +174,7 @@ export function getMetadataPayload(data: HciotKnowledgeFile | FileMetadataDraft)
 }
 
 export function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
+  return toErrorMessage(error);
 }
 
 function buildGenericOptions<T extends { id: string; labels: HciotLabels }>(

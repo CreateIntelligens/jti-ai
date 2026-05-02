@@ -3,6 +3,7 @@ import { Image as ImageIcon, Loader2, Plus, Table, Trash2, Upload, X, XCircle } 
 
 import type { HciotLanguage } from '../../../../config/hciotTopics';
 import type { HciotImage } from '../../../../services/api/hciot';
+import { toErrorMessage } from '../../../../utils/errors';
 import { getHciotImageUrl } from '../../../../utils/hciotImage';
 import ExistingImagePicker from '../explorer/ExistingImagePicker';
 import {
@@ -222,9 +223,9 @@ export default function QaUploadTab({
           };
           preparedRows[i] = { ...preparedRows[i], ...updates };
           updateRow(i, updates);
-        } catch (error: any) {
+        } catch (error) {
           failedIndex = i;
-          failedMsg = error?.message || String(error);
+          failedMsg = toErrorMessage(error);
           throw error;
         }
       }
@@ -243,7 +244,7 @@ export default function QaUploadTab({
           updateRow(failedIndex, { imgStatus: 'error', imgError: failedMsg });
         }
       }
-      alert(error instanceof Error ? error.message : String(error));
+      alert(toErrorMessage(error));
     } finally {
       setUploadingLocal(false);
     }

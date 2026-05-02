@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import * as api from '../services/api';
+import { useTransientStatus } from '../hooks/useTransientStatus';
+import { toErrorMessage } from '../utils/errors';
 import JtiPersonaTab from './jti/JtiPersonaTab';
 import JtiKnowledgeTab from './jti/JtiKnowledgeTab';
 import JtiQuizTab from './jti/JtiQuizTab';
@@ -49,7 +51,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   const [cloning, setCloning] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [successMsg, showSuccessMsg] = useTransientStatus();
   const [runtimeSettings, setRuntimeSettings] = useState<api.JtiRuntimeSettings | null>(null);
   const [runtimePromptId, setRuntimePromptId] = useState<string>(SYSTEM_DEFAULT_ID);
   const [defaultRuntimeSettings, setDefaultRuntimeSettings] = useState<api.JtiRuntimeSettings | null>(null);
@@ -166,8 +168,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
       const latestActivePromptId = await loadPrompts();
       await refreshRuntimeSettings(latestActivePromptId);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      alert('建立失敗: ' + msg);
+      alert('建立失敗: ' + toErrorMessage(e));
     } finally {
       setCreating(false);
     }
@@ -180,11 +181,9 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
       const latestActivePromptId = await loadPrompts();
       await refreshRuntimeSettings(latestActivePromptId);
       onPromptChange();
-      setSuccessMsg('✅ 已複製預設人物設定並啟用');
-      setTimeout(() => setSuccessMsg(null), 3000);
+      showSuccessMsg('✅ 已複製預設人物設定並啟用');
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      alert('複製失敗: ' + msg);
+      alert('複製失敗: ' + toErrorMessage(e));
     } finally {
       setCloning(false);
     }
@@ -197,8 +196,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
       await refreshRuntimeSettings(latestActivePromptId);
       onPromptChange();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      alert('設定失敗: ' + msg);
+      alert('設定失敗: ' + toErrorMessage(e));
     }
   };
 
@@ -221,12 +219,10 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
       const latestActivePromptId = await loadPrompts();
       await refreshRuntimeSettings(latestActivePromptId);
       if (editingId === activePromptId) onPromptChange();
-      setSuccessMsg('✅ 已儲存人物設定');
-      setTimeout(() => setSuccessMsg(null), 3000);
+      showSuccessMsg('✅ 已儲存人物設定');
       cancelEdit();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      alert('更新失敗: ' + msg);
+      alert('更新失敗: ' + toErrorMessage(e));
     }
   };
 
@@ -243,11 +239,9 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
       const latestActivePromptId = await loadPrompts();
       await refreshRuntimeSettings(latestActivePromptId);
       if (promptId === activePromptId) onPromptChange();
-      setSuccessMsg('✅ 已刪除人物設定');
-      setTimeout(() => setSuccessMsg(null), 3000);
+      showSuccessMsg('✅ 已刪除人物設定');
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      alert('刪除失敗: ' + msg);
+      alert('刪除失敗: ' + toErrorMessage(e));
     } finally {
       setDeleting(false);
     }
@@ -268,11 +262,9 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
       setRuntimeSettings(result.settings);
       setRuntimePromptId(promptId);
       if (promptId === activePromptId) onPromptChange();
-      setSuccessMsg('✅ 已更新回覆規則');
-      setTimeout(() => setSuccessMsg(null), 3000);
+      showSuccessMsg('✅ 已更新回覆規則');
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      alert('儲存設定失敗: ' + msg);
+      alert('儲存設定失敗: ' + toErrorMessage(e));
     } finally {
       setSavingRuntimeSettings(false);
     }
@@ -298,11 +290,9 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
         await api.uploadJtiKnowledgeFile(normalizedLanguage, file);
       }
       await loadKbFiles();
-      setSuccessMsg(`✅ 已上傳 ${files.length} 個檔案`);
-      setTimeout(() => setSuccessMsg(null), 3000);
+      showSuccessMsg(`✅ 已上傳 ${files.length} 個檔案`);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      alert('上傳失敗: ' + msg);
+      alert('上傳失敗: ' + toErrorMessage(e));
     } finally {
       setUploading(false);
     }
@@ -328,8 +318,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
     try {
       await api.downloadJtiKnowledgeFile(filename, normalizedLanguage);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      alert('下載失敗: ' + msg);
+      alert('下載失敗: ' + toErrorMessage(e));
     }
   };
 
@@ -343,11 +332,9 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
       await api.updateJtiKnowledgeFileContent(viewingFile, fileEditContent, normalizedLanguage);
       setFileContent(fileEditContent);
       setIsEditing(false);
-      setSuccessMsg('✅ 已儲存變更');
-      setTimeout(() => setSuccessMsg(null), 3000);
+      showSuccessMsg('✅ 已儲存變更');
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      alert('儲存失敗: ' + msg);
+      alert('儲存失敗: ' + toErrorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -369,11 +356,9 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
     }
     try {
       await api.deleteJtiKnowledgeFile(fileName, normalizedLanguage);
-      setSuccessMsg('✅ 已刪除檔案');
-      setTimeout(() => setSuccessMsg(null), 3000);
+      showSuccessMsg('✅ 已刪除檔案');
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      alert('刪除失敗: ' + msg);
+      alert('刪除失敗: ' + toErrorMessage(e));
     } finally {
       setDeletingFiles(prev => prev.filter(name => name !== fileName));
       void loadKbFiles(false);

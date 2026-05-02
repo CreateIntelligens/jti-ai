@@ -1,6 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { BookOpen, History, MessageSquare, Pencil, Plus, RefreshCw, RotateCcw, Send } from 'lucide-react';
 import type { Message } from '../types';
+import { useEnterToSubmit } from '../hooks/useEnterToSubmit';
+import { useFocusOnOpen } from '../hooks/useFocusOnOpen';
 import { useScrollToBottom } from '../hooks/useScrollToBottom';
 import CitationsList from './CitationsList';
 
@@ -57,45 +59,43 @@ export default function ChatArea({
     }
   }, [shouldFocus, disabled]);
 
-  useEffect(() => {
-    if (editingTurn !== null && editTextareaRef.current) {
-      editTextareaRef.current.focus();
-      const len = editTextareaRef.current.value.length;
-      editTextareaRef.current.setSelectionRange(len, len);
-    }
-  }, [editingTurn]);
+  useFocusOnOpen(editTextareaRef, editingTurn !== null);
 
-  const handleSubmit = (e: { preventDefault(): void }) => {
-    e.preventDefault();
+  const submitInput = useCallback(() => {
     if (input.trim()) {
       onSendMessage(input.trim());
       setInput('');
       setShouldFocus(true);
     }
+  }, [input, onSendMessage]);
+
+  const handleSubmit = (e: { preventDefault(): void }) => {
+    e.preventDefault();
+    submitInput();
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.nativeEvent.isComposing) return;
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSubmit(e);
-    }
-  };
+  const handleKeyDown = useEnterToSubmit(submitInput);
 
-  const handleEditKeyDown = (e: React.KeyboardEvent, turnNumber: number) => {
-    if (e.nativeEvent.isComposing) return;
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleEditSubmit(turnNumber);
-    }
-    if (e.key === 'Escape') setEditingTurn(null);
-  };
-
-  const handleEditSubmit = (turnNumber: number) => {
+  const handleEditSubmit = useCallback((turnNumber: number) => {
     if (editText.trim() && onEditAndResend) {
       onEditAndResend(turnNumber, editText.trim());
       setEditingTurn(null);
     }
+  }, [editText, onEditAndResend]);
+
+  const submitEditedMessage = useCallback(() => {
+    if (editingTurn !== null) {
+      handleEditSubmit(editingTurn);
+    }
+  }, [editingTurn, handleEditSubmit]);
+
+  const handleEditEnterSubmit = useEnterToSubmit(submitEditedMessage);
+
+  const handleEditKeyDown = (e: React.KeyboardEvent, turnNumber: number) => {
+    if (turnNumber === editingTurn) {
+      handleEditEnterSubmit(e);
+    }
+    if (e.key === 'Escape') setEditingTurn(null);
   };
 
   const startEditing = (msg: Message) => {

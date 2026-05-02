@@ -10,6 +10,7 @@ import ConversationHistoryModal from './components/ConversationHistoryModal';
 import Jti from './pages/Jti';
 import Hciot from './pages/Hciot';
 import { useAppChat } from './hooks/useAppChat';
+import { PROJECT_COLORS, getStoreIcon } from './utils/storeDisplay';
 import './styles/shared/index.css';
 import './styles/app/layout.css';
 import './styles/app/forms.css';
@@ -73,9 +74,7 @@ export default function App() {
     ? stores.find((s) => s.name === currentTarget.storeName)
     : null;
   const currentStoreName = activeStore ? (activeStore.display_name || activeStore.name) : null;
-  const currentStoreIcon = activeStore?.managed_app === 'jti' ? '🏢'
-    : activeStore?.managed_app === 'hciot' ? '🏥' : '📁';
-  const PROJECT_COLORS = ['#0f766e', '#7c3aed', '#d97706', '#0284c7', '#dc2626', '#059669'];
+  const currentStoreIcon = getStoreIcon(activeStore?.managed_app || '');
   const currentProjectIdx = typeof activeStore?.key_index === 'number' ? activeStore.key_index : 0;
   const currentProjectName = keyNames.length > 1
     ? (keyNames[currentProjectIdx] || `Key #${currentProjectIdx + 1}`)

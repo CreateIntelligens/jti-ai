@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useTheme } from './useTheme';
+import { useTransientStatus } from './useTransientStatus';
 import * as api from '../services/api';
+import { toErrorMessage } from '../utils/errors';
 import type {
   Store,
   FileItem,
@@ -9,10 +11,6 @@ import type {
   AppTarget,
   KnowledgeLanguage,
 } from '../types';
-
-function toErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 function normalizeKeyLabels(keyNames: unknown): string[] {
   if (!Array.isArray(keyNames)) return [];
@@ -94,7 +92,7 @@ export function useAppChat() {
   const [promptModalOpen, setPromptModalOpen] = useState(false);
   const [userApiKeyModalOpen, setUserApiKeyModalOpen] = useState(false);
   const [conversationHistoryModalOpen, setConversationHistoryModalOpen] = useState(false);
-  const [status, setStatus] = useState('');
+  const [statusMessage, showStatus] = useTransientStatus();
   const [stores, setStores] = useState<Store[]>([]);
   const [keyNames, setKeyNames] = useState<string[]>([]);
   const [projectFilter, setProjectFilter] = useState(
@@ -135,11 +133,6 @@ export function useAppChat() {
   };
 
   const toggleSidebar = () => setSidebarOpen(!sidebarOpen);
-
-  const showStatus = (msg: string) => {
-    setStatus(msg);
-    setTimeout(() => setStatus(''), 3000);
-  };
 
   const refreshStores = useCallback(async () => {
     try {
@@ -490,8 +483,9 @@ export function useAppChat() {
     promptModalOpen, setPromptModalOpen,
     userApiKeyModalOpen, setUserApiKeyModalOpen,
     conversationHistoryModalOpen, setConversationHistoryModalOpen,
-    status,
+    status: statusMessage || '',
     stores,
+    keyNames,
     projectFilter,
     projectFilterOptions,
     knowledgeTargets,

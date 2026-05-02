@@ -8,6 +8,8 @@ import JtiInputArea from '../components/jti/JtiInputArea';
 import { fetchWithApiKey, getJtiRuntimeSettings } from '../services/api';
 import { useTheme } from '../hooks/useTheme';
 import { useAutoResize } from '../hooks/useAutoResize';
+import { useEnterToSubmit } from '../hooks/useEnterToSubmit';
+import { useFocusOnOpen } from '../hooks/useFocusOnOpen';
 import { useScrollToBottom } from '../hooks/useScrollToBottom';
 import '../styles/shared/index.css';
 import '../styles/jti/layout.css';
@@ -246,14 +248,7 @@ export default function Jti() {
     return ttsStateMap[id];
   }, [ttsStateMap]);
 
-  // 進入編輯模式時自動 focus 編輯框
-  useEffect(() => {
-    if (editingTurn !== null && editTextareaRef.current) {
-      editTextareaRef.current.focus();
-      const len = editTextareaRef.current.value.length;
-      editTextareaRef.current.setSelectionRange(len, len);
-    }
-  }, [editingTurn]);
+  useFocusOnOpen(editTextareaRef, editingTurn !== null);
 
   // Reset unmounted flag on mount (required for HMR/hot reload where ref persists across remounts)
   useEffect(() => {
@@ -519,13 +514,25 @@ export default function Jti() {
     setEditingTurn(null);
   };
 
+  const submitEditedMessage = useCallback(() => {
+    if (editingTurn !== null && editText.trim()) {
+      void handleEditAndResend(editingTurn, editText.trim());
+    }
+  }, [editText, editingTurn, handleEditAndResend]);
+
+  const submitUserInput = useCallback(() => {
+    const msg = userInput.trim();
+    if (msg) {
+      void sendMessage(msg);
+    }
+  }, [sendMessage, userInput]);
+
+  const handleEditEnterSubmit = useEnterToSubmit(submitEditedMessage);
+  const handleEnterSubmit = useEnterToSubmit(submitUserInput);
+
   const handleEditKeyDown = (e: React.KeyboardEvent, turnNumber: number) => {
-    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (editText.trim()) {
-        handleEditAndResend(turnNumber, editText.trim());
-      }
+    if (turnNumber === editingTurn) {
+      handleEditEnterSubmit(e);
     }
     if (e.key === 'Escape') {
       setEditingTurn(null);
@@ -539,12 +546,7 @@ export default function Jti() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.nativeEvent.isComposing || e.keyCode === 229) return;
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      const msg = userInput.trim();
-      if (msg) sendMessage(msg);
-    }
+    handleEnterSubmit(e);
   };
 
   const quickActions = [
