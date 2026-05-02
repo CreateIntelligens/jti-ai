@@ -426,9 +426,6 @@ export default function Jti() {
       await new Promise(resolve => setTimeout(resolve, 300));
       setIsTyping(false);
 
-      console.log(`[用戶] ${message}`);
-      console.log(`[AI回應] ${data.message} (Turn: ${data.turn_number})`);
-
       const newMsg: Message = data.error && !data.message
         ? { text: `⚠️ ${data.error}`, type: 'system', timestamp: Date.now() }
         : {

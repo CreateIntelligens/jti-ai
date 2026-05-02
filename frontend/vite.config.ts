@@ -7,15 +7,9 @@ export default defineConfig({
     port: 5174,
     host: '0.0.0.0',
     strictPort: true,
-    cors: true, // 啟用 CORS
+    cors: true,
     hmr: {
-      clientPort: parseInt(process.env.PORT || '8913'), // HMR 透過 nginx port
-    },
-    proxy: {
-      '/api': {
-        target: 'http://localhost:5000',
-        changeOrigin: true,
-      },
+      clientPort: parseInt(process.env.PORT || '8008'),
     },
   },
   cacheDir: '/tmp/.vite-cache',

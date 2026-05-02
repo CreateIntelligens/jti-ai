@@ -217,10 +217,7 @@ class BaseAgent:
 
     def _sync_history_to_db_background(self, *args, **kwargs):
         """Asynchronously write to DB without blocking response."""
-        try:
-            asyncio.get_running_loop().run_in_executor(None, lambda: self._sync_history_to_db(*args, **kwargs))
-        except Exception:
-            self._sync_history_to_db(*args, **kwargs)
+        asyncio.get_running_loop().run_in_executor(None, lambda: self._sync_history_to_db(*args, **kwargs))
 
     def remove_session(self, session_id: str):
         """清除記憶體中的 chat session"""

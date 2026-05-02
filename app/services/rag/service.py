@@ -12,10 +12,15 @@ logger = logging.getLogger(__name__)
 class RAGPipeline:
     """Orchestrates the RAG retrieval flow."""
     
+    _DEFAULT_DISTANCE_THRESHOLD = 0.85
+
     def __init__(self):
         # Using factory functions for lazy initialization
         self._embedding_service = None
         self._vector_store = None
+        self._distance_threshold = float(
+            os.getenv("RAG_DISTANCE_THRESHOLD", str(self._DEFAULT_DISTANCE_THRESHOLD))
+        )
 
     @property
     def embedding_service(self):
@@ -29,11 +34,9 @@ class RAGPipeline:
             self._vector_store = get_lancedb_store()
         return self._vector_store
 
-    _DEFAULT_DISTANCE_THRESHOLD = 0.85
-
     @property
     def distance_threshold(self) -> float:
-        return float(os.getenv("RAG_DISTANCE_THRESHOLD", str(self._DEFAULT_DISTANCE_THRESHOLD)))
+        return self._distance_threshold
 
     def retrieve(
         self,

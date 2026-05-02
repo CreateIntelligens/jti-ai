@@ -1,20 +1,26 @@
+import { useEffect, useState } from 'react';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
-import StoreManagementModal from './components/StoreManagementModal';
-import PromptManagementModal from './components/PromptManagementModal';
-import UserApiKeyModal from './components/UserApiKeyModal';
+import AdminPanel from './components/AdminPanel';
+import ApiKeysPanel from './components/ApiKeysPanel';
+import PromptPanel from './components/PromptPanel';
+import ExtKeysPanel from './components/ExtKeysPanel';
 import ConversationHistoryModal from './components/ConversationHistoryModal';
 import Jti from './pages/Jti';
 import Hciot from './pages/Hciot';
 import { useAppChat } from './hooks/useAppChat';
-import * as api from './services/api';
 import './styles/shared/index.css';
 import './styles/app/layout.css';
 import './styles/app/forms.css';
 import './styles/app/components.css';
 import './styles/app/messages.css';
 import './styles/app/light.css';
+import './styles/app/variables.css';
+import './styles/app/redesign.css';
+import './styles/conversation-history.css';
+
+type PanelId = 'admin' | 'apikeys' | 'prompt' | 'extkeys' | null;
 
 export default function App() {
   // 受限 hostname（外網 domain）只顯示 ALLOWED_PAGES；其餘顯示全部
@@ -31,71 +37,81 @@ export default function App() {
 
   const isHciotPage = page === 'hciot' && canShow('hciot');
   const isJtiPage = page === 'jti' && canShow('jti');
-  const activeGeminiKeyName = api.getActiveApiKeyName();
 
-  if (isHciotPage) {
-    if (pathname !== '/hciot') window.history.replaceState(null, '', '/hciot');
-    return <Hciot />;
-  }
+  useEffect(() => {
+    if (isHciotPage && pathname !== '/hciot') window.history.replaceState(null, '', '/hciot');
+    else if (isJtiPage && pathname !== '/jti') window.history.replaceState(null, '', '/jti');
+  }, [isHciotPage, isJtiPage, pathname]);
 
-  if (isJtiPage) {
-    if (pathname !== '/jti') window.history.replaceState(null, '', '/jti');
-    return <Jti />;
-  }
+  if (isHciotPage) return <Hciot />;
+  if (isJtiPage) return <Jti />;
 
   const {
     sidebarOpen,
-    storeModalOpen, setStoreModalOpen,
-    promptModalOpen, setPromptModalOpen,
-    userApiKeyModalOpen, setUserApiKeyModalOpen,
     conversationHistoryModalOpen, setConversationHistoryModalOpen,
-    status, stores, projectFilter, projectFilterOptions, knowledgeTargets, currentTargetId, currentStore, managedContext,
+    status, stores, keyNames,
+    knowledgeTargets, currentTarget, currentTargetId, currentStore,
     files, filesLoading,
     messages, setMessages,
     loading,
     sessionId, setSessionId,
     theme, toggleTheme,
     toggleSidebar, showStatus,
-    refreshStores, handleRefreshKnowledge, setProjectFilter,
+    refreshStores, handleRefreshKnowledge,
     handleStoreChange, handleRestartChat,
     handleCreateStore, handleDeleteStore,
     handleUploadFile, handleDeleteFile,
     handleSendMessage, handleRegenerate, handleEditAndResend,
   } = useAppChat();
 
+  const [panel, setPanel] = useState<PanelId>(null);
+  const openPanel = (id: PanelId) => setPanel(id);
+  const closePanel = () => setPanel(null);
+
+  // Derive store display info for chat area
+  const activeStore = currentTarget?.kind === 'store'
+    ? stores.find((s) => s.name === currentTarget.storeName)
+    : null;
+  const currentStoreName = activeStore ? (activeStore.display_name || activeStore.name) : null;
+  const currentStoreIcon = activeStore?.managed_app === 'jti' ? '🏢'
+    : activeStore?.managed_app === 'hciot' ? '🏥' : '📁';
+  const PROJECT_COLORS = ['#0f766e', '#7c3aed', '#d97706', '#0284c7', '#dc2626', '#059669'];
+  const currentProjectIdx = typeof activeStore?.key_index === 'number' ? activeStore.key_index : 0;
+  const currentProjectName = keyNames.length > 1
+    ? (keyNames[currentProjectIdx] || `Key #${currentProjectIdx + 1}`)
+    : null;
+  const currentProjectColor = PROJECT_COLORS[currentProjectIdx % PROJECT_COLORS.length];
+
   return (
     <>
-      <div className="app-container">
+      <div className="app-shell">
         <Header
-          onToggleSidebar={toggleSidebar}
           sidebarOpen={sidebarOpen}
-          onOpenStoreManagement={() => setStoreModalOpen(true)}
-          onOpenUserApiKeySettings={() => setUserApiKeyModalOpen(true)}
-          activeGeminiKeyName={activeGeminiKeyName === 'system' ? '系統預設' : activeGeminiKeyName}
-          onOpenConversationHistory={() => setConversationHistoryModalOpen(true)}
-          onRestartChat={handleRestartChat}
-          canOpenConversationHistory={Boolean(currentStore)}
-          canRestartChat={Boolean(currentStore)}
+          onToggleSidebar={toggleSidebar}
+          status={status}
           theme={theme}
           onToggleTheme={toggleTheme}
+          canOpenConversationHistory={Boolean(currentStore)}
+          onOpenConversationHistory={() => setConversationHistoryModalOpen(true)}
+          onOpenAdminPanel={() => openPanel('admin')}
+          onOpenApiKeysPanel={() => openPanel('apikeys')}
+          onOpenPromptPanel={() => openPanel('prompt')}
+          onOpenExtKeysPanel={() => openPanel('extkeys')}
+          onShowStatus={showStatus}
         />
-        <div className="app-content">
+        <div className="app-body">
           <Sidebar
             isOpen={sidebarOpen}
-            projectFilter={projectFilter}
-            projectFilterOptions={projectFilterOptions}
+            stores={stores}
+            keyNames={keyNames}
             knowledgeTargets={knowledgeTargets}
             currentTargetId={currentTargetId}
-            managedContext={managedContext}
             files={files}
             filesLoading={filesLoading}
-            onProjectFilterChange={setProjectFilter}
             onTargetChange={handleStoreChange}
             onUploadFile={handleUploadFile}
             onDeleteFile={handleDeleteFile}
-            onRefresh={handleRefreshKnowledge}
-            onOpenPromptManagement={() => setPromptModalOpen(true)}
-            onShowStatus={showStatus}
+            onCreateStore={handleCreateStore}
           />
           <ChatArea
             messages={messages}
@@ -104,33 +120,52 @@ export default function App() {
             loading={loading}
             onRegenerate={handleRegenerate}
             onEditAndResend={handleEditAndResend}
+            currentStoreName={currentStoreName}
+            currentStoreIcon={currentStoreIcon}
+            currentProjectName={currentProjectName}
+            currentProjectColor={currentProjectColor}
+            onOpenPromptPanel={() => openPanel('prompt')}
+            onRestartChat={handleRestartChat}
+            onOpenHistory={() => setConversationHistoryModalOpen(true)}
+            onCreateStore={() => openPanel('admin')}
           />
         </div>
       </div>
-      <StoreManagementModal
-        isOpen={storeModalOpen}
-        onClose={() => setStoreModalOpen(false)}
+
+      {/* ── Slide Panels ── */}
+      <AdminPanel
+        isOpen={panel === 'admin'}
+        onClose={closePanel}
         stores={stores}
         currentStore={currentStore}
         onCreateStore={handleCreateStore}
         onDeleteStore={handleDeleteStore}
         onRefresh={refreshStores}
       />
-      <PromptManagementModal
-        isOpen={promptModalOpen}
-        onClose={() => setPromptModalOpen(false)}
-        currentStore={currentStore}
-        onRestartChat={handleRestartChat}
-        stores={stores}
-      />
-      <UserApiKeyModal
-        isOpen={userApiKeyModalOpen}
-        onClose={() => setUserApiKeyModalOpen(false)}
+      <ApiKeysPanel
+        isOpen={panel === 'apikeys'}
+        onClose={closePanel}
         onApiKeySaved={() => {
           showStatus('✅ API Key 已儲存');
           void handleRefreshKnowledge();
         }}
       />
+      <PromptPanel
+        isOpen={panel === 'prompt'}
+        onClose={closePanel}
+        currentStore={currentStore}
+        currentStoreName={currentStoreName}
+        onRestartChat={handleRestartChat}
+        onShowStatus={showStatus}
+      />
+      <ExtKeysPanel
+        isOpen={panel === 'extkeys'}
+        onClose={closePanel}
+        stores={stores}
+        onShowStatus={showStatus}
+      />
+
+      {/* ── Conversation History (kept as modal) ── */}
       <ConversationHistoryModal
         isOpen={conversationHistoryModalOpen}
         onClose={() => setConversationHistoryModalOpen(false)}
@@ -148,11 +183,6 @@ export default function App() {
           // General 模式目前不處理語言切換（沒有多語言支援）
         }}
       />
-      {status && (
-        <div className="status-toast" role="status" aria-live="polite">
-          {status}
-        </div>
-      )}
     </>
   );
 }

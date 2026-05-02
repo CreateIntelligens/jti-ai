@@ -14,8 +14,11 @@ from pydantic import BaseModel
 
 from app.auth import verify_admin, verify_auth
 from app.routers.knowledge_utils import (
+    EDITABLE_EXTENSIONS,
+    TEXT_PREVIEW_EXTENSIONS,
     delete_from_rag,
     extract_docx_text,
+    safe_filename,
     sync_to_rag,
     write_docx_text,
 )
@@ -26,8 +29,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/knowledge", tags=["Knowledge Management"], dependencies=[Depends(verify_admin)])
 
-EDITABLE_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".yaml", ".yml", ".docx"}
-TEXT_PREVIEW_EXTENSIONS = EDITABLE_EXTENSIONS | {".log", ".py", ".js", ".html"}
 SUPPORTED_APPS = {"jti", "hciot"}
 
 
@@ -36,10 +37,6 @@ def _normalize_app_name(app_name: str) -> str:
     if normalized not in SUPPORTED_APPS:
         raise HTTPException(status_code=400, detail="Unsupported app. Use 'jti' or 'hciot'.")
     return normalized
-
-
-def _safe_filename(name: str) -> str:
-    return Path(name).name
 
 
 def _store_for(namespace: str):
@@ -76,7 +73,7 @@ def get_file_content(
     auth: dict = Depends(verify_auth),
 ):
     namespace = _normalize_app_name(app_name)
-    safe_name = _safe_filename(filename)
+    safe_name = safe_filename(filename)
     store = _store_for(namespace)
     doc = store.get_file(language, safe_name)
     if not doc:
@@ -121,7 +118,7 @@ def download_file(
     auth: dict = Depends(verify_auth),
 ):
     namespace = _normalize_app_name(app_name)
-    safe_name = _safe_filename(filename)
+    safe_name = safe_filename(filename)
     store = _store_for(namespace)
     doc = store.get_file(language, safe_name)
     if not doc:
@@ -142,7 +139,7 @@ async def update_file_content(
     auth: dict = Depends(verify_auth),
 ):
     namespace = _normalize_app_name(app_name)
-    safe_name = _safe_filename(filename)
+    safe_name = safe_filename(filename)
     ext = Path(safe_name).suffix.lower()
     if ext not in EDITABLE_EXTENSIONS:
         raise HTTPException(status_code=400, detail="此檔案格式不支援線上編輯")
@@ -182,7 +179,7 @@ async def upload_knowledge_file(
 ):
     namespace = _normalize_app_name(app_name)
     display_name = file.filename or f"file_{uuid.uuid4().hex[:8]}"
-    safe_name = _safe_filename(display_name)
+    safe_name = safe_filename(display_name)
     file_bytes = await file.read()
 
     ext = Path(safe_name).suffix.lower()
@@ -223,7 +220,7 @@ def delete_knowledge_file(
     auth: dict = Depends(verify_auth),
 ):
     namespace = _normalize_app_name(app_name)
-    safe_name = _safe_filename(filename)
+    safe_name = safe_filename(filename)
     store = _store_for(namespace)
     doc = store.get_file(language, safe_name)
     if not doc:

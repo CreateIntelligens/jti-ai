@@ -349,14 +349,14 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
 # ========== Health & Root ==========
 
 @app.get("/health")
-def health_check():
+async def health_check():
     """Service health check (no auth required)."""
     checks = {}
 
     # 1. MongoDB
     try:
         mongo = get_mongo_client()
-        checks["mongodb"] = mongo.health_check()
+        checks["mongodb"] = await asyncio.to_thread(mongo.health_check)
     except Exception:
         checks["mongodb"] = False
 

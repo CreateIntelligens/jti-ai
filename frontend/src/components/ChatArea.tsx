@@ -1,7 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Pencil, RotateCcw, SendHorizontal } from 'lucide-react';
+import { BookOpen, History, MessageSquare, Pencil, Plus, RefreshCw, RotateCcw, Send } from 'lucide-react';
 import type { Message } from '../types';
+import { useScrollToBottom } from '../hooks/useScrollToBottom';
 import CitationsList from './CitationsList';
+
+const QUICK_PROMPTS = ['幫我總結主要內容', '有哪些常見問題？', '請給我快速入門指南'];
 
 interface ChatAreaProps {
   messages: Message[];
@@ -10,6 +13,15 @@ interface ChatAreaProps {
   loading: boolean;
   onRegenerate?: (turnNumber: number) => void;
   onEditAndResend?: (turnNumber: number, newText: string) => void;
+  /* New props for the redesigned layout */
+  currentStoreName?: string | null;
+  currentStoreIcon?: string;
+  currentProjectName?: string | null;
+  currentProjectColor?: string;
+  onOpenPromptPanel?: () => void;
+  onRestartChat?: () => void;
+  onOpenHistory?: () => void;
+  onCreateStore?: () => void;
 }
 
 export default function ChatArea({
@@ -19,6 +31,14 @@ export default function ChatArea({
   loading,
   onRegenerate,
   onEditAndResend,
+  currentStoreName,
+  currentStoreIcon,
+  currentProjectName,
+  currentProjectColor,
+  onOpenPromptPanel,
+  onRestartChat,
+  onOpenHistory,
+  onCreateStore,
 }: ChatAreaProps) {
   const [input, setInput] = useState('');
   const [shouldFocus, setShouldFocus] = useState(false);
@@ -28,9 +48,7 @@ export default function ChatArea({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
+  useScrollToBottom(chatEndRef, [messages, loading]);
 
   useEffect(() => {
     if (shouldFocus && textareaRef.current && !disabled) {
@@ -39,11 +57,9 @@ export default function ChatArea({
     }
   }, [shouldFocus, disabled]);
 
-  // 進入編輯模式時自動 focus 編輯框
   useEffect(() => {
     if (editingTurn !== null && editTextareaRef.current) {
       editTextareaRef.current.focus();
-      // 游標移到最後
       const len = editTextareaRef.current.value.length;
       editTextareaRef.current.setSelectionRange(len, len);
     }
@@ -72,9 +88,7 @@ export default function ChatArea({
       e.preventDefault();
       handleEditSubmit(turnNumber);
     }
-    if (e.key === 'Escape') {
-      setEditingTurn(null);
-    }
+    if (e.key === 'Escape') setEditingTurn(null);
   };
 
   const handleEditSubmit = (turnNumber: number) => {
@@ -90,36 +104,121 @@ export default function ChatArea({
     setEditText(msg.text || '');
   };
 
+  const sendQuick = (text: string) => {
+    onSendMessage(text);
+  };
+
+  const hasStore = Boolean(currentStoreName);
+
   return (
-    <main>
-      <div className="chat-history custom-scrollbar" role="log" aria-live="polite" aria-label="對話歷史">
-        {messages.length === 0 ? (
-          <div className="empty-state">
-            <h3>開始對話</h3>
-            <p>選擇知識庫後輸入問題</p>
-          </div>
-        ) : (
-          messages.map((msg, idx) => (
+    <main className="chat-area">
+      {/* ── Top bar ── */}
+      {hasStore && (
+        <div className="chat-topbar">
+          <div className="ctl-label">
             <div
-              key={idx}
-              className={`message-wrapper ${msg.role}`}
-            >
-              <div
-                className={`message ${msg.role} ${msg.error ? 'error' : ''}`}
-                role="article"
-                aria-label={msg.role === 'user' ? '使用者訊息' : 'AI 回覆'}
+              className="ctl-dot"
+              style={currentProjectColor ? { background: currentProjectColor } : undefined}
+            />
+            <span className="ctl-name">{currentStoreName}</span>
+            {currentProjectName && (
+              <span className="ctl-project">· {currentProjectName}</span>
+            )}
+          </div>
+          <div className="ctl-actions">
+            {onOpenHistory && (
+              <button className="icon-btn" title="對話歷史" onClick={onOpenHistory}>
+                <History size={18} />
+              </button>
+            )}
+            {onRestartChat && (
+              <button
+                className="icon-btn"
+                title="重新開始"
+                onClick={onRestartChat}
               >
-                {msg.loading ? (
-                  <span className="loading-dots" aria-label="AI 思考中">思考中</span>
-                ) : editingTurn !== null && msg.role === 'user' && msg.turnNumber === editingTurn ? (
-                  /* 編輯模式 */
+                <RefreshCw size={18} />
+              </button>
+            )}
+            {onOpenPromptPanel && (
+              <button
+                className="icon-btn icon-btn-pill"
+                title="Prompt 設定"
+                onClick={onOpenPromptPanel}
+              >
+                <MessageSquare size={16} /> Prompt
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Empty state: no store selected ── */}
+      {!hasStore ? (
+        <div className="empty-state">
+          <div className="empty-icon">
+            <BookOpen size={26} />
+          </div>
+          <div className="empty-title">選擇左側知識庫開始對話</div>
+          <div className="empty-sub">
+            選擇一個已有的知識庫，或新增新知識庫，系統就會自動建立 RAG 對話 session。
+          </div>
+          {onCreateStore && (
+            <button
+              className="btn btn-primary"
+              style={{ marginTop: '.25rem' }}
+              onClick={onCreateStore}
+            >
+              <Plus size={14} /> 新增知識庫
+            </button>
+          )}
+        </div>
+      ) : messages.length === 0 ? (
+        /* ── Empty state: store selected, no messages ── */
+        <div className="empty-state">
+          <div style={{ fontSize: '2rem', marginBottom: '.25rem' }}>
+            {currentStoreIcon || '📁'}
+          </div>
+          <div className="empty-title">向「{currentStoreName}」提問</div>
+          <div className="empty-sub">
+            知識庫已就緒，可以直接提問或點選建議問題：
+          </div>
+          <div className="welcome-chips">
+            {QUICK_PROMPTS.map((p, i) => (
+              <button
+                key={i}
+                className="welcome-chip"
+                onClick={() => sendQuick(p)}
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        </div>
+      ) : (
+        /* ── Messages ── */
+        <div className="messages-area">
+          {messages.map((msg, idx) => (
+            <div key={idx} className={`msg-row ${msg.role}`}>
+              {msg.loading ? (
+                <div className="msg-bubble model" style={{ padding: '.625rem .9375rem' }}>
+                  <div className="msg-loading">
+                    <span />
+                    <span />
+                    <span />
+                  </div>
+                </div>
+              ) : editingTurn !== null &&
+                msg.role === 'user' &&
+                msg.turnNumber === editingTurn ? (
+                <div className="msg-bubble user" style={{ maxWidth: '72%' }}>
                   <div className="message-edit-area">
                     <textarea
                       ref={editTextareaRef}
                       className="message-edit-textarea"
                       value={editText}
-                      onChange={e => setEditText(e.target.value)}
-                      onKeyDown={e => handleEditKeyDown(e, editingTurn)}
+                      onChange={(e) => setEditText(e.target.value)}
+                      onKeyDown={(e) => handleEditKeyDown(e, editingTurn)}
                       rows={Math.min(editText.split('\n').length + 1, 8)}
                     />
                     <div className="message-edit-actions">
@@ -138,65 +237,82 @@ export default function ChatArea({
                       </button>
                     </div>
                   </div>
-                ) : (
-                  <>
+                </div>
+              ) : (
+                <>
+                  <div
+                    className={`msg-bubble ${msg.role}${msg.error ? ' error' : ''}`}
+                  >
                     {msg.text}
-                    {/* 操作按鈕 - hover 時顯示 */}
+                  </div>
+                  {msg.citations && msg.citations.length > 0 && (
+                    <CitationsList citations={msg.citations} messageIndex={idx} />
+                  )}
+                  <div
+                    className="msg-actions"
+                    style={{
+                      justifyContent:
+                        msg.role === 'user' ? 'flex-end' : 'flex-start',
+                    }}
+                  >
                     {!loading && msg.turnNumber && !msg.error && (
-                      <div className="message-actions">
+                      <>
                         {msg.role === 'user' && onEditAndResend && (
                           <button
-                            className="message-action-btn"
+                            className="msg-act-btn"
                             onClick={() => startEditing(msg)}
                             title="編輯並重送"
-                            aria-label="編輯訊息"
                           >
-                            <Pencil size={14} />
+                            <Pencil size={12} /> 編輯
                           </button>
                         )}
                         {msg.role === 'model' && onRegenerate && (
                           <button
-                            className="message-action-btn"
+                            className="msg-act-btn"
                             onClick={() => onRegenerate(msg.turnNumber!)}
                             title="重新生成"
-                            aria-label="重新生成回覆"
                           >
-                            <RotateCcw size={14} />
+                            <RotateCcw size={12} /> 重新生成
                           </button>
                         )}
-                      </div>
+                      </>
                     )}
-                  </>
-                )}
-              </div>
-              {msg.citations && msg.citations.length > 0 && (
-                <CitationsList citations={msg.citations} messageIndex={idx} />
+                  </div>
+                </>
               )}
             </div>
-          ))
-        )}
-        <div ref={chatEndRef} />
-      </div>
+          ))}
+          <div ref={chatEndRef} />
+        </div>
+      )}
 
-      <form className="input-area" onSubmit={handleSubmit} aria-label="訊息輸入表單">
-        <textarea
-          ref={textareaRef}
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={disabled ? '請先選擇知識庫' : '輸入訊息...'}
-          disabled={disabled}
-          aria-label="訊息輸入框"
-        />
-        <button
-          type="submit"
-          disabled={disabled || !input.trim()}
-          aria-label="傳送訊息"
-        >
-          <SendHorizontal size={16} />
-          <span>傳送</span>
-        </button>
-      </form>
+      {/* ── Input Area ── */}
+      <div className="input-area">
+        <div className="input-wrap">
+          <textarea
+            ref={textareaRef}
+            className="chat-ta"
+            rows={1}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={
+              hasStore
+                ? `向「${currentStoreName}」提問...`
+                : '請先選擇知識庫...'
+            }
+            disabled={disabled || loading}
+          />
+          <button
+            className="send-btn"
+            onClick={handleSubmit}
+            disabled={disabled || !input.trim() || loading}
+          >
+            <Send size={15} />
+          </button>
+        </div>
+        <div className="input-hint">Enter 傳送 · Shift+Enter 換行</div>
+      </div>
     </main>
   );
 }

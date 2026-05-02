@@ -32,7 +32,7 @@ def build_search_knowledge_decl(
     )
 
 
-def normalize_language(language: str) -> str:
+def normalize_language(language: str | None) -> str:
     """將語言代碼正規化為 'en' 或 'zh'。"""
     if isinstance(language, str) and language.strip().lower().startswith("en"):
         return "en"
@@ -41,11 +41,17 @@ def normalize_language(language: str) -> str:
 
 def extract_response_text(response) -> str:
     """從 Gemini GenerateContentResponse 擷取所有文字 part 並串接。"""
-    if not response.candidates or not response.candidates[0].content.parts:
+    text = getattr(response, "text", None)
+    if isinstance(text, str):
+        return text
+    candidates = getattr(response, "candidates", None) or []
+    if not candidates:
         return ""
+    content = getattr(candidates[0], "content", None)
+    parts = getattr(content, "parts", None) or []
     return "".join(
         part.text
-        for part in response.candidates[0].content.parts
+        for part in parts
         if hasattr(part, "text") and part.text
     )
 

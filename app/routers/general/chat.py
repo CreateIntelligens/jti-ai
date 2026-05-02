@@ -27,7 +27,7 @@ from app.schemas.chat import (
     GeneralConversationsResponse,
 )
 from app.services import gemini_service
-from app.services.agent_utils import strip_citations
+from app.services.agent_utils import extract_response_text, strip_citations
 from app.services.gemini_clients import get_client_by_index, get_client_for_api_key
 from app.utils import group_conversations_by_session, group_conversations_as_summary
 import app.deps as deps
@@ -167,22 +167,6 @@ def _format_history(history: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
-def _extract_response_text(response: Any) -> str:
-    text = getattr(response, "text", None)
-    if isinstance(text, str):
-        return text
-
-    candidates = getattr(response, "candidates", None) or []
-    parts = []
-    for candidate in candidates:
-        content = getattr(candidate, "content", None)
-        for part in getattr(content, "parts", None) or []:
-            part_text = getattr(part, "text", None)
-            if isinstance(part_text, str):
-                parts.append(part_text)
-    return "\n".join(parts)
-
-
 def _generate_rag_answer(
     *,
     message: str,
@@ -248,7 +232,7 @@ def _generate_rag_answer(
             ),
         )
     )
-    return strip_citations(_extract_response_text(response)).strip(), citations or []
+    return strip_citations(extract_response_text(response)).strip(), citations or []
 
 
 @router.post("/start")

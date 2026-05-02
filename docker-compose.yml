@@ -10,7 +10,6 @@ services:
       - ./.env:/app/.env
       - ./data:/app/data
       - ./logs:/app/logs
-      - ./data/lancedb:/app/data/lancedb
       - ./.hf_cache:/home/appuser/.cache/huggingface
     deploy:
       resources:

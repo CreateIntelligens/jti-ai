@@ -17,6 +17,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.auth import verify_admin
+from app.services.agent_utils import normalize_language as _normalize_language
 import app.deps as deps
 
 SUPPORTED_LANGUAGES = ("zh", "en")
@@ -126,13 +127,6 @@ class PersonaRouterConfig:
     runtime_default_readonly_message: str = "預設設定為唯讀，請先建立副本並啟用後再編輯。"
     delete_clears_runtime_overrides: bool = False
     runtime_overrides_attr: Optional[str] = None
-
-
-def _normalize_language(language: Optional[str]) -> str:
-    if not isinstance(language, str):
-        return "zh"
-    normalized = language.strip().lower()
-    return "en" if normalized.startswith("en") else "zh"
 
 
 class _CreatePromptRequest(BaseModel):
