@@ -29,6 +29,7 @@ from app.schemas.chat import (
 from app.services import gemini_service
 from app.services.agent_utils import extract_response_text, strip_citations
 from app.services.gemini_clients import get_client_by_index, get_client_for_api_key
+from app.models_config import DEFAULT_RAG_MODEL
 from app.utils import build_date_query, export_sessions_by_ids, group_conversations_by_session, group_conversations_as_summary
 import app.deps as deps
 
@@ -38,7 +39,7 @@ _IN_MEMORY_SESSIONS: dict[str, dict[str, Any]] = {}
 
 class ChatStartRequest(BaseModel):
     store_name: Optional[str] = None
-    model: str = os.getenv("GEMINI_MODEL_NAME", "") or "gemini-3.1-flash-lite-preview"
+    model: str = DEFAULT_RAG_MODEL
     previous_session_id: Optional[str] = None
 
 
@@ -224,7 +225,7 @@ def _generate_rag_answer(
 
     response = gemini_service.gemini_with_retry(
         lambda: client.models.generate_content(
-            model=session.get("model") or os.getenv("GEMINI_MODEL_NAME", "gemini-3.1-flash-lite-preview"),
+            model=session.get("model") or DEFAULT_RAG_MODEL,
             contents="\n\n".join(sections),
             config=types.GenerateContentConfig(
                 thinking_config=types.ThinkingConfig(thinking_budget=0),

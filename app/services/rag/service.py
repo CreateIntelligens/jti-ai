@@ -18,9 +18,6 @@ class RAGPipeline:
         # Using factory functions for lazy initialization
         self._embedding_service = None
         self._vector_store = None
-        self._distance_threshold = float(
-            os.getenv("RAG_DISTANCE_THRESHOLD", str(self._DEFAULT_DISTANCE_THRESHOLD))
-        )
 
     @property
     def embedding_service(self):
@@ -36,7 +33,7 @@ class RAGPipeline:
 
     @property
     def distance_threshold(self) -> float:
-        return self._distance_threshold
+        return float(os.getenv("RAG_DISTANCE_THRESHOLD", str(self._DEFAULT_DISTANCE_THRESHOLD)))
 
     def retrieve(
         self,

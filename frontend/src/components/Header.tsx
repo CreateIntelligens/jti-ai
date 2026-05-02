@@ -1,150 +1,155 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Database,
   History,
   KeyRound,
+  Link2,
   Loader2,
+  Menu,
+  MessageSquare,
   Moon,
-  PanelLeftClose,
-  PanelLeftOpen,
   RefreshCw,
+  Settings,
   Sun,
+  X,
 } from 'lucide-react';
 
 import reindexRag from '../services/api/general';
 
 interface HeaderProps {
-  onToggleSidebar: () => void;
   sidebarOpen: boolean;
-  onOpenStoreManagement: () => void;
-  onOpenUserApiKeySettings: () => void;
-  activeGeminiKeyName: string;
-  onOpenConversationHistory: () => void;
-  onRestartChat: () => void;
-  canOpenConversationHistory: boolean;
-  canRestartChat: boolean;
+  onToggleSidebar: () => void;
+  status: string;
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
+  canOpenConversationHistory: boolean;
+  onOpenConversationHistory: () => void;
+  onOpenAdminPanel: () => void;
+  onOpenApiKeysPanel: () => void;
+  onOpenPromptPanel: () => void;
+  onOpenExtKeysPanel: () => void;
+  onShowStatus: (msg: string) => void;
 }
 
 export default function Header({
-  onToggleSidebar,
   sidebarOpen,
-  onOpenStoreManagement,
-  onOpenUserApiKeySettings,
-  activeGeminiKeyName,
-  onOpenConversationHistory,
-  onRestartChat,
-  canOpenConversationHistory,
-  canRestartChat,
+  onToggleSidebar,
+  status,
   theme,
   onToggleTheme,
+  canOpenConversationHistory,
+  onOpenConversationHistory,
+  onOpenAdminPanel,
+  onOpenApiKeysPanel,
+  onOpenPromptPanel,
+  onOpenExtKeysPanel,
+  onShowStatus,
 }: HeaderProps) {
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [isReindexing, setIsReindexing] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  const openPanel = (openFn: () => void) => {
+    openFn();
+    setSettingsOpen(false);
+  };
 
   const handleReindexRag = async () => {
     if (isReindexing) return;
-    const confirmed = window.confirm('重建知識庫索引會重新整理 embedding，期間服務可能暫停約 1 分鐘。是否繼續？');
+    setSettingsOpen(false);
+    const confirmed = window.confirm(
+      '重建知識庫索引會重新整理 embedding，期間服務可能暫停約 1 分鐘。是否繼續？',
+    );
     if (!confirmed) return;
-
     setIsReindexing(true);
+    onShowStatus('重新索引已啟動...');
     try {
       await reindexRag('all');
-      window.alert('重新索引已啟動，請稍待');
+      onShowStatus('✅ 重新索引完成');
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : '重新索引失敗');
+      onShowStatus(error instanceof Error ? error.message : '重新索引失敗');
     } finally {
       setIsReindexing(false);
     }
   };
 
   return (
-    <header>
+    <header
+      className="app-header"
+      onClick={() => settingsOpen && setSettingsOpen(false)}
+    >
       <div className="header-left">
         <button
-          className="toggle-icon"
+          className="sidebar-toggle"
           onClick={onToggleSidebar}
           aria-label={sidebarOpen ? '關閉側邊欄' : '開啟側邊欄'}
-          aria-expanded={sidebarOpen}
         >
-          {sidebarOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
+          {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
         </button>
-        <h1>AI360 Knowledge Base</h1>
+        <div className="app-logo">
+          AI360 <span>Knowledge</span>
+        </div>
+        {status && <div className="status-badge">{status}</div>}
       </div>
-      <div className="header-actions">
+
+      <div className="header-right">
         <button
-          className={`header-icon-btn theme-toggle-btn ${theme}`}
+          className="icon-btn"
+          title="對話歷史"
+          disabled={!canOpenConversationHistory}
+          onClick={onOpenConversationHistory}
+        >
+          <History size={18} />
+        </button>
+        <button
+          className="icon-btn"
           onClick={onToggleTheme}
-          aria-label={theme === 'dark' ? '切換為淺色主題' : '切換為深色主題'}
           title={theme === 'dark' ? '切換為淺色主題' : '切換為深色主題'}
         >
-          <div className="theme-icon-wrapper">
-            <Sun className="icon-sun" size={18} />
-            <Moon className="icon-moon" size={18} />
-          </div>
+          {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
         <button
-          onClick={onRestartChat}
-          className="header-link secondary"
-          aria-label="重新開始對話"
-          disabled={!canRestartChat}
-          title={canRestartChat ? '重新開始對話' : '目前沒有可重新開始的知識庫'}
+          className="icon-btn icon-btn-pill"
+          onClick={() => openPanel(onOpenExtKeysPanel)}
+          title="對外 API Keys"
         >
-          <RefreshCw size={14} />
-          <span className="header-link-label">重新開始</span>
+          <Link2 size={16} /> 對外 Keys
         </button>
-        <button
-          onClick={onOpenConversationHistory}
-          className="header-link secondary"
-          aria-label="查看對話歷史"
-          disabled={!canOpenConversationHistory}
-          title={canOpenConversationHistory ? '查看對話歷史' : '目前沒有可查看歷史的知識庫'}
+        <div
+          className="dd-wrap"
+          ref={wrapRef}
+          onClick={(e) => e.stopPropagation()}
         >
-          <History size={14} />
-          <span className="header-link-label">歷史</span>
-        </button>
-        <button
-          onClick={onOpenUserApiKeySettings}
-          className="header-link primary"
-          aria-label="設定你的 API Key"
-          title={`目前使用中的 Gemini Key：${activeGeminiKeyName}`}
-        >
-          <KeyRound size={14} />
-          <span className="header-link-label">Key：{activeGeminiKeyName}</span>
-        </button>
-        <button
-          onClick={handleReindexRag}
-          className="header-link secondary"
-          aria-label="重建索引"
-          title="重建知識庫索引"
-          disabled={isReindexing}
-          aria-busy={isReindexing}
-        >
-          {isReindexing ? (
-            <Loader2 size={14} aria-hidden="true">
-              <animateTransform
-                attributeName="transform"
-                attributeType="XML"
-                type="rotate"
-                from="0 12 12"
-                to="360 12 12"
-                dur="1s"
-                repeatCount="indefinite"
-              />
-            </Loader2>
-          ) : (
-            <RefreshCw size={14} aria-hidden="true" />
+          <button
+            className="icon-btn"
+            onClick={() => setSettingsOpen((o) => !o)}
+            title="設定"
+          >
+            <Settings size={16} />
+          </button>
+          {settingsOpen && (
+            <div className="dd-menu">
+              <button className="dd-item" onClick={() => openPanel(onOpenAdminPanel)}>
+                <Database size={16} /> 知識庫管理
+              </button>
+              <button className="dd-item" onClick={() => openPanel(onOpenApiKeysPanel)}>
+                <KeyRound size={16} /> API Key 設定
+              </button>
+              <button className="dd-item" onClick={() => openPanel(onOpenPromptPanel)}>
+                <MessageSquare size={16} /> Prompt 設定
+              </button>
+              <div className="dd-sep" />
+              <button
+                className="dd-item"
+                onClick={handleReindexRag}
+                disabled={isReindexing}
+              >
+                {isReindexing ? <Loader2 size={16} /> : <RefreshCw size={16} />}
+                重新索引 RAG
+              </button>
+            </div>
           )}
-          <span className="header-link-label">重建索引</span>
-        </button>
-        <button
-          onClick={onOpenStoreManagement}
-          className="header-link secondary"
-          aria-label="開啟知識庫管理"
-        >
-          <Database size={14} />
-          <span className="header-link-label">知識庫</span>
-        </button>
+        </div>
       </div>
     </header>
   );

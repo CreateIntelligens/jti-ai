@@ -9,8 +9,8 @@ from pydantic import BaseModel, Field
 
 from app.services._shared.runtime_settings_base import (
     FlatRuntimeSettingsAdapter,
-    RULE_SECTION_FIELDS as _RULE_SECTION_FIELDS,
-    SYSTEM_DEFAULT_PROMPT_ID as _SYSTEM_DEFAULT_PROMPT_ID,
+    RULE_SECTION_FIELDS,
+    SYSTEM_DEFAULT_PROMPT_ID,
     RuleSections,
     RuntimeSettingsRepo,
     WelcomeBlock,
@@ -24,8 +24,18 @@ from app.services.hciot.agent_prompts import (
 HCIOT_STORE_NAME = "__hciot__"
 HCIOT_RUNTIME_SETTINGS_ATTR = "hciot_runtime_settings_by_prompt"
 HCIOT_PERSONA_ATTR = "hciot_persona_by_prompt"
-RULE_SECTION_FIELDS = _RULE_SECTION_FIELDS
-SYSTEM_DEFAULT_PROMPT_ID = _SYSTEM_DEFAULT_PROMPT_ID
+__all__ = [
+    "RULE_SECTION_FIELDS",
+    "SYSTEM_DEFAULT_PROMPT_ID",
+    "RuleSections",
+    "WelcomeBlock",
+    "HciotRuntimeSettings",
+    "HCIOT_STORE_NAME",
+    "get_available_tts_characters",
+    "load_runtime_settings_from_prompt_manager",
+    "save_runtime_settings_to_prompt_manager",
+    "get_default_runtime_settings",
+]
 _TTS_CHARACTER_ENV = "HCIOT_TTS_CHARACTER"
 _TTS_CHARACTER_FALLBACK = "healthy2"
 

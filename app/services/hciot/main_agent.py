@@ -55,17 +55,26 @@ _file_map_cache: dict[str, tuple[float, dict[str, str]]] = {}
 
 
 def _get_file_map(language: str) -> dict[str, str]:
+    lang = normalize_language(language)
     now = time.monotonic()
-    cached = _file_map_cache.get(language)
+    cached = _file_map_cache.get(lang)
     if cached and now - cached[0] < _FILE_MAP_TTL_SEC:
         return cached[1]
-    store_files = get_hciot_knowledge_store().list_files(language)
+    store_files = get_hciot_knowledge_store().list_files(lang)
     file_map = {
         f["name"].lower(): f.get("display_name") or f["name"]
         for f in store_files if f.get("name")
     }
-    _file_map_cache[language] = (now, file_map)
+    _file_map_cache[lang] = (now, file_map)
     return file_map
+
+
+def invalidate_hciot_file_map(language: str | None = None) -> None:
+    """Invalidate the citation display-name cache after knowledge changes."""
+    if language is None:
+        _file_map_cache.clear()
+    else:
+        _file_map_cache.pop(normalize_language(language), None)
 
 
 from app.models_config import CHAT_MODEL as _DEFAULT_CHAT_MODEL

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Generic, Optional, Type, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
+
+logger = logging.getLogger(__name__)
 
 SYSTEM_DEFAULT_PROMPT_ID = "system_default"
 SUPPORTED_LANGUAGES = ("zh", "en")
@@ -242,11 +245,15 @@ class RuntimeSettingsRepo(Generic[RuntimeSettingsModel]):
 
         try:
             settings = self.normalize_runtime_settings(raw)
-            if runtime_prompt_id == self.system_default_prompt_id:
-                settings.max_response_chars = self.default_max_response_chars
-            return settings
-        except Exception:
+        except ValidationError as e:
+            logger.warning(
+                "Invalid runtime settings for store=%s prompt=%s, using defaults: %s",
+                store_name or self.store_name, runtime_prompt_id, e,
+            )
             return self.get_default_runtime_settings()
+        if runtime_prompt_id == self.system_default_prompt_id:
+            settings.max_response_chars = self.default_max_response_chars
+        return settings
 
     def save_to_prompt_manager(
         self,

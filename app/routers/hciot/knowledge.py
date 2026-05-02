@@ -24,6 +24,7 @@ from app.routers.knowledge_utils import (
 )
 from app.services.hciot.csv_utils import extract_questions_from_csv, merge_csv_files, normalize_qa_csv_rows, split_qa_csv_by_image
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
+from app.services.hciot.main_agent import invalidate_hciot_file_map
 from app.services.hciot.topic_store import get_hciot_topic_store
 from app.utils import get_other_language
 
@@ -472,6 +473,7 @@ async def upload_knowledge_file(
     )
 
     primary = saved_files[0]
+    invalidate_hciot_file_map(language)
 
     return {
         "name": primary["name"],
@@ -502,6 +504,7 @@ async def delete_knowledge_file(
     _schedule_rag_delete(background_tasks, language, safe_name)
 
     topic_synced = _sync_topic_questions_for_doc(language, existing)
+    invalidate_hciot_file_map(language)
 
     return {
         "message": "已刪除",

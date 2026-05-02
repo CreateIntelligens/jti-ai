@@ -212,8 +212,17 @@ class BaseAgent:
         self._session_manager.update_session(session)
 
     def _sync_history_to_db_background(self, *args, **kwargs):
-        """Asynchronously write to DB without blocking response."""
-        asyncio.get_running_loop().run_in_executor(None, lambda: self._sync_history_to_db(*args, **kwargs))
+        """Asynchronously write to DB without blocking response.
+
+        Falls back to a sync call when invoked outside an event loop (e.g. from
+        scripts, scheduled jobs, or tests).
+        """
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            self._sync_history_to_db(*args, **kwargs)
+            return
+        loop.run_in_executor(None, lambda: self._sync_history_to_db(*args, **kwargs))
 
     def remove_session(self, session_id: str):
         """清除記憶體中的 chat session"""

@@ -8,8 +8,8 @@ from pydantic import BaseModel, Field
 
 from app.services._shared.runtime_settings_base import (
     NestedProfileRuntimeSettingsAdapter,
-    RULE_SECTION_FIELDS as _RULE_SECTION_FIELDS,
-    SYSTEM_DEFAULT_PROMPT_ID as _SYSTEM_DEFAULT_PROMPT_ID,
+    RULE_SECTION_FIELDS,
+    SYSTEM_DEFAULT_PROMPT_ID,
     RuleSections,
     RuntimeSettingsRepo,
     WelcomeBlock,
@@ -25,8 +25,18 @@ JTI_STORE_NAME = "__jti__"
 JTI_PROFILES_ATTR = "jti_profiles_by_prompt"
 PROFILE_PERSONA_KEY = "persona"
 PROFILE_RUNTIME_KEY = "runtime_settings"
-RULE_SECTION_FIELDS = _RULE_SECTION_FIELDS
-SYSTEM_DEFAULT_PROMPT_ID = _SYSTEM_DEFAULT_PROMPT_ID
+__all__ = [
+    "RULE_SECTION_FIELDS",
+    "SYSTEM_DEFAULT_PROMPT_ID",
+    "RuleSections",
+    "WelcomeBlock",
+    "JtiRuntimeSettings",
+    "JTI_STORE_NAME",
+    "PROFILE_PERSONA_KEY",
+    "load_runtime_settings_from_prompt_manager",
+    "save_runtime_settings_to_prompt_manager",
+    "get_default_runtime_settings",
+]
 
 
 class JtiRuntimeSettings(BaseModel):

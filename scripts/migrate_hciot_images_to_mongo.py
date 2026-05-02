@@ -15,7 +15,7 @@ from app.services.hciot.image_store import get_hciot_image_store
 DEFAULT_IMAGES_DIR = os.getenv("HCIOT_IMAGES_DIR") or str(PROJECT_ROOT / "data" / "hciot" / "images")
 
 
-def migrate_images(images_dir: str = DEFAULT_IMAGES_DIR):
+def migrate_images(images_dir: str = DEFAULT_IMAGES_DIR, force: bool = False):
     path = Path(images_dir)
     if not path.exists():
         print(f"Error: Directory {images_dir} does not exist.")
@@ -27,10 +27,15 @@ def migrate_images(images_dir: str = DEFAULT_IMAGES_DIR):
 
     migrated = 0
     replaced = 0
+    skipped = 0
     failed = 0
     for file_path in files:
         image_id = file_path.stem
         try:
+            if not force and store.image_exists(image_id):
+                print(f"Skipping {image_id} (already in MongoDB; use --force to overwrite)")
+                skipped += 1
+                continue
             data = file_path.read_bytes()
             mime = mimetypes.guess_type(str(file_path))[0] or "image/jpeg"
             result = store.upsert_image(image_id, data, content_type=mime)
@@ -52,6 +57,7 @@ def migrate_images(images_dir: str = DEFAULT_IMAGES_DIR):
     print(f"Total files: {len(files)}")
     print(f"Inserted: {migrated}")
     print(f"Replaced: {replaced}")
+    print(f"Skipped: {skipped}")
     print(f"Failed: {failed}")
 
 
@@ -59,5 +65,6 @@ if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description="Migrate HCIoT images to MongoDB")
     parser.add_argument("--dir", help="Directory containing images", default=DEFAULT_IMAGES_DIR)
+    parser.add_argument("--force", action="store_true", help="Overwrite existing images")
     args = parser.parse_args()
-    migrate_images(args.dir)
+    migrate_images(args.dir, force=args.force)
