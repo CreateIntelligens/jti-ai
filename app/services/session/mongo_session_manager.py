@@ -19,6 +19,136 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _extract_quiz_state_from_logs(logs: List[Dict]) -> Dict[str, Any]:
+    """Extract chat history and quiz state collected from conversation logs."""
+    answers = {}
+    selected_questions = []
+    quiz_scores = {}
+    quiz_result = None
+    quiz_result_id = None
+    chat_history = []
+
+    for log in logs:
+        user_msg = log.get("user_message", "")
+        agent_resp = log.get("agent_response", "")
+        if user_msg:
+            chat_history.append({"role": "user", "content": user_msg})
+        if agent_resp:
+            chat_history.append({"role": "assistant", "content": agent_resp})
+
+        for tool_call in log.get("tool_calls", []):
+            tool = tool_call.get("tool") or tool_call.get("tool_name")
+            result = tool_call.get("result", {})
+
+            if tool == "start_quiz" and result.get("current_question"):
+                selected_questions.append(result["current_question"])
+
+            elif tool == "submit_answer":
+                if result.get("success"):
+                    question_id = result.get("answered")
+                    option_id = result.get("selected")
+                    if question_id and option_id:
+                        answers[question_id] = option_id
+
+                if result.get("next_question"):
+                    selected_questions.append(result["next_question"])
+
+                if result.get("quiz_result"):
+                    completed_result = result["quiz_result"]
+                    quiz_scores = completed_result.get("quiz_scores", {})
+                    quiz_result = completed_result.get("result")
+
+    snapshot = logs[-1].get("session_snapshot") or logs[-1].get("session_state") or {}
+    return {
+        "answers": answers,
+        "selected_questions": selected_questions,
+        "quiz_scores": quiz_scores,
+        "quiz_result": quiz_result,
+        "quiz_result_id": snapshot.get("quiz_result_id") or quiz_result_id,
+        "chat_history": chat_history,
+        "snapshot": snapshot,
+        "step": snapshot.get("step", "WELCOME"),
+    }
+
+
+def _resolve_session_language(logs: List[Dict], default: str) -> str:
+    """Infer rebuilt session language from the last log snapshot.
+
+    Mongo find_one may return non-str values (e.g. MagicMock in tests, or a
+    legacy doc with a missing/null language); guard at every layer.
+    """
+    snapshot = logs[-1].get("session_snapshot") or logs[-1].get("session_state") or {}
+    language = snapshot.get("language")
+    if isinstance(language, str):
+        return language
+    return default if isinstance(default, str) else "zh"
+
+
+def _reconcile_selected_questions(
+    selected_questions: List[Dict[str, Any]],
+    *,
+    snapshot: Dict[str, Any],
+    existing_selected_questions: Optional[List[Dict[str, Any]]],
+    language: str,
+) -> List[Dict[str, Any]]:
+    """Use the most complete selected_questions source and fill missing tail items."""
+    reconciled = selected_questions
+
+    snapshot_selected_questions = snapshot.get("selected_questions")
+    if (
+        isinstance(snapshot_selected_questions, list)
+        and len(snapshot_selected_questions) > len(reconciled)
+    ):
+        reconciled = snapshot_selected_questions
+
+    if (
+        isinstance(existing_selected_questions, list)
+        and len(existing_selected_questions) > len(reconciled)
+    ):
+        reconciled = existing_selected_questions
+
+    if reconciled:
+        total_questions = get_total_questions(language)
+        if len(reconciled) < total_questions:
+            reconciled = complete_selected_questions(reconciled, language=language)
+
+    return reconciled
+
+
+def _resolve_rebuilt_current_question(
+    session_id: str,
+    step: str,
+    selected_questions: List[Dict[str, Any]],
+    current_q_index: int,
+) -> tuple[str, Optional[Dict[str, Any]]]:
+    """Resolve rebuilt current_question, degrading invalid QUIZ state to WELCOME."""
+    if step != "QUIZ":
+        return step, None
+
+    if selected_questions and current_q_index < len(selected_questions):
+        return step, selected_questions[current_q_index]
+
+    reason = (
+        "no selected_questions"
+        if not selected_questions
+        else f"selected_questions ({len(selected_questions)}) < current_q_index ({current_q_index})"
+    )
+    logger.warning(f"Rebuilding session {session_id[:8]}...: {reason}, degrading to WELCOME")
+    return "WELCOME", None
+
+
+def _persist_rebuilt_session(sessions_collection, session_id: str, session: Session) -> None:
+    """Write rebuilt session back to MongoDB."""
+    session_dict = session.model_dump(mode="json")
+    session_dict["created_at"] = datetime.now()
+    session_dict["updated_at"] = datetime.now()
+    sessions_collection.update_one(
+        {"session_id": session_id},
+        {"$set": session_dict},
+        upsert=True,
+    )
+
+
 class MongoSessionManager(SessionStateMixin):
     """MongoDB Session 管理器"""
 
@@ -86,20 +216,11 @@ class MongoSessionManager(SessionStateMixin):
             return False
 
     def rebuild_session_from_logs(self, session_id: str, logs: List[Dict]) -> Optional[Session]:
-        """從 conversation logs 重建過期的 JTI session
-
-        Args:
-            session_id: 原始 session ID
-            logs: 該 session 的 conversation logs（已按 turn_number 排序）
-
-        Returns:
-            重建的 Session 物件（已寫入 MongoDB），或 None（logs 為空）
-        """
+        """從 conversation logs 重建過期的 JTI session."""
         if not logs:
             return None
 
         try:
-            # 先嘗試從現有 session 取完整 selected_questions（重建時優先保留）
             existing_selected_questions = None
             existing_language = "zh"
             try:
@@ -110,109 +231,24 @@ class MongoSessionManager(SessionStateMixin):
             except Exception:
                 pass
 
-            # === 從 logs 提取資料 ===
-            answers = {}            # {question_id: option_id}
-            selected_questions = [] # 按順序收集的題目
-            quiz_scores = {}
-            quiz_result = None
-            quiz_result_id = None
-            chat_history = []
-
-            for log in logs:
-                # 收集 chat_history
-                user_msg = log.get("user_message", "")
-                agent_resp = log.get("agent_response", "")
-                if user_msg:
-                    chat_history.append({"role": "user", "content": user_msg})
-                if agent_resp:
-                    chat_history.append({"role": "assistant", "content": agent_resp})
-
-                # 解析 tool_calls
-                for tc in log.get("tool_calls", []):
-                    tool = tc.get("tool") or tc.get("tool_name")
-                    result = tc.get("result", {})
-
-                    if tool == "start_quiz" and result.get("current_question"):
-                        # 第一題
-                        selected_questions.append(result["current_question"])
-
-                    elif tool == "submit_answer":
-                        if result.get("success"):
-                            question_id = result.get("answered")
-                            option_id = result.get("selected")
-                            if question_id and option_id:
-                                answers[question_id] = option_id
-
-                        if result.get("next_question"):
-                            # 後續題目
-                            selected_questions.append(result["next_question"])
-
-                        # 提取 quiz_result（最後一題完成時）
-                        if result.get("quiz_result"):
-                            cr = result["quiz_result"]
-                            quiz_scores = cr.get("quiz_scores", {})
-                            quiz_result = cr.get("result")
-
-            # === 從最後一筆 log 的 session_snapshot 取得狀態 ===
-            last_log = logs[-1]
-            snapshot = last_log.get("session_snapshot") or last_log.get("session_state") or {}
-            step = snapshot.get("step", "WELCOME")
-            quiz_result_id = snapshot.get("quiz_result_id") or quiz_result_id
-
-            # === 推斷語言（優先使用最後一筆 snapshot） ===
-            language = snapshot.get("language", existing_language)
-            if not isinstance(language, str):
-                language = existing_language if isinstance(existing_language, str) else "zh"
-
-            # 若 snapshot 已帶完整 selected_questions，也優先使用
-            snapshot_selected_questions = snapshot.get("selected_questions")
-            if (
-                isinstance(snapshot_selected_questions, list)
-                and len(snapshot_selected_questions) > len(selected_questions)
-            ):
-                selected_questions = snapshot_selected_questions
-
-            # 保留舊 session 的完整抽題序列（避免 rollback 後遺失未揭露題目）
-            if (
-                isinstance(existing_selected_questions, list)
-                and len(existing_selected_questions) > len(selected_questions)
-            ):
-                selected_questions = existing_selected_questions
-
-            # 若仍不足，做 deterministic 補齊，避免後續 submit_answer 缺題炸掉
-            if selected_questions:
-                total_questions = get_total_questions(language)
-                if len(selected_questions) < total_questions:
-                    selected_questions = complete_selected_questions(
-                        selected_questions,
-                        language=language,
-                    )
-
-            # === 計算 current_q_index 和 current_question ===
+            state = _extract_quiz_state_from_logs(logs)
+            language = _resolve_session_language(logs, existing_language)
+            selected_questions = _reconcile_selected_questions(
+                state["selected_questions"],
+                snapshot=state["snapshot"],
+                existing_selected_questions=existing_selected_questions,
+                language=language,
+            )
+            step = state["step"]
+            answers = state["answers"]
             current_q_index = len(answers)
-            current_question = None
+            step, current_question = _resolve_rebuilt_current_question(
+                session_id,
+                step,
+                selected_questions,
+                current_q_index,
+            )
 
-            if step == "QUIZ" and selected_questions:
-                if current_q_index < len(selected_questions):
-                    current_question = selected_questions[current_q_index]
-                else:
-                    # selected_questions 不完整，降級為 WELCOME
-                    logger.warning(
-                        f"Rebuilding session {session_id[:8]}...: "
-                        f"selected_questions ({len(selected_questions)}) < current_q_index ({current_q_index}), "
-                        f"degrading to WELCOME"
-                    )
-                    step = "WELCOME"
-            elif step == "QUIZ" and not selected_questions:
-                # 沒有 selected_questions 資料，降級為 WELCOME
-                logger.warning(
-                    f"Rebuilding session {session_id[:8]}...: no selected_questions, degrading to WELCOME"
-                )
-                step = "WELCOME"
-
-            metadata = {}
-
-            # === 建立 Session 物件 ===
             session = Session(
                 session_id=session_id,
                 step=step,
@@ -220,24 +256,14 @@ class MongoSessionManager(SessionStateMixin):
                 current_q_index=current_q_index,
                 answers=answers,
                 selected_questions=selected_questions if selected_questions else None,
-                quiz_result_id=quiz_result_id,
-                quiz_scores=quiz_scores,
-                quiz_result=quiz_result,
-                chat_history=chat_history,
+                quiz_result_id=state["quiz_result_id"],
+                quiz_scores=state["quiz_scores"],
+                quiz_result=state["quiz_result"],
+                chat_history=state["chat_history"],
                 current_question=current_question,
-                metadata=metadata,
+                metadata={},
             )
-
-            # === 寫入 MongoDB ===
-            session_dict = session.model_dump(mode="json")
-            session_dict["created_at"] = datetime.now()
-            session_dict["updated_at"] = datetime.now()
-
-            self.sessions_collection.update_one(
-                {"session_id": session_id},
-                {"$set": session_dict},
-                upsert=True
-            )
+            _persist_rebuilt_session(self.sessions_collection, session_id, session)
             logger.info(
                 f"Rebuilt session from {len(logs)} logs: {session_id[:8]}... "
                 f"(step={step}, answers={len(answers)}, questions={len(selected_questions)})"
