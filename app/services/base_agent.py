@@ -11,7 +11,10 @@ Base Agent - 共用的 Gemini chat session 管理邏輯
 import asyncio
 import logging
 import time
+from collections import OrderedDict
 from typing import Any
+
+_CHAT_SESSION_CACHE_MAX = 128
 
 from google.genai import types
 
@@ -36,7 +39,7 @@ class BaseAgent:
 
     def __init__(self, model_name: str):
         self.model_name = model_name
-        self._chat_sessions: dict[str, Any] = {}
+        self._chat_sessions: "OrderedDict[str, Any]" = OrderedDict()
 
     # --- 子類必須實作 ---
 
@@ -180,6 +183,7 @@ class BaseAgent:
         sid = session.session_id
         cached_session = self._chat_sessions.get(sid)
         if cached_session is not None:
+            self._chat_sessions.move_to_end(sid)
             return cached_session
 
         history = []
@@ -196,6 +200,8 @@ class BaseAgent:
             model=self.model_name, config=config, history=history,
         )
         self._chat_sessions[sid] = chat_session
+        if len(self._chat_sessions) > _CHAT_SESSION_CACHE_MAX:
+            self._chat_sessions.popitem(last=False)
         return chat_session
 
     def _sync_history_to_db(self, session_id: str, user_message: str, assistant_message: str, citations: list | None = None):

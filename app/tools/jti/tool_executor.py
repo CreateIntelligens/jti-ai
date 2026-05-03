@@ -421,6 +421,7 @@ Format:
                         "注意：不要重複任何測驗題目，只需宣布結果。"
                     )
 
+        result["_updated_session"] = session_manager.get_session(session_id)
         return result
 
     async def _execute_calculate_quiz_result(self, args: Dict) -> Dict:

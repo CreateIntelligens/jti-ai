@@ -149,9 +149,8 @@ async def handle_quiz_message(session, request) -> Optional[ChatResponse]:
             "session_id": request.session_id,
             "user_choice": user_choice,
         })
+        updated_session = tool_result.pop("_updated_session", None) or session_manager.get_session(request.session_id)
         tool_calls = [{"tool": "submit_answer", "args": {"user_choice": user_choice}, "result": tool_result}]
-
-        updated_session = session_manager.get_session(request.session_id)
         logger.info(f"[答題結果] 選項: {user_choice} | 已答: {len(updated_session.answers)}/{total_questions} 題")
         if updated_session.quiz_scores:
             scores_str = " | ".join([f"{k}:{v}" for k, v in sorted(updated_session.quiz_scores.items(), key=lambda x: -x[1])])

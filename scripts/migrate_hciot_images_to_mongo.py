@@ -1,3 +1,4 @@
+import logging
 import mimetypes
 import os
 import sys
@@ -12,18 +13,21 @@ load_dotenv()
 
 from app.services.hciot.image_store import get_hciot_image_store
 
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+logger = logging.getLogger(__name__)
+
 DEFAULT_IMAGES_DIR = os.getenv("HCIOT_IMAGES_DIR") or str(PROJECT_ROOT / "data" / "hciot" / "images")
 
 
 def migrate_images(images_dir: str = DEFAULT_IMAGES_DIR, force: bool = False):
     path = Path(images_dir)
     if not path.exists():
-        print(f"Error: Directory {images_dir} does not exist.")
+        logger.error("Directory %s does not exist.", images_dir)
         return
 
     store = get_hciot_image_store()
     files = [f for f in path.iterdir() if f.is_file() and not f.name.startswith(".")]
-    print(f"Found {len(files)} files in {images_dir}")
+    logger.info("Found %d files in %s", len(files), images_dir)
 
     migrated = 0
     replaced = 0
@@ -33,7 +37,7 @@ def migrate_images(images_dir: str = DEFAULT_IMAGES_DIR, force: bool = False):
         image_id = file_path.stem
         try:
             if not force and store.image_exists(image_id):
-                print(f"Skipping {image_id} (already in MongoDB; use --force to overwrite)")
+                logger.info("Skipping %s (already in MongoDB; use --force to overwrite)", image_id)
                 skipped += 1
                 continue
             data = file_path.read_bytes()
@@ -41,24 +45,22 @@ def migrate_images(images_dir: str = DEFAULT_IMAGES_DIR, force: bool = False):
             result = store.upsert_image(image_id, data, content_type=mime)
             if result["success"]:
                 if result["replaced"]:
-                    print(f"Replaced {image_id} ({mime})")
+                    logger.info("Replaced %s (%s)", image_id, mime)
                     replaced += 1
                 else:
-                    print(f"Migrated {image_id} ({mime})")
+                    logger.info("Migrated %s (%s)", image_id, mime)
                     migrated += 1
             else:
-                print(f"Failed to upsert {image_id}")
+                logger.warning("Failed to upsert %s", image_id)
                 failed += 1
         except Exception as e:
-            print(f"Error migrating {file_path.name}: {e}")
+            logger.error("Error migrating %s: %s", file_path.name, e)
             failed += 1
 
-    print("\nMigration Summary:")
-    print(f"Total files: {len(files)}")
-    print(f"Inserted: {migrated}")
-    print(f"Replaced: {replaced}")
-    print(f"Skipped: {skipped}")
-    print(f"Failed: {failed}")
+    logger.info(
+        "Migration summary: total=%d inserted=%d replaced=%d skipped=%d failed=%d",
+        len(files), migrated, replaced, skipped, failed,
+    )
 
 
 if __name__ == "__main__":
