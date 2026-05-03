@@ -6,7 +6,7 @@ API Key 管理模組 (MongoDB 版本)
 import os
 import secrets
 import hashlib
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from pydantic import BaseModel, Field
@@ -21,6 +21,19 @@ def log(message: str) -> None:
     logger.info(message)
 
 
+def _parse_iso_utc(value) -> Optional[datetime]:
+    """Parse an ISO-8601 string (or pass-through datetime) into a UTC-aware datetime."""
+    if isinstance(value, datetime):
+        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
 class APIKey(BaseModel):
     """API Key 模型"""
     id: str = Field(default_factory=lambda: f"key_{secrets.token_hex(4)}")
@@ -29,7 +42,7 @@ class APIKey(BaseModel):
     name: str  # 用途說明，如 "給 Cursor 用"
     store_name: str  # 綁定的知識庫
     prompt_index: Optional[int] = None  # None = 用預設, 0/1/2 = 指定
-    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     last_used_at: Optional[str] = None
 
 
@@ -107,14 +120,8 @@ class APIKeyManager:
         if not doc:
             return None
 
-        now = datetime.utcnow()
-        last_used = doc.get("last_used_at")
-        last_used_dt = None
-        if isinstance(last_used, str):
-            try:
-                last_used_dt = datetime.fromisoformat(last_used)
-            except ValueError:
-                last_used_dt = None
+        now = datetime.now(timezone.utc)
+        last_used_dt = _parse_iso_utc(doc.get("last_used_at"))
         if last_used_dt is None or (now - last_used_dt).total_seconds() >= 60:
             self.collection.update_one(
                 {"key_hash": key_hash},

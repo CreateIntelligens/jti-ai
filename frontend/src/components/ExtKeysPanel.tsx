@@ -3,6 +3,7 @@ import { Copy, Link2, X } from 'lucide-react';
 import * as api from '../services/api';
 import type { Store } from '../types';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { toErrorMessage } from '../utils/errors';
 
 interface ExtKeysPanelProps {
   isOpen: boolean;
@@ -65,7 +66,7 @@ export default function ExtKeysPanel({
       await loadKeys();
       onShowStatus?.('✅ API Key 已建立');
     } catch (e) {
-      alert('建立失敗: ' + (e instanceof Error ? e.message : String(e)));
+      alert('建立失敗: ' + (toErrorMessage(e)));
     } finally {
       setCreating(false);
     }
@@ -78,7 +79,7 @@ export default function ExtKeysPanel({
       await loadKeys();
       onShowStatus?.('API Key 已撤銷');
     } catch (e) {
-      alert('撤銷失敗: ' + (e instanceof Error ? e.message : String(e)));
+      alert('撤銷失敗: ' + (toErrorMessage(e)));
     }
   };
 

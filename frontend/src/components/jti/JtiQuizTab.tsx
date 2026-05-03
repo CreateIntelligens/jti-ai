@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Plus, Pencil, Trash2, ChevronDown, ChevronUp, Save, X, Upload, Download, Star } from 'lucide-react';
 import * as api from '../../services/api';
+import { toErrorMessage } from '../../utils/errors';
 
 interface JtiQuizTabProps {
        language: string;
@@ -143,7 +144,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                      await loadBanks();
                      showSuccess('✅ 已建立新題庫');
               } catch (e) {
-                     const msg = e instanceof Error ? e.message : String(e);
+                     const msg = toErrorMessage(e);
                      alert('建立失敗: ' + msg);
               }
        };
@@ -156,7 +157,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                      await loadBanks();
                      showSuccess('✅ 已刪除題庫');
               } catch (e) {
-                     const msg = e instanceof Error ? e.message : String(e);
+                     const msg = toErrorMessage(e);
                      alert('刪除失敗: ' + msg);
               }
        };
@@ -167,7 +168,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                      await loadBanks();
                      showSuccess('✅ 已切換使用中的題庫');
               } catch (e) {
-                     const msg = e instanceof Error ? e.message : String(e);
+                     const msg = toErrorMessage(e);
                      alert('切換失敗: ' + msg);
               }
        };
@@ -181,7 +182,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                      await loadBanks();
                      showSuccess(`✅ 已匯入 ${result.count} 題`);
               } catch (e) {
-                     const msg = e instanceof Error ? e.message : String(e);
+                     const msg = toErrorMessage(e);
                      alert('匯入失敗: ' + msg);
               } finally {
                      setImporting(false);
@@ -192,7 +193,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
               try {
                      await api.exportQuizBankCsv(language, selectedBankId);
               } catch (e) {
-                     const msg = e instanceof Error ? e.message : String(e);
+                     const msg = toErrorMessage(e);
                      alert('匯出失敗: ' + msg);
               }
        };
@@ -201,7 +202,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
               try {
                      await api.exportQuizResultsCsv(language);
               } catch (e) {
-                     const msg = e instanceof Error ? e.message : String(e);
+                     const msg = toErrorMessage(e);
                      alert('匯出測驗結果失敗: ' + msg);
               }
        };
@@ -221,7 +222,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                      await loadBanks();
                      showSuccess('✅ 已新增題目');
               } catch (e) {
-                     const msg = e instanceof Error ? e.message : String(e);
+                     const msg = toErrorMessage(e);
                      alert('新增失敗: ' + msg);
               } finally {
                      setSaving(false);
@@ -244,7 +245,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                      await loadQuestions();
                      showSuccess('✅ 已更新題目');
               } catch (e) {
-                     const msg = e instanceof Error ? e.message : String(e);
+                     const msg = toErrorMessage(e);
                      alert('更新失敗: ' + msg);
               } finally {
                      setSaving(false);
@@ -261,7 +262,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                      await loadBanks();
                      showSuccess('✅ 已刪除題目');
               } catch (e) {
-                     const msg = e instanceof Error ? e.message : String(e);
+                     const msg = toErrorMessage(e);
                      alert('刪除失敗: ' + msg);
               } finally {
                      setDeleting(false);
@@ -279,7 +280,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                      await loadQuizSets();
                      showSuccess('✅ 已建立新測驗結果集');
               } catch (e) {
-                     const msg = e instanceof Error ? e.message : String(e);
+                     const msg = toErrorMessage(e);
                      alert('建立失敗: ' + msg);
               }
        };
@@ -292,7 +293,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                      await loadQuizSets();
                      showSuccess('✅ 已刪除測驗結果集');
               } catch (e) {
-                     const msg = e instanceof Error ? e.message : String(e);
+                     const msg = toErrorMessage(e);
                      alert('刪除失敗: ' + msg);
               }
        };
@@ -303,7 +304,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                      await loadQuizSets();
                      showSuccess('✅ 已切換使用中的測驗結果集');
               } catch (e) {
-                     const msg = e instanceof Error ? e.message : String(e);
+                     const msg = toErrorMessage(e);
                      alert('切換失敗: ' + msg);
               }
        };
@@ -327,7 +328,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                      await loadQuizResults();
                      showSuccess('✅ 已更新測驗結果');
               } catch (e) {
-                     const msg = e instanceof Error ? e.message : String(e);
+                     const msg = toErrorMessage(e);
                      alert('更新失敗: ' + msg);
               } finally {
                      setSavingQuizResult(false);

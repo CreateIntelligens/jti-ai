@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Optional, Tuple, Type
 
 from fastapi import APIRouter, Body, Depends, HTTPException
@@ -419,7 +419,7 @@ def build_persona_router(config: PersonaRouterConfig) -> APIRouter:
             config.persona_adapter.set(store_prompts, prompt_id, persona_pair)
 
         prompt.content = persona_pair.get(lang, prompt.content)
-        prompt.updated_at = datetime.utcnow().isoformat()
+        prompt.updated_at = datetime.now(timezone.utc).isoformat()
         store_prompts.prompts[prompt_index] = prompt
         pm.save_store_prompts(store_prompts)
 

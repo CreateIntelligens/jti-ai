@@ -5,6 +5,7 @@ import ModelSelectionTab from './settings/ModelSelectionTab';
 import PromptTab from './settings/PromptTab';
 import ApiKeyTab from './settings/ApiKeyTab';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { toErrorMessage } from '../utils/errors';
 
 interface Prompt {
   id: string;
@@ -119,7 +120,7 @@ export default function PromptManagementModal({
       setNewPromptContent('');
       await loadPrompts();
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
+      const errorMsg = toErrorMessage(e);
       alert('建立失敗: ' + errorMsg);
     } finally {
       setCreating(false);
@@ -133,7 +134,7 @@ export default function PromptManagementModal({
       await loadPrompts();
       await onRestartChat();
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
+      const errorMsg = toErrorMessage(e);
       alert('設定失敗: ' + errorMsg);
     }
   };
@@ -146,7 +147,7 @@ export default function PromptManagementModal({
       await loadPrompts();
       if (promptId === activePromptId) await onRestartChat();
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
+      const errorMsg = toErrorMessage(e);
       alert('刪除失敗: ' + errorMsg);
     }
   };
@@ -186,7 +187,7 @@ export default function PromptManagementModal({
       if (editingId === activePromptId) await onRestartChat();
       cancelEdit();
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
+      const errorMsg = toErrorMessage(e);
       alert('更新失敗: ' + errorMsg);
     }
   };
@@ -221,7 +222,7 @@ export default function PromptManagementModal({
       setApiKeyPromptIndex('');
       await loadApiKeys();
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
+      const errorMsg = toErrorMessage(e);
       alert('建立失敗: ' + errorMsg);
     } finally {
       setApiKeyCreating(false);
@@ -234,7 +235,7 @@ export default function PromptManagementModal({
       await api.deleteServerApiKey(keyId);
       await loadApiKeys();
     } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
+      const errorMsg = toErrorMessage(e);
       alert('刪除失敗: ' + errorMsg);
     }
   };

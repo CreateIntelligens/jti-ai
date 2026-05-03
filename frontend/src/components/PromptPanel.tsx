@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import * as api from '../services/api';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { toErrorMessage } from '../utils/errors';
 
 interface PromptPanelProps {
   isOpen: boolean;
@@ -74,7 +75,7 @@ export default function PromptPanel({
       await loadPrompts();
       onShowStatus?.('✅ Prompt 已建立');
     } catch (e) {
-      alert('建立失敗: ' + (e instanceof Error ? e.message : String(e)));
+      alert('建立失敗: ' + (toErrorMessage(e)));
     } finally {
       setCreating(false);
     }
@@ -88,7 +89,7 @@ export default function PromptPanel({
       await onRestartChat();
       onShowStatus?.('✅ Prompt 已套用');
     } catch (e) {
-      alert('設定失敗: ' + (e instanceof Error ? e.message : String(e)));
+      alert('設定失敗: ' + (toErrorMessage(e)));
     }
   };
 
@@ -99,7 +100,7 @@ export default function PromptPanel({
       await loadPrompts();
       if (promptId === activePromptId) await onRestartChat();
     } catch (e) {
-      alert('刪除失敗: ' + (e instanceof Error ? e.message : String(e)));
+      alert('刪除失敗: ' + (toErrorMessage(e)));
     }
   };
 

@@ -5,7 +5,7 @@ Prompt 管理模組 (MongoDB 版本)
 
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
 
 from pydantic import BaseModel, Field
@@ -25,8 +25,8 @@ class Prompt(BaseModel):
     id: str = Field(default_factory=lambda: f"prompt_{uuid.uuid4().hex[:8]}")
     name: str
     content: str
-    created_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
-    updated_at: str = Field(default_factory=lambda: datetime.utcnow().isoformat())
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class StorePrompts(BaseModel):
@@ -180,7 +180,7 @@ class PromptManager:
                     prompt.name = name
                 if content is not None:
                     prompt.content = content
-                prompt.updated_at = datetime.utcnow().isoformat()
+                prompt.updated_at = datetime.now(timezone.utc).isoformat()
 
                 store_prompts.prompts[i] = prompt
                 self.save_store_prompts(store_prompts)

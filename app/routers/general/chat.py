@@ -6,7 +6,7 @@ import hashlib
 import logging
 import os
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -427,7 +427,7 @@ def export_general_conversations(
                 conversation_logger, session_ids, "general", store_filter=store_name,
             )
             return {
-                "exported_at": datetime.utcnow().isoformat(),
+                "exported_at": datetime.now(timezone.utc).isoformat(),
                 "store_name": store_name,
                 "mode": "general",
                 "sessions": sessions,
@@ -445,7 +445,7 @@ def export_general_conversations(
             session_list = group_conversations_by_session(store_conversations)
 
             return {
-                "exported_at": datetime.utcnow().isoformat(),
+                "exported_at": datetime.now(timezone.utc).isoformat(),
                 "store_name": store_name,
                 "mode": "general",
                 "sessions": session_list,
