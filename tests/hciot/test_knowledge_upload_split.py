@@ -96,8 +96,7 @@ class FakeKnowledgeStore:
 
 def _post_upload(client: TestClient, fake_store: FakeKnowledgeStore, fake_topic_store: mock.Mock, csv_bytes: bytes):
     with mock.patch("app.routers.hciot.knowledge.get_hciot_knowledge_store", return_value=fake_store), \
-         mock.patch("app.routers.hciot.knowledge.get_hciot_topic_store", return_value=fake_topic_store), \
-         mock.patch("app.routers.hciot.knowledge._store_name", return_value=None):
+         mock.patch("app.routers.hciot.knowledge.get_hciot_topic_store", return_value=fake_topic_store):
         return client.post(
             "/api/hciot-admin/knowledge/upload/?language=zh",
             files={"file": ("prp.csv", csv_bytes, "text/csv")},
@@ -221,8 +220,7 @@ def test_update_file_content_splits_legacy_single_csv_with_image_rows():
     )
 
     with mock.patch("app.routers.hciot.knowledge.get_hciot_knowledge_store", return_value=fake_store), \
-         mock.patch("app.routers.hciot.knowledge.get_hciot_topic_store", return_value=fake_topic_store), \
-         mock.patch("app.routers.hciot.knowledge._store_name", return_value=None):
+         mock.patch("app.routers.hciot.knowledge.get_hciot_topic_store", return_value=fake_topic_store):
         response = client.put(
             "/api/hciot-admin/knowledge/files/legacy.csv/content?language=zh",
             json={
@@ -263,8 +261,7 @@ def test_update_file_content_keeps_canonical_name_for_existing_img_csv():
     )
 
     with mock.patch("app.routers.hciot.knowledge.get_hciot_knowledge_store", return_value=fake_store), \
-         mock.patch("app.routers.hciot.knowledge.get_hciot_topic_store", return_value=fake_topic_store), \
-         mock.patch("app.routers.hciot.knowledge._store_name", return_value=None):
+         mock.patch("app.routers.hciot.knowledge.get_hciot_topic_store", return_value=fake_topic_store):
         response = client.put(
             "/api/hciot-admin/knowledge/files/legacy_IMG_T02_001.csv/content?language=zh",
             json={"content": "index,q,a,img\n1,第一題,第一答,IMG_T02_001\n"},
@@ -290,8 +287,7 @@ def test_update_file_content_drops_blank_rows_from_csv_save():
     )
 
     with mock.patch("app.routers.hciot.knowledge.get_hciot_knowledge_store", return_value=fake_store), \
-         mock.patch("app.routers.hciot.knowledge.get_hciot_topic_store", return_value=fake_topic_store), \
-         mock.patch("app.routers.hciot.knowledge._store_name", return_value=None):
+         mock.patch("app.routers.hciot.knowledge.get_hciot_topic_store", return_value=fake_topic_store):
         response = client.put(
             "/api/hciot-admin/knowledge/files/legacy.csv/content?language=zh",
             json={"content": "index,q,a,img\n1,第一題,第一答,\n2,,,\n"},

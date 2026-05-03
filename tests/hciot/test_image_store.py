@@ -14,6 +14,11 @@ class FakeDeleteResult:
         self.deleted_count = deleted_count
 
 
+class FakeUpdateResult:
+    def __init__(self, upserted_id):
+        self.upserted_id = upserted_id
+
+
 class FakeCursor(list):
     def sort(self, key: str, direction: int):
         reverse = direction < 0
@@ -74,6 +79,19 @@ class FakeCollection:
                 return FakeDeleteResult(1)
         return FakeDeleteResult(0)
 
+    def update_one(self, query: dict, update: dict, upsert: bool = False):
+        set_data = update.get("$set", {})
+        set_on_insert = update.get("$setOnInsert", {})
+        for doc in self.docs:
+            if self._matches(doc, query):
+                doc.update(set_data)
+                return FakeUpdateResult(upserted_id=None)
+        if upsert:
+            new_doc = {**set_on_insert, **set_data}
+            self.docs.append(new_doc)
+            return FakeUpdateResult(upserted_id="fake-upserted-id")
+        return FakeUpdateResult(upserted_id=None)
+
 
 fake_collection = FakeCollection()
 fake_db = {"hciot_images": fake_collection}
@@ -90,10 +108,11 @@ class TestHciotImageStore(unittest.TestCase):
         fake_collection.docs.clear()
         self.store = HciotImageStore()
 
-    def test_insert_and_get_image(self):
+    def test_upsert_and_get_image(self):
         data = b"fake-image-data"
-        success = self.store.insert_image("test-img", data, "image/png")
-        self.assertTrue(success)
+        result = self.store.upsert_image("test-img", data, "image/png")
+        self.assertTrue(result["success"])
+        self.assertFalse(result["replaced"])
 
         image = self.store.get_image("test-img")
         self.assertIsNotNone(image)
@@ -102,14 +121,16 @@ class TestHciotImageStore(unittest.TestCase):
         self.assertEqual(image["content_type"], "image/png")
         self.assertIsInstance(image["created_at"], datetime)
 
-    def test_insert_duplicate_fails(self):
-        self.store.insert_image("dup", b"data1")
-        success = self.store.insert_image("dup", b"data2")
-        self.assertFalse(success)
+    def test_upsert_replaces_existing(self):
+        self.store.upsert_image("dup", b"data1")
+        result = self.store.upsert_image("dup", b"data2")
+        self.assertTrue(result["success"])
+        self.assertTrue(result["replaced"])
+        self.assertEqual(self.store.get_image("dup")["data"], b"data2")
 
     def test_list_images(self):
-        self.store.insert_image("img1", b"d1")
-        self.store.insert_image("img2", b"d2")
+        self.store.upsert_image("img1", b"d1")
+        self.store.upsert_image("img2", b"d2")
 
         images = self.store.list_images()
         self.assertEqual(len(images), 2)
@@ -120,7 +141,7 @@ class TestHciotImageStore(unittest.TestCase):
         self.assertNotIn("data", images[0])
 
     def test_delete_image(self):
-        self.store.insert_image("to-delete", b"data")
+        self.store.upsert_image("to-delete", b"data")
         self.assertTrue(self.store.delete_image("to-delete"))
         self.assertIsNone(self.store.get_image("to-delete"))
         self.assertFalse(self.store.delete_image("nonexistent"))

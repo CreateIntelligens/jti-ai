@@ -96,17 +96,14 @@ class TestImageApi(unittest.TestCase):
             {"image_id": "unused", "url": "/api/hciot/images/unused"},
             {"image_id": "1", "url": "/api/hciot/images/1"},
         ]
-        mock_knowledge_store.list_files.side_effect = [
-            [{"name": "qa.csv", "filename": "qa.csv"}],
-            [],
-        ]
-        mock_knowledge_store.get_file.return_value = {
-            "data": (
-                b"index,q,a,img\n"
-                b"1,\xe9\xa1\x8c\xe7\x9b\xae,\xe7\xad\x94\xe6\xa1\x88,used.png\n"
-                b"2,\xe9\xa1\x8c\xe7\x9b\xae2,\xe7\xad\x94\xe6\xa1\x882,IMG_1.jpg\n"
-            )
-        }
+        csv_data = (
+            b"index,q,a,img\n"
+            b"1,\xe9\xa1\x8c\xe7\x9b\xae,\xe7\xad\x94\xe6\xa1\x88,used.png\n"
+            b"2,\xe9\xa1\x8c\xe7\x9b\xae2,\xe7\xad\x94\xe6\xa1\x882,IMG_1.jpg\n"
+        )
+        mock_knowledge_store.iter_csv_files_with_data.side_effect = lambda lang: (
+            [("qa.csv", csv_data)] if lang == "zh" else []
+        )
 
         res = self.client.get("/api/hciot-admin/images/")
 
@@ -124,13 +121,10 @@ class TestImageApi(unittest.TestCase):
             {"image_id": "unused", "url": "/api/hciot/images/unused"},
         ]
         mock_store.delete_image.return_value = True
-        mock_knowledge_store.list_files.side_effect = [
-            [{"name": "qa.csv", "filename": "qa.csv"}],
-            [],
-        ]
-        mock_knowledge_store.get_file.return_value = {
-            "data": b"index,q,a,img\n1,\xe9\xa1\x8c\xe7\x9b\xae,\xe7\xad\x94\xe6\xa1\x88,used.png\n"
-        }
+        csv_data = b"index,q,a,img\n1,\xe9\xa1\x8c\xe7\x9b\xae,\xe7\xad\x94\xe6\xa1\x88,used.png\n"
+        mock_knowledge_store.iter_csv_files_with_data.side_effect = lambda lang: (
+            [("qa.csv", csv_data)] if lang == "zh" else []
+        )
 
         res = self.client.delete("/api/hciot-admin/images/cleanup-unused")
 
@@ -140,23 +134,24 @@ class TestImageApi(unittest.TestCase):
         mock_store.delete_image.assert_called_once_with("unused")
 
     def test_upload_image_success(self):
-        mock_store.image_exists.return_value = False
-        mock_store.insert_image.return_value = True
-        
+        mock_store.upsert_image.return_value = {"success": True, "replaced": False}
+
         files = {"file": ("test.png", b"fakeimage", "image/png")}
         res = self.client.post("/api/hciot-admin/images/upload", files=files)
-        
+
         self.assertEqual(res.status_code, 201)
         data = res.json()
         self.assertEqual(data["image_id"], "test")
         self.assertEqual(data["url"], "/api/hciot/images/test")
-        
-    def test_upload_image_conflict(self):
-        mock_store.image_exists.return_value = True
-        
+        self.assertFalse(data["replaced"])
+
+    def test_upload_image_replaces_existing(self):
+        mock_store.upsert_image.return_value = {"success": True, "replaced": True}
+
         files = {"file": ("exists.png", b"data", "image/png")}
         res = self.client.post("/api/hciot-admin/images/upload", files=files)
-        self.assertEqual(res.status_code, 409)
+        self.assertEqual(res.status_code, 201)
+        self.assertTrue(res.json()["replaced"])
 
     def test_delete_image_success(self):
         mock_store.delete_image.return_value = True
