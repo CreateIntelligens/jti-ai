@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
@@ -33,20 +34,19 @@ export default function App() {
     .split(',').map((s: string) => s.trim().toLowerCase());
   const canShow = (p: string) => !isRestricted || allowedPages.includes(p);
 
-  const pathname = window.location.pathname;
-  const page = pathname.replace(/^\/+|\/+$/g, '').toLowerCase() || 'home';
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/jti" element={canShow('jti') ? <Jti /> : <Navigate to="/" replace />} />
+        <Route path="/hciot" element={canShow('hciot') ? <Hciot /> : <Navigate to="/" replace />} />
+        <Route path="/" element={<HomeShell />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
 
-  const isHciotPage = page === 'hciot' && canShow('hciot');
-  const isJtiPage = page === 'jti' && canShow('jti');
-
-  useEffect(() => {
-    if (isHciotPage && pathname !== '/hciot') window.history.replaceState(null, '', '/hciot');
-    else if (isJtiPage && pathname !== '/jti') window.history.replaceState(null, '', '/jti');
-  }, [isHciotPage, isJtiPage, pathname]);
-
-  if (isHciotPage) return <Hciot />;
-  if (isJtiPage) return <Jti />;
-
+function HomeShell() {
   const {
     sidebarOpen,
     conversationHistoryModalOpen, setConversationHistoryModalOpen,

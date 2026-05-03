@@ -22,7 +22,11 @@ server {
     proxy_send_timeout 300;
   }
 
-  # Vite dev server - 處理所有其他路由 (包括 /jti)
+  # Vite dev server - 處理所有其他路由 (包括 /jti, /hciot 等 SPA routes)
+  # Vite 會自動把未知路徑回 index.html，所以不需要額外 try_files。
+  # 若改成 prod build (serve dist/)，需把這個 block 換成：
+  #   root /app/dist;
+  #   try_files $uri $uri/ /index.html;
   location / {
     proxy_pass http://127.0.0.1:5174;
     proxy_http_version 1.1;
