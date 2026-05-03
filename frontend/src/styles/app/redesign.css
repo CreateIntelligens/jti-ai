@@ -248,9 +248,38 @@ select.input-base { cursor: pointer; }
 .rp-overlay .message-edit-btn.cancel:hover { background: var(--border); }
 
 /* ── Responsive ── */
+
+/* Tablet and below (≤ 768px) */
 @media (max-width: 48rem) {
-  .app-shell .sidebar { position: absolute; top: 0; left: 0; height: 100%; z-index: 30; border-radius: 0; }
-  .app-shell .app-body { padding: .5rem; }
+  .app-shell .sidebar { position: absolute; top: 0; left: 0; height: 100%; z-index: 30; border-radius: 0; box-shadow: var(--shadow-lg); }
+  .app-shell .app-body { padding: .5rem; gap: .5rem; }
   .app-shell .chat-area { border-radius: var(--r-lg); }
-  .msg-bubble { max-width: 90%; }
+  .app-shell .messages-area { padding: 1rem 1rem; gap: .875rem; }
+  .app-shell .input-area { padding: .625rem .25rem .75rem; }
+  .msg-bubble { max-width: 90%; font-size: .875rem; }
+  .app-header { padding: 0 .75rem; }
+  .app-header .app-logo { font-size: .875rem; }
+  .app-header .app-logo span { display: none; }
+  .app-header .icon-btn-pill { padding: 0 .5rem; font-size: .75rem; }
+  .app-header .status-badge { display: none; }
+}
+
+/* Phone portrait (≤ 480px) */
+@media (max-width: 30rem) {
+  .app-shell .app-body { padding: .375rem; gap: .375rem; }
+  .app-shell .chat-area { border-radius: var(--r-md); }
+  .app-shell .messages-area { padding: .75rem .75rem; }
+  .app-shell .input-area { padding: .5rem .125rem .625rem; }
+  .input-wrap { padding: .5rem .5rem .5rem .75rem; }
+  .chat-ta { font-size: .875rem; }
+  .send-btn { width: 1.875rem; height: 1.875rem; }
+  .msg-bubble { max-width: 95%; padding: .5rem .75rem; }
+  .app-header { padding: 0 .5rem; height: 3rem; }
+  .ctl-actions .icon-btn-pill .ctl-label-text { display: none; }
+  .rp-overlay .panel { width: 100%; max-width: 100%; border-radius: 0; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .app-shell *, .rp-overlay * { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
