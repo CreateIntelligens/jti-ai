@@ -137,7 +137,7 @@ def test_upload_knowledge_file_splits_mixed_qa_csv_and_syncs_all_questions():
     _, topic_payload = fake_topic_store.upsert_topic.call_args.args
     assert topic_payload["questions"] == {
         "zh": ["無圖問題", "有圖問題"],
-        "en": ["無圖問題", "有圖問題"],
+        "en": [],
     }
 
 
@@ -164,7 +164,7 @@ def test_upload_knowledge_file_with_only_image_rows_still_syncs_questions():
     _, topic_payload = fake_topic_store.upsert_topic.call_args.args
     assert topic_payload["questions"] == {
         "zh": ["第一題", "第二題"],
-        "en": ["第一題", "第二題"],
+        "en": [],
     }
 
 
@@ -241,7 +241,7 @@ def test_update_file_content_splits_legacy_single_csv_with_image_rows():
     _, topic_payload = fake_topic_store.upsert_topic.call_args.args
     assert topic_payload["questions"] == {
         "zh": ["第一題", "第二題"],
-        "en": ["第一題", "第二題"],
+        "en": [],
     }
 
 

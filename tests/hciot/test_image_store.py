@@ -1,5 +1,6 @@
 import sys
 import unittest
+import importlib
 from datetime import datetime
 
 from tests.support.app_test_support import install_app_import_mocks
@@ -100,7 +101,9 @@ fake_db = {"hciot_images": fake_collection}
 install_app_import_mocks()
 sys.modules["app.services.mongo_client"].get_mongo_db.return_value = fake_db
 
-from app.services.hciot.image_store import HciotImageStore
+image_store_module = importlib.import_module("app.services.hciot.image_store")
+image_store_module = importlib.reload(image_store_module)
+HciotImageStore = image_store_module.HciotImageStore
 
 
 class TestHciotImageStore(unittest.TestCase):

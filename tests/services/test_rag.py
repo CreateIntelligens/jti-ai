@@ -13,17 +13,38 @@ mock_lancedb_store = MagicMock()
 mock_mongodb_backup = MagicMock()
 mock_knowledge_store = MagicMock()
 
-with patch.dict(sys.modules, {
-    'app.services.embedding.service': MagicMock(get_embedding_service=lambda: mock_embedding_service),
-    'app.services.vector_store.lancedb': MagicMock(get_lancedb_store=lambda: mock_lancedb_store),
-    'app.services.vector_store.mongodb_backup': MagicMock(get_mongodb_backup=lambda: mock_mongodb_backup),
-    'app.services.knowledge_store': MagicMock(get_knowledge_store=lambda: mock_knowledge_store),
-}):
-    from app.services.rag.chunker import SemanticChunker
-    from app.services.rag.service import RAGPipeline
-    from app.services.rag.backfill import BackfillService
+from app.services.rag.chunker import SemanticChunker
+from app.services.rag.service import RAGPipeline
+from app.services.rag.backfill import BackfillService
 
 class TestRAGPipeline(unittest.TestCase):
+    def setUp(self):
+        self.patchers = [
+            patch("app.services.rag.service.get_embedding_service", return_value=mock_embedding_service),
+            patch("app.services.rag.service.get_lancedb_store", return_value=mock_lancedb_store),
+            patch("app.services.rag.backfill.get_embedding_service", return_value=mock_embedding_service),
+            patch("app.services.rag.backfill.get_lancedb_store", return_value=mock_lancedb_store),
+            patch("app.services.rag.backfill.get_mongodb_backup", return_value=mock_mongodb_backup),
+            patch("app.services.rag.backfill.get_jti_knowledge_store", return_value=mock_knowledge_store),
+            patch("app.services.rag.backfill.get_hciot_knowledge_store", return_value=mock_knowledge_store),
+        ]
+        for patcher in self.patchers:
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+        for mocked in (mock_embedding_service, mock_lancedb_store, mock_mongodb_backup, mock_knowledge_store):
+            mocked.reset_mock()
+            mocked.side_effect = None
+
+        mock_lancedb_store.get_file_fingerprint.side_effect = None
+        mock_lancedb_store.get_file_fingerprint.return_value = None
+        mock_lancedb_store.search.side_effect = None
+        mock_lancedb_store.search.return_value = []
+        mock_knowledge_store.list_files.side_effect = None
+        mock_knowledge_store.list_files.return_value = []
+        mock_knowledge_store.get_file_data.side_effect = None
+        mock_knowledge_store.get_file_data.return_value = None
+
     def test_semantic_chunker(self):
         chunker = SemanticChunker(chunk_size_tokens=5)
         text = "This is a sentence. This is another one."

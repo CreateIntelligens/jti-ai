@@ -12,10 +12,17 @@ mock_lancedb = MagicMock()
 sys.modules['lancedb'] = mock_lancedb
 sys.modules['pandas'] = MagicMock()
 
+import app.services.vector_store.lancedb as lancedb_module
 from app.services.vector_store.lancedb import LanceDBStore
 from app.services.vector_store.mongodb_backup import MongoDBBackup
 
 class TestVectorStore(unittest.TestCase):
+    def setUp(self):
+        self.lancedb_patcher = patch.object(lancedb_module, "lancedb", mock_lancedb)
+        self.lancedb_patcher.start()
+        self.addCleanup(self.lancedb_patcher.stop)
+        mock_lancedb.reset_mock()
+
     def test_lancedb_insert_and_search(self):
         mock_db = MagicMock()
         mock_lancedb.connect.return_value = mock_db

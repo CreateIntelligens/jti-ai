@@ -17,7 +17,7 @@ class TestJtiKnowledgeCoreValidation(unittest.TestCase):
     def test_upload_rejects_core_marker_in_text_files(self):
         store = MagicMock()
 
-        with patch("app.routers.jti.knowledge.get_knowledge_store", return_value=store):
+        with patch("app.routers.jti.knowledge.get_jti_knowledge_store", return_value=store):
             response = self.client.post(
                 "/api/jti-admin/knowledge/upload/?language=zh",
                 files={"file": ("guide.csv", BytesIO(b"[CORE: secret]"), "text/csv")},
@@ -35,7 +35,7 @@ class TestJtiKnowledgeCoreValidation(unittest.TestCase):
             "data": b"old",
         }
 
-        with patch("app.routers.jti.knowledge.get_knowledge_store", return_value=store):
+        with patch("app.routers.jti.knowledge.get_jti_knowledge_store", return_value=store):
             response = self.client.put(
                 "/api/jti-admin/knowledge/files/guide.csv/content?language=zh",
                 json={"content": "[CORE: secret]"},

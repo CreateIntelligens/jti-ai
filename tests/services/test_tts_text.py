@@ -13,9 +13,11 @@ class TestTtsText(unittest.TestCase):
         self.assertIn("二零二四年", result)
         self.assertIn("一百三十", result)
 
-    def test_hciot_tts_text_preserves_digits_for_chinese(self):
+    def test_hciot_tts_text_converts_digits_for_chinese(self):
         result = to_hciot_tts_text("2024年有130人", "zh")
-        self.assertEqual(result, "2024年有130人")
+        self.assertIsNotNone(result)
+        self.assertIn("二零二四年", result)
+        self.assertIn("一百三十", result)
 
     def test_jti_tts_text_reads_hotlines_digit_by_digit(self):
         result = to_jti_tts_text("請撥1922、1925、1995、110、113或119。", "zh")

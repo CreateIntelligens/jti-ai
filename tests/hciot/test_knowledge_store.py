@@ -1,5 +1,6 @@
 import sys
 import unittest
+import importlib
 from unittest.mock import MagicMock
 
 from tests.support.app_test_support import install_app_import_mocks
@@ -83,7 +84,9 @@ fake_db = {"knowledge_files": fake_collection}
 install_app_import_mocks()
 sys.modules["app.services.mongo_client"].get_mongo_db.return_value = fake_db
 
-from app.services.hciot.knowledge_store import HciotKnowledgeStore
+knowledge_store_module = importlib.import_module("app.services.hciot.knowledge_store")
+knowledge_store_module = importlib.reload(knowledge_store_module)
+HciotKnowledgeStore = knowledge_store_module.HciotKnowledgeStore
 
 
 class TestHciotKnowledgeStore(unittest.TestCase):

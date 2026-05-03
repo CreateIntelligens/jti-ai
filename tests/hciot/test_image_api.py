@@ -1,4 +1,3 @@
-import sys
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -9,10 +8,6 @@ from tests.support.app_test_support import install_app_import_mocks
 install_app_import_mocks()
 mock_store = MagicMock()
 mock_knowledge_store = MagicMock()
-sys.modules["app.services.hciot.image_store"] = MagicMock()
-sys.modules["app.services.hciot.image_store"].get_hciot_image_store.return_value = mock_store
-sys.modules["app.services.hciot.knowledge_store"] = MagicMock()
-sys.modules["app.services.hciot.knowledge_store"].get_hciot_knowledge_store.return_value = mock_knowledge_store
 
 from app.auth import verify_admin
 from app.routers.hciot.images import router, admin_router
