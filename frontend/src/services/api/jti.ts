@@ -1,4 +1,4 @@
-import { API_BASE, fetchAsAdmin, handleResponse, normLang } from './base';
+import { API_BASE, fetchAsAdmin, handleResponse, normLang, buildUrl } from './base';
 import { downloadBlob } from '../../utils/download';
 
 // ========== JTI Prompt Management ==========
@@ -34,9 +34,8 @@ export interface JtiRuntimeSettingsResponse {
 
 const JTI_ADMIN_BASE = `${API_BASE}/jti-admin`;
 
-function jtiUrl(path: string, language: string = 'zh', extraParams?: Record<string, string>): string {
-  const params = new URLSearchParams({ language: normLang(language), ...extraParams });
-  return `${JTI_ADMIN_BASE}${path}?${params}`;
+function jtiUrl(path: string, language: string = 'zh', extraParams?: Record<string, string | number | boolean>): string {
+  return buildUrl(`${JTI_ADMIN_BASE}${path}`, { language: normLang(language), ...extraParams });
 }
 
 export async function listJtiPrompts(language: string = 'zh'): Promise<any> {

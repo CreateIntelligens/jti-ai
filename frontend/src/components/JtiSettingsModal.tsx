@@ -9,16 +9,6 @@ import JtiQuizTab from './jti/JtiQuizTab';
 import Tabs from './Tabs';
 import type { Tab } from './Tabs';
 
-interface Prompt {
-  id: string;
-  name: string;
-  content: string;
-  created_at: string;
-  updated_at: string;
-  is_default?: boolean;
-  readonly?: boolean;
-  is_active?: boolean;
-}
 
 interface JtiSettingsModalProps {
   isOpen: boolean;
@@ -27,7 +17,7 @@ interface JtiSettingsModalProps {
   language?: string;
 }
 
-interface KBFile { name: string; display_name: string; size?: number; editable?: boolean; }
+type KBFile = api.KnowledgeFile;
 
 const MAX_CUSTOM = 3;
 const SYSTEM_DEFAULT_ID = 'system_default';
@@ -37,7 +27,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   const [activeTab, setActiveTab] = useState<'prompt' | 'quiz' | 'kb'>('prompt');
 
   // === Prompt state ===
-  const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [prompts, setPrompts] = useState<api.Prompt[]>([]);
   const [activePromptId, setActivePromptId] = useState<string | null>(null);
   const [maxCustom, setMaxCustom] = useState(MAX_CUSTOM);
   const [loading, setLoading] = useState(false);
@@ -158,46 +148,39 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
     await loadRuntimeSettings(promptId);
   };
 
-  const handleCreate = async (name: string, content: string) => {
-    setCreating(true);
+  const handleAction = async (action: () => Promise<any>, errorPrefix: string) => {
     try {
-      await api.createJtiPrompt(name, content, normalizedLanguage);
+      await action();
       const latestActivePromptId = await loadPrompts();
       await refreshRuntimeSettings(latestActivePromptId);
+      return latestActivePromptId;
     } catch (e) {
-      alert('建立失敗: ' + toErrorMessage(e));
-    } finally {
-      setCreating(false);
+      alert(`${errorPrefix}: ${toErrorMessage(e)}`);
     }
+  };
+
+  const handleCreate = async (name: string, content: string) => {
+    setCreating(true);
+    await handleAction(() => api.createJtiPrompt(name, content, normalizedLanguage), '建立失敗');
+    setCreating(false);
   };
 
   const handleCloneDefault = async () => {
     setCloning(true);
-    try {
-      await api.cloneDefaultJtiPrompt(normalizedLanguage);
-      const latestActivePromptId = await loadPrompts();
-      await refreshRuntimeSettings(latestActivePromptId);
+    const success = await handleAction(() => api.cloneDefaultJtiPrompt(normalizedLanguage), '複製失敗');
+    if (success) {
       onPromptChange();
       showSuccessMsg('✅ 已複製預設人物設定並啟用');
-    } catch (e) {
-      alert('複製失敗: ' + toErrorMessage(e));
-    } finally {
-      setCloning(false);
     }
+    setCloning(false);
   };
 
   const handleSetActive = async (promptId: string | null) => {
-    try {
-      await api.setActiveJtiPrompt(promptId, normalizedLanguage);
-      const latestActivePromptId = await loadPrompts();
-      await refreshRuntimeSettings(latestActivePromptId);
-      onPromptChange();
-    } catch (e) {
-      alert('設定失敗: ' + toErrorMessage(e));
-    }
+    const success = await handleAction(() => api.setActiveJtiPrompt(promptId, normalizedLanguage), '設定失敗');
+    if (success) onPromptChange();
   };
 
-  const startEdit = (prompt: Prompt) => {
+  const startEdit = (prompt: api.Prompt) => {
     setEditingId(prompt.id);
     setEditName(prompt.name);
     setEditContent(prompt.content);
@@ -211,15 +194,11 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
 
   const saveEdit = async () => {
     if (!editingId) return;
-    try {
-      await api.updateJtiPrompt(editingId, editName, editContent, normalizedLanguage);
-      const latestActivePromptId = await loadPrompts();
-      await refreshRuntimeSettings(latestActivePromptId);
+    const success = await handleAction(() => api.updateJtiPrompt(editingId, editName, editContent, normalizedLanguage), '更新失敗');
+    if (success) {
       if (editingId === activePromptId) onPromptChange();
       showSuccessMsg('✅ 已儲存人物設定');
       cancelEdit();
-    } catch (e) {
-      alert('更新失敗: ' + toErrorMessage(e));
     }
   };
 
@@ -230,18 +209,13 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
     if (!confirmDeleteId) return;
     const promptId = confirmDeleteId;
     setDeleting(true);
-    try {
-      await api.deleteJtiPrompt(promptId, normalizedLanguage);
+    const success = await handleAction(() => api.deleteJtiPrompt(promptId, normalizedLanguage), '刪除失敗');
+    if (success) {
       setConfirmDeleteId(null);
-      const latestActivePromptId = await loadPrompts();
-      await refreshRuntimeSettings(latestActivePromptId);
       if (promptId === activePromptId) onPromptChange();
       showSuccessMsg('✅ 已刪除人物設定');
-    } catch (e) {
-      alert('刪除失敗: ' + toErrorMessage(e));
-    } finally {
-      setDeleting(false);
     }
+    setDeleting(false);
   };
 
   const handleSaveRuntimeSettings = async (

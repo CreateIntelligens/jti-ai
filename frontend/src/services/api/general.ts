@@ -4,8 +4,10 @@ import type {
   ChatResponse,
   StartChatResponse,
   AppTarget,
+  KnowledgeFile,
+  KnowledgeFileContent,
 } from '../../types';
-import { API_BASE, fetchAsAdmin, fetchWithApiKey, fetchWithUserGeminiKey, handleResponse, STORAGE_KEYS, STORAGE_ACTIVE, normLang } from './base';
+import { API_BASE, fetchAsAdmin, fetchWithApiKey, fetchWithUserGeminiKey, handleResponse, STORAGE_KEYS, STORAGE_ACTIVE, normLang, buildUrl } from './base';
 
 // ========== Stores & Files ==========
 
@@ -56,13 +58,7 @@ export async function deleteStoreFile(storeName: string, fileName: string): Prom
   await handleResponse<void>(response);
 }
 
-export interface StoreFileContent {
-  filename: string;
-  editable: boolean;
-  content: string | null;
-  size?: number;
-  message?: string;
-}
+export type StoreFileContent = KnowledgeFileContent;
 
 export async function getStoreFileContent(
   storeName: string,
@@ -92,17 +88,16 @@ export async function updateStoreFileContent(
 
 // ========== Knowledge Management ==========
 
-function knowledgeParams(appTarget: AppTarget, language: string): URLSearchParams {
-  return new URLSearchParams({ app: appTarget, language: normLang(language) });
-}
 
 function knowledgeFileUrl(filename: string, suffix: string, appTarget: AppTarget, language: string): string {
-  return `${API_BASE}/knowledge/files/${encodeURIComponent(filename)}${suffix}?${knowledgeParams(appTarget, language)}`;
+  const path = `${API_BASE}/knowledge/files/${encodeURIComponent(filename)}${suffix}`;
+  return buildUrl(path, { app: appTarget, language: normLang(language) });
 }
 
-export async function listManagedKnowledgeFiles(appTarget: AppTarget, language: string = 'zh'): Promise<any> {
-  const response = await fetchAsAdmin(`${API_BASE}/knowledge/files/?${knowledgeParams(appTarget, language)}`);
-  return handleResponse<any>(response);
+export async function listManagedKnowledgeFiles(appTarget: AppTarget, language: string = 'zh'): Promise<{ files: KnowledgeFile[] }> {
+  const url = buildUrl(`${API_BASE}/knowledge/files/`, { app: appTarget, language: normLang(language) });
+  const response = await fetchAsAdmin(url);
+  return handleResponse<{ files: KnowledgeFile[] }>(response);
 }
 
 export async function getManagedKnowledgeFileContent(appTarget: AppTarget, filename: string, language: string = 'zh'): Promise<any> {
@@ -131,7 +126,8 @@ export async function updateManagedKnowledgeFileContent(
 export async function uploadManagedKnowledgeFile(appTarget: AppTarget, language: string, file: File): Promise<any> {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await fetchAsAdmin(`${API_BASE}/knowledge/upload/?${knowledgeParams(appTarget, language)}`, {
+  const url = buildUrl(`${API_BASE}/knowledge/upload/`, { app: appTarget, language: normLang(language) });
+  const response = await fetchAsAdmin(url, {
     method: 'POST',
     body: formData,
   });

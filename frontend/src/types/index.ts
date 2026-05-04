@@ -61,3 +61,36 @@ export interface StartChatResponse {
   session_id?: string;
   opening_message?: string;
 }
+
+export interface Prompt {
+  id: string;
+  name: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  is_default?: boolean;
+  readonly?: boolean;
+  is_active?: boolean;
+}
+
+export interface KnowledgeFile {
+  name: string;
+  display_name?: string;
+  content_type?: string;
+  size?: number;
+  created_at?: string;
+  editable?: boolean;
+  topic_id?: string | null;
+  category_label_zh?: string | null;
+  category_label_en?: string | null;
+  topic_label_zh?: string | null;
+  topic_label_en?: string | null;
+}
+
+export interface KnowledgeFileContent {
+  filename: string;
+  content: string | null;
+  editable?: boolean;
+  size?: number;
+  message?: string;
+}

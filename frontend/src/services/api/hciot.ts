@@ -1,5 +1,5 @@
-import type { StartChatResponse, ChatResponse } from '../../types';
-import { API_BASE, fetchAsAdmin, fetchWithApiKey, handleResponse, normLang } from './base';
+import type { StartChatResponse, ChatResponse, Prompt, KnowledgeFile, KnowledgeFileContent } from '../../types';
+import { API_BASE, fetchAsAdmin, fetchWithApiKey, handleResponse, normLang, buildUrl } from './base';
 
 export interface HciotRuntimeSettings {
   response_rule_sections: {
@@ -28,43 +28,14 @@ export interface HciotRuntimeSettingsResponse {
   settings: HciotRuntimeSettings;
 }
 
-export interface HciotPrompt {
-  id: string;
-  name: string;
-  content: string;
-  created_at: string;
-  updated_at: string;
-  is_default?: boolean;
-  readonly?: boolean;
-  is_active?: boolean;
-}
+export type HciotPrompt = Prompt;
+export type HciotKnowledgeFile = KnowledgeFile;
+export type HciotKnowledgeFileContent = KnowledgeFileContent;
 
 export interface HciotPromptListResponse {
-  prompts: HciotPrompt[];
+  prompts: Prompt[];
   active_prompt_id: string | null;
   max_custom_prompts?: number;
-}
-
-export interface HciotKnowledgeFile {
-  name: string;
-  display_name?: string;
-  content_type?: string;
-  size?: number;
-  created_at?: string;
-  editable?: boolean;
-  topic_id?: string | null;
-  category_label_zh?: string | null;
-  category_label_en?: string | null;
-  topic_label_zh?: string | null;
-  topic_label_en?: string | null;
-}
-
-export interface HciotKnowledgeFileContent {
-  filename: string;
-  content: string | null;
-  editable?: boolean;
-  size?: number;
-  message?: string;
 }
 
 export interface HciotLabels {
@@ -83,29 +54,12 @@ const JSON_HEADERS = { 'Content-Type': 'application/json' };
 type QueryValue = string | null | undefined;
 
 
-function buildQuery(params: Record<string, QueryValue>): string {
-  const query = new URLSearchParams();
-
-  Object.entries(params).forEach(([key, value]) => {
-    if (value) {
-      query.set(key, value);
-    }
-  });
-
-  return query.toString();
+function buildAdminUrl(path: string, params?: Record<string, string | number | boolean | null | undefined>): string {
+  return buildUrl(`${HCIOT_ADMIN_BASE}${path}`, params);
 }
 
-function appendQuery(path: string, params: Record<string, QueryValue>): string {
-  const query = buildQuery(params);
-  return query ? `${path}?${query}` : path;
-}
-
-function buildAdminUrl(path: string, params?: Record<string, QueryValue>): string {
-  return `${HCIOT_ADMIN_BASE}${appendQuery(path, params || {})}`;
-}
-
-function buildApiUrl(path: string, params?: Record<string, QueryValue>): string {
-  return `${HCIOT_API_BASE}${appendQuery(path, params || {})}`;
+function buildApiUrl(path: string, params?: Record<string, string | number | boolean | null | undefined>): string {
+  return buildUrl(`${HCIOT_API_BASE}${path}`, params);
 }
 
 function jsonRequest(method: 'POST' | 'PUT', body: unknown): RequestInit {
