@@ -124,8 +124,8 @@ export default function JtiMessageList({
                       {msg.type === 'user' ? '👤' : msg.type === 'assistant' ? '🤖' : '💡'}
                     </span>
                   </div>
-                  <div className="message-content" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, minWidth: 0 }}>
-                    <div className="message-bubble" style={{ flex: 'none' }}>
+                  <div className="message-content">
+                    <div className="message-bubble is-fixed">
                       {editingTurn !== null && editingTurn === msg.turnNumber && msg.type === 'user' ? (
                         <div className="message-edit-area">
                           <textarea

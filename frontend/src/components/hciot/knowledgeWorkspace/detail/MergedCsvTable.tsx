@@ -110,12 +110,12 @@ export default function MergedCsvTable({
         <table className="hciot-merged-csv-table">
           <thead>
             <tr>
-              <th style={{ width: '60px' }}>編號</th>
+              <th className="hciot-csv-col-num">編號</th>
               <th>問題 (Q)</th>
               <th>回答 (A)</th>
-              <th style={{ width: '180px' }}>圖片 (IMG)</th>
-              <th style={{ width: '180px' }}>網址 (URL)</th>
-              {isEditing && <th style={{ width: '60px', textAlign: 'center' }}>-</th>}
+              <th className="hciot-csv-col-wide">圖片 (IMG)</th>
+              <th className="hciot-csv-col-wide">網址 (URL)</th>
+              {isEditing && <th className="hciot-csv-col-action">-</th>}
             </tr>
           </thead>
           <tbody>
@@ -131,23 +131,15 @@ export default function MergedCsvTable({
                   <td>{i + 1}</td>
                   <td>
                     {isEditing ? (
-                      <textarea
-                        className="hciot-file-textarea"
-                        style={{ minHeight: '60px', padding: '4px' }}
-                        value={row.q}
-                        onChange={(e) => onUpdateRow(i, { q: e.target.value })}
+                      <textarea className="hciot-file-textarea hciot-csv-textarea" value={row.q} onChange={(e) => onUpdateRow(i, { q: e.target.value })}
                       />
                     ) : (
                       row.q
                     )}
                   </td>
-                  <td style={{ whiteSpace: 'pre-wrap' }}>
+                  <td className="hciot-csv-cell-pre">
                     {isEditing ? (
-                      <textarea
-                        className="hciot-file-textarea"
-                        style={{ minHeight: '60px', padding: '4px' }}
-                        value={row.a}
-                        onChange={(e) => onUpdateRow(i, { a: e.target.value })}
+                      <textarea className="hciot-file-textarea hciot-csv-textarea" value={row.a} onChange={(e) => onUpdateRow(i, { a: e.target.value })}
                       />
                     ) : (
                       row.a
@@ -177,11 +169,7 @@ export default function MergedCsvTable({
                             </div>
                             <div style={{ display: 'flex', gap: 6 }}>
                               <label className={`hciot-merged-csv-upload-btn${row.imgStatus === 'uploading' ? ' is-uploading' : ''}`}>
-                                <input
-                                  type="file"
-                                  accept="image/*"
-                                  style={{ display: 'none' }}
-                                  onChange={(e) => handleFileChange(i, e.target.files?.[0] || null)}
+                                <input className="file-input-hidden"type="file" accept="image/*" onChange={(e) => handleFileChange(i, e.target.files?.[0] || null)}
                                   disabled={row.imgStatus === 'uploading'}
                                 />
                                 <Upload size={14} />
@@ -198,11 +186,7 @@ export default function MergedCsvTable({
                         ) : (
                           <div style={{ display: 'flex', gap: 6 }}>
                             <label className={`hciot-merged-csv-upload-btn${row.imgStatus === 'uploading' ? ' is-uploading' : ''}`}>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                style={{ display: 'none' }}
-                                onChange={(e) => handleFileChange(i, e.target.files?.[0] || null)}
+                              <input className="file-input-hidden"type="file" accept="image/*" onChange={(e) => handleFileChange(i, e.target.files?.[0] || null)}
                                 disabled={row.imgStatus === 'uploading'}
                               />
                               <Upload size={14} />
@@ -238,20 +222,16 @@ export default function MergedCsvTable({
                       </div>
                     ) : null}
                   </td>
-                  <td style={{ wordBreak: 'break-all' }}>
+                  <td className="hciot-csv-cell-break">
                     {isEditing ? (
-                      <textarea
-                        className="hciot-file-textarea"
-                        style={{ minHeight: '60px', padding: '4px' }}
-                        value={row.url || ''}
-                        onChange={(e) => onUpdateRow(i, { url: e.target.value })}
+                      <textarea className="hciot-file-textarea hciot-csv-textarea" value={row.url || ''} onChange={(e) => onUpdateRow(i, { url: e.target.value })}
                       />
                     ) : row.url ? (
                       <a href={row.url} target="_blank" rel="noopener noreferrer">{row.url}</a>
                     ) : null}
                   </td>
                   {isEditing && (
-                    <td style={{ textAlign: 'center' }}>
+                    <td className="hciot-csv-cell-center">
                       <button
                         type="button"
                         className="hciot-explorer-icon-button danger"
@@ -268,7 +248,7 @@ export default function MergedCsvTable({
           </tbody>
         </table>
         {isEditing && (
-          <div style={{ marginTop: '1rem', textAlign: 'center' }}>
+          <div className="hciot-csv-footer">
             <button
               type="button"
               className="hciot-file-action-button"

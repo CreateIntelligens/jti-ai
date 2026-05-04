@@ -19,7 +19,10 @@ import './styles/app/components.css';
 import './styles/app/messages.css';
 import './styles/app/light.css';
 import './styles/app/variables.css';
-import './styles/app/redesign.css';
+import './styles/app/shell.css';
+import './styles/app/panel.css';
+import './styles/app/buttons.css';
+import './styles/app/utility.css';
 import './styles/conversation-history.css';
 
 type PanelId = 'admin' | 'apikeys' | 'prompt' | 'extkeys' | null;
@@ -50,7 +53,7 @@ function HomeShell() {
   const {
     sidebarOpen,
     conversationHistoryModalOpen, setConversationHistoryModalOpen,
-    status, stores, keyNames,
+    status, stores, filteredStores, keyNames,
     knowledgeTargets, currentTarget, currentTargetId, currentStore,
     files, filesLoading,
     messages, setMessages,
@@ -101,7 +104,7 @@ function HomeShell() {
         <div className="app-body">
           <Sidebar
             isOpen={sidebarOpen}
-            stores={stores}
+            stores={filteredStores}
             keyNames={keyNames}
             knowledgeTargets={knowledgeTargets}
             currentTargetId={currentTargetId}
@@ -125,7 +128,6 @@ function HomeShell() {
             currentProjectColor={currentProjectColor}
             onOpenPromptPanel={() => openPanel('prompt')}
             onRestartChat={handleRestartChat}
-            onOpenHistory={() => setConversationHistoryModalOpen(true)}
             onCreateStore={() => openPanel('admin')}
           />
         </div>

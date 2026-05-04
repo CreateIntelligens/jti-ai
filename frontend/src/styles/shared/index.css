@@ -441,3 +441,6 @@ body::before {
   letter-spacing: 0.02em;
   word-break: break-all;
 }
+
+/* Hidden file input (used by uploads / quiz import) */
+.file-input-hidden { display: none; }

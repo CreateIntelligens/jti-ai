@@ -1,0 +1,59 @@
+/* ==========================================================================
+   App-shell button system + inline message edit primitives.
+   Shared by .app-shell main view and .rp-overlay slide panels.
+   ========================================================================== */
+
+/* ── Buttons ── */
+.app-shell .btn,
+.rp-overlay .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .375rem;
+  padding: .4375rem .875rem; border-radius: var(--r-md);
+  font-size: .8125rem; font-family: var(--font); font-weight: 500;
+  cursor: pointer; border: none; transition: all var(--trans); white-space: nowrap;
+}
+.app-shell .btn-primary,
+.rp-overlay .btn-primary { background: var(--primary); color: #fff; }
+.app-shell .btn-primary:hover,
+.rp-overlay .btn-primary:hover { background: var(--primary-dark); }
+.app-shell .btn-primary:disabled,
+.rp-overlay .btn-primary:disabled { opacity: .45; cursor: not-allowed; }
+.app-shell .btn-ghost,
+.rp-overlay .btn-ghost { background: none; color: var(--text-2); border: 1px solid var(--border); }
+.app-shell .btn-ghost:hover,
+.rp-overlay .btn-ghost:hover { background: var(--border); color: var(--text); }
+.app-shell .btn-danger,
+.rp-overlay .btn-danger { background: none; color: var(--red-500); border: 1px solid var(--red-100); }
+.app-shell .btn-danger:hover,
+.rp-overlay .btn-danger:hover { background: var(--red-100); }
+.app-shell .btn-sm,
+.rp-overlay .btn-sm { padding: .3125rem .625rem; font-size: .75rem; }
+
+/* ── Inline Message Edit ── */
+.app-shell .message-edit-area,
+.rp-overlay .message-edit-area { width: 100%; }
+.app-shell .message-edit-textarea,
+.rp-overlay .message-edit-textarea {
+  width: 100%; background: var(--bg); border: 1px solid var(--primary);
+  border-radius: var(--r-md); color: var(--text); padding: .75rem;
+  font-family: var(--font); font-size: .9375rem; resize: vertical;
+  outline: none; min-height: 3.75rem;
+}
+.app-shell .message-edit-textarea:focus,
+.rp-overlay .message-edit-textarea:focus { box-shadow: 0 0 0 .125rem rgba(15,118,110,.15); }
+.app-shell .message-edit-actions,
+.rp-overlay .message-edit-actions { display: flex; gap: .5rem; margin-top: .5rem; justify-content: flex-end; }
+.app-shell .message-edit-btn,
+.rp-overlay .message-edit-btn {
+  padding: .25rem 1rem; border-radius: var(--r-md); border: none;
+  font-size: .85rem; cursor: pointer; transition: all var(--trans); font-family: var(--font);
+}
+.app-shell .message-edit-btn.save,
+.rp-overlay .message-edit-btn.save { background: var(--primary); color: #fff; font-weight: 600; }
+.app-shell .message-edit-btn.save:hover:not(:disabled),
+.rp-overlay .message-edit-btn.save:hover:not(:disabled) { background: var(--primary-dark); }
+.app-shell .message-edit-btn.save:disabled,
+.rp-overlay .message-edit-btn.save:disabled { opacity: .5; cursor: not-allowed; }
+.app-shell .message-edit-btn.cancel,
+.rp-overlay .message-edit-btn.cancel { background: transparent; color: var(--text-2); border: 1px solid var(--border); }
+.app-shell .message-edit-btn.cancel:hover,
+.rp-overlay .message-edit-btn.cancel:hover { background: var(--border); }

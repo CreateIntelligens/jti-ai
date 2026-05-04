@@ -93,6 +93,9 @@
   padding: 1.25rem 1.6rem;
   transition: all 0.4s ease;
 }
+.message-bubble.is-fixed {
+  flex: none;
+}
 
 .message:hover .message-bubble {
   background: var(--surface-hover);

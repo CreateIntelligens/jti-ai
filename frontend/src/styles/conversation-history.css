@@ -384,6 +384,8 @@
   margin-bottom: 1rem;
 }
 
+.conversation-empty-pad { padding: 2rem; }
+
 .conversation-spinner {
   width: 3rem;
   height: 3rem;

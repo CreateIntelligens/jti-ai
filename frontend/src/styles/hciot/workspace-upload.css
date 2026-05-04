@@ -631,3 +631,7 @@
   color: var(--hciot-text);
   font-family: 'SF Mono', 'Fira Code', monospace;
 }
+/* Upload status icons */
+.hciot-upload-icon-spin    { color: #3b82f6; animation: spin 1s linear infinite; }
+.hciot-upload-icon-success { color: #22c55e; }
+.hciot-upload-icon-error   { color: #ef4444; }

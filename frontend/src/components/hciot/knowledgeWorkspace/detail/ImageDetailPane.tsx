@@ -76,18 +76,14 @@ export default function ImageDetailPane({
         </div>
       </div>
 
-      <section className="hciot-file-editor-panel hciot-image-preview-panel" style={{ display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="hciot-file-editor-meta" style={{ width: '100%' }}>
+      <section className="hciot-file-editor-panel hciot-image-preview-panel">
+        <div className="hciot-file-editor-meta hciot-image-preview-meta-full">
           <span>ID: {selectedImage.image_id}</span>
           <span>{selectedImage.size_bytes ? `${Math.max(1, Math.round(selectedImage.size_bytes / 1024))} KB` : '0 KB'}</span>
           <span style={{ color: referenceColor, fontWeight: 600 }}>{referenceLabel}</span>
         </div>
-        <div className="hciot-image-preview-container" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#f3f4f6', borderRadius: '8px', overflow: 'hidden', width: '100%', minHeight: '300px' }}>
-          <img
-            src={selectedImage.url}
-            alt={selectedImage.image_id}
-            style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }}
-          />
+        <div className="hciot-image-preview-container">
+          <img className="hciot-image-preview-img" src={selectedImage.url} alt={selectedImage.image_id} />
         </div>
       </section>
     </div>

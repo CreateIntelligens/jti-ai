@@ -677,7 +677,7 @@ export default function ConversationHistoryModal({
                       className="session-card-toggle"
                       onClick={() => handleExpandSession(session.session_id)}
                     >
-                      <div style={{ flex: 1 }}>
+                      <div className="flex-1">
                         <div className="session-card-meta">
                           <span className="session-badge">Session {sessionIndex + 1}</span>
                           <span className="session-count">{msgCount} {t('conversations_count')}</span>
@@ -769,7 +769,7 @@ export default function ConversationHistoryModal({
                   {isSessionExpanded && (
                     <div className="session-conversations">
                       {detailLoading === session.session_id ? (
-                        <div className="conversation-empty" style={{ padding: '2rem' }}>
+                        <div className="conversation-empty conversation-empty-pad">
                           <div>
                             <div className="conversation-spinner" />
                             <p>{t('loading')}</p>
@@ -791,7 +791,7 @@ export default function ConversationHistoryModal({
                                 [session.session_id]: isTurnExpanded ? null : turnNum
                               }))}
                             >
-                              <div style={{ flex: 1 }}>
+                              <div className="flex-1">
                                 <div className="turn-card-meta">
                                   <span className="turn-badge">#{turnNum}</span>
                                   <span className="session-time">

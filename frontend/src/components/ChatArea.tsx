@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { BookOpen, History, MessageSquare, Pencil, Plus, RefreshCw, RotateCcw, Send } from 'lucide-react';
+import { BookOpen, MessageSquare, Pencil, Plus, RefreshCw, RotateCcw, Send } from 'lucide-react';
 import type { Message } from '../types';
 import { useEnterToSubmit } from '../hooks/useEnterToSubmit';
 import { useFocusOnOpen } from '../hooks/useFocusOnOpen';
@@ -22,7 +22,6 @@ interface ChatAreaProps {
   currentProjectColor?: string;
   onOpenPromptPanel?: () => void;
   onRestartChat?: () => void;
-  onOpenHistory?: () => void;
   onCreateStore?: () => void;
 }
 
@@ -39,7 +38,6 @@ export default function ChatArea({
   currentProjectColor,
   onOpenPromptPanel,
   onRestartChat,
-  onOpenHistory,
   onCreateStore,
 }: ChatAreaProps) {
   const [input, setInput] = useState('');
@@ -126,11 +124,6 @@ export default function ChatArea({
             )}
           </div>
           <div className="ctl-actions">
-            {onOpenHistory && (
-              <button className="icon-btn" title="對話歷史" onClick={onOpenHistory}>
-                <History size={18} />
-              </button>
-            )}
             {onRestartChat && (
               <button
                 className="icon-btn"
@@ -164,11 +157,7 @@ export default function ChatArea({
             選擇一個已有的知識庫，或新增新知識庫，系統就會自動建立 RAG 對話 session。
           </div>
           {onCreateStore && (
-            <button
-              className="btn btn-primary"
-              style={{ marginTop: '.25rem' }}
-              onClick={onCreateStore}
-            >
+            <button className="btn btn-primary mt-1" onClick={onCreateStore} >
               <Plus size={14} /> 新增知識庫
             </button>
           )}
@@ -176,7 +165,7 @@ export default function ChatArea({
       ) : messages.length === 0 ? (
         /* ── Empty state: store selected, no messages ── */
         <div className="empty-state">
-          <div style={{ fontSize: '2rem', marginBottom: '.25rem' }}>
+          <div className="welcome-icon">
             {currentStoreIcon || '📁'}
           </div>
           <div className="empty-title">向「{currentStoreName}」提問</div>
@@ -201,7 +190,7 @@ export default function ChatArea({
           {messages.map((msg, idx) => (
             <div key={idx} className={`msg-row ${msg.role}`}>
               {msg.loading ? (
-                <div className="msg-bubble model" style={{ padding: '.625rem .9375rem' }}>
+                <div className="msg-bubble model is-loading">
                   <div className="msg-loading">
                     <span />
                     <span />
@@ -211,7 +200,7 @@ export default function ChatArea({
               ) : editingTurn !== null &&
                 msg.role === 'user' &&
                 msg.turnNumber === editingTurn ? (
-                <div className="msg-bubble user" style={{ maxWidth: '72%' }}>
+                <div className="msg-bubble user">
                   <div className="message-edit-area">
                     <textarea
                       ref={editTextareaRef}

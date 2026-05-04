@@ -81,22 +81,10 @@ export default function AdminPanel({
           {/* Create new store */}
           <div>
             <div className="rp-section-title">新增知識庫</div>
-            <div style={{ display: 'flex', gap: '.5rem' }}>
-              <input
-                className="input-base"
-                placeholder="知識庫名稱"
-                value={newStoreName}
-                onChange={(e) => setNewStoreName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                style={{ flex: 2 }}
-              />
+            <div className="inline-row">
+              <input className="input-base flex-2" placeholder="知識庫名稱" value={newStoreName} onChange={(e) => setNewStoreName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleCreate()} />
               {effectiveKeyNames.length > 1 && (
-                <select
-                  className="input-base"
-                  value={selectedKeyIndex}
-                  onChange={(e) => setSelectedKeyIndex(e.target.value)}
-                  style={{ flex: 1 }}
-                >
+                <select className="input-base flex-1" value={selectedKeyIndex} onChange={(e) => setSelectedKeyIndex(e.target.value)} >
                   {effectiveKeyNames.map((name, i) => (
                     <option key={i} value={String(i)}>{name || `Key #${i + 1}`}</option>
                   ))}
@@ -111,7 +99,7 @@ export default function AdminPanel({
               </button>
             </div>
             {effectiveKeyNames.length > 1 && (
-              <div style={{ marginTop: '.5rem', fontSize: '.75rem', color: 'var(--text-3)' }}>
+              <div className="field-hint mt-2">
                 選擇要使用哪個 Gemini Key（專案）。
               </div>
             )}
@@ -120,9 +108,9 @@ export default function AdminPanel({
           {/* Existing stores */}
           <div>
             <div className="rp-section-title">現有知識庫</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '.375rem' }}>
+            <div className="rp-list">
               {stores.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-3)', fontSize: '.875rem' }}>
+                <div className="rp-list-empty">
                   尚無知識庫
                 </div>
               ) : (
@@ -132,11 +120,11 @@ export default function AdminPanel({
                     : null;
                   return (
                     <div key={s.name} className="key-card">
-                      <div style={{ fontSize: '1.25rem', width: '2rem', textAlign: 'center', flexShrink: 0 }}>
+                      <div className="kc-icon-text">
                         {getStoreIcon(s.managed_app || '')}
                       </div>
                       <div className="kc-info">
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '.375rem' }}>
+                        <div className="kc-name-row">
                           <span className="kc-name">{s.display_name || s.name}</span>
                           {s.managed_app && <span className="kc-badge system">固定</span>}
                           {s.name === currentStore && <span className="kc-badge system">使用中</span>}

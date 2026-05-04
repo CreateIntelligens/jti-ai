@@ -11,7 +11,6 @@ import {
   RefreshCw,
   Settings,
   Sun,
-  X,
 } from 'lucide-react';
 
 import reindexRag from '../services/api/general';
@@ -84,7 +83,7 @@ export default function Header({
           onClick={onToggleSidebar}
           aria-label={sidebarOpen ? '關閉側邊欄' : '開啟側邊欄'}
         >
-          {sidebarOpen ? <X size={18} /> : <Menu size={18} />}
+          <Menu size={18} />
         </button>
         <div className="app-logo">
           AI360 <span>Knowledge</span>

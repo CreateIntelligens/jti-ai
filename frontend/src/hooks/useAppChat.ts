@@ -88,9 +88,6 @@ async function fetchFilesForTarget(target: KnowledgeTarget): Promise<FileItem[]>
 
 export function useAppChat() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [storeModalOpen, setStoreModalOpen] = useState(false);
-  const [promptModalOpen, setPromptModalOpen] = useState(false);
-  const [userApiKeyModalOpen, setUserApiKeyModalOpen] = useState(false);
   const [conversationHistoryModalOpen, setConversationHistoryModalOpen] = useState(false);
   const [statusMessage, showStatus] = useTransientStatus();
   const [stores, setStores] = useState<Store[]>([]);
@@ -113,7 +110,9 @@ export function useAppChat() {
   const filesRequestIdRef = useRef(0);
 
   const projectFilterOptions = getProjectFilterOptions(keyNames, stores);
-  const filteredStores = filterStoresByProject(stores, projectFilter);
+  // Sidebar 已用 project group 分組顯示，不需要全域 filter；保留 setter 供未來擴充。
+  void projectFilter;
+  const filteredStores = stores;
   const knowledgeTargets = buildKnowledgeTargets(filteredStores);
   const currentTarget = findKnowledgeTarget(currentTargetId, filteredStores);
   const currentStore = currentTarget?.kind === 'store' ? currentTarget.storeName : null;
@@ -479,12 +478,10 @@ export function useAppChat() {
 
   return {
     sidebarOpen,
-    storeModalOpen, setStoreModalOpen,
-    promptModalOpen, setPromptModalOpen,
-    userApiKeyModalOpen, setUserApiKeyModalOpen,
     conversationHistoryModalOpen, setConversationHistoryModalOpen,
     status: statusMessage || '',
     stores,
+    filteredStores,
     keyNames,
     projectFilter,
     projectFilterOptions,

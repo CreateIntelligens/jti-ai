@@ -363,7 +363,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
       })}
 
       {addingCat ? (
-        <div className="hciot-te-add-row" style={{ marginTop: '0.5rem' }}>
+        <div className="hciot-te-add-row">
           <input className="hciot-kb-input" placeholder={t.newCatZh}
             value={newCatZh} onChange={(e) => setNewCatZh(e.target.value)} autoFocus />
           <input className="hciot-kb-input" placeholder={t.newCatEn}
@@ -372,7 +372,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
           <button className="hciot-te-icon-btn" onClick={resetCategoryDraft}><X size={14} /></button>
         </div>
       ) : (
-        <button className="hciot-te-add-btn" onClick={() => setAddingCat(true)} style={{ marginTop: '0.5rem' }}>
+        <button className="hciot-te-add-btn" onClick={() => setAddingCat(true)} >
           <Plus size={14} /> {t.addCat}
         </button>
       )}

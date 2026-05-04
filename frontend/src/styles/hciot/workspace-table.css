@@ -168,3 +168,13 @@
 .hciot-merged-csv-upload-btn.is-uploading {
   cursor: wait;
 }
+
+/* Merged CSV table cells */
+.hciot-csv-col-num    { width: 3.75rem; }
+.hciot-csv-col-wide   { width: 11.25rem; }
+.hciot-csv-col-action { width: 3.75rem; text-align: center; }
+.hciot-csv-textarea   { min-height: 3.75rem; padding: 0.25rem; }
+.hciot-csv-cell-pre   { white-space: pre-wrap; }
+.hciot-csv-cell-break { word-break: break-all; }
+.hciot-csv-cell-center { text-align: center; }
+.hciot-csv-footer     { margin-top: 1rem; text-align: center; }

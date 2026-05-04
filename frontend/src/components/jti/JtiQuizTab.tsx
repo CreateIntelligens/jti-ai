@@ -463,12 +463,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                                    <div className="jti-quiz-toolbar">
                                           {selectedBankId !== 'default' && (
                                                  <>
-                                                        <input
-                                                               ref={fileInputRef}
-                                                               type="file"
-                                                               accept=".csv,.xlsx,.xls"
-                                                               style={{ display: 'none' }}
-                                                               onChange={e => {
+                                                        <input className="file-input-hidden" ref={fileInputRef} type="file" accept=".csv,.xlsx,.xls" onChange={e => {
                                                                       const f = e.target.files?.[0];
                                                                       if (f) handleImport(f);
                                                                       e.target.value = '';
@@ -704,7 +699,7 @@ export default function JtiQuizTab({ language }: JtiQuizTabProps) {
                                           </div>
                                    </div>
 
-                                   <div className="jti-quiz-toolbar" style={{ justifyContent: 'flex-end', marginBottom: '10px' }}>
+                                   <div className="jti-quiz-toolbar is-end">
                                           <button
                                                  className="jti-quiz-export-btn"
                                                  onClick={handleExportQuizResults}

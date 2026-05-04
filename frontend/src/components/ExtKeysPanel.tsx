@@ -100,7 +100,7 @@ export default function ExtKeysPanel({
           {/* Create new key */}
           <div>
             <div className="rp-section-title">發行新 Key</div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem' }}>
+            <div className="rp-form-stack">
               <input
                 className="input-base"
                 placeholder="Key 名稱"
@@ -119,41 +119,19 @@ export default function ExtKeysPanel({
                   </option>
                 ))}
               </select>
-              <button
-                className="btn btn-primary btn-sm"
-                style={{ alignSelf: 'flex-start' }}
-                onClick={handleCreate}
-                disabled={creating || !newKeyName.trim() || !targetStore}
-              >
+              <button className="btn btn-primary btn-sm self-start" onClick={handleCreate} disabled={creating || !newKeyName.trim() || !targetStore} >
                 {creating ? '建立中...' : '發行'}
               </button>
             </div>
 
             {/* Newly created key */}
             {newKeyResult && (
-              <div
-                style={{
-                  marginTop: '.75rem',
-                  padding: '.75rem',
-                  background: 'var(--primary-lt)',
-                  border: '1px solid var(--primary)',
-                  borderRadius: 'var(--r-md)',
-                }}
-              >
-                <div style={{ fontSize: '.8125rem', color: 'var(--primary)', fontWeight: 600, marginBottom: '.375rem' }}>
+              <div className="rp-key-result">
+                <div className="rp-key-result-label">
                   Key 已建立！請立即複製，離開後無法再查看：
                 </div>
-                <div style={{ display: 'flex', gap: '.375rem', alignItems: 'center' }}>
-                  <code
-                    style={{
-                      flex: 1,
-                      fontSize: '.75rem',
-                      wordBreak: 'break-all',
-                      background: 'var(--bg)',
-                      padding: '.375rem .5rem',
-                      borderRadius: '.25rem',
-                    }}
-                  >
+                <div className="rp-key-result-row">
+                  <code className="rp-key-result-code">
                     {newKeyResult}
                   </code>
                   <button
@@ -177,26 +155,22 @@ export default function ExtKeysPanel({
           {/* Key list */}
           <div>
             {loading ? (
-              <div style={{ color: 'var(--text-3)', fontSize: '.875rem' }}>載入中...</div>
+              <div className="rp-loading">載入中...</div>
             ) : apiKeys.length === 0 ? (
-              <div style={{ textAlign: 'center', padding: '1.5rem', color: 'var(--text-3)', fontSize: '.875rem' }}>
+              <div className="rp-list-empty">
                 尚無對外 API Key
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '.375rem' }}>
+              <div className="rp-list">
                 {apiKeys.map((k) => (
                   <div key={k.id} className="ext-key-row">
-                    <Link2 size={14} style={{ color: 'var(--text-3)', flexShrink: 0 }} />
+                    <Link2 className="ekr-icon" size={14} />
                     <span className="ekr-name">{k.name}</span>
                     <span className="ekr-key">{k.key_prefix}••••</span>
                     <span className="ekr-meta">
                       {stores.find((s) => s.name === k.store_name)?.display_name || k.store_name}
                     </span>
-                    <button
-                      className="btn btn-danger btn-sm"
-                      onClick={() => handleDelete(k.id)}
-                      style={{ flexShrink: 0 }}
-                    >
+                    <button className="btn btn-danger btn-sm shrink-0" onClick={() => handleDelete(k.id)} >
                       撤銷
                     </button>
                   </div>

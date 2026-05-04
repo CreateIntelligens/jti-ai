@@ -166,22 +166,18 @@ export default function Sidebar({
         <div className="file-panel">
           <div className="fp-header">
             <span className="fp-title">文件</span>
-            <button
-              className="icon-btn"
-              style={{ width: '1.5rem', height: '1.5rem' }}
-              title="上傳"
-              onClick={() => fileInputRef.current?.click()}
+            <button className="icon-btn icon-btn-sm" title="上傳" onClick={() => fileInputRef.current?.click()}
             >
               <Plus size={14} />
             </button>
           </div>
           <ul className="file-list-inner">
             {filesLoading ? (
-              <li style={{ padding: '.375rem .625rem', fontSize: '.8rem', color: 'var(--text-3)' }}>
+              <li className="fp-empty">
                 載入中...
               </li>
             ) : files.length === 0 ? (
-              <li style={{ padding: '.375rem .625rem', fontSize: '.8rem', color: 'var(--text-3)' }}>
+              <li className="fp-empty">
                 尚無文件
               </li>
             ) : (
@@ -216,13 +212,7 @@ export default function Sidebar({
               {uploading ? '上傳中...' : (<>拖曳或<span>選擇</span>上傳</>)}
             </div>
           )}
-          <input
-            ref={fileInputRef}
-            type="file"
-            onChange={handleFileSelect}
-            style={{ display: 'none' }}
-            aria-label="選擇文件"
-          />
+          <input className="file-input-hidden" ref={fileInputRef} type="file" onChange={handleFileSelect} aria-label="選擇文件" />
         </div>
       )}
 
@@ -238,19 +228,11 @@ export default function Sidebar({
               autoFocus
             />
             <div className="create-actions">
-              <button
-                className="btn btn-ghost btn-sm"
-                style={{ flex: 1 }}
-                onClick={() => { setCreatingStore(false); setNewStoreName(''); }}
+              <button className="btn btn-ghost btn-sm flex-1" onClick={() => { setCreatingStore(false); setNewStoreName(''); }}
               >
                 取消
               </button>
-              <button
-                className="btn btn-primary btn-sm"
-                style={{ flex: 1 }}
-                onClick={handleCreateStore}
-                disabled={!newStoreName.trim()}
-              >
+              <button className="btn btn-primary btn-sm flex-1" onClick={handleCreateStore} disabled={!newStoreName.trim()} >
                 建立
               </button>
             </div>

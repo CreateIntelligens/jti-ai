@@ -226,7 +226,7 @@ export default function MergedCsvPane({
         <div>
           <p className="hciot-file-kicker">知識庫</p>
           <h2 className="hciot-file-title">
-            <TableIcon size={20} style={{ verticalAlign: '-3px', marginRight: '0.4rem' }} />
+            <TableIcon className="hciot-csv-icon" size={20} />
             {topicLabel || topicSlug}
           </h2>
         </div>

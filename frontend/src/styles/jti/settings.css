@@ -81,6 +81,10 @@
   align-items: center;
   gap: 0.5rem;
 }
+.jti-quiz-toolbar.is-end {
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
 
 .jti-quiz-filter {
   flex: 1;

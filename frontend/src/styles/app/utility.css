@@ -1,0 +1,19 @@
+/* ==========================================================================
+   App-shell utility classes — atomic helpers used across panels & sidebar.
+   Scoped to .app-shell / .rp-overlay so they don't leak into jti / hciot pages.
+   ========================================================================== */
+
+.app-shell .shrink-0,
+.rp-overlay .shrink-0 { flex-shrink: 0; }
+
+.app-shell .flex-1,
+.rp-overlay .flex-1 { flex: 1; }
+
+.app-shell .flex-2,
+.rp-overlay .flex-2 { flex: 2; }
+
+.app-shell .self-start,
+.rp-overlay .self-start { align-self: flex-start; }
+
+.app-shell .mt-1,
+.rp-overlay .mt-1 { margin-top: .25rem; }

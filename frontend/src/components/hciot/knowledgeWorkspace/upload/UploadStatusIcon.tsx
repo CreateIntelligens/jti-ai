@@ -9,17 +9,17 @@ interface UploadStatusIconProps {
 
 export default function UploadStatusIcon({ status, error }: UploadStatusIconProps) {
   if (status === 'uploading') {
-    return <Loader2 size={16} style={{ color: '#3b82f6', animation: 'spin 1s linear infinite' }} />;
+    return <Loader2 className="hciot-upload-icon-spin" size={16} />;
   }
 
   if (status === 'done') {
-    return <CheckCircle2 size={16} style={{ color: '#22c55e' }} />;
+    return <CheckCircle2 className="hciot-upload-icon-success" size={16} />;
   }
 
   if (status === 'error') {
     return (
       <span title={error}>
-        <XCircle size={16} style={{ color: '#ef4444' }} />
+        <XCircle className="hciot-upload-icon-error" size={16} />
       </span>
     );
   }

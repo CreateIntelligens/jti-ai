@@ -122,12 +122,12 @@ export default function PromptPanel({
         </div>
         <div className="rp-body">
           {!currentStore ? (
-            <div style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-3)', fontSize: '.875rem' }}>
+            <div className="rp-list-empty">
               請先在左側選擇一個知識庫
             </div>
           ) : (
             <>
-              <div style={{ fontSize: '.875rem', color: 'var(--text-2)', fontWeight: 600 }}>
+              <div className="rp-current-store">
                 目前知識庫：{currentStoreName || currentStore}
               </div>
 
@@ -149,36 +149,29 @@ export default function PromptPanel({
                 <div>
                   {/* Existing prompts */}
                   {loading ? (
-                    <div style={{ color: 'var(--text-3)', fontSize: '.875rem' }}>載入中...</div>
+                    <div className="rp-loading">載入中...</div>
                   ) : (
                     <>
                       {prompts.length > 0 && (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '.5rem', marginBottom: '1rem' }}>
+                        <div className="rp-stack">
                           {prompts.map((p) => (
-                            <div key={p.id} className="key-card" style={{ cursor: 'pointer' }} onClick={() => handleSetActive(p.id)}>
-                              <div className="kc-info" style={{ flex: 1 }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '.375rem' }}>
+                            <div key={p.id} className="key-card key-card-clickable" onClick={() => handleSetActive(p.id)}>
+                              <div className="kc-info flex-1">
+                                <div className="kc-name-row">
                                   <span className="kc-name">{p.name}</span>
                                   {p.id === activePromptId && <span className="kc-badge system">使用中</span>}
                                 </div>
-                                <div className="kc-meta" style={{ whiteSpace: 'pre-wrap', marginTop: '.25rem' }}>
+                                <div className="kc-meta kc-meta-pre">
                                   {p.content.length > 80 ? p.content.slice(0, 80) + '...' : p.content}
                                 </div>
                               </div>
-                              <button
-                                className="btn btn-danger btn-sm"
-                                onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }}
-                                style={{ flexShrink: 0 }}
-                              >
+                              <button className="btn btn-danger btn-sm shrink-0" onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} >
                                 刪除
                               </button>
                             </div>
                           ))}
                           {activePromptId && (
-                            <button
-                              className="btn btn-ghost btn-sm"
-                              style={{ alignSelf: 'flex-start' }}
-                              onClick={() => handleSetActive(null)}
+                            <button className="btn btn-ghost btn-sm self-start" onClick={() => handleSetActive(null)}
                             >
                               取消使用 Prompt
                             </button>
@@ -202,12 +195,7 @@ export default function PromptPanel({
                             value={newPromptContent}
                             onChange={(e) => setNewPromptContent(e.target.value)}
                           />
-                          <button
-                            className="btn btn-primary btn-sm"
-                            style={{ alignSelf: 'flex-start' }}
-                            onClick={handleCreate}
-                            disabled={creating || !newPromptContent.trim()}
-                          >
+                          <button className="btn btn-primary btn-sm self-start" onClick={handleCreate} disabled={creating || !newPromptContent.trim()} >
                             {creating ? '建立中...' : '建立'}
                           </button>
                           <span className="field-hint">套用後將在下次對話生效。最多 {maxPrompts} 個。</span>
@@ -230,7 +218,7 @@ export default function PromptPanel({
               )}
 
               {promptTab === 'model' && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div className="rp-stack-lg">
                   <div className="field">
                     <label>模型</label>
                     <select
