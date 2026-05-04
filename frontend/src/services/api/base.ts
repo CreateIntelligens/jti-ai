@@ -1,7 +1,7 @@
 export const API_BASE = '/api';
 
-const STORAGE_KEYS = 'userGeminiApiKeys';
-const STORAGE_ACTIVE = 'activeGeminiApiKey';
+export const STORAGE_KEYS = 'userGeminiApiKeys';
+export const STORAGE_ACTIVE = 'activeGeminiApiKey';
 
 export function getUserApiKey(): string | null {
   const activeName = (localStorage.getItem(STORAGE_ACTIVE) || 'system').trim();
@@ -9,8 +9,7 @@ export function getUserApiKey(): string | null {
   try {
     const keys: { name: string; key: string }[] = JSON.parse(localStorage.getItem(STORAGE_KEYS) || '[]');
     const found = keys.find(k => (k.name || '').trim() === activeName);
-    const trimmedKey = (found?.key || '').trim();
-    return trimmedKey || null;
+    return (found?.key || '').trim() || null;
   } catch {
     return null;
   }
@@ -79,4 +78,8 @@ export async function fetchWithUserGeminiKey(url: string, options: RequestInit =
 
 export async function fetchAsAdmin(url: string, options: RequestInit = {}): Promise<Response> {
   return fetch(url, options);
+}
+
+export function normLang(language: string): string {
+  return language.toLowerCase().startsWith('en') ? 'en' : 'zh';
 }

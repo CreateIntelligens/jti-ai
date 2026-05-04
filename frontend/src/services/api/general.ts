@@ -5,7 +5,7 @@ import type {
   StartChatResponse,
   AppTarget,
 } from '../../types';
-import { API_BASE, fetchAsAdmin, fetchWithApiKey, fetchWithUserGeminiKey, handleResponse } from './base';
+import { API_BASE, fetchAsAdmin, fetchWithApiKey, fetchWithUserGeminiKey, handleResponse, STORAGE_KEYS, STORAGE_ACTIVE, normLang } from './base';
 
 // ========== Stores & Files ==========
 
@@ -56,11 +56,44 @@ export async function deleteStoreFile(storeName: string, fileName: string): Prom
   await handleResponse<void>(response);
 }
 
+export interface StoreFileContent {
+  filename: string;
+  editable: boolean;
+  content: string | null;
+  size?: number;
+  message?: string;
+}
+
+export async function getStoreFileContent(
+  storeName: string,
+  fileName: string,
+): Promise<StoreFileContent> {
+  const response = await fetchWithUserGeminiKey(
+    `${API_BASE}/stores/${storeName}/files/${encodeURIComponent(fileName)}/content`,
+  );
+  return handleResponse<StoreFileContent>(response);
+}
+
+export async function updateStoreFileContent(
+  storeName: string,
+  fileName: string,
+  content: string,
+): Promise<{ message: string; synced: boolean }> {
+  const response = await fetchWithUserGeminiKey(
+    `${API_BASE}/stores/${storeName}/files/${encodeURIComponent(fileName)}/content`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    },
+  );
+  return handleResponse<{ message: string; synced: boolean }>(response);
+}
+
 // ========== Knowledge Management ==========
 
 function knowledgeParams(appTarget: AppTarget, language: string): URLSearchParams {
-  const normalizedLanguage = language.toLowerCase().startsWith('en') ? 'en' : 'zh';
-  return new URLSearchParams({ app: appTarget, language: normalizedLanguage });
+  return new URLSearchParams({ app: appTarget, language: normLang(language) });
 }
 
 function knowledgeFileUrl(filename: string, suffix: string, appTarget: AppTarget, language: string): string {
@@ -106,9 +139,7 @@ export async function uploadManagedKnowledgeFile(appTarget: AppTarget, language:
 }
 
 export async function deleteManagedKnowledgeFile(appTarget: AppTarget, fileName: string, language: string = 'zh'): Promise<any> {
-  const response = await fetchAsAdmin(knowledgeFileUrl(fileName, '', appTarget, language), {
-    method: 'DELETE',
-  });
+  const response = await fetchAsAdmin(knowledgeFileUrl(fileName, '', appTarget, language), { method: 'DELETE' });
   return handleResponse<any>(response);
 }
 
@@ -128,13 +159,10 @@ export async function startChat(storeName: string, previousSessionId?: string | 
 }
 
 export async function sendMessage(text: string, sessionId?: string, turnNumber?: number): Promise<ChatResponse> {
-  const payload: Record<string, unknown> = { message: text };
-  if (sessionId) payload.session_id = sessionId;
-  if (turnNumber !== undefined) payload.turn_number = turnNumber;
   const response = await fetchWithUserGeminiKey(`${API_BASE}/chat/message`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ message: text, session_id: sessionId, turn_number: turnNumber }),
   });
   return handleResponse<ChatResponse>(response);
 }
@@ -213,7 +241,7 @@ interface SavedApiKey {
 
 export function getSavedApiKeys(): SavedApiKey[] {
   try {
-    const raw = JSON.parse(localStorage.getItem('userGeminiApiKeys') || '[]');
+    const raw = JSON.parse(localStorage.getItem(STORAGE_KEYS) || '[]');
     if (!Array.isArray(raw)) return [];
     return raw
       .map((item: any) => ({
@@ -227,38 +255,34 @@ export function getSavedApiKeys(): SavedApiKey[] {
 }
 
 export function saveApiKey(name: string, key: string): void {
-  const normalizedName = (name || '').trim();
-  const normalizedKey = (key || '').trim();
+  const normalizedName = name.trim();
+  const normalizedKey = key.trim();
   if (!normalizedName || !normalizedKey) return;
 
   const keys = getSavedApiKeys();
-  const existing = keys.findIndex(k => k.name === normalizedName);
-  if (existing >= 0) {
-    keys[existing].key = normalizedKey;
-  } else {
-    keys.push({ name: normalizedName, key: normalizedKey });
-  }
-  localStorage.setItem('userGeminiApiKeys', JSON.stringify(keys));
+  const index = keys.findIndex(k => k.name === normalizedName);
+  if (index >= 0) keys[index].key = normalizedKey;
+  else keys.push({ name: normalizedName, key: normalizedKey });
+
+  localStorage.setItem(STORAGE_KEYS, JSON.stringify(keys));
   setActiveApiKey(normalizedName);
 }
 
 export function deleteApiKey(name: string): void {
-  const normalizedName = (name || '').trim();
+  const normalizedName = name.trim();
   const keys = getSavedApiKeys().filter(k => k.name !== normalizedName);
-  localStorage.setItem('userGeminiApiKeys', JSON.stringify(keys));
+  localStorage.setItem(STORAGE_KEYS, JSON.stringify(keys));
   if (getActiveApiKeyName() === normalizedName) {
     setActiveApiKey('system');
   }
 }
 
 export function getActiveApiKeyName(): string {
-  const active = (localStorage.getItem('activeGeminiApiKey') || 'system').trim();
-  return active || 'system';
+  return (localStorage.getItem(STORAGE_ACTIVE) || 'system').trim() || 'system';
 }
 
 export function setActiveApiKey(name: string): void {
-  const normalizedName = (name || '').trim();
-  localStorage.setItem('activeGeminiApiKey', normalizedName || 'system');
+  localStorage.setItem(STORAGE_ACTIVE, name.trim() || 'system');
 }
 
 // ========== General Chat Conversations ==========
@@ -275,18 +299,12 @@ export async function getGeneralConversationDetail(sessionId: string): Promise<a
 }
 
 export async function deleteConversations(mode: 'jti' | 'hciot' | 'general', sessionIds: string[]): Promise<void> {
-  let url: string;
-  switch (mode) {
-    case 'jti':
-      url = `${API_BASE}/jti-admin/conversations`;
-      break;
-    case 'hciot':
-      url = `${API_BASE}/hciot-admin/conversations`;
-      break;
-    default:
-      url = `${API_BASE}/chat/history`;
-      break;
-  }
+  const urlMap = {
+    jti: `${API_BASE}/jti-admin/conversations`,
+    hciot: `${API_BASE}/hciot-admin/conversations`,
+    general: `${API_BASE}/chat/history`,
+  };
+  const url = urlMap[mode];
   const doFetch = mode === 'general' ? fetchWithUserGeminiKey : fetchAsAdmin;
   const response = await doFetch(url, {
     method: 'DELETE',

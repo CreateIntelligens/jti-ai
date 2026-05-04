@@ -1,5 +1,5 @@
 import type { StartChatResponse, ChatResponse } from '../../types';
-import { API_BASE, fetchAsAdmin, fetchWithApiKey, handleResponse } from './base';
+import { API_BASE, fetchAsAdmin, fetchWithApiKey, handleResponse, normLang } from './base';
 
 export interface HciotRuntimeSettings {
   response_rule_sections: {
@@ -82,9 +82,6 @@ const HCIOT_API_BASE = `${API_BASE}/hciot`;
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 type QueryValue = string | null | undefined;
 
-function normLang(language: string): string {
-  return language.toLowerCase().startsWith('en') ? 'en' : 'zh';
-}
 
 function buildQuery(params: Record<string, QueryValue>): string {
   const query = new URLSearchParams();
@@ -158,22 +155,19 @@ export async function hciotSendMessage(
   turnNumber?: number,
   ttsCharacter?: string,
 ): Promise<ChatResponse> {
-  const payload: Record<string, unknown> = { message: text, session_id: sessionId };
-  if (turnNumber !== undefined) payload.turn_number = turnNumber;
-  if (ttsCharacter) payload.tts_character = ttsCharacter;
   const response = await fetchWithApiKey('/api/hciot/chat/message', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ message: text, session_id: sessionId, turn_number: turnNumber, tts_character: ttsCharacter }),
   });
-  const data = await handleResponse<Record<string, unknown>>(response);
+  const data = await handleResponse<any>(response);
   return {
-    answer: (data.message ?? data.answer ?? '') as string,
-    turn_number: data.turn_number as number | undefined,
-    citations: data.citations as Array<{ title: string; uri: string }> | undefined,
-    image_id: data.image_id as string | undefined,
-    tts_text: data.tts_text as string | undefined,
-    tts_message_id: data.tts_message_id as string | undefined,
+    answer: data.message ?? data.answer ?? '',
+    turn_number: data.turn_number,
+    citations: data.citations,
+    image_id: data.image_id,
+    tts_text: data.tts_text,
+    tts_message_id: data.tts_message_id,
   };
 }
 

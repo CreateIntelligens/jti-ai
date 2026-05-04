@@ -31,12 +31,9 @@ interface KBFile { name: string; display_name: string; size?: number; editable?:
 
 const MAX_CUSTOM = 3;
 const SYSTEM_DEFAULT_ID = 'system_default';
-const normalizeLanguage = (value?: string) => (
-  typeof value === 'string' && value.trim().toLowerCase().startsWith('en') ? 'en' : 'zh'
-);
 
 export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, language = 'zh' }: JtiSettingsModalProps) {
-  const normalizedLanguage = normalizeLanguage(language);
+  const normalizedLanguage = api.normLang(language);
   const [activeTab, setActiveTab] = useState<'prompt' | 'quiz' | 'kb'>('prompt');
 
   // === Prompt state ===

@@ -15,6 +15,7 @@ interface SidebarProps {
   onUploadFile: (file: File) => Promise<void>;
   onDeleteFile: (fileName: string) => void;
   onCreateStore: (name: string, keyIndex: number) => Promise<void>;
+  onOpenFile?: (file: FileItem) => void;
 }
 
 export default function Sidebar({
@@ -29,6 +30,7 @@ export default function Sidebar({
   onUploadFile,
   onDeleteFile,
   onCreateStore,
+  onOpenFile,
 }: SidebarProps) {
   const [collapsedProjects, setCollapsedProjects] = useState<Record<string, boolean>>({});
   const [creatingStore, setCreatingStore] = useState(false);
@@ -183,14 +185,23 @@ export default function Sidebar({
             ) : (
               files.map((f) => (
                 <li key={f.name} className="file-row">
-                  <FileText size={13} />
-                  <span className="file-name" title={f.display_name || f.name}>
-                    {f.display_name || f.name}
-                  </span>
+                  <button
+                    className="file-row-main"
+                    onClick={() => onOpenFile?.(f)}
+                    title={`預覽 ${f.display_name || f.name}`}
+                  >
+                    <FileText size={13} />
+                    <span className="file-name">
+                      {f.display_name || f.name}
+                    </span>
+                  </button>
                   {!activeStore.managed_app && (
                     <button
                       className="file-del"
-                      onClick={() => onDeleteFile(f.name)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDeleteFile(f.name);
+                      }}
                       title="刪除"
                     >
                       <Trash2 size={13} />

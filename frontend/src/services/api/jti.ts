@@ -1,4 +1,4 @@
-import { API_BASE, fetchAsAdmin, handleResponse } from './base';
+import { API_BASE, fetchAsAdmin, handleResponse, normLang } from './base';
 import { downloadBlob } from '../../utils/download';
 
 // ========== JTI Prompt Management ==========
@@ -31,19 +31,21 @@ export interface JtiRuntimeSettingsResponse {
   settings: JtiRuntimeSettings;
 }
 
-function normLang(language: string): string {
-  return language.toLowerCase().startsWith('en') ? 'en' : 'zh';
-}
 
 const JTI_ADMIN_BASE = `${API_BASE}/jti-admin`;
 
+function jtiUrl(path: string, language: string = 'zh', extraParams?: Record<string, string>): string {
+  const params = new URLSearchParams({ language: normLang(language), ...extraParams });
+  return `${JTI_ADMIN_BASE}${path}?${params}`;
+}
+
 export async function listJtiPrompts(language: string = 'zh'): Promise<any> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/prompts/?language=${normLang(language)}`);
+  const response = await fetchAsAdmin(jtiUrl('/prompts/', language));
   return handleResponse<any>(response);
 }
 
 export async function createJtiPrompt(name: string, content: string, language: string = 'zh'): Promise<any> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/prompts/?language=${normLang(language)}`, {
+  const response = await fetchAsAdmin(jtiUrl('/prompts/', language), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, content }),
@@ -52,7 +54,7 @@ export async function createJtiPrompt(name: string, content: string, language: s
 }
 
 export async function updateJtiPrompt(promptId: string, name?: string, content?: string, language: string = 'zh'): Promise<any> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/prompts/${promptId}?language=${normLang(language)}`, {
+  const response = await fetchAsAdmin(jtiUrl(`/prompts/${promptId}`, language), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name, content }),
@@ -61,14 +63,12 @@ export async function updateJtiPrompt(promptId: string, name?: string, content?:
 }
 
 export async function deleteJtiPrompt(promptId: string, language: string = 'zh'): Promise<void> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/prompts/${promptId}?language=${normLang(language)}`, {
-    method: 'DELETE',
-  });
+  const response = await fetchAsAdmin(jtiUrl(`/prompts/${promptId}`, language), { method: 'DELETE' });
   await handleResponse<void>(response);
 }
 
 export async function setActiveJtiPrompt(promptId: string | null, language: string = 'zh'): Promise<void> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/prompts/active?language=${normLang(language)}`, {
+  const response = await fetchAsAdmin(jtiUrl('/prompts/active', language), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ prompt_id: promptId }),
@@ -77,7 +77,7 @@ export async function setActiveJtiPrompt(promptId: string | null, language: stri
 }
 
 export async function cloneDefaultJtiPrompt(language: string = 'zh'): Promise<any> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/prompts/clone?language=${normLang(language)}`, {
+  const response = await fetchAsAdmin(jtiUrl('/prompts/clone', language), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   });
@@ -85,9 +85,7 @@ export async function cloneDefaultJtiPrompt(language: string = 'zh'): Promise<an
 }
 
 export async function getJtiRuntimeSettings(promptId?: string, language: string = 'zh'): Promise<JtiRuntimeSettingsResponse> {
-  const query = new URLSearchParams({ language: normLang(language) });
-  if (promptId) query.set('prompt_id', promptId);
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/prompts/runtime-settings?${query}`, { method: 'GET' });
+  const response = await fetchAsAdmin(jtiUrl('/prompts/runtime-settings', language, promptId ? { prompt_id: promptId } : {}), { method: 'GET' });
   return handleResponse<JtiRuntimeSettingsResponse>(response);
 }
 
@@ -96,11 +94,10 @@ export async function updateJtiRuntimeSettings(
   promptId?: string,
   language: string = 'zh',
 ): Promise<{ settings: JtiRuntimeSettings; message: string; prompt_id?: string }> {
-  const payload = promptId ? { ...settings, prompt_id: promptId } : settings;
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/prompts/runtime-settings?language=${normLang(language)}`, {
+  const response = await fetchAsAdmin(jtiUrl('/prompts/runtime-settings', language), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ ...settings, prompt_id: promptId }),
   });
   return handleResponse(response);
 }
@@ -108,22 +105,21 @@ export async function updateJtiRuntimeSettings(
 // ========== JTI 知識庫管理 ==========
 
 export async function listJtiKnowledgeFiles(language: string = 'zh'): Promise<any> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/knowledge/files/?language=${language}`);
+  const response = await fetchAsAdmin(jtiUrl('/knowledge/files/', language));
   return handleResponse<any>(response);
 }
 
 export async function getJtiKnowledgeFileContent(filename: string, language: string = 'zh'): Promise<any> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/knowledge/files/${encodeURIComponent(filename)}/content?language=${language}`);
+  const response = await fetchAsAdmin(jtiUrl(`/knowledge/files/${encodeURIComponent(filename)}/content`, language));
   return handleResponse<any>(response);
 }
 
 export async function downloadJtiKnowledgeFile(filename: string, language: string = 'zh'): Promise<void> {
-  const params = new URLSearchParams({ language });
-  window.open(`${JTI_ADMIN_BASE}/knowledge/files/${encodeURIComponent(filename)}/download?${params}`, '_blank');
+  window.open(jtiUrl(`/knowledge/files/${encodeURIComponent(filename)}/download`, language), '_blank');
 }
 
 export async function updateJtiKnowledgeFileContent(filename: string, content: string, language: string = 'zh'): Promise<any> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/knowledge/files/${encodeURIComponent(filename)}/content?language=${language}`, {
+  const response = await fetchAsAdmin(jtiUrl(`/knowledge/files/${encodeURIComponent(filename)}/content`, language), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ content }),
@@ -134,7 +130,7 @@ export async function updateJtiKnowledgeFileContent(filename: string, content: s
 export async function uploadJtiKnowledgeFile(language: string, file: File): Promise<any> {
   const formData = new FormData();
   formData.append('file', file);
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/knowledge/upload/?language=${language}`, {
+  const response = await fetchAsAdmin(jtiUrl('/knowledge/upload/', language), {
     method: 'POST',
     body: formData,
   });
@@ -142,7 +138,7 @@ export async function uploadJtiKnowledgeFile(language: string, file: File): Prom
 }
 
 export async function deleteJtiKnowledgeFile(fileName: string, language: string = 'zh'): Promise<any> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/knowledge/files/${encodeURIComponent(fileName)}?language=${language}`, {
+  const response = await fetchAsAdmin(jtiUrl(`/knowledge/files/${encodeURIComponent(fileName)}`, language), {
     method: 'DELETE',
   });
   return handleResponse<any>(response);
@@ -216,12 +212,12 @@ export interface QuizBankStats {
 }
 
 export async function listQuizBanks(language: string = 'zh'): Promise<{ banks: QuizBank[]; total: number; max: number }> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/banks/?language=${language}`);
+  const response = await fetchAsAdmin(jtiUrl('/quiz-bank/banks/', language));
   return handleResponse(response);
 }
 
 export async function createQuizBank(language: string, name: string): Promise<QuizBank> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/banks/?language=${language}`, {
+  const response = await fetchAsAdmin(jtiUrl('/quiz-bank/banks/', language), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
@@ -230,37 +226,31 @@ export async function createQuizBank(language: string, name: string): Promise<Qu
 }
 
 export async function deleteQuizBank(language: string, bankId: string): Promise<void> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/banks/${encodeURIComponent(bankId)}?language=${language}`, {
+  const response = await fetchAsAdmin(jtiUrl(`/quiz-bank/banks/${encodeURIComponent(bankId)}`, language), {
     method: 'DELETE',
   });
   await handleResponse(response);
 }
 
 export async function activateQuizBank(language: string, bankId: string): Promise<void> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/banks/${encodeURIComponent(bankId)}/activate?language=${language}`, {
+  const response = await fetchAsAdmin(jtiUrl(`/quiz-bank/banks/${encodeURIComponent(bankId)}/activate`, language), {
     method: 'POST',
   });
   await handleResponse(response);
 }
 
 export async function listQuizQuestions(language: string = 'zh', bankId?: string): Promise<{ questions: QuizQuestion[]; total: number }> {
-  const params = new URLSearchParams({ language });
-  if (bankId) params.set('bank_id', bankId);
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/questions/?${params}`);
+  const response = await fetchAsAdmin(jtiUrl('/quiz-bank/questions/', language, bankId ? { bank_id: bankId } : {}));
   return handleResponse(response);
 }
 
 export async function getQuizQuestion(language: string, id: string, bankId?: string): Promise<QuizQuestion> {
-  const params = new URLSearchParams({ language });
-  if (bankId) params.set('bank_id', bankId);
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/questions/${encodeURIComponent(id)}?${params}`);
+  const response = await fetchAsAdmin(jtiUrl(`/quiz-bank/questions/${encodeURIComponent(id)}`, language, bankId ? { bank_id: bankId } : {}));
   return handleResponse(response);
 }
 
 export async function createQuizQuestion(language: string, question: QuizQuestion, bankId?: string): Promise<QuizQuestion> {
-  const params = new URLSearchParams({ language });
-  if (bankId) params.set('bank_id', bankId);
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/questions/?${params}`, {
+  const response = await fetchAsAdmin(jtiUrl('/quiz-bank/questions/', language, bankId ? { bank_id: bankId } : {}), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(question),
@@ -269,9 +259,7 @@ export async function createQuizQuestion(language: string, question: QuizQuestio
 }
 
 export async function updateQuizQuestion(language: string, id: string, data: Partial<QuizQuestion>, bankId?: string): Promise<QuizQuestion> {
-  const params = new URLSearchParams({ language });
-  if (bankId) params.set('bank_id', bankId);
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/questions/${encodeURIComponent(id)}?${params}`, {
+  const response = await fetchAsAdmin(jtiUrl(`/quiz-bank/questions/${encodeURIComponent(id)}`, language, bankId ? { bank_id: bankId } : {}), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -280,21 +268,19 @@ export async function updateQuizQuestion(language: string, id: string, data: Par
 }
 
 export async function deleteQuizQuestion(language: string, id: string, bankId?: string): Promise<void> {
-  const params = new URLSearchParams({ language });
-  if (bankId) params.set('bank_id', bankId);
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/questions/${encodeURIComponent(id)}?${params}`, {
+  const response = await fetchAsAdmin(jtiUrl(`/quiz-bank/questions/${encodeURIComponent(id)}`, language, bankId ? { bank_id: bankId } : {}), {
     method: 'DELETE',
   });
   await handleResponse(response);
 }
 
 export async function getQuizBankMetadata(language: string = 'zh', bankId: string = 'default'): Promise<QuizBankMetadata> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/banks/${encodeURIComponent(bankId)}?language=${language}`);
+  const response = await fetchAsAdmin(jtiUrl(`/quiz-bank/banks/${encodeURIComponent(bankId)}`, language));
   return handleResponse(response);
 }
 
 export async function updateQuizBankMetadata(language: string, data: Partial<QuizBankMetadata>, bankId: string = 'default'): Promise<QuizBankMetadata> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/banks/${encodeURIComponent(bankId)}?language=${language}`, {
+  const response = await fetchAsAdmin(jtiUrl(`/quiz-bank/banks/${encodeURIComponent(bankId)}`, language), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -303,12 +289,12 @@ export async function updateQuizBankMetadata(language: string, data: Partial<Qui
 }
 
 export async function listQuizSets(language: string = 'zh'): Promise<{ sets: QuizSet[]; total: number; max: number }> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/quiz-results/sets/?language=${language}`);
+  const response = await fetchAsAdmin(jtiUrl('/quiz-bank/quiz-results/sets/', language));
   return handleResponse(response);
 }
 
 export async function createQuizSet(language: string, name: string): Promise<QuizSet> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/quiz-results/sets/?language=${language}`, {
+  const response = await fetchAsAdmin(jtiUrl('/quiz-bank/quiz-results/sets/', language), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
@@ -317,30 +303,26 @@ export async function createQuizSet(language: string, name: string): Promise<Qui
 }
 
 export async function deleteQuizSet(language: string, setId: string): Promise<void> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/quiz-results/sets/${encodeURIComponent(setId)}?language=${language}`, {
+  const response = await fetchAsAdmin(jtiUrl(`/quiz-bank/quiz-results/sets/${encodeURIComponent(setId)}`, language), {
     method: 'DELETE',
   });
   await handleResponse(response);
 }
 
 export async function activateQuizSet(language: string, setId: string): Promise<void> {
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/quiz-results/sets/${encodeURIComponent(setId)}/activate?language=${language}`, {
+  const response = await fetchAsAdmin(jtiUrl(`/quiz-bank/quiz-results/sets/${encodeURIComponent(setId)}/activate`, language), {
     method: 'POST',
   });
   await handleResponse(response);
 }
 
 export async function listQuizResults(language: string = 'zh', setId?: string): Promise<{ results: QuizResult[]; total: number }> {
-  const params = new URLSearchParams({ language });
-  if (setId) params.set('set_id', setId);
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/quiz-results/?${params}`);
+  const response = await fetchAsAdmin(jtiUrl('/quiz-bank/quiz-results/', language, setId ? { set_id: setId } : {}));
   return handleResponse(response);
 }
 
 export async function updateQuizResult(language: string, quizId: string, data: Partial<QuizResult>, setId?: string): Promise<QuizResult> {
-  const params = new URLSearchParams({ language });
-  if (setId) params.set('set_id', setId);
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/quiz-results/${encodeURIComponent(quizId)}?${params}`, {
+  const response = await fetchAsAdmin(jtiUrl(`/quiz-bank/quiz-results/${encodeURIComponent(quizId)}`, language, setId ? { set_id: setId } : {}), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
@@ -349,25 +331,22 @@ export async function updateQuizResult(language: string, quizId: string, data: P
 }
 
 export async function exportQuizResultsCsv(language: string): Promise<void> {
-  const params = new URLSearchParams({ language, type: 'results' });
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/transfer/export?${params}`);
+  const response = await fetchAsAdmin(jtiUrl('/quiz-bank/transfer/export', language, { type: 'results' }));
   if (!response.ok) throw new Error('Export failed');
   downloadBlob(await response.blob(), `quiz_results_${language}.csv`);
 }
 
 export async function getQuizBankStats(language: string = 'zh', bankId?: string): Promise<QuizBankStats> {
-  const params = new URLSearchParams({ language });
-  if (bankId) params.set('bank_id', bankId);
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/stats/?${params}`);
+  const response = await fetchAsAdmin(jtiUrl('/quiz-bank/stats/', language, bankId ? { bank_id: bankId } : {}));
   return handleResponse(response);
 }
 
 export async function importQuizBank(language: string, bankId: string, file: File, replace = false): Promise<{ count: number; message: string }> {
-  const params = new URLSearchParams({ language, bank_id: bankId, type: 'questions' });
-  if (replace) params.set('replace', 'true');
+  const extra: Record<string, string> = { bank_id: bankId, type: 'questions' };
+  if (replace) extra.replace = 'true';
   const formData = new FormData();
   formData.append('file', file);
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/transfer/import?${params}`, {
+  const response = await fetchAsAdmin(jtiUrl('/quiz-bank/transfer/import', language, extra), {
     method: 'POST',
     body: formData,
   });
@@ -375,8 +354,7 @@ export async function importQuizBank(language: string, bankId: string, file: Fil
 }
 
 export async function exportQuizBankCsv(language: string, bankId: string): Promise<void> {
-  const params = new URLSearchParams({ language, bank_id: bankId, type: 'questions' });
-  const response = await fetchAsAdmin(`${JTI_ADMIN_BASE}/quiz-bank/transfer/export?${params}`);
+  const response = await fetchAsAdmin(jtiUrl('/quiz-bank/transfer/export', language, { bank_id: bankId, type: 'questions' }));
   if (!response.ok) throw new Error('Export failed');
   downloadBlob(await response.blob(), `quiz_bank_${bankId}_${language}.csv`);
 }

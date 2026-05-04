@@ -8,10 +8,12 @@ import ApiKeysPanel from './components/ApiKeysPanel';
 import PromptPanel from './components/PromptPanel';
 import ExtKeysPanel from './components/ExtKeysPanel';
 import ConversationHistoryModal from './components/ConversationHistoryModal';
+import FilePreviewModal from './components/FilePreviewModal';
 import Jti from './pages/Jti';
 import Hciot from './pages/Hciot';
 import { useAppChat } from './hooks/useAppChat';
 import { PROJECT_COLORS, getStoreIcon } from './utils/storeDisplay';
+import type { FileItem } from './types';
 import './styles/shared/index.css';
 import './styles/app/layout.css';
 import './styles/app/forms.css';
@@ -72,6 +74,8 @@ function HomeShell() {
   const openPanel = (id: PanelId) => setPanel(id);
   const closePanel = () => setPanel(null);
 
+  const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+
   // Derive store display info for chat area
   const activeStore = currentTarget?.kind === 'store'
     ? stores.find((s) => s.name === currentTarget.storeName)
@@ -114,6 +118,7 @@ function HomeShell() {
             onUploadFile={handleUploadFile}
             onDeleteFile={handleDeleteFile}
             onCreateStore={handleCreateStore}
+            onOpenFile={(f) => setPreviewFile(f)}
           />
           <ChatArea
             messages={messages}
@@ -163,6 +168,15 @@ function HomeShell() {
         isOpen={panel === 'extkeys'}
         onClose={closePanel}
         stores={stores}
+        onShowStatus={showStatus}
+      />
+
+      <FilePreviewModal
+        isOpen={previewFile !== null}
+        store={activeStore || null}
+        file={previewFile}
+        onClose={() => setPreviewFile(null)}
+        onSaved={() => { void handleRefreshKnowledge(); }}
         onShowStatus={showStatus}
       />
 

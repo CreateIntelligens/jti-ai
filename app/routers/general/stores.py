@@ -15,7 +15,15 @@ from pydantic import BaseModel
 
 from app.auth import extract_user_gemini_api_key, require_admin, verify_auth
 import app.deps as deps
-from app.routers.knowledge_utils import delete_from_rag, safe_filename, sync_to_rag
+from app.routers.knowledge_utils import (
+    EDITABLE_EXTENSIONS,
+    TEXT_PREVIEW_EXTENSIONS,
+    delete_from_rag,
+    extract_docx_text,
+    safe_filename,
+    sync_to_rag,
+    write_docx_text,
+)
 from app.services import gemini_clients
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.jti.knowledge_store import get_jti_knowledge_store
@@ -39,6 +47,10 @@ class ManagedStoreConfig:
 class CreateStoreRequest(BaseModel):
     display_name: str
     key_index: int = 0
+
+
+class UpdateFileContentRequest(BaseModel):
+    content: str
 
 
 GENERAL_NAMESPACE = "general"
@@ -388,6 +400,121 @@ def delete_file(store_name: str, filename: str, request: Request, auth: dict = D
     if not deleted:
         raise HTTPException(status_code=404, detail="File not found")
     return {"message": "File deleted"}
+
+
+@router.get("/stores/{store_name}/files/{filename:path}/content")
+def get_store_file_content(
+    store_name: str,
+    filename: str,
+    request: Request,
+    auth: dict = Depends(verify_auth),
+):
+    """Return text content of a file for inline preview/edit."""
+    require_admin(auth)
+    if resolve_managed_store(store_name) is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Managed stores use /api/knowledge/files for content access",
+        )
+
+    normalized = normalize_store_name(store_name)
+    if not get_store_registry().get_store(normalized, _owner_key_hash(request)):
+        raise HTTPException(status_code=404, detail="Knowledge store not found")
+
+    safe_name = safe_filename(filename)
+    store = get_knowledge_store()
+    doc = store.get_file(normalized, safe_name, namespace=GENERAL_NAMESPACE)
+    if not doc:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    file_bytes: bytes = doc.get("data", b"")
+    ext = (
+        "." + safe_name.rsplit(".", 1)[-1].lower()
+        if "." in safe_name
+        else ""
+    )
+
+    if ext == ".docx":
+        return {
+            "filename": safe_name,
+            "editable": True,
+            "content": extract_docx_text(file_bytes),
+            "size": doc.get("size", len(file_bytes)),
+        }
+
+    if ext not in TEXT_PREVIEW_EXTENSIONS:
+        return {
+            "filename": safe_name,
+            "editable": False,
+            "content": None,
+            "message": "此檔案格式不支援線上預覽，請下載查看",
+        }
+
+    return {
+        "filename": safe_name,
+        "editable": ext in EDITABLE_EXTENSIONS,
+        "content": file_bytes.decode("utf-8", errors="replace"),
+        "size": doc.get("size", len(file_bytes)),
+    }
+
+
+@router.put("/stores/{store_name}/files/{filename:path}/content")
+async def update_store_file_content(
+    store_name: str,
+    filename: str,
+    req: UpdateFileContentRequest,
+    request: Request,
+    auth: dict = Depends(verify_auth),
+):
+    """Save edited text content and re-index the file in RAG."""
+    require_admin(auth)
+    if resolve_managed_store(store_name) is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Managed stores use /api/knowledge/files for content access",
+        )
+
+    normalized = normalize_store_name(store_name)
+    if not get_store_registry().get_store(normalized, _owner_key_hash(request)):
+        raise HTTPException(status_code=404, detail="Knowledge store not found")
+
+    safe_name = safe_filename(filename)
+    ext = (
+        "." + safe_name.rsplit(".", 1)[-1].lower()
+        if "." in safe_name
+        else ""
+    )
+    if ext not in EDITABLE_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="此檔案格式不支援線上編輯")
+
+    store = get_knowledge_store()
+    doc = store.get_file(normalized, safe_name, namespace=GENERAL_NAMESPACE)
+    if not doc:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    if ext == ".docx":
+        try:
+            new_bytes = write_docx_text(doc.get("data", b""), req.content)
+        except Exception as exc:
+            raise HTTPException(status_code=500, detail=f"寫入 docx 失敗: {exc}")
+    else:
+        new_bytes = req.content.encode("utf-8")
+
+    updated = store.update_file_content(
+        normalized, safe_name, new_bytes, namespace=GENERAL_NAMESPACE
+    )
+    if not updated:
+        raise HTTPException(status_code=404, detail="File not found")
+
+    try:
+        sync_to_rag(GENERAL_NAMESPACE, normalized, safe_name, new_bytes)
+    except Exception as exc:
+        logger.warning(
+            "[Knowledge] RAG sync failed for %s/%s: %s", normalized, safe_name, exc
+        )
+        return {"message": "已更新，但 RAG 同步失敗", "synced": False}
+
+    return {"message": "已更新", "synced": True}
 
 
 @router.delete("/stores/{store_name:path}")
