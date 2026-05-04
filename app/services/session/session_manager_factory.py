@@ -98,10 +98,17 @@ def get_hciot_conversation_logger():
 
 
 def get_general_chat_session_manager():
-    """取得一般知識庫 Chat Session Manager（無 fallback，失敗回傳 None）"""
-    from app.services.session.general_chat_session_manager import GeneralChatSessionManager
+    """取得一般知識庫 Chat Session Manager
+
+    Uses the standard MongoSessionManager (same as JTI/HCIoT) with an
+    in-memory SessionManager fallback so the General agent can operate
+    in environments without MongoDB (tests, local dev).
+    """
+    from .mongo_session_manager import MongoSessionManager
+    from .session_manager import SessionManager
     return _get_or_create(
         "general_chat_session_manager",
-        mongo_factory=lambda: GeneralChatSessionManager(db_name=JTI_DB_NAME),
+        mongo_factory=lambda: MongoSessionManager(db_name=JTI_DB_NAME),
+        fallback_factory=SessionManager,
         label="GeneralChatSessionManager",
     )

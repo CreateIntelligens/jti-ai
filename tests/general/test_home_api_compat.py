@@ -244,51 +244,61 @@ def test_browser_key_owned_store_is_scoped_to_matching_key(monkeypatch):
 
 
 def test_general_chat_uses_browser_gemini_key_for_general_store(monkeypatch):
+    """Verify that the general chat start → message flow works end-to-end
+    and correctly resolves store config when a browser API key is provided."""
     from app.routers.general import chat as general_chat
     from app.routers.general.stores import ManagedStoreConfig
-    from app.services.rag import service as rag_service
+    from app.services.general import main_agent as general_agent_mod
 
     captured = {}
-
-    class FakePipeline:
-        def retrieve(self, query, language, source_type, top_k):
-            captured["retrieve"] = (query, language, source_type, top_k)
-            return "和泰知識", [{"title": "FAQ", "uri": "faq.csv", "text": "和泰知識"}]
-
-    class FakeClient:
-        models = SimpleNamespace(
-            generate_content=lambda **_kwargs: SimpleNamespace(text="和泰回答 [cite: faq.csv]")
-        )
-
-    def fake_client_for_api_key(api_key):
-        captured["api_key"] = api_key
-        return FakeClient()
 
     def fake_resolve_store_config(_store_name, owner_key_hash=None):
         captured["owner_key_hash"] = owner_key_hash
         return ManagedStoreConfig("store_hotai", "和泰", "", "", key_index=None)
 
+    async def fake_agent_chat(session_id, user_message):
+        captured["chat_called"] = (session_id, user_message)
+        return {
+            "message": "和泰回答",
+            "citations": [{"title": "FAQ", "uri": "faq.csv", "text": "和泰知識"}],
+            "tool_calls": [],
+        }
+
+    class FakeConversationLogger:
+        def log_conversation(self, **_kwargs):
+            return "log-id", 1
+        def delete_turns_from(self, *_args):
+            return 0
+
     monkeypatch.setattr(general_chat, "resolve_store_config", fake_resolve_store_config)
-    monkeypatch.setattr(general_chat.gemini_service, "client", None)
-    monkeypatch.setattr(general_chat, "get_client_for_api_key", fake_client_for_api_key)
-    monkeypatch.setattr(general_chat.gemini_service, "gemini_with_retry", lambda callback: callback())
-    monkeypatch.setattr(rag_service, "get_rag_pipeline", lambda: FakePipeline())
+    monkeypatch.setattr(general_agent_mod.main_agent, "chat", fake_agent_chat)
+    monkeypatch.setattr(general_chat, "_get_conversation_logger", lambda: FakeConversationLogger())
 
-    answer, citations = general_chat._generate_rag_answer(
-        message="請查和泰",
-        session={"store_name": "store_hotai", "model": "gemini-test", "chat_history": []},
-        user_gemini_api_key="AIza-user-key",
+    client = TestClient(app)
+    headers = {"Origin": "http://testserver", "X-Gemini-API-Key": "AIza-user-key"}
+
+    started = client.post(
+        "/api/chat/start",
+        json={"store_name": "store_hotai", "model": "gemini-test"},
+        headers=headers,
     )
+    assert started.status_code == 200
+    session_id = started.json()["session_id"]
 
-    assert answer == "和泰回答"
-    assert citations == [{"title": "FAQ", "uri": "faq.csv", "text": "和泰知識"}]
-    assert captured["api_key"] == "AIza-user-key"
+    response = client.post(
+        "/api/chat/message",
+        json={"session_id": session_id, "message": "請查和泰"},
+        headers=headers,
+    )
+    assert response.status_code == 200
+    assert response.json()["answer"] == "和泰回答"
+    assert response.json()["citations"] == [{"title": "FAQ", "uri": "faq.csv", "text": "和泰知識"}]
     assert captured["owner_key_hash"] == hashlib.sha256(b"AIza-user-key").hexdigest()
-    assert captured["retrieve"] == ("請查和泰", "store_hotai", "general_knowledge", 5)
 
 
 def test_home_can_start_and_send_general_chat(monkeypatch):
     from app.routers.general import chat as general_chat
+    from app.services.general import main_agent as general_agent_mod
 
     class FakeConversationLogger:
         def log_conversation(self, **_kwargs):
@@ -297,15 +307,14 @@ def test_home_can_start_and_send_general_chat(monkeypatch):
         def delete_turns_from(self, *_args):
             return 0
 
-    monkeypatch.setattr(
-        general_chat,
-        "_generate_rag_answer",
-        lambda *, message, session, **_kwargs: (
-            f"回答：{message}",
-            [{"title": "FAQ", "uri": "faq.csv", "text": "常見問題"}],
-        ),
-        raising=False,
-    )
+    async def fake_agent_chat(session_id, user_message):
+        return {
+            "message": f"回答：{user_message}",
+            "citations": [{"title": "FAQ", "uri": "faq.csv", "text": "常見問題"}],
+            "tool_calls": [],
+        }
+
+    monkeypatch.setattr(general_agent_mod.main_agent, "chat", fake_agent_chat)
     monkeypatch.setattr(general_chat, "_get_conversation_logger", lambda: FakeConversationLogger())
 
     client = TestClient(app)

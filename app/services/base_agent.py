@@ -1,7 +1,7 @@
 """
 Base Agent - 共用的 Gemini chat session 管理邏輯
 
-提供 JTI MainAgent 與 HCIoT HciotMainAgent 共用的：
+提供 JTI / HCIoT / General 各 MainAgent 共用的：
 - Gemini chat session 建立與快取
 - RAG 知識庫查詢
 - MongoDB 歷史同步（含背景非同步寫入）
@@ -12,7 +12,7 @@ import asyncio
 import logging
 import time
 from collections import OrderedDict
-from typing import Any
+from typing import Any, cast
 
 _CHAT_SESSION_CACHE_MAX = 128
 
@@ -56,10 +56,28 @@ class BaseAgent:
     def _get_store_name_for_language(language: str) -> str:
         raise NotImplementedError
 
+    def _get_store_name_for_session(self, session: Session) -> str:
+        """Resolve the knowledge store name from session context.
+
+        Default: delegate to the static _get_store_name_for_language.
+        Override in subclasses (e.g. GeneralAgent) where the store
+        is dynamic and comes from the session itself.
+        """
+        return self._get_store_name_for_language(session.language)
+
     @property
     def _rag_source_type(self) -> str:
         """Return the source_type for RAG ('jti_knowledge' or 'hciot_knowledge')."""
         raise NotImplementedError
+
+    def _get_rag_source_type_for_session(self, session: Session) -> str:
+        """Resolve RAG source_type from session context.
+
+        Default: use the static _rag_source_type property. Override in
+        subclasses (e.g. GeneralAgent) where source_type can vary
+        per-session (managed app vs. general).
+        """
+        return self._rag_source_type
 
     def _get_default_persona(self, language: str) -> str:
         """Return default persona text when no DB persona is configured."""
@@ -69,7 +87,7 @@ class BaseAgent:
         """Delegate to project-specific build_system_instruction."""
         raise NotImplementedError
 
-    def _load_runtime_settings(self, prompt_manager, prompt_id: str, store_name: str):
+    def _load_runtime_settings(self, prompt_manager, prompt_id: str | None, store_name: str):
         """Delegate to project-specific load_runtime_settings_from_prompt_manager."""
         raise NotImplementedError
 
@@ -194,10 +212,14 @@ class BaseAgent:
 
         config = self._make_chat_config(session)
 
-        store_name = self._get_store_name_for_language(session.language)
+        store_name = self._get_store_name_for_session(session)
         client = get_client_by_index(resolve_key_index_for_store(store_name))
+        # Cast: build_chat_history returns list[Content]; the SDK accepts
+        # list[Content | dict] but list is invariant so Pyright can't narrow.
         chat_session = client.chats.create(
-            model=self.model_name, config=config, history=history,
+            model=self.model_name,
+            config=config,
+            history=cast(list[types.ContentOrDict], history) if history else None,
         )
         self._chat_sessions[sid] = chat_session
         if len(self._chat_sessions) > _CHAT_SESSION_CACHE_MAX:
@@ -211,7 +233,7 @@ class BaseAgent:
             return
 
         session.chat_history.append({"role": "user", "content": user_message})
-        assistant_entry = {"role": "assistant", "content": assistant_message}
+        assistant_entry: dict[str, Any] = {"role": "assistant", "content": assistant_message}
         if citations:
             assistant_entry["citations"] = citations
         session.chat_history.append(assistant_entry)
@@ -368,10 +390,11 @@ class BaseAgent:
         # Use _rag_search_language if defined, otherwise session.language
         search_lang = self._rag_search_language or session.language
         search_lang = normalize_language(search_lang)
+        rag_source_type = self._get_rag_source_type_for_session(session)
 
         ai_future = loop.run_in_executor(
             None,
-            lambda: pipeline.retrieve(ai_query, language=search_lang, source_type=self._rag_source_type, top_k=3),
+            lambda q=ai_query, sl=search_lang, rst=rag_source_type: pipeline.retrieve(q, language=sl, source_type=rst, top_k=3),
         )
 
         # Skip duplicate query when AI didn't rewrite
@@ -381,7 +404,7 @@ class BaseAgent:
         else:
             user_future = loop.run_in_executor(
                 None,
-                lambda: pipeline.retrieve(user_message, language=search_lang, source_type=self._rag_source_type, top_k=3),
+                lambda um=user_message, sl=search_lang, rst=rag_source_type: pipeline.retrieve(um, language=sl, source_type=rst, top_k=3),
             )
             (_, ai_citations), (_, user_citations) = await asyncio.gather(ai_future, user_future)
 

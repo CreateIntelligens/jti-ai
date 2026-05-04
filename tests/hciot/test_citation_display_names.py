@@ -1,6 +1,6 @@
 import pytest
 
-from app.services.hciot.main_agent import HciotMainAgent
+from app.services.hciot.main_agent import MainAgent
 
 
 def test_localize_citations_uses_display_name(monkeypatch):
@@ -26,7 +26,7 @@ def test_localize_citations_uses_display_name(monkeypatch):
         {"title": "Unmapped", "uri": ""},
     ]
 
-    localized = HciotMainAgent._localize_citations("zh", citations)
+    localized = MainAgent._localize_citations("zh", citations)
 
     assert localized == [
         {"title": "PRP.csv", "uri": ""},
@@ -36,17 +36,17 @@ def test_localize_citations_uses_display_name(monkeypatch):
 
 
 def test_hciot_agent_uses_flash_lite_for_chat():
-    agent = HciotMainAgent()
+    agent = MainAgent()
     assert agent.model_name == "gemini-3.1-flash-lite-preview"
 
 
 def test_extract_image_id_returns_top_citation_id():
     citations = [{"image_id": "123"}, {"image_id": "456"}]
-    assert HciotMainAgent._extract_image_id(citations) == "123"
+    assert MainAgent._extract_image_id(citations) == "123"
 
 def test_extract_image_id_returns_none_if_missing():
     citations = [{"text": "no image"}]
-    assert HciotMainAgent._extract_image_id(citations) is None
+    assert MainAgent._extract_image_id(citations) is None
 
 
 async def _fake_concurrent_result(user_message, language, session_id=None):
@@ -55,7 +55,7 @@ async def _fake_concurrent_result(user_message, language, session_id=None):
 
 @pytest.mark.asyncio
 async def test_hciot_chat_injects_session_state_into_prompt(monkeypatch):
-    agent = HciotMainAgent()
+    agent = MainAgent()
     captured = {}
 
     class FakeChatSession:

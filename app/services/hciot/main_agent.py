@@ -80,7 +80,7 @@ def invalidate_hciot_file_map(language: str | None = None) -> None:
 from app.models_config import CHAT_MODEL as _DEFAULT_CHAT_MODEL
 
 
-class HciotMainAgent(BaseAgent):
+class MainAgent(BaseAgent):
     CHAT_MODEL = _DEFAULT_CHAT_MODEL
 
     def __init__(self):
@@ -186,4 +186,4 @@ class HciotMainAgent(BaseAgent):
         return "目前無法回應，請稍後再試。"
 
 
-main_agent = HciotMainAgent()
+main_agent = MainAgent()
