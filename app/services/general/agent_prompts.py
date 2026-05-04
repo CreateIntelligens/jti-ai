@@ -1,21 +1,20 @@
 """
-General Knowledge Base Agent Prompts
+General Knowledge Base Agent Prompts.
 
-Simpler than JTI/HCIoT:
-- No quiz, no TTS, no safety filter (general KB is internal-facing)
-- Persona is read from prompt_manager's active prompt content (per-store)
-- Session state is minimal (just mode + timestamp)
+Simpler than JTI/HCIoT (no quiz/TTS/safety filter; persona comes from
+prompt_manager's active prompt), 但仍透過共用 `AgentPrompts` base 組裝，
+只是關閉了 safety wrap、scope 段與敏感議題段。
 """
 
 from __future__ import annotations
 
 from typing import Dict, Optional
 
+from app.services._shared.agent_prompts_base import AgentPrompts, RuleHeaders
 
 DEFAULT_MAX_RESPONSE_CHARS = 0  # No character limit for general KB chat
 
-# ===== Default persona (used when no prompt_manager persona is configured) =====
-PERSONA = {
+PERSONA: Dict[str, str] = {
     "zh": """你是一個知識庫問答助手。
 
 - 任務：根據知識庫提供的資料回答使用者的問題
@@ -28,8 +27,7 @@ PERSONA = {
 - Principle: prioritize knowledge base content; be honest when information is unavailable""",
 }
 
-# ===== Response rule sections =====
-DEFAULT_RESPONSE_RULE_SECTIONS = {
+DEFAULT_RESPONSE_RULE_SECTIONS: Dict[str, Dict[str, str]] = {
     "zh": {
         "role_scope": "1. 根據知識庫內容回答使用者問題\n2. 將知識庫查到的資訊整理成容易理解的回覆",
         "scope_limits": "- 回答時以知識庫資料為主\n- 如果問題與知識庫無關，可以禮貌地說明",
@@ -44,8 +42,18 @@ DEFAULT_RESPONSE_RULE_SECTIONS = {
     },
 }
 
-# ===== Session state template (minimal for general KB) =====
-SESSION_STATE_TEMPLATES = {
+WELCOME_TEXT: Dict[str, Dict[str, str]] = {
+    "zh": {
+        "title": "歡迎使用通用知識庫助手",
+        "description": "依據你選擇的知識庫內容回答問題。",
+    },
+    "en": {
+        "title": "Welcome to the General Knowledge Assistant",
+        "description": "Ask questions grounded in the knowledge base you selected.",
+    },
+}
+
+SESSION_STATE_TEMPLATES: Dict[str, str] = {
     "zh": """<內部狀態資訊 - 不要在回應中提及>
 目前模式: 知識庫問答
 現在時間: {now}
@@ -56,6 +64,52 @@ Current time: {now}
 </Internal State Info>""",
 }
 
+# General 不顯示「範圍限制」與「敏感議題」段，header 只用到 role/rules/kb。
+_GENERAL_HEADERS_ZH = RuleHeaders(
+    role="## 你的角色",
+    scope="",
+    rules="## 回應規則",
+    kb="## 知識庫使用規則",
+    sensitive="",
+)
+
+_GENERAL_HEADERS_EN = RuleHeaders(
+    role="## Your Role",
+    scope="",
+    rules="## Response Rules",
+    kb="## Knowledge Base Usage",
+    sensitive="",
+)
+
+
+class _GeneralAgentPrompts(AgentPrompts):
+    """General KB 使用較簡潔的字數措辭（不加「（必要時更短）」）。"""
+
+    def length_rule(self, language: str, max_response_chars: int) -> str:
+        is_en = language == "en"
+        if max_response_chars and max_response_chars > 0:
+            return (
+                f"- Length: keep each response within {max_response_chars} characters"
+                if is_en
+                else f"- 字數：每次回覆不超過{max_response_chars}字"
+            )
+        return ""
+
+
+prompts = _GeneralAgentPrompts(
+    persona=PERSONA,
+    response_rule_sections=DEFAULT_RESPONSE_RULE_SECTIONS,
+    welcome_text=WELCOME_TEXT,
+    session_state_templates=SESSION_STATE_TEMPLATES,
+    default_max_response_chars=DEFAULT_MAX_RESPONSE_CHARS,
+    headers_zh=_GENERAL_HEADERS_ZH,
+    headers_en=_GENERAL_HEADERS_EN,
+    include_scope=False,
+    include_sensitive=False,
+    include_safety_wrap=False,
+    omit_length_when_unlimited=True,
+)
+
 
 def build_system_instruction(
     persona: str,
@@ -63,39 +117,10 @@ def build_system_instruction(
     response_rule_sections: Optional[Dict[str, str]] = None,
     max_response_chars: int = DEFAULT_MAX_RESPONSE_CHARS,
 ) -> str:
-    """Build system instruction for general KB chat.
-
-    Simpler than JTI/HCIoT: no safety wrapper, no sensitive topic handling.
-    """
-    normalized_lang = "en" if language == "en" else "zh"
-    sections = response_rule_sections or DEFAULT_RESPONSE_RULE_SECTIONS[normalized_lang]
-
-    is_en = normalized_lang == "en"
-    headers = {
-        "role": "## Your Role" if is_en else "## 你的角色",
-        "rules": "## Response Rules" if is_en else "## 回應規則",
-        "kb": "## Knowledge Base Usage" if is_en else "## 知識庫使用規則",
-    }
-
-    length_section = ""
-    if max_response_chars > 0:
-        length_rule = (
-            f"- Length: keep each response within {max_response_chars} characters"
-            if is_en else
-            f"- 字數：每次回覆不超過{max_response_chars}字"
-        )
-        length_section = f"\n{length_rule}"
-
-    rules = f"""{headers['role']}
-
-{sections.get('role_scope', '')}
-
-{headers['rules']}
-
-{sections.get('response_style', '')}{length_section}
-
-{headers['kb']}
-
-{sections.get('knowledge_rules', '')}"""
-
-    return f"{persona}\n\n{rules}"
+    """Build system instruction for general KB chat."""
+    return prompts.build_system_instruction(
+        persona=persona,
+        language=language,
+        response_rule_sections=response_rule_sections,
+        max_response_chars=max_response_chars,
+    )

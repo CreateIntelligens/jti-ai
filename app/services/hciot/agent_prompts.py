@@ -1,19 +1,20 @@
 """
 HCIoT assistant prompts and system rules.
 
-安全護欄（Priority 0 + 敏感議題處理）由 safety_prompts 共用模組注入，
-不包含在可編輯的區塊中。
+資料部分（PERSONA、規則分段、歡迎詞、Session State 範本）保留在這裡作為可編輯來源；
+共用的組合邏輯由 `_shared.agent_prompts_base.AgentPrompts` 提供。HCIoT 自帶較嚴格的字數
+限制措辭，透過子類覆寫 `length_rule`。
 """
 
 from __future__ import annotations
 
 from typing import Dict, Optional
 
-from app.services.safety_prompts import SENSITIVE_HANDLING, wrap_with_safety
+from app.services._shared.agent_prompts_base import AgentPrompts
 
 DEFAULT_MAX_RESPONSE_CHARS = 40
 
-PERSONA = {
+PERSONA: Dict[str, str] = {
     "zh": """你的名字是「小元」，你是元復醫院的衛教智慧助理。
 
 - 身份：醫院提供給病人與家屬使用的衛教智慧助理
@@ -28,7 +29,7 @@ PERSONA = {
 - Tone: calm, professional, and easy to understand""",
 }
 
-DEFAULT_RESPONSE_RULE_SECTIONS = {
+DEFAULT_RESPONSE_RULE_SECTIONS: Dict[str, Dict[str, str]] = {
     "zh": {
         "role_scope": """1. 回答與醫院衛教資料相關的問題（使用知識庫）
 2. 協助病人與家屬理解疾病、治療方式、檢查流程、術後照護與日常注意事項
@@ -68,7 +69,7 @@ DEFAULT_RESPONSE_RULE_SECTIONS = {
     },
 }
 
-WELCOME_TEXT = {
+WELCOME_TEXT: Dict[str, Dict[str, str]] = {
     "zh": {
         "title": "歡迎使用元復衛教小元",
         "description": "根據醫院提供的衛教資料，協助你快速理解疾病、治療與照護重點。",
@@ -79,7 +80,7 @@ WELCOME_TEXT = {
     },
 }
 
-SESSION_STATE_TEMPLATES = {
+SESSION_STATE_TEMPLATES: Dict[str, str] = {
     "zh": """<內部狀態資訊 - 不要在回應中提及>
 目前模式: 衛教問答
 現在時間: {now}
@@ -95,49 +96,25 @@ Current time: {now}
 }
 
 
-def _compose_response_rules(
-    language: str,
-    sections: Dict[str, str],
-    limit: int,
-) -> str:
-    is_en = language == "en"
-    headers = {
-        "role": "## Your Role" if is_en else "## 你的角色",
-        "scope": "## Scope Restriction" if is_en else "## 範圍限制",
-        "rules": "## Response Rules" if is_en else "## 回應規則",
-        "kb": "## Knowledge Base Usage" if is_en else "## 知識庫使用規則",
-        "sensitive": "## Sensitive Topics" if is_en else "## 敏感議題處理",
-    }
+class _HciotAgentPrompts(AgentPrompts):
+    """HCIoT 對字數要求較嚴格，覆寫 length_rule 的措辭。"""
 
-    length_rule = (
-        f"- Length: keep each response within {limit} words when practical"
-        if is_en else
-        f"- 字數：每次回覆嚴格不超過{limit}字，超過即違規，寧可精簡也不可超過"
-    )
+    def length_rule(self, language: str, max_response_chars: int) -> str:
+        is_en = language == "en"
+        return (
+            f"- Length: keep each response within {max_response_chars} words when practical"
+            if is_en
+            else f"- 字數：每次回覆嚴格不超過{max_response_chars}字，超過即違規，寧可精簡也不可超過"
+        )
 
-    lang = "en" if is_en else "zh"
-    sensitive_block = SENSITIVE_HANDLING[lang]
 
-    return f"""{headers['role']}
-
-{sections.get('role_scope', '')}
-
-{headers['scope']}
-
-{sections.get('scope_limits', '')}
-
-{headers['rules']}
-
-{sections.get('response_style', '')}
-{length_rule}
-
-{headers['kb']}
-
-{sections.get('knowledge_rules', '')}
-
-{headers['sensitive']}
-
-{sensitive_block}"""
+prompts = _HciotAgentPrompts(
+    persona=PERSONA,
+    response_rule_sections=DEFAULT_RESPONSE_RULE_SECTIONS,
+    welcome_text=WELCOME_TEXT,
+    session_state_templates=SESSION_STATE_TEMPLATES,
+    default_max_response_chars=DEFAULT_MAX_RESPONSE_CHARS,
+)
 
 
 def build_system_instruction(
@@ -146,21 +123,12 @@ def build_system_instruction(
     response_rule_sections: Optional[Dict[str, str]] = None,
     limit: int = DEFAULT_MAX_RESPONSE_CHARS,
 ) -> str:
-    normalized_lang = "en" if language == "en" else "zh"
-    sections = response_rule_sections or DEFAULT_RESPONSE_RULE_SECTIONS[normalized_lang]
-    rules = _compose_response_rules(normalized_lang, sections, limit)
-    safe_persona = wrap_with_safety(persona, normalized_lang)
-    return f"{safe_persona}\n\n{rules}"
+    """組合完整 system instruction（safety wrap + persona + 規則）。"""
+    return prompts.build_system_instruction(
+        persona=persona,
+        language=language,
+        response_rule_sections=response_rule_sections,
+        max_response_chars=limit,
+    )
 
 
-def build_intent_prompt(query: str) -> str:
-    """Build a YES/NO intent-classification prompt for the knowledge-base search gate."""
-    return f"""判斷以下使用者語句是否需要查詢醫院相關知識庫。
-如果使用者是在詢問任何與醫院有關的事務（包括但不限於：疾病、症狀、治療、照護、飲食、復健、檢查、藥物衛教、門診時間、科別、掛號、住院、手術、醫師、樓層位置、服務項目），請回覆 YES。
-如果只是單純打招呼或表達感謝，沒有附帶任何具體問題，請回覆 NO。
-如果使用者在詢問對話本身（例如：我前面說什麼、你剛才說什麼、我問了什麼），請回覆 NO。
-如果使用者在詢問完全無關的知識（例如：天氣、美食推薦、旅遊、政治、投資、寫程式），請回覆 NO。
-
-使用者訊息：「{query}」
-
-只能回覆 YES 或 NO："""

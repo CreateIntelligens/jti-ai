@@ -1,25 +1,25 @@
 """
-Main Agent Prompts - 人物設定與系統規則
+JTI Main Agent Prompts — 人物設定與系統規則。
 
-拆分為兩部分：
-- PERSONA: 人物設定（可編輯）
-- RESPONSE_RULE_SECTIONS: 回覆規則分段（可編輯）
+資料部分（PERSONA、規則分段、歡迎詞、Session State 範本）保留在這裡作為可編輯來源；
+共用的組合邏輯（build_system_instruction、compose_response_rules）由 `_shared.agent_prompts_base.AgentPrompts` 提供。
 
-安全護欄（Priority 0 + 敏感議題處理）由 safety_prompts 共用模組注入，
-不包含在可編輯的區塊中。
+本模組對外仍 export 與既有相同的常數與函式名，避免下游 import 變動。
 """
 
 from __future__ import annotations
 
-from copy import deepcopy
 from typing import Dict, Optional
 
-from app.services.safety_prompts import SENSITIVE_HANDLING, wrap_with_safety
+from app.services._shared.agent_prompts_base import (
+    DEFAULT_RULE_HEADERS_EN,
+    AgentPrompts,
+    RuleHeaders,
+)
 
 DEFAULT_MAX_RESPONSE_CHARS = 60
 
-# ===== 人物設定（可編輯）=====
-PERSONA = {
+PERSONA: Dict[str, str] = {
     "zh": """你是 Ploom X 加熱器的智慧客服人員。
 
 - 身份：Ploom X 加熱器的智慧客服人員
@@ -36,8 +36,7 @@ PERSONA = {
 - Speaking style: warm, natural, like chatting with a friend""",
 }
 
-# ===== 回覆規則（分段，可編輯）=====
-DEFAULT_RESPONSE_RULE_SECTIONS = {
+DEFAULT_RESPONSE_RULE_SECTIONS: Dict[str, Dict[str, str]] = {
     "zh": {
         "role_scope": """1. 回答關於 JTI 傑太日煙、Ploom X 加熱器、加熱菸產品的問題（使用知識庫）
 2. 引導使用者進行「尋找命定前蓋」測驗
@@ -80,7 +79,7 @@ DEFAULT_RESPONSE_RULE_SECTIONS = {
     },
 }
 
-WELCOME_TEXT = {
+WELCOME_TEXT: Dict[str, Dict[str, str]] = {
     "zh": {
         "title": "歡迎使用 JTI 智慧助手",
         "description": "透過 AI 對話帶你完成尋找命定前蓋，找到最適合你的測驗結果。",
@@ -91,80 +90,7 @@ WELCOME_TEXT = {
     },
 }
 
-
-def _compose_response_rules(
-    language: str,
-    sections: Dict[str, str],
-    max_response_chars: int,
-) -> str:
-    is_en = language == "en"
-    headers = {
-        "role": "## Your Role" if is_en else "## 你的角色",
-        "scope": "## Scope Restriction (Strictly Follow)" if is_en else "## 範圍限制（嚴格遵守）",
-        "rules": "## Response Rules" if is_en else "## 回應規則",
-        "kb": "## Knowledge Base Usage (Most Important)" if is_en else "## 知識庫使用規則（最重要）",
-        "sensitive": "## Sensitive Topics" if is_en else "## 敏感議題處理",
-    }
-    
-    if max_response_chars > 0:
-        length_rule = (
-            f"- Length: keep each response within {max_response_chars} characters"
-            if is_en else
-            f"- 字數：每次回覆不超過{max_response_chars}字（必要時更短）"
-        )
-    else:
-        length_rule = (
-            "- Length: no strict character limit"
-            if is_en else
-            "- 字數：不限制（可依情境自然回覆）"
-        )
-
-    lang = "en" if is_en else "zh"
-    sensitive_block = SENSITIVE_HANDLING[lang]
-
-    return f"""{headers['role']}
-
-{sections.get('role_scope', '')}
-
-{headers['scope']}
-
-{sections.get('scope_limits', '')}
-
-{headers['rules']}
-
-{sections.get('response_style', '')}
-{length_rule}
-
-{headers['kb']}
-
-{sections.get('knowledge_rules', '')}
-
-{headers['sensitive']}
-
-{sensitive_block}"""
-
-
-def get_default_response_rule_sections() -> Dict[str, Dict[str, str]]:
-    """取得預設分段回覆規則（可安全修改副本）。"""
-    return deepcopy(DEFAULT_RESPONSE_RULE_SECTIONS)
-
-
-def build_system_instruction(
-    persona: str,
-    language: str,
-    response_rule_sections: Optional[Dict[str, str]] = None,
-    max_response_chars: int = DEFAULT_MAX_RESPONSE_CHARS,
-) -> str:
-    """組合完整 system instruction: safety wrap + persona + 規則。"""
-    defaults = get_default_response_rule_sections()
-    sections = response_rule_sections or defaults.get(language, defaults["zh"])
-    rules = _compose_response_rules(language, sections, max_response_chars)
-    safe_persona = wrap_with_safety(persona, language)
-    return f"{safe_persona}\n\n{rules}"
-
-
-# 動態狀態模板（每次對話會變）
-SESSION_STATE_TEMPLATES = {
+SESSION_STATE_TEMPLATES: Dict[str, str] = {
     "zh": """<內部狀態資訊 - 不要在回應中提及>
 目前階段: {step_value}
 測驗進度: {answers_count}/4 題
@@ -182,3 +108,51 @@ Current time: {now}
 ⚠️ CRITICAL: You MUST respond in English only, even if user writes in Chinese
 </Internal State Info>""",
 }
+
+# JTI uses a slightly different scope-restriction header wording.
+_JTI_HEADERS_ZH = RuleHeaders(
+    role="## 你的角色",
+    scope="## 範圍限制（嚴格遵守）",
+    rules="## 回應規則",
+    kb="## 知識庫使用規則（最重要）",
+    sensitive="## 敏感議題處理",
+)
+
+_JTI_HEADERS_EN = RuleHeaders(
+    role=DEFAULT_RULE_HEADERS_EN.role,
+    scope="## Scope Restriction (Strictly Follow)",
+    rules=DEFAULT_RULE_HEADERS_EN.rules,
+    kb="## Knowledge Base Usage (Most Important)",
+    sensitive=DEFAULT_RULE_HEADERS_EN.sensitive,
+)
+
+
+prompts = AgentPrompts(
+    persona=PERSONA,
+    response_rule_sections=DEFAULT_RESPONSE_RULE_SECTIONS,
+    welcome_text=WELCOME_TEXT,
+    session_state_templates=SESSION_STATE_TEMPLATES,
+    default_max_response_chars=DEFAULT_MAX_RESPONSE_CHARS,
+    headers_zh=_JTI_HEADERS_ZH,
+    headers_en=_JTI_HEADERS_EN,
+)
+
+
+def get_default_response_rule_sections() -> Dict[str, Dict[str, str]]:
+    """取得預設分段回覆規則（可安全修改副本）。"""
+    return prompts.get_default_response_rule_sections()
+
+
+def build_system_instruction(
+    persona: str,
+    language: str,
+    response_rule_sections: Optional[Dict[str, str]] = None,
+    max_response_chars: int = DEFAULT_MAX_RESPONSE_CHARS,
+) -> str:
+    """組合完整 system instruction: safety wrap + persona + 規則。"""
+    return prompts.build_system_instruction(
+        persona=persona,
+        language=language,
+        response_rule_sections=response_rule_sections,
+        max_response_chars=max_response_chars,
+    )
