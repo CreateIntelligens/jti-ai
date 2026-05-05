@@ -11,9 +11,9 @@ import json
 import logging
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
+from typing import Dict, List, Optional
 
 _TZ_TAIPEI = timezone(timedelta(hours=8))
-from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +31,15 @@ class ConversationLogger:
         self.log_dir.mkdir(parents=True, exist_ok=True)
         logger.info(f"ConversationLogger initialized: {self.log_dir}")
 
+    def _get_log_paths(self, session_id: str, timestamp: Optional[datetime] = None) -> tuple[Path, Path]:
+        """Find or create log paths (jsonl and txt) for a session."""
+        log_file = next(self.log_dir.glob(f"*{session_id}.jsonl"), None)
+        if log_file is None:
+            ts = timestamp or datetime.now(_TZ_TAIPEI)
+            prefix = ts.strftime("%Y%m%d_%H%M%S")
+            log_file = self.log_dir / f"{prefix}_{session_id}.jsonl"
+        return log_file, log_file.with_suffix(".txt")
+
     def log_conversation(
         self,
         session_id: str,
@@ -45,24 +54,12 @@ class ConversationLogger:
         image_id: Optional[str] = None,
         **kwargs,
     ) -> None:
-        """記錄一次對話
-
-        Args:
-            session_id: Session ID
-            user_message: 使用者訊息
-            agent_response: Agent 回應
-            tool_calls: 工具呼叫記錄
-            session_state: Session 狀態
-            error: 錯誤訊息（如果有）
-            mode: 對話模式 (jti / general / hciot)
-        """
+        """記錄一次對話"""
         if not mode:
             raise ValueError("mode is required")
 
         try:
             timestamp = datetime.now(_TZ_TAIPEI)
-
-            # 構建日誌記錄
             log_entry = {
                 "timestamp": timestamp.isoformat(),
                 "responded_at": (responded_at or timestamp).isoformat(),
@@ -75,25 +72,11 @@ class ConversationLogger:
                 "error": error
             }
 
-            # 檔名格式: YYYYMMDD_HHMMSS_{session_id}
-            # 如果檔案已存在，就沿用舊檔名；否則用當前時間戳建立新檔
-            # 找出是否已有這個 session 的檔案
-            existing_files = list(self.log_dir.glob(f"*{session_id}.jsonl"))
-            if existing_files:
-                # 使用現有檔名
-                log_file = existing_files[0]
-                readable_log_file = existing_files[0].with_suffix('.txt')
-            else:
-                # 建立新檔名（加上時間戳）
-                timestamp_prefix = timestamp.strftime("%Y%m%d_%H%M%S")
-                log_file = self.log_dir / f"{timestamp_prefix}_{session_id}.jsonl"
-                readable_log_file = self.log_dir / f"{timestamp_prefix}_{session_id}.txt"
+            log_file, readable_log_file = self._get_log_paths(session_id, timestamp)
 
-            # 寫入 session 專屬的日誌檔案（JSONL 格式）
             with open(log_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
 
-            # 同時寫入可讀的文字日誌
             with open(readable_log_file, "a", encoding="utf-8") as f:
                 f.write(f"\n{'='*80}\n")
                 f.write(f"[{timestamp.strftime('%Y-%m-%d %H:%M:%S')}]\n")
@@ -101,44 +84,34 @@ class ConversationLogger:
                 f.write(f"\n👤 使用者:\n{user_message}\n")
 
                 if tool_calls:
-                    f.write(f"\n🔧 工具呼叫:\n")
+                    f.write("\n🔧 工具呼叫:\n")
                     for tool_call in tool_calls:
                         f.write(f"  - {tool_call.get('tool')}({tool_call.get('args', {})})\n")
-                        f.write(f"    結果: {json.dumps(tool_call.get('result', {}), ensure_ascii=False)}\n")
+                        result = json.dumps(tool_call.get("result", {}), ensure_ascii=False)
+                        f.write(f"    結果: {result}\n")
 
                 f.write(f"\n🤖 Agent:\n{agent_response}\n")
 
                 if session_state:
-                    f.write(f"\n📊 Session 狀態:\n")
+                    f.write("\n📊 Session 狀態:\n")
                     f.write(f"  - 階段: {session_state.get('step')}\n")
                     f.write(f"  - 已回答: {session_state.get('answers_count', 0)}/4\n")
-                    if session_state.get('quiz_result_id'):
-                        f.write(f"  - 測驗結果: {session_state.get('quiz_result_id')}\n")
+                    if rid := session_state.get("quiz_result_id"):
+                        f.write(f"  - 測驗結果: {rid}\n")
 
                 if error:
                     f.write(f"\n❌ 錯誤:\n{error}\n")
-
                 f.write(f"{'='*80}\n")
 
         except Exception as e:
             logger.error(f"Failed to log conversation: {e}", exc_info=True)
 
     def get_session_logs(self, session_id: str) -> List[Dict]:
-        """取得特定 session 的所有日誌
-
-        Args:
-            session_id: Session ID
-
-        Returns:
-            日誌記錄列表
-        """
-        # 檔名格式: YYYYMMDD_HHMMSS_{session_id}.jsonl
-        # 使用 glob 找出該 session 的檔案
-        existing_files = list(self.log_dir.glob(f"*{session_id}.jsonl"))
-        if not existing_files:
+        """取得特定 session 的所有日誌"""
+        log_file, _ = self._get_log_paths(session_id)
+        if not log_file.exists():
             return []
 
-        log_file = existing_files[0]
         logs = []
         try:
             with open(log_file, "r", encoding="utf-8") as f:
@@ -147,43 +120,27 @@ class ConversationLogger:
                         logs.append(json.loads(line))
         except Exception as e:
             logger.error(f"Failed to read session logs: {e}")
-
         return logs
 
     def delete_session_logs(self, session_id: str) -> int:
-        """刪除特定 session 的所有對話紀錄
-
-        Args:
-            session_id: Session ID
-
-        Returns:
-            刪除的記錄數
-        """
-        existing_files = list(self.log_dir.glob(f"*{session_id}.jsonl"))
-        if not existing_files:
+        """刪除特定 session 的所有對話紀錄"""
+        log_file, readable_log_file = self._get_log_paths(session_id)
+        if not log_file.exists():
             return 0
 
-        log_file = existing_files[0]
-        # 計算行數
         count = 0
         try:
             with open(log_file, "r", encoding="utf-8") as f:
                 count = sum(1 for line in f if line.strip())
             log_file.unlink()
+            if readable_log_file.exists():
+                readable_log_file.unlink()
             logger.info(f"Deleted {count} conversation logs for session {session_id[:8]}...")
         except Exception as e:
             logger.error(f"Failed to delete session logs: {e}")
             return 0
-
         return count
 
     def list_sessions(self) -> List[str]:
-        """列出所有有日誌的 session
-
-        Returns:
-            Session ID 列表
-        """
-        sessions = []
-        for log_file in self.log_dir.glob("*.jsonl"):
-            sessions.append(log_file.stem)
-        return sorted(sessions)
+        """列出所有有日誌的 session"""
+        return sorted(f.stem for f in self.log_dir.glob("*.jsonl"))

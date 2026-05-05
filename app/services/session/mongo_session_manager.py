@@ -19,52 +19,59 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _get_log_snapshot(log: Dict[str, Any]) -> Dict[str, Any]:
+    """Extract session snapshot or state from a log entry."""
+    return log.get("session_snapshot") or log.get("session_state") or {}
+
+
+def _longest_list(*candidates: Any) -> List[Any]:
+    """Return the longest list among the given candidates."""
+    longest: List[Any] = []
+    for candidate in candidates:
+        if isinstance(candidate, list) and len(candidate) > len(longest):
+            longest = candidate
+    return longest
+
+
 def _extract_quiz_state_from_logs(logs: List[Dict]) -> Dict[str, Any]:
     """Extract chat history and quiz state collected from conversation logs."""
     answers = {}
     selected_questions = []
     quiz_scores = {}
     quiz_result = None
-    quiz_result_id = None
     chat_history = []
 
     for log in logs:
-        user_msg = log.get("user_message", "")
-        agent_resp = log.get("agent_response", "")
-        if user_msg:
+        if user_msg := log.get("user_message"):
             chat_history.append({"role": "user", "content": user_msg})
-        if agent_resp:
+        if agent_resp := log.get("agent_response"):
             chat_history.append({"role": "assistant", "content": agent_resp})
 
         for tool_call in log.get("tool_calls", []):
             tool = tool_call.get("tool") or tool_call.get("tool_name")
             result = tool_call.get("result", {})
 
-            if tool == "start_quiz" and result.get("current_question"):
-                selected_questions.append(result["current_question"])
-
+            if tool == "start_quiz" and (q := result.get("current_question")):
+                selected_questions.append(q)
             elif tool == "submit_answer":
                 if result.get("success"):
-                    question_id = result.get("answered")
-                    option_id = result.get("selected")
-                    if question_id and option_id:
-                        answers[question_id] = option_id
-
-                if result.get("next_question"):
-                    selected_questions.append(result["next_question"])
-
-                if result.get("quiz_result"):
-                    completed_result = result["quiz_result"]
+                    q_id = result.get("answered")
+                    opt_id = result.get("selected")
+                    if q_id and opt_id:
+                        answers[q_id] = opt_id
+                if next_q := result.get("next_question"):
+                    selected_questions.append(next_q)
+                if completed_result := result.get("quiz_result"):
                     quiz_scores = completed_result.get("quiz_scores", {})
                     quiz_result = completed_result.get("result")
 
-    snapshot = logs[-1].get("session_snapshot") or logs[-1].get("session_state") or {}
+    snapshot = _get_log_snapshot(logs[-1])
     return {
         "answers": answers,
         "selected_questions": selected_questions,
         "quiz_scores": quiz_scores,
         "quiz_result": quiz_result,
-        "quiz_result_id": snapshot.get("quiz_result_id") or quiz_result_id,
+        "quiz_result_id": snapshot.get("quiz_result_id"),
         "chat_history": chat_history,
         "snapshot": snapshot,
         "step": snapshot.get("step", "WELCOME"),
@@ -77,7 +84,7 @@ def _resolve_session_language(logs: List[Dict], default: str) -> str:
     Mongo find_one may return non-str values (e.g. MagicMock in tests, or a
     legacy doc with a missing/null language); guard at every layer.
     """
-    snapshot = logs[-1].get("session_snapshot") or logs[-1].get("session_state") or {}
+    snapshot = _get_log_snapshot(logs[-1])
     language = snapshot.get("language")
     if isinstance(language, str):
         return language
@@ -92,20 +99,11 @@ def _reconcile_selected_questions(
     language: str,
 ) -> List[Dict[str, Any]]:
     """Use the most complete selected_questions source and fill missing tail items."""
-    reconciled = selected_questions
-
-    snapshot_selected_questions = snapshot.get("selected_questions")
-    if (
-        isinstance(snapshot_selected_questions, list)
-        and len(snapshot_selected_questions) > len(reconciled)
-    ):
-        reconciled = snapshot_selected_questions
-
-    if (
-        isinstance(existing_selected_questions, list)
-        and len(existing_selected_questions) > len(reconciled)
-    ):
-        reconciled = existing_selected_questions
+    reconciled = _longest_list(
+        selected_questions,
+        snapshot.get("selected_questions"),
+        existing_selected_questions,
+    )
 
     if reconciled:
         total_questions = get_total_questions(language)
@@ -279,10 +277,15 @@ class MongoSessionManager(SessionStateMixin):
     @staticmethod
     def _doc_to_session(doc: Dict[str, Any]) -> Optional[Session]:
         """Convert MongoDB doc to Session object."""
-        if not doc: return None
+        if not doc:
+            return None
+
         cleaned = dict(doc)
-        for k in ("_id", "expires_at", "created_at", "updated_at"): cleaned.pop(k, None)
-        try: return Session(**cleaned)
+        for key in ("_id", "expires_at", "created_at", "updated_at"):
+            cleaned.pop(key, None)
+
+        try:
+            return Session(**cleaned)
         except Exception as e:
             logger.warning(f"Failed to parse session: {e}")
             return None
