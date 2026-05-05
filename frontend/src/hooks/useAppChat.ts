@@ -38,6 +38,20 @@ function findKnowledgeTarget(targetId: string | null, storeList: Store[]): Knowl
   return buildKnowledgeTargets(storeList).find((target) => target.id === targetId) || null;
 }
 
+export function resolvePersistedKnowledgeTargetId(
+  storeList: Store[],
+  persistedTargetId: string | null,
+): string | null {
+  // Sidebar groups all projects instead of filtering globally, so restore
+  // against the full store list. A stale saved projectFilter must not hide
+  // the user's last selected store on reload.
+  const targets = buildKnowledgeTargets(storeList);
+  if (persistedTargetId && targets.some((target) => target.id === persistedTargetId)) {
+    return persistedTargetId;
+  }
+  return targets[0]?.id ?? null;
+}
+
 function getManagedKnowledgeContext(target: KnowledgeTarget | null): {
   appTarget: AppTarget;
   language: KnowledgeLanguage;
@@ -222,36 +236,32 @@ export function useAppChat() {
 
   const handleRefreshKnowledge = useCallback(async () => {
     const nextStores = await refreshStores();
-    const nextFilteredStores = filterStoresByProject(nextStores, projectFilter);
-    const nextTarget = findKnowledgeTarget(currentTargetId, nextFilteredStores);
+    const nextTarget = findKnowledgeTarget(currentTargetId, nextStores);
     if (nextTarget) {
       await refreshFiles(nextTarget);
       return;
     }
-    const fallbackTarget = buildKnowledgeTargets(nextFilteredStores)[0] || null;
+    const fallbackTarget = buildKnowledgeTargets(nextStores)[0] || null;
     if (fallbackTarget) {
-      await handleStoreChange(fallbackTarget.id, nextFilteredStores);
+      await handleStoreChange(fallbackTarget.id, nextStores);
       await refreshFiles(fallbackTarget);
       return;
     }
     clearSelection();
-  }, [currentTargetId, projectFilter, refreshFiles, refreshStores, stores]);
+  }, [currentTargetId, refreshFiles, refreshStores]);
 
   useEffect(() => {
     const init = async () => {
       const storeList = await refreshStores();
-      const targets = buildKnowledgeTargets(filterStoresByProject(storeList, projectFilter));
       const lastTargetId = localStorage.getItem('lastKnowledgeTargetId') || localStorage.getItem('lastStore');
-      if (lastTargetId && targets.some((target) => target.id === lastTargetId)) {
-        await handleStoreChange(lastTargetId, filterStoresByProject(storeList, projectFilter));
+      const targetId = resolvePersistedKnowledgeTargetId(storeList, lastTargetId);
+      if (targetId) {
+        await handleStoreChange(targetId, storeList);
         return;
-      }
-      if (targets.length > 0) {
-        await handleStoreChange(targets[0].id, filterStoresByProject(storeList, projectFilter));
       }
     };
     void init();
-  }, [projectFilter, refreshStores]);
+  }, [refreshStores]);
 
   useEffect(() => {
     currentTargetIdRef.current = currentTargetId;
@@ -267,7 +277,7 @@ export function useAppChat() {
       return;
     }
     clearSelection(true);
-  }, [projectFilter, stores]);
+  }, [stores]);
 
   useEffect(() => {
     if (currentTarget) {
@@ -307,11 +317,10 @@ export function useAppChat() {
     try {
       await api.deleteStore(storeName);
       const nextStores = await refreshStores();
-      const nextFilteredStores = filterStoresByProject(nextStores, projectFilter);
       if (currentStore === storeName) {
-        const fallbackTarget = buildKnowledgeTargets(nextFilteredStores)[0] || null;
+        const fallbackTarget = buildKnowledgeTargets(nextStores)[0] || null;
         if (fallbackTarget) {
-          await handleStoreChange(fallbackTarget.id, nextFilteredStores);
+          await handleStoreChange(fallbackTarget.id, nextStores);
         } else {
           clearSelection(true);
         }
