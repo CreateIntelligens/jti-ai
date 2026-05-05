@@ -6,6 +6,7 @@ import { getHciotImageUrl, normalizeImageId } from '../../../../utils/hciotImage
 import ExistingImagePicker from '../explorer/ExistingImagePicker';
 import { usePendingImageUrls } from '../imageUpload';
 import type { FileStatus } from '../upload/types';
+import ImageLightbox from '../ImageLightbox';
 
 export interface EditableMergedCsvRow extends HciotMergedCsvRow {
   pendingImageFile?: File | null;
@@ -59,6 +60,7 @@ export default function MergedCsvTable({
 }: MergedCsvTableProps) {
   const pendingUrls = usePendingImageUrls(rows);
   const [pickerIndex, setPickerIndex] = useState<number | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   if (loading) {
     return <div className="hciot-merged-csv-loading">載入整合資料中...</div>;
@@ -102,6 +104,10 @@ export default function MergedCsvTable({
         selectedImageId={pickerIndex === null ? null : (rows[pickerIndex]?.img || null)}
         onClose={() => setPickerIndex(null)}
         onSelect={handleSelectExistingImage}
+      />
+      <ImageLightbox
+        url={previewImageUrl}
+        onClose={() => setPreviewImageUrl(null)}
       />
       <div className="hciot-merged-csv-meta">
         {`已合併 ${sourceFiles.length} 個檔案`}
@@ -152,7 +158,13 @@ export default function MergedCsvTable({
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                             <div className="hciot-merged-csv-img-wrapper edit-mode">
                               {imageUrl && (
-                                <img src={imageUrl} alt={row.img} className="hciot-merged-csv-thumbnail" />
+                                <img 
+                                  src={imageUrl} 
+                                  alt={row.img} 
+                                  className="hciot-merged-csv-thumbnail" 
+                                  style={{ cursor: 'zoom-in' }}
+                                  onClick={() => setPreviewImageUrl(imageUrl)}
+                                />
                               )}
                               {row.imgStatus === 'uploading' ? (
                                 <Loader2 size={14} className="animate-spin" />
@@ -211,6 +223,8 @@ export default function MergedCsvTable({
                             alt={row.img}
                             className="hciot-merged-csv-thumbnail"
                             title={row.img}
+                            style={{ cursor: 'zoom-in' }}
+                            onClick={() => setPreviewImageUrl(imageUrl)}
                             onError={(e) => {
                               (e.target as HTMLImageElement).style.display = 'none';
                               const next = (e.target as HTMLImageElement).nextElementSibling;

@@ -6,6 +6,7 @@ import type { HciotImage } from '../../../../services/api/hciot';
 import { toErrorMessage } from '../../../../utils/errors';
 import { getHciotImageUrl } from '../../../../utils/hciotImage';
 import ExistingImagePicker from '../explorer/ExistingImagePicker';
+import ImageLightbox from '../ImageLightbox';
 import {
   applyExistingRowImage,
   buildCsvBlob,
@@ -45,6 +46,7 @@ interface QaRowItemProps {
   onClearImage: () => void;
   onUploadImage: () => void;
   onChooseExisting: () => void;
+  onPreviewImage: (url: string) => void;
 }
 
 function QaRowItem({
@@ -57,6 +59,7 @@ function QaRowItem({
   onClearImage,
   onUploadImage,
   onChooseExisting,
+  onPreviewImage,
 }: QaRowItemProps) {
   const imageLabel = row.pendingImageName || row.img;
   const hasImage = Boolean(imageLabel);
@@ -83,7 +86,13 @@ function QaRowItem({
             {hasImage && (
               <div className="hciot-qa-image-preview">
                 {previewUrl ? (
-                  <img src={previewUrl} alt={imageLabel} className="hciot-qa-image-thumb" />
+                  <img 
+                    src={previewUrl} 
+                    alt={imageLabel} 
+                    className="hciot-qa-image-thumb" 
+                    style={{ cursor: 'zoom-in' }}
+                    onClick={() => onPreviewImage(previewUrl)}
+                  />
                 ) : (
                   <span className="hciot-qa-image-name" title={imageLabel}>{imageLabel}</span>
                 )}
@@ -149,6 +158,7 @@ export default function QaUploadTab({
   const [uploadingLocal, setUploadingLocal] = useState(false);
   const [pendingRowImageIndex, setPendingRowImageIndex] = useState<number | null>(null);
   const [pickerRowIndex, setPickerRowIndex] = useState<number | null>(null);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const rowImageInputRef = useRef<HTMLInputElement>(null);
   const pendingUrls = usePendingImageUrls(rows);
 
@@ -266,6 +276,11 @@ export default function QaUploadTab({
         }}
       />
 
+      <ImageLightbox
+        url={previewImageUrl}
+        onClose={() => setPreviewImageUrl(null)}
+      />
+
       <div className="hciot-upload-qa-body">
         <div className="hciot-qa-rows custom-scrollbar">
           {rows.map((row, index) => (
@@ -283,6 +298,7 @@ export default function QaUploadTab({
                 rowImageInputRef.current?.click();
               }}
               onChooseExisting={() => setPickerRowIndex(index)}
+              onPreviewImage={setPreviewImageUrl}
             />
           ))}
         </div>
