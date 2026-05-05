@@ -170,20 +170,47 @@ export async function listPrompts(storeName: string): Promise<any> {
   return handleResponse<any>(response);
 }
 
-export async function createPrompt(storeName: string, name: string, content: string): Promise<any> {
+type RuleSectionsByLanguage = Record<string, unknown> | null;
+
+export async function createPrompt(
+  storeName: string,
+  name: string,
+  content: string,
+  responseRuleSections?: RuleSectionsByLanguage,
+  maxResponseChars?: number | null,
+): Promise<any> {
+  const body = {
+    name,
+    content,
+    ...(responseRuleSections !== undefined && { response_rule_sections: responseRuleSections }),
+    ...(maxResponseChars !== undefined && { max_response_chars: maxResponseChars }),
+  };
   const response = await fetchWithApiKey(`${API_BASE}/stores/${storeName}/prompts`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, content }),
+    body: JSON.stringify(body),
   });
   return handleResponse<any>(response);
 }
 
-export async function updatePrompt(storeName: string, promptId: string, name?: string, content?: string): Promise<any> {
+export async function updatePrompt(
+  storeName: string,
+  promptId: string,
+  name?: string,
+  content?: string,
+  responseRuleSections?: RuleSectionsByLanguage,
+  maxResponseChars?: number | null,
+): Promise<any> {
+  const body = {
+    ...(name !== undefined && { name }),
+    ...(content !== undefined && { content }),
+    ...(responseRuleSections !== undefined && { response_rule_sections: responseRuleSections }),
+    ...(maxResponseChars !== undefined && { max_response_chars: maxResponseChars }),
+  };
   const response = await fetchWithApiKey(`${API_BASE}/stores/${storeName}/prompts/${promptId}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name, content }),
+    body: JSON.stringify(body),
   });
   return handleResponse<any>(response);
 }

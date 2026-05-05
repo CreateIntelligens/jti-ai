@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ChevronDown, ChevronRight, X } from 'lucide-react';
 import * as api from '../services/api';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { toErrorMessage } from '../utils/errors';
@@ -13,10 +13,94 @@ interface PromptPanelProps {
   onShowStatus?: (msg: string) => void;
 }
 
+type RuleSectionKey = 'role_scope' | 'scope_limits' | 'response_style' | 'knowledge_rules';
+
+const NEW_PROMPT_ID = '__new__';
+const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
+const RULE_SECTION_KEYS: RuleSectionKey[] = [
+  'role_scope',
+  'scope_limits',
+  'response_style',
+  'knowledge_rules',
+];
+
+const RULE_SECTION_LABELS: Record<RuleSectionKey, string> = {
+  role_scope: '角色與任務',
+  scope_limits: '範圍限制',
+  response_style: '回應風格',
+  knowledge_rules: '知識庫使用規則',
+};
+
+const RULE_SECTION_PLACEHOLDERS: Record<RuleSectionKey, string> = {
+  role_scope: '留空使用預設：根據知識庫內容回答…',
+  scope_limits: '留空使用預設：以知識庫資料為主…',
+  response_style: '留空使用預設：使用繁體中文回覆…',
+  knowledge_rules: '留空使用預設：優先依據知識庫…',
+};
+
+interface RuleSections {
+  role_scope?: string;
+  scope_limits?: string;
+  response_style?: string;
+  knowledge_rules?: string;
+}
+
 interface Prompt {
   id: string;
   name: string;
   content: string;
+  response_rule_sections?: { zh?: RuleSections; en?: RuleSections } | null;
+  max_response_chars?: number | null;
+}
+
+interface DraftState {
+  name: string;
+  content: string;
+  sections: RuleSections;
+  max_response_chars: number;
+}
+
+function makeEmptySections(): RuleSections {
+  return {
+    role_scope: '',
+    scope_limits: '',
+    response_style: '',
+    knowledge_rules: '',
+  };
+}
+
+function makeRuleSections(source: RuleSections = {}): RuleSections {
+  const sections = makeEmptySections();
+  RULE_SECTION_KEYS.forEach((key) => {
+    sections[key] = source[key] ?? '';
+  });
+  return sections;
+}
+
+function makeDraft(prompt: Prompt | null): DraftState {
+  const sections = prompt?.response_rule_sections?.zh || {};
+  return {
+    name: prompt?.name ?? '',
+    content: prompt?.content ?? '',
+    sections: makeRuleSections(sections),
+    max_response_chars: prompt?.max_response_chars ?? 0,
+  };
+}
+
+function isDraftDirty(draft: DraftState, prompt: Prompt | null): boolean {
+  const baseline = makeDraft(prompt);
+  return JSON.stringify(draft) !== JSON.stringify(baseline);
+}
+
+function buildSectionsPayload(draft: DraftState): { zh: RuleSections } | null {
+  const trimmed: RuleSections = {};
+  RULE_SECTION_KEYS.forEach((key) => {
+    const value = (draft.sections[key] || '').trim();
+    if (value) {
+      trimmed[key] = value;
+    }
+  });
+  return Object.keys(trimmed).length > 0 ? { zh: trimmed } : null;
 }
 
 export default function PromptPanel({
@@ -27,36 +111,48 @@ export default function PromptPanel({
   onRestartChat,
   onShowStatus,
 }: PromptPanelProps) {
-  const [promptTab, setPromptTab] = useState<'system' | 'rag' | 'model'>('system');
-
-  // Prompt state
+  const [promptTab, setPromptTab] = useState<'system' | 'model'>('system');
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [activePromptId, setActivePromptId] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [draft, setDraft] = useState<DraftState>(makeDraft(null));
+  const [showSections, setShowSections] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [newPromptName, setNewPromptName] = useState('');
-  const [newPromptContent, setNewPromptContent] = useState('');
-  const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [maxPrompts, setMaxPrompts] = useState(3);
 
-  // Model state
   const [selectedModel, setSelectedModel] = useState(() =>
-    localStorage.getItem('selectedModel') || 'gemini-2.5-flash-lite',
+    localStorage.getItem('selectedModel') || DEFAULT_MODEL,
   );
 
   useEscapeKey(onClose, isOpen);
 
   useEffect(() => {
-    if (isOpen && currentStore) loadPrompts();
+    if (isOpen && currentStore) void loadPrompts();
   }, [isOpen, currentStore]);
+
+  const editingPrompt = prompts.find((p) => p.id === editingId) || null;
+  const isCreatingPrompt = editingId === NEW_PROMPT_ID;
+  const dirty = editingId !== null && isDraftDirty(draft, editingPrompt);
+
+  const resetEditor = () => {
+    setEditingId(null);
+    setDraft(makeDraft(null));
+    setShowSections(false);
+  };
 
   const loadPrompts = async () => {
     if (!currentStore) return;
     setLoading(true);
     try {
       const data = await api.listPrompts(currentStore);
-      setPrompts(data.prompts || []);
-      setActivePromptId(data.active_prompt_id);
+      const next: Prompt[] = data.prompts || [];
+      setPrompts(next);
+      setActivePromptId(data.active_prompt_id ?? null);
       setMaxPrompts(data.max_prompts || 3);
+      if (editingId && !next.some((p) => p.id === editingId)) {
+        resetEditor();
+      }
     } catch (e) {
       console.error('Failed to load prompts:', e);
     } finally {
@@ -64,20 +160,76 @@ export default function PromptPanel({
     }
   };
 
-  const handleCreate = async () => {
-    if (!currentStore || !newPromptContent.trim()) return;
-    setCreating(true);
+  const startEditing = (prompt: Prompt) => {
+    if (dirty && !window.confirm('有未儲存的變更，確定切換？')) return;
+    setEditingId(prompt.id);
+    setDraft(makeDraft(prompt));
+    const hasSections = Boolean(
+      prompt.response_rule_sections?.zh && Object.keys(prompt.response_rule_sections.zh).length,
+    );
+    setShowSections(hasSections);
+  };
+
+  const cancelEditing = () => {
+    if (dirty && !window.confirm('放棄未儲存的變更？')) return;
+    resetEditor();
+  };
+
+  const handleCreateBlank = () => {
+    if (!currentStore || prompts.length >= maxPrompts) return;
+    if (dirty && !window.confirm('放棄未儲存的變更？')) return;
+    setEditingId(NEW_PROMPT_ID);
+    setDraft({
+      name: `Prompt ${prompts.length + 1}`,
+      content: '',
+      sections: makeEmptySections(),
+      max_response_chars: 0,
+    });
+    setShowSections(false);
+  };
+
+  const handleSave = async () => {
+    if (!currentStore) return;
+    if (!draft.content.trim()) {
+      alert('Persona 內容不可為空');
+      return;
+    }
+    setSaving(true);
     try {
-      const name = newPromptName.trim() || `Prompt ${prompts.length + 1}`;
-      await api.createPrompt(currentStore, name, newPromptContent.trim());
-      setNewPromptName('');
-      setNewPromptContent('');
+      const payload = {
+        name: draft.name.trim() || `Prompt ${prompts.length + 1}`,
+        content: draft.content.trim(),
+        response_rule_sections: buildSectionsPayload(draft),
+        max_response_chars: draft.max_response_chars > 0 ? draft.max_response_chars : null,
+      };
+
+      if (isCreatingPrompt) {
+        await api.createPrompt(
+          currentStore,
+          payload.name,
+          payload.content,
+          payload.response_rule_sections,
+          payload.max_response_chars,
+        );
+        onShowStatus?.('✅ Prompt 已建立');
+      } else if (editingId) {
+        await api.updatePrompt(
+          currentStore,
+          editingId,
+          payload.name,
+          payload.content,
+          payload.response_rule_sections,
+          payload.max_response_chars,
+        );
+        onShowStatus?.('✅ Prompt 已更新');
+        if (editingId === activePromptId) await onRestartChat();
+      }
       await loadPrompts();
-      onShowStatus?.('✅ Prompt 已建立');
+      resetEditor();
     } catch (e) {
-      alert('建立失敗: ' + (toErrorMessage(e)));
+      alert('儲存失敗: ' + toErrorMessage(e));
     } finally {
-      setCreating(false);
+      setSaving(false);
     }
   };
 
@@ -87,9 +239,9 @@ export default function PromptPanel({
       await api.setActivePrompt(currentStore, promptId);
       await loadPrompts();
       await onRestartChat();
-      onShowStatus?.('✅ Prompt 已套用');
+      onShowStatus?.(promptId ? '✅ Prompt 已套用' : '✅ 已停用 Prompt');
     } catch (e) {
-      alert('設定失敗: ' + (toErrorMessage(e)));
+      alert('設定失敗: ' + toErrorMessage(e));
     }
   };
 
@@ -97,10 +249,13 @@ export default function PromptPanel({
     if (!currentStore || !confirm('確定要刪除此 Prompt 嗎？')) return;
     try {
       await api.deletePrompt(currentStore, promptId);
+      if (editingId === promptId) {
+        resetEditor();
+      }
       await loadPrompts();
       if (promptId === activePromptId) await onRestartChat();
     } catch (e) {
-      alert('刪除失敗: ' + (toErrorMessage(e)));
+      alert('刪除失敗: ' + toErrorMessage(e));
     }
   };
 
@@ -132,7 +287,7 @@ export default function PromptPanel({
               </div>
 
               <div className="prompt-tab-row">
-                {([['system', '系統 Prompt'], ['rag', 'RAG 指引'], ['model', '模型設定']] as const).map(
+                {([['system', '系統 Prompt'], ['model', '模型設定']] as const).map(
                   ([id, label]) => (
                     <button
                       key={id}
@@ -146,32 +301,57 @@ export default function PromptPanel({
               </div>
 
               {promptTab === 'system' && (
-                <div>
-                  {/* Existing prompts */}
+                <div className="rp-stack">
                   {loading ? (
                     <div className="rp-loading">載入中...</div>
                   ) : (
                     <>
                       {prompts.length > 0 && (
                         <div className="rp-stack">
-                          {prompts.map((p) => (
-                            <div key={p.id} className="key-card key-card-clickable" onClick={() => handleSetActive(p.id)}>
-                              <div className="kc-info flex-1">
-                                <div className="kc-name-row">
-                                  <span className="kc-name">{p.name}</span>
-                                  {p.id === activePromptId && <span className="kc-badge system">使用中</span>}
+                          {prompts.map((p) => {
+                            const isEditing = editingId === p.id;
+                            const isActive = p.id === activePromptId;
+                            return (
+                              <div key={p.id} className={`key-card${isEditing ? ' active' : ''}`}>
+                                <div className="kc-info flex-1">
+                                  <div className="kc-name-row">
+                                    <span className="kc-name">{p.name}</span>
+                                    {isActive && <span className="kc-badge system">使用中</span>}
+                                  </div>
+                                  {!isEditing && (
+                                    <div className="kc-meta kc-meta-pre">
+                                      {p.content.length > 80 ? p.content.slice(0, 80) + '...' : p.content}
+                                    </div>
+                                  )}
                                 </div>
-                                <div className="kc-meta kc-meta-pre">
-                                  {p.content.length > 80 ? p.content.slice(0, 80) + '...' : p.content}
-                                </div>
+                                {!isEditing && (
+                                  <div className="rp-card-actions">
+                                    <button className="btn btn-ghost btn-sm" onClick={() => startEditing(p)}>
+                                      編輯
+                                    </button>
+                                    {!isActive && (
+                                      <button
+                                        className="btn btn-primary btn-sm"
+                                        onClick={() => handleSetActive(p.id)}
+                                      >
+                                        套用
+                                      </button>
+                                    )}
+                                    <button
+                                      className="btn btn-danger btn-sm"
+                                      onClick={() => handleDelete(p.id)}
+                                    >
+                                      刪除
+                                    </button>
+                                  </div>
+                                )}
                               </div>
-                              <button className="btn btn-danger btn-sm shrink-0" onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} >
-                                刪除
-                              </button>
-                            </div>
-                          ))}
+                            );
+                          })}
                           {activePromptId && (
-                            <button className="btn btn-ghost btn-sm self-start" onClick={() => handleSetActive(null)}
+                            <button
+                              className="btn btn-ghost btn-sm self-start"
+                              onClick={() => handleSetActive(null)}
                             >
                               取消使用 Prompt
                             </button>
@@ -179,41 +359,111 @@ export default function PromptPanel({
                         </div>
                       )}
 
-                      {/* Create new */}
-                      {prompts.length < maxPrompts && (
-                        <div className="field">
-                          <label>新增 Prompt</label>
-                          <input
-                            className="input-base"
-                            placeholder="Prompt 名稱（可留空）"
-                            value={newPromptName}
-                            onChange={(e) => setNewPromptName(e.target.value)}
-                          />
-                          <textarea
-                            className="textarea-base"
-                            placeholder="系統角色提示內容..."
-                            value={newPromptContent}
-                            onChange={(e) => setNewPromptContent(e.target.value)}
-                          />
-                          <button className="btn btn-primary btn-sm self-start" onClick={handleCreate} disabled={creating || !newPromptContent.trim()} >
-                            {creating ? '建立中...' : '建立'}
+                      {editingId !== null && (
+                        <div className="rp-edit-card">
+                          <div className="field">
+                            <label>名稱</label>
+                            <input
+                              className="input-base"
+                              placeholder="Prompt 名稱"
+                              value={draft.name}
+                              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                            />
+                          </div>
+
+                          <div className="field">
+                            <label>角色設定 (Persona)</label>
+                            <textarea
+                              className="textarea-base"
+                              placeholder="例：你是一個知識庫問答助手…"
+                              rows={6}
+                              value={draft.content}
+                              onChange={(e) => setDraft({ ...draft, content: e.target.value })}
+                            />
+                          </div>
+
+                          <button
+                            type="button"
+                            className="rp-section-toggle"
+                            onClick={() => setShowSections((s) => !s)}
+                          >
+                            {showSections ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                            進階：分段規則 (留空使用預設)
                           </button>
-                          <span className="field-hint">套用後將在下次對話生效。最多 {maxPrompts} 個。</span>
+
+                          {showSections && (
+                            <div className="rp-stack">
+                              {RULE_SECTION_KEYS.map((key) => (
+                                <div key={key} className="field">
+                                  <label>{RULE_SECTION_LABELS[key]}</label>
+                                  <textarea
+                                    className="textarea-base"
+                                    rows={3}
+                                    placeholder={RULE_SECTION_PLACEHOLDERS[key]}
+                                    value={draft.sections[key] || ''}
+                                    onChange={(e) =>
+                                      setDraft({
+                                        ...draft,
+                                        sections: { ...draft.sections, [key]: e.target.value },
+                                      })
+                                    }
+                                  />
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div className="field">
+                            <label>字數限制（0 = 不限制）</label>
+                            <input
+                              className="input-base"
+                              type="number"
+                              min={0}
+                              max={600}
+                              step={10}
+                              value={draft.max_response_chars}
+                              onChange={(e) =>
+                                setDraft({
+                                  ...draft,
+                                  max_response_chars: Number(e.target.value) || 0,
+                                })
+                              }
+                            />
+                          </div>
+
+                          <div className="rp-card-actions">
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              onClick={cancelEditing}
+                              disabled={saving}
+                            >
+                              取消
+                            </button>
+                            <button
+                              className="btn btn-primary btn-sm"
+                              onClick={handleSave}
+                              disabled={saving || !draft.content.trim() || (!dirty && !isCreatingPrompt)}
+                            >
+                              {saving ? '儲存中...' : '儲存'}
+                            </button>
+                          </div>
                         </div>
                       )}
+
+                      {editingId === null && prompts.length < maxPrompts && (
+                        <button
+                          className="btn btn-primary btn-sm self-start"
+                          onClick={handleCreateBlank}
+                        >
+                          + 新增 Prompt
+                        </button>
+                      )}
+
+                      <span className="field-hint">
+                        最多 {maxPrompts} 個。儲存後若該 Prompt 已啟用，將在下次對話生效。
+                      </span>
                     </>
                   )}
-                </div>
-              )}
-
-              {promptTab === 'rag' && (
-                <div className="field">
-                  <label>RAG 檢索指引</label>
-                  <textarea
-                    className="textarea-base"
-                    defaultValue={'優先從近期上傳的文件中檢索。\n若找不到相關資訊，請明確告知使用者。\n最多引用 3 個來源文件。'}
-                  />
-                  <span className="field-hint">控制 RAG 檢索行為與回答格式。（此功能規劃中）</span>
                 </div>
               )}
 
@@ -232,16 +482,6 @@ export default function PromptPanel({
                       <option value="gemini-2.5-pro">gemini-2.5-pro</option>
                       <option value="gemini-3.1-flash-lite-preview">gemini-3.1-flash-lite (preview)</option>
                     </select>
-                  </div>
-                  <div className="field">
-                    <label>Temperature</label>
-                    <input className="input-base" type="range" min="0" max="1" step="0.1" defaultValue="0.7" />
-                    <span className="field-hint">0 = 穩定，1 = 創意。（此功能規劃中）</span>
-                  </div>
-                  <div className="field">
-                    <label>Distance Threshold（RAG）</label>
-                    <input className="input-base" type="number" min="0" max="1" step="0.01" defaultValue="0.85" />
-                    <span className="field-hint">低於此相似度的文件不會被引用。（此功能規劃中）</span>
                   </div>
                 </div>
               )}

@@ -21,10 +21,18 @@ def log(message: str) -> None:
 
 
 class Prompt(BaseModel):
-    """單個 Prompt 模型"""
+    """單個 Prompt 模型。
+
+    `content` 是 persona 主文（舊欄位保留，向後相容）。
+    分段欄位（response_rule_sections / welcome / max_response_chars）皆為 optional，
+    省略時由 chat pipeline 套用 general 的預設值。
+    """
     id: str = Field(default_factory=lambda: f"prompt_{uuid.uuid4().hex[:8]}")
     name: str
     content: str
+    response_rule_sections: Optional[Dict[str, Dict[str, str]]] = None
+    welcome: Optional[Dict[str, Dict[str, str]]] = None
+    max_response_chars: Optional[int] = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
@@ -123,16 +131,16 @@ class PromptManager:
 
         return self.get_prompt(store_name, store_prompts.active_prompt_id)
 
-    def create_prompt(self, store_name: str, name: str, content: str) -> Prompt:
-        """建立新的 prompt
-
-        Args:
-            store_name: Store 名稱
-            name: Prompt 名稱
-            content: Prompt 內容
-
-        Returns:
-            新建立的 Prompt
+    def create_prompt(
+        self,
+        store_name: str,
+        name: str,
+        content: str,
+        response_rule_sections: Optional[Dict[str, Dict[str, str]]] = None,
+        welcome: Optional[Dict[str, Dict[str, str]]] = None,
+        max_response_chars: Optional[int] = None,
+    ) -> Prompt:
+        """建立新的 prompt（Persona + 可選分段欄位）。
 
         Raises:
             ValueError: 超過最大數量限制
@@ -143,8 +151,13 @@ class PromptManager:
         if len(store_prompts.prompts) >= self.MAX_PROMPTS_PER_STORE:
             raise ValueError(f"每個 Store 最多只能有 {self.MAX_PROMPTS_PER_STORE} 個 Prompts")
 
-        # 建立新 prompt
-        new_prompt = Prompt(name=name, content=content)
+        new_prompt = Prompt(
+            name=name,
+            content=content,
+            response_rule_sections=response_rule_sections,
+            welcome=welcome,
+            max_response_chars=max_response_chars,
+        )
         store_prompts.prompts.append(new_prompt)
 
         # 如果是第一個 prompt，自動設為啟用
@@ -156,18 +169,17 @@ class PromptManager:
 
         return new_prompt
 
-    def update_prompt(self, store_name: str, prompt_id: str, name: Optional[str] = None,
-                     content: Optional[str] = None) -> Prompt:
-        """更新 prompt
-
-        Args:
-            store_name: Store 名稱
-            prompt_id: Prompt ID
-            name: 新名稱（可選）
-            content: 新內容（可選）
-
-        Returns:
-            更新後的 Prompt
+    def update_prompt(
+        self,
+        store_name: str,
+        prompt_id: str,
+        name: Optional[str] = None,
+        content: Optional[str] = None,
+        response_rule_sections: Optional[Dict[str, Dict[str, str]]] = None,
+        welcome: Optional[Dict[str, Dict[str, str]]] = None,
+        max_response_chars: Optional[int] = None,
+    ) -> Prompt:
+        """更新 prompt（任一欄位可選）。
 
         Raises:
             ValueError: Prompt 不存在
@@ -180,6 +192,12 @@ class PromptManager:
                     prompt.name = name
                 if content is not None:
                     prompt.content = content
+                if response_rule_sections is not None:
+                    prompt.response_rule_sections = response_rule_sections
+                if welcome is not None:
+                    prompt.welcome = welcome
+                if max_response_chars is not None:
+                    prompt.max_response_chars = max_response_chars
                 prompt.updated_at = datetime.now(timezone.utc).isoformat()
 
                 store_prompts.prompts[i] = prompt

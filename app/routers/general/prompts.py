@@ -2,7 +2,7 @@
 Prompt Management API Endpoints
 """
 
-from typing import Optional
+from typing import Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
@@ -16,11 +16,17 @@ router = APIRouter(prefix="/api/stores", tags=["Prompt Management"])
 class CreatePromptRequest(BaseModel):
     name: str
     content: str
+    response_rule_sections: Optional[Dict[str, Dict[str, str]]] = None
+    welcome: Optional[Dict[str, Dict[str, str]]] = None
+    max_response_chars: Optional[int] = None
 
 
 class UpdatePromptRequest(BaseModel):
     name: Optional[str] = None
     content: Optional[str] = None
+    response_rule_sections: Optional[Dict[str, Dict[str, str]]] = None
+    welcome: Optional[Dict[str, Dict[str, str]]] = None
+    max_response_chars: Optional[int] = None
 
 
 class SetActivePromptRequest(BaseModel):
@@ -55,7 +61,10 @@ def create_store_prompt(store_name: str, request: CreatePromptRequest, auth: dic
         prompt = deps.prompt_manager.create_prompt(
             store_name=store_name,
             name=request.name,
-            content=request.content
+            content=request.content,
+            response_rule_sections=request.response_rule_sections,
+            welcome=request.welcome,
+            max_response_chars=request.max_response_chars,
         )
         return prompt.model_dump()
     except ValueError as e:
@@ -88,7 +97,10 @@ def update_store_prompt(store_name: str, prompt_id: str, request: UpdatePromptRe
             store_name=store_name,
             prompt_id=prompt_id,
             name=request.name,
-            content=request.content
+            content=request.content,
+            response_rule_sections=request.response_rule_sections,
+            welcome=request.welcome,
+            max_response_chars=request.max_response_chars,
         )
         return prompt.model_dump()
     except ValueError as e:

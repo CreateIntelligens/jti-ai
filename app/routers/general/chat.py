@@ -27,6 +27,11 @@ from app.schemas.chat import (
 from app.models_config import DEFAULT_RAG_MODEL
 from app.utils import build_date_query, export_sessions_by_ids, group_conversations_by_session, group_conversations_as_summary
 import app.deps as deps
+from app.services.general.agent_prompts import (
+    DEFAULT_MAX_RESPONSE_CHARS,
+    DEFAULT_RESPONSE_RULE_SECTIONS,
+    build_system_instruction,
+)
 from app.services.general.main_agent import main_agent
 
 router = APIRouter(prefix="/api/chat", tags=["General Chat"])
@@ -67,7 +72,8 @@ def _resolve_request_store(
     return config.name
 
 
-def _get_system_instruction(store_name: str, auth: dict) -> str | None:
+def _resolve_active_prompt(store_name: str, auth: dict):
+    """Pick the prompt that should drive this chat session."""
     if not deps.prompt_manager:
         return None
 
@@ -75,10 +81,37 @@ def _get_system_instruction(store_name: str, auth: dict) -> str | None:
         prompts = deps.prompt_manager.list_prompts(store_name)
         prompt_index = auth["prompt_index"]
         if 0 <= prompt_index < len(prompts):
-            return prompts[prompt_index].content
+            return prompts[prompt_index]
 
-    active_prompt = deps.prompt_manager.get_active_prompt(store_name)
-    return active_prompt.content if active_prompt else None
+    return deps.prompt_manager.get_active_prompt(store_name)
+
+
+def _compose_prompt_system_instruction(prompt, language: str = "zh") -> str:
+    """Compose a system instruction from a Prompt's persona + optional sections."""
+    sections_by_lang = prompt.response_rule_sections or {}
+    sections = sections_by_lang.get(language) or sections_by_lang.get("zh")
+    if not sections:
+        sections = DEFAULT_RESPONSE_RULE_SECTIONS.get(
+            language, DEFAULT_RESPONSE_RULE_SECTIONS["zh"]
+        )
+    max_chars = (
+        prompt.max_response_chars
+        if prompt.max_response_chars is not None
+        else DEFAULT_MAX_RESPONSE_CHARS
+    )
+    return build_system_instruction(
+        persona=prompt.content,
+        language=language,
+        response_rule_sections=sections,
+        max_response_chars=max_chars,
+    )
+
+
+def _get_system_instruction(store_name: str, auth: dict) -> str | None:
+    prompt = _resolve_active_prompt(store_name, auth)
+    if prompt is None:
+        return None
+    return _compose_prompt_system_instruction(prompt)
 
 
 # === Chat Endpoints ===

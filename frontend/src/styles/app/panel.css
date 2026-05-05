@@ -152,3 +152,22 @@ select.input-base { cursor: pointer; }
   transition: all var(--trans);
 }
 .prompt-tab.active { background: var(--surface); color: var(--primary); box-shadow: var(--shadow-sm); }
+
+/* ── Edit Card (PromptPanel system tab) ── */
+.rp-overlay .rp-edit-card {
+  display: flex; flex-direction: column; gap: .75rem;
+  padding: .875rem; border: 1px solid var(--primary);
+  border-radius: var(--r-md); background: var(--surface);
+}
+.rp-overlay .rp-card-actions {
+  display: flex; gap: .5rem; flex-wrap: wrap; align-items: center;
+}
+.rp-overlay .rp-section-toggle {
+  display: inline-flex; align-items: center; gap: .25rem;
+  background: none; border: none; padding: .25rem 0;
+  font-size: .8125rem; color: var(--text-2); cursor: pointer; align-self: flex-start;
+}
+.rp-overlay .rp-section-toggle:hover { color: var(--primary); }
+.rp-overlay .key-card.active {
+  border-color: var(--primary); background: var(--primary-lt);
+}
