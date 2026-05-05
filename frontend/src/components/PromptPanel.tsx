@@ -51,7 +51,12 @@ interface Prompt {
   content: string;
   response_rule_sections?: { zh?: RuleSections; en?: RuleSections } | null;
   max_response_chars?: number | null;
+  is_default?: boolean;
+  readonly?: boolean;
+  is_active?: boolean;
 }
+
+const SYSTEM_DEFAULT_PROMPT_ID = 'system_default';
 
 interface DraftState {
   name: string;
@@ -175,17 +180,33 @@ export default function PromptPanel({
     resetEditor();
   };
 
+  const customPrompts = prompts.filter((p) => !p.readonly && p.id !== SYSTEM_DEFAULT_PROMPT_ID);
+
   const handleCreateBlank = () => {
-    if (!currentStore || prompts.length >= maxPrompts) return;
+    if (!currentStore || customPrompts.length >= maxPrompts) return;
     if (dirty && !window.confirm('放棄未儲存的變更？')) return;
     setEditingId(NEW_PROMPT_ID);
     setDraft({
-      name: `Prompt ${prompts.length + 1}`,
+      name: `Prompt ${customPrompts.length + 1}`,
       content: '',
       sections: makeEmptySections(),
       max_response_chars: 0,
     });
     setShowSections(false);
+  };
+
+  const duplicateFromDefault = (source: Prompt) => {
+    if (!currentStore || customPrompts.length >= maxPrompts) return;
+    if (dirty && !window.confirm('放棄未儲存的變更？')) return;
+    const sections = source.response_rule_sections?.zh || {};
+    setEditingId(NEW_PROMPT_ID);
+    setDraft({
+      name: `自訂 ${customPrompts.length + 1}`,
+      content: source.content || '',
+      sections: makeRuleSections(sections),
+      max_response_chars: source.max_response_chars ?? 0,
+    });
+    setShowSections(Object.keys(sections).length > 0);
   };
 
   const handleSave = async () => {
@@ -197,7 +218,7 @@ export default function PromptPanel({
     setSaving(true);
     try {
       const payload = {
-        name: draft.name.trim() || `Prompt ${prompts.length + 1}`,
+        name: draft.name.trim() || `Prompt ${customPrompts.length + 1}`,
         content: draft.content.trim(),
         response_rule_sections: buildSectionsPayload(draft),
         max_response_chars: draft.max_response_chars > 0 ? draft.max_response_chars : null,
@@ -310,12 +331,16 @@ export default function PromptPanel({
                         <div className="rp-stack">
                           {prompts.map((p) => {
                             const isEditing = editingId === p.id;
-                            const isActive = p.id === activePromptId;
+                            const isReadonly = p.readonly === true || p.id === SYSTEM_DEFAULT_PROMPT_ID;
+                            const isActive = isReadonly
+                              ? activePromptId === null
+                              : p.id === activePromptId;
                             return (
                               <div key={p.id} className={`key-card${isEditing ? ' active' : ''}`}>
                                 <div className="kc-info flex-1">
                                   <div className="kc-name-row">
                                     <span className="kc-name">{p.name}</span>
+                                    {isReadonly && <span className="kc-badge">系統預設</span>}
                                     {isActive && <span className="kc-badge system">使用中</span>}
                                   </div>
                                   {!isEditing && (
@@ -326,36 +351,45 @@ export default function PromptPanel({
                                 </div>
                                 {!isEditing && (
                                   <div className="rp-card-actions">
-                                    <button className="btn btn-ghost btn-sm" onClick={() => startEditing(p)}>
-                                      編輯
-                                    </button>
+                                    {isReadonly ? (
+                                      <button
+                                        className="btn btn-ghost btn-sm"
+                                        onClick={() => duplicateFromDefault(p)}
+                                        disabled={customPrompts.length >= maxPrompts}
+                                        title={
+                                          customPrompts.length >= maxPrompts
+                                            ? `已達 ${maxPrompts} 個自訂 Prompt 上限`
+                                            : '複製預設內容並開始編輯'
+                                        }
+                                      >
+                                        複製為自訂
+                                      </button>
+                                    ) : (
+                                      <button className="btn btn-ghost btn-sm" onClick={() => startEditing(p)}>
+                                        編輯
+                                      </button>
+                                    )}
                                     {!isActive && (
                                       <button
                                         className="btn btn-primary btn-sm"
-                                        onClick={() => handleSetActive(p.id)}
+                                        onClick={() => handleSetActive(isReadonly ? null : p.id)}
                                       >
                                         套用
                                       </button>
                                     )}
-                                    <button
-                                      className="btn btn-danger btn-sm"
-                                      onClick={() => handleDelete(p.id)}
-                                    >
-                                      刪除
-                                    </button>
+                                    {!isReadonly && (
+                                      <button
+                                        className="btn btn-danger btn-sm"
+                                        onClick={() => handleDelete(p.id)}
+                                      >
+                                        刪除
+                                      </button>
+                                    )}
                                   </div>
                                 )}
                               </div>
                             );
                           })}
-                          {activePromptId && (
-                            <button
-                              className="btn btn-ghost btn-sm self-start"
-                              onClick={() => handleSetActive(null)}
-                            >
-                              取消使用 Prompt
-                            </button>
-                          )}
                         </div>
                       )}
 
@@ -450,7 +484,7 @@ export default function PromptPanel({
                         </div>
                       )}
 
-                      {editingId === null && prompts.length < maxPrompts && (
+                      {editingId === null && customPrompts.length < maxPrompts && (
                         <button
                           className="btn btn-primary btn-sm self-start"
                           onClick={handleCreateBlank}
