@@ -17,9 +17,15 @@ _SUPPORTED_KNOWLEDGE_EXTENSIONS = (".csv", ".txt", ".md", ".docx")
 
 class BackfillService:
     """Handles incremental document indexing into the local vector store."""
-    
+
+    # SemanticChunker tuning. Only applies to free-form text (.txt/.md/.docx).
+    # JTI/HCIoT use CSV files which go through _chunk_csv_by_row instead, so
+    # this never touches their chunking.
+    _CHUNK_SIZE_TOKENS = 200
+    _CHUNK_OVERLAP_TOKENS = 30
+
     def __init__(self):
-        self._chunker = None
+        self._chunker: Optional[SemanticChunker] = None
         self._embedding_service = None
         self._lancedb_store = None
         self._mongodb_backup = None
@@ -27,7 +33,10 @@ class BackfillService:
     @property
     def chunker(self) -> SemanticChunker:
         if self._chunker is None:
-            self._chunker = SemanticChunker()
+            self._chunker = SemanticChunker(
+                chunk_size_tokens=self._CHUNK_SIZE_TOKENS,
+                chunk_overlap_tokens=self._CHUNK_OVERLAP_TOKENS,
+            )
         return self._chunker
 
     @property

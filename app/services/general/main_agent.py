@@ -92,6 +92,18 @@ class MainAgent(BaseAgent):
             return f"{managed_app}_knowledge"
         return "general_knowledge"
 
+    def _get_rag_search_language_for_session(self, session: Session) -> str | None:
+        """Override: dynamic stores key RAG entries by store_name (not zh/en).
+
+        When the session is bound to a managed app (JTI/HCIoT), defer to
+        managed_language so we hit the same index they wrote.
+        """
+        managed_app = session.metadata.get("managed_app")
+        if managed_app:
+            managed_lang = session.metadata.get("managed_language")
+            return normalize_language(managed_lang) if managed_lang else None
+        return session.metadata.get("store_name")
+
     @property
     def _rag_source_type(self) -> str:
         return "general_knowledge"

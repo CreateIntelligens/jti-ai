@@ -100,6 +100,15 @@ class BaseAgent:
         """Language to use for RAG search (None means use session.language). 子類可覆寫。"""
         return None
 
+    def _get_rag_search_language_for_session(self, session: Session) -> str | None:
+        """Session-aware variant of `_rag_search_language`.
+
+        Default: use the static property. Override in subclasses where the
+        language axis used for RAG storage is dynamic (e.g. GeneralAgent
+        stores per-store under language=store_name).
+        """
+        return self._rag_search_language
+
     @property
     def _rag_tool_declaration(self) -> types.Tool | None:
         """Return the RAG tool declaration for this agent, or None if RAG tool is not used."""
@@ -387,9 +396,14 @@ class BaseAgent:
         loop = asyncio.get_running_loop()
         pipeline = get_rag_pipeline()
         
-        # Use _rag_search_language if defined, otherwise session.language
-        search_lang = self._rag_search_language or session.language
-        search_lang = normalize_language(search_lang)
+        # Resolve the language axis used for RAG retrieval. When a subclass
+        # overrides this with a non-None value, take it as the storage key
+        # verbatim (GeneralAgent stores per-store under language=store_name);
+        # otherwise normalize the session language to "zh"/"en".
+        search_lang = (
+            self._get_rag_search_language_for_session(session)
+            or normalize_language(session.language)
+        )
         rag_source_type = self._get_rag_source_type_for_session(session)
 
         ai_future = loop.run_in_executor(
