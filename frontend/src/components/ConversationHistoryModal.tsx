@@ -19,6 +19,7 @@ import {
 import { deleteConversations, fetchAsAdmin, fetchWithApiKey, getGeneralConversationDetail, getHciotConversationDetail } from '../services/api';
 import MiniCalendar from './MiniCalendar';
 import HciotImageAttachment from './hciot/HciotImageAttachment';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface ConversationEntry {
   _id: string;
@@ -230,29 +231,21 @@ export default function ConversationHistoryModal({
     fetchConversations();
   }, [isOpen, sessionId, storeName, mode, activeDateFrom, activeDateTo]);
 
+  useEscapeKey(() => {
+    if (openCal) { setOpenCal(null); return; }
+    onClose();
+  }, isOpen);
+
   useEffect(() => {
     if (!isOpen) return;
-
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (openCal) { setOpenCal(null); return; }
-        onClose();
-      }
-    };
-
     const handleClickOutside = (e: MouseEvent) => {
       if (openCal && !(e.target as HTMLElement).closest('.date-picker-anchor')) {
         setOpenCal(null);
       }
     };
-
-    window.addEventListener('keydown', handleEscape);
     document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      window.removeEventListener('keydown', handleEscape);
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isOpen, onClose, openCal]);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen, openCal]);
 
   useEffect(() => {
     const query = searchQuery.trim().toLowerCase();

@@ -8,6 +8,7 @@ import { downloadBlob } from '../../../../utils/download';
 import { extractUploadedImageId, rollbackUploadedImages, type DeleteImageHandler, type UploadedImageResult } from '../imageUpload';
 import { getErrorMessage } from '../topicUtils';
 import MergedCsvTable, { type EditableMergedCsvRow } from './MergedCsvTable';
+import { useEscapeKey } from '../../../../hooks/useEscapeKey';
 
 interface MergedCsvPaneProps {
   topicId: string;
@@ -62,10 +63,12 @@ export default function MergedCsvPane({
 
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
   const applyMergedCsvResponse = useCallback((response: { rows: EditableMergedCsvRow[]; source_files: string[] }) => {
     setRows(response.rows);
     setSourceFiles(response.source_files);
+    setDirty(false);
     setError(null);
   }, []);
 
@@ -80,6 +83,14 @@ export default function MergedCsvPane({
       setLoading(false);
     }
   }, [applyMergedCsvResponse, language, topicId]);
+
+  const handleCancelEdit = useCallback(() => {
+    if (dirty && !window.confirm('有未儲存的變更，確定要取消嗎？')) {
+      return;
+    }
+    setIsEditing(false);
+    void fetchCsv();
+  }, [dirty, fetchCsv]);
 
   useEffect(() => {
     setIsEditing(false);
@@ -101,19 +112,7 @@ export default function MergedCsvPane({
     return () => { active = false; };
   }, [applyMergedCsvResponse, topicId, language]);
 
-  useEffect(() => {
-    if (!isEditing) return;
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        setIsEditing(false);
-        fetchCsv(); // revert modifications
-      }
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [fetchCsv, isEditing]);
+  useEscapeKey(handleCancelEdit, isEditing);
 
   const handleSave = async () => {
     if (!sourceFiles.length) return;
@@ -201,10 +200,12 @@ export default function MergedCsvPane({
 
   const handleUpdateRow = (index: number, updated: Partial<EditableMergedCsvRow>) => {
     setRows(prev => prev.map((r, i) => i === index ? { ...r, ...updated } : r));
+    setDirty(true);
   };
 
   const handleDeleteRow = (index: number) => {
     setRows(prev => prev.filter((_, i) => i !== index));
+    setDirty(true);
   };
 
   const handleAddRow = () => {
@@ -212,6 +213,7 @@ export default function MergedCsvPane({
       ...prev,
       { index: String(prev.length + 1), q: '', a: '', img: '', url: '' }
     ]);
+    setDirty(true);
   };
 
   const handleDownload = () => {
@@ -237,10 +239,7 @@ export default function MergedCsvPane({
               <button
                 type="button"
                 className="hciot-file-action-button"
-                onClick={() => {
-                  setIsEditing(false);
-                  void fetchCsv(); // revert modifications
-                }}
+                onClick={handleCancelEdit}
                 disabled={saving}
               >
                 <X size={15} />

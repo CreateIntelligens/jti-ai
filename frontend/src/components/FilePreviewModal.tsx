@@ -8,6 +8,7 @@ import {
 } from '../services/api';
 import type { AppTarget, FileItem, KnowledgeLanguage, Store } from '../types';
 import { toErrorMessage } from '../utils/errors';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface FilePreviewModalProps {
   isOpen: boolean;
@@ -82,19 +83,12 @@ export default function FilePreviewModal({
     return () => { cancelled = true; };
   }, [isOpen, store, file]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        if (dirty) {
-          if (!window.confirm('有未儲存的變更，確定關閉？')) return;
-        }
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [isOpen, dirty, onClose]);
+  useEscapeKey(() => {
+    if (dirty) {
+      if (!window.confirm('有未儲存的變更，確定關閉？')) return;
+    }
+    onClose();
+  }, isOpen);
 
   if (!isOpen || !store || !file) return null;
 

@@ -6,6 +6,7 @@ import { useTransientStatus } from '../hooks/useTransientStatus';
 import * as api from '../services/api';
 import { toErrorMessage } from '../utils/errors';
 import JtiPersonaTab from './jti/JtiPersonaTab';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface Prompt {
   id: string;
@@ -110,30 +111,19 @@ export default function HciotSettingsModal({
     void init();
   }, [isOpen, normalizedLanguage]);
 
-  useEffect(() => {
-    const handleEsc = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || !isOpen) {
-        return;
-      }
-
-      if (confirmDeleteId) {
-        setConfirmDeleteId(null);
-        return;
-      }
-
-      if (editingId) {
-        setEditingId(null);
-        setEditName('');
-        setEditContent('');
-        return;
-      }
-
-      onClose();
-    };
-
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [confirmDeleteId, editingId, isOpen, onClose]);
+  useEscapeKey(() => {
+    if (confirmDeleteId) {
+      setConfirmDeleteId(null);
+      return;
+    }
+    if (editingId) {
+      setEditingId(null);
+      setEditName('');
+      setEditContent('');
+      return;
+    }
+    onClose();
+  }, isOpen);
 
   const handleSelectRuntimePrompt = async (promptId: string) => {
     if (promptId === SYSTEM_DEFAULT_ID) {

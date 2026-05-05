@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import * as api from '../services/api';
 import { useTransientStatus } from '../hooks/useTransientStatus';
 import { toErrorMessage } from '../utils/errors';
+import { useEscapeKey } from '../hooks/useEscapeKey';
 import JtiPersonaTab from './jti/JtiPersonaTab';
 import JtiKnowledgeTab from './jti/JtiKnowledgeTab';
 import JtiQuizTab from './jti/JtiQuizTab';
@@ -78,25 +79,23 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
     }
   }, [isOpen, activeTab, normalizedLanguage]);
 
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isOpen) {
-        if (confirmDeleteId || confirmDeleteFile) {
-          setConfirmDeleteId(null);
-          setConfirmDeleteFile(null);
-        } else if (viewingFile) {
-          if (isEditing) handleCancelFileEdit();
-          else closeViewer();
-        } else if (editingId) {
-          cancelEdit();
-        } else {
-          onClose();
-        }
-      }
-    };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [isOpen, onClose, editingId, confirmDeleteId, confirmDeleteFile, viewingFile, isEditing]);
+  useEscapeKey(() => {
+    if (confirmDeleteId || confirmDeleteFile) {
+      setConfirmDeleteId(null);
+      setConfirmDeleteFile(null);
+      return;
+    }
+    if (viewingFile) {
+      if (isEditing) handleCancelFileEdit();
+      else closeViewer();
+      return;
+    }
+    if (editingId) {
+      cancelEdit();
+      return;
+    }
+    onClose();
+  }, isOpen);
 
   // === Prompt handlers ===
   const loadPrompts = async (): Promise<string | null> => {
