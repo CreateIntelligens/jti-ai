@@ -7,6 +7,7 @@ import ExistingImagePicker from '../explorer/ExistingImagePicker';
 import { usePendingImageUrls } from '../imageUpload';
 import type { FileStatus } from '../upload/types';
 import ImageLightbox from '../ImageLightbox';
+import ZoomableThumbnail from '../ZoomableThumbnail';
 
 export interface EditableMergedCsvRow extends HciotMergedCsvRow {
   pendingImageFile?: File | null;
@@ -158,12 +159,11 @@ export default function MergedCsvTable({
                           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                             <div className="hciot-merged-csv-img-wrapper edit-mode">
                               {imageUrl && (
-                                <img 
-                                  src={imageUrl} 
-                                  alt={row.img} 
-                                  className="hciot-merged-csv-thumbnail" 
-                                  style={{ cursor: 'zoom-in' }}
-                                  onClick={() => setPreviewImageUrl(imageUrl)}
+                                <ZoomableThumbnail
+                                  src={imageUrl}
+                                  alt={row.img}
+                                  className="hciot-merged-csv-thumbnail"
+                                  onZoom={setPreviewImageUrl}
                                 />
                               )}
                               {row.imgStatus === 'uploading' ? (
@@ -218,13 +218,12 @@ export default function MergedCsvTable({
                     ) : row.img ? (
                       <div className="hciot-merged-csv-img-wrapper">
                         {imageUrl && (
-                          <img
+                          <ZoomableThumbnail
                             src={imageUrl}
                             alt={row.img}
                             className="hciot-merged-csv-thumbnail"
                             title={row.img}
-                            style={{ cursor: 'zoom-in' }}
-                            onClick={() => setPreviewImageUrl(imageUrl)}
+                            onZoom={setPreviewImageUrl}
                             onError={(e) => {
                               (e.target as HTMLImageElement).style.display = 'none';
                               const next = (e.target as HTMLImageElement).nextElementSibling;

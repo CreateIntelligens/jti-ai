@@ -9,6 +9,7 @@ import { extractUploadedImageId, rollbackUploadedImages, type DeleteImageHandler
 import { getErrorMessage } from '../topicUtils';
 import MergedCsvTable, { type EditableMergedCsvRow } from './MergedCsvTable';
 import { useEscapeKey } from '../../../../hooks/useEscapeKey';
+import { confirmDiscard } from '../../../../utils/confirmDiscard';
 
 interface MergedCsvPaneProps {
   topicId: string;
@@ -85,7 +86,7 @@ export default function MergedCsvPane({
   }, [applyMergedCsvResponse, language, topicId]);
 
   const handleCancelEdit = useCallback(() => {
-    if (dirty && !window.confirm('有未儲存的變更，確定要取消嗎？')) {
+    if (dirty && !confirmDiscard('cancel')) {
       return;
     }
     setIsEditing(false);

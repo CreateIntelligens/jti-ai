@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, X } from 'lucide-react';
 import * as api from '../services/api';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { toErrorMessage } from '../utils/errors';
+import { confirmDiscard } from '../utils/confirmDiscard';
 
 interface PromptPanelProps {
   isOpen: boolean;
@@ -166,7 +167,7 @@ export default function PromptPanel({
   };
 
   const startEditing = (prompt: Prompt) => {
-    if (dirty && !window.confirm('有未儲存的變更，確定切換？')) return;
+    if (dirty && !confirmDiscard('switch')) return;
     setEditingId(prompt.id);
     setDraft(makeDraft(prompt));
     const hasSections = Boolean(
@@ -176,7 +177,7 @@ export default function PromptPanel({
   };
 
   const cancelEditing = () => {
-    if (dirty && !window.confirm('放棄未儲存的變更？')) return;
+    if (dirty && !confirmDiscard('discard')) return;
     resetEditor();
   };
 
@@ -184,7 +185,7 @@ export default function PromptPanel({
 
   const handleCreateBlank = () => {
     if (!currentStore || customPrompts.length >= maxPrompts) return;
-    if (dirty && !window.confirm('放棄未儲存的變更？')) return;
+    if (dirty && !confirmDiscard('discard')) return;
     setEditingId(NEW_PROMPT_ID);
     setDraft({
       name: `Prompt ${customPrompts.length + 1}`,
@@ -197,7 +198,7 @@ export default function PromptPanel({
 
   const duplicateFromDefault = (source: Prompt) => {
     if (!currentStore || customPrompts.length >= maxPrompts) return;
-    if (dirty && !window.confirm('放棄未儲存的變更？')) return;
+    if (dirty && !confirmDiscard('discard')) return;
     const sections = source.response_rule_sections?.zh || {};
     setEditingId(NEW_PROMPT_ID);
     setDraft({

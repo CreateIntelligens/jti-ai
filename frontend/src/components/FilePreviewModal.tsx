@@ -8,6 +8,7 @@ import {
 } from '../services/api';
 import type { AppTarget, FileItem, KnowledgeLanguage, Store } from '../types';
 import { toErrorMessage } from '../utils/errors';
+import { confirmDiscard } from '../utils/confirmDiscard';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 
 interface FilePreviewModalProps {
@@ -84,9 +85,7 @@ export default function FilePreviewModal({
   }, [isOpen, store, file]);
 
   useEscapeKey(() => {
-    if (dirty) {
-      if (!window.confirm('有未儲存的變更，確定關閉？')) return;
-    }
+    if (dirty && !confirmDiscard('close')) return;
     onClose();
   }, isOpen);
 
@@ -118,7 +117,7 @@ export default function FilePreviewModal({
   };
 
   const requestClose = () => {
-    if (dirty && !window.confirm('有未儲存的變更，確定關閉？')) return;
+    if (dirty && !confirmDiscard('close')) return;
     onClose();
   };
 

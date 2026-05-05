@@ -7,6 +7,7 @@ import { toErrorMessage } from '../../../../utils/errors';
 import { getHciotImageUrl } from '../../../../utils/hciotImage';
 import ExistingImagePicker from '../explorer/ExistingImagePicker';
 import ImageLightbox from '../ImageLightbox';
+import ZoomableThumbnail from '../ZoomableThumbnail';
 import {
   applyExistingRowImage,
   buildCsvBlob,
@@ -86,12 +87,11 @@ function QaRowItem({
             {hasImage && (
               <div className="hciot-qa-image-preview">
                 {previewUrl ? (
-                  <img 
-                    src={previewUrl} 
-                    alt={imageLabel} 
-                    className="hciot-qa-image-thumb" 
-                    style={{ cursor: 'zoom-in' }}
-                    onClick={() => onPreviewImage(previewUrl)}
+                  <ZoomableThumbnail
+                    src={previewUrl}
+                    alt={imageLabel}
+                    className="hciot-qa-image-thumb"
+                    onZoom={onPreviewImage}
                   />
                 ) : (
                   <span className="hciot-qa-image-name" title={imageLabel}>{imageLabel}</span>
