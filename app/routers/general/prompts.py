@@ -1,5 +1,11 @@
 """
 Prompt Management API Endpoints
+
+主頁的 Prompt 管理：
+- DB 只存使用者自訂的 prompts（使用 prompts[] 陣列）。
+- 沒有自訂 prompt 時列表為空，後端 chat pipeline 用 code 裡的 PERSONA fallback。
+- 此模組「不」讀取 JTI/HCIoT 抽出去的 persona/runtime 設定（`jti_profiles_by_prompt`、
+  `hciot_persona_by_prompt` 等），保持兩邊獨立。
 """
 
 from typing import Dict, Optional
@@ -35,18 +41,27 @@ class SetActivePromptRequest(BaseModel):
 
 @router.get("/{store_name:path}/prompts")
 def list_store_prompts(store_name: str, auth: dict = Depends(verify_auth)):
-    """列出 Store 的所有 Prompts（Admin only）"""
+    """列出 Store 的所有 Prompts（Admin only）。
+
+    只回傳使用者自訂的 prompts。沒建任何 prompt 時列表為空。
+    """
     require_admin(auth)
     if not deps.prompt_manager:
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
 
-    prompts = deps.prompt_manager.list_prompts(store_name)
+    custom_prompts = [p.model_dump() for p in deps.prompt_manager.list_prompts(store_name)]
     active_prompt = deps.prompt_manager.get_active_prompt(store_name)
+    active_prompt_id = active_prompt.id if active_prompt else None
+
+    for p in custom_prompts:
+        p["is_default"] = False
+        p["readonly"] = False
+        p["is_active"] = p["id"] == active_prompt_id
 
     return {
-        "prompts": [p.model_dump() for p in prompts],
-        "active_prompt_id": active_prompt.id if active_prompt else None,
-        "max_prompts": deps.prompt_manager.MAX_PROMPTS_PER_STORE
+        "prompts": custom_prompts,
+        "active_prompt_id": active_prompt_id,
+        "max_prompts": deps.prompt_manager.MAX_PROMPTS_PER_STORE,
     }
 
 
@@ -132,9 +147,8 @@ def set_active_store_prompt(store_name: str, request: SetActivePromptRequest, au
         if request.prompt_id:
             deps.prompt_manager.set_active_prompt(store_name, request.prompt_id)
             return {"message": "已設定啟用的 Prompt", "prompt_id": request.prompt_id}
-        else:
-            deps.prompt_manager.clear_active_prompt(store_name)
-            return {"message": "已取消啟用 Prompt", "prompt_id": None}
+        deps.prompt_manager.clear_active_prompt(store_name)
+        return {"message": "已清除啟用的 Prompt", "prompt_id": None}
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
 
