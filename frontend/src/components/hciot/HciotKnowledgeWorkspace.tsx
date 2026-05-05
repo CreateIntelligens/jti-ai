@@ -11,6 +11,7 @@ import ImageDetailPane from './knowledgeWorkspace/detail/ImageDetailPane';
 import { NEW_VALUE, buildLabels, buildCategoryOptions, buildTopicOptions, createEmptyDraft, draftFromFile, getErrorMessage, getMetadataPayload, slugify, type FileMetadataDraft, type TopicLabels } from './knowledgeWorkspace/topicUtils';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { buildExplorerTree, filterExplorerNodes, flattenExplorerNodes, getCurrentPathLabel, readExpandedKeys, writeExpandedKeys } from './knowledgeWorkspace/explorer/explorerTree';
+import reindexRag from '../../services/api/general';
 
 interface HciotKnowledgeWorkspaceProps {
   active: boolean;
@@ -59,6 +60,7 @@ export default function HciotKnowledgeWorkspace({
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [draft, setDraft] = useState<FileMetadataDraft>(createEmptyDraft());
   const [qaDialogOpen, setQaDialogOpen] = useState(false);
+  const [reindexing, setReindexing] = useState(false);
 
   const deferredSearchQuery = useDeferredValue(searchQuery.trim().toLowerCase());
   const text = (zh: string, en: string) => getLocalizedText(language, zh, en);
@@ -172,6 +174,29 @@ export default function HciotKnowledgeWorkspace({
       showStatus(text('載入檔案管理失敗', 'Failed to load file workspace'));
     } finally {
       setLoadingWorkspace(false);
+    }
+  };
+
+  const handleReindex = async () => {
+    if (reindexing) return;
+    if (!window.confirm(text(
+      '確定要重新索引嗎？這將會暫停服務約 1 分鐘。',
+      'Are you sure you want to reindex? This will pause service for about 1 minute.',
+    ))) {
+      return;
+    }
+
+    setReindexing(true);
+    try {
+      await reindexRag('hciot');
+      showStatus(text('重新索引已開始', 'Reindexing started'));
+    } catch (error) {
+      console.error('Failed to reindex HCIoT RAG:', error);
+      alert(getErrorMessage(error));
+    } finally {
+      // Reindexing is background task, we just unlock the button after a while
+      // or let it stay disabled for a bit.
+      window.setTimeout(() => setReindexing(false), 5000);
     }
   };
 
@@ -706,6 +731,8 @@ export default function HciotKnowledgeWorkspace({
         onSelectMergedCsv={handleSelectMergedCsv}
         onOpenUploadDialog={() => setQaDialogOpen(true)}
         onDeleteTopic={handleDeleteTopic}
+        onReindex={handleReindex}
+        reindexing={reindexing}
       />
 
       <UploadDialog

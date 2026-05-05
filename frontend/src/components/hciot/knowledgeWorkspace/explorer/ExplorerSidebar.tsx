@@ -10,6 +10,7 @@ import {
   Trash2,
   Image as ImageIcon,
   Table as TableIcon,
+  RefreshCw,
 } from 'lucide-react';
 
 import type { ExplorerNode, ExplorerRow } from './explorerTree';
@@ -35,6 +36,8 @@ interface ExplorerSidebarProps {
   onSelectMergedCsv: (topicId: string) => void;
   onOpenUploadDialog: () => void;
   onDeleteTopic?: (topicId: string, topicLabel: string) => void;
+  onReindex?: () => void;
+  reindexing?: boolean;
 }
 
 function getDeletableTopicId(node: ExplorerNode): string | null {
@@ -92,6 +95,8 @@ export default function ExplorerSidebar({
   onSelectMergedCsv,
   onOpenUploadDialog,
   onDeleteTopic,
+  onReindex,
+  reindexing,
 }: ExplorerSidebarProps) {
   return (
     <aside
@@ -120,6 +125,19 @@ export default function ExplorerSidebar({
           >
             <Plus size={16} />
           </button>
+
+          {onReindex && (
+            <button
+              type="button"
+              className={`hciot-explorer-icon-button reindex${reindexing ? ' is-loading' : ''}`}
+              onClick={onReindex}
+              disabled={reindexing}
+              title="重新索引 RAG (暫停約 1 分鐘)"
+              aria-label="重新索引 RAG"
+            >
+              <RefreshCw size={16} className={reindexing ? 'animate-spin' : ''} />
+            </button>
+          )}
 
         </div>
       </div>

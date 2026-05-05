@@ -135,6 +135,10 @@ body::before {
   }
 }
 
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
 @keyframes overlayFade {
   from {
     opacity: 0;
