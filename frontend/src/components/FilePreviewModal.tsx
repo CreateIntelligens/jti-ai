@@ -144,7 +144,7 @@ export default function FilePreviewModal({
               {data && !data.editable && data.message ? ` · ${data.message}` : null}
             </div>
           </div>
-          <button className="icon-btn" onClick={requestClose} title="關閉">
+          <button className="fpm-close" onClick={requestClose} title="關閉" aria-label="關閉">
             <X size={18} />
           </button>
         </div>
@@ -170,31 +170,45 @@ export default function FilePreviewModal({
           )}
         </div>
 
-        <div className="modal-actions">
-          {data?.editable && (
+        <div className="fpm-actions">
+          <div className="fpm-actions-left">
+            {data?.editable && (
+              <button
+                type="button"
+                className="fpm-btn fpm-btn-quiet"
+                onClick={() => {
+                  setDraft(data.content ?? '');
+                  setDirty(false);
+                }}
+                disabled={!dirty || saving}
+              >
+                還原
+              </button>
+            )}
+          </div>
+          <div className="fpm-actions-right">
             <button
-              className="btn btn-ghost"
-              onClick={() => {
-                setDraft(data.content ?? '');
-                setDirty(false);
-              }}
-              disabled={!dirty || saving}
+              type="button"
+              className="fpm-btn fpm-btn-ghost"
+              onClick={requestClose}
+              disabled={saving}
             >
-              還原
+              關閉
             </button>
-          )}
-          <button className="btn btn-ghost" onClick={requestClose} disabled={saving}>
-            關閉
-          </button>
-          {data?.editable && (
-            <button
-              className="btn btn-primary"
-              onClick={handleSave}
-              disabled={saving || !dirty}
-            >
-              {saving ? '儲存中…' : '儲存並重新索引'}
-            </button>
-          )}
+            {data?.editable && (
+              <button
+                type="button"
+                className="fpm-btn fpm-btn-primary"
+                onClick={handleSave}
+                disabled={saving || !dirty}
+              >
+                <span className="fpm-btn-label">
+                  {saving ? '儲存中' : '儲存並重新索引'}
+                </span>
+                {saving && <span className="fpm-btn-dots" aria-hidden="true" />}
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>

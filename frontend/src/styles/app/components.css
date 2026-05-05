@@ -437,6 +437,42 @@
   margin-bottom: 1rem;
 }
 
+.overlay .file-preview-modal .fpm-close,
+.overlay button.fpm-close {
+  border: none !important;
+  background: none !important;
+  padding: 0.25rem !important;
+  margin: -0.25rem !important;
+  width: auto !important;
+  height: auto !important;
+  color: rgba(255, 255, 255, 0.75) !important;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  font-weight: 400 !important;
+  transition: color 160ms ease, transform 220ms ease, opacity 160ms ease !important;
+  opacity: 1;
+  overflow: visible !important;
+  transform: none;
+}
+
+.overlay .file-preview-modal .fpm-close:hover,
+.overlay button.fpm-close:hover {
+  background: none !important;
+  color: #ffffff !important;
+  transform: rotate(90deg) !important;
+  box-shadow: none !important;
+}
+
+.overlay .file-preview-modal .fpm-close:focus-visible,
+.overlay button.fpm-close:focus-visible {
+  outline: none;
+  color: #ffffff !important;
+}
+
 .fpm-title h2 {
   margin: 0 0 0.25rem 0;
   font-size: 1.1rem;
@@ -486,4 +522,139 @@
 .fpm-textarea:focus {
   border-color: var(--crystal-teal, #3dd9d3);
   box-shadow: 0 0 0 2px rgba(61, 217, 211, 0.15);
+}
+
+/* ── FPM action bar ── */
+.overlay .file-preview-modal .fpm-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding-top: 0.875rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.overlay .file-preview-modal .fpm-actions-left,
+.overlay .file-preview-modal .fpm-actions-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+}
+
+/* Reset against global .modal button / .overlay button */
+.overlay .file-preview-modal .fpm-btn {
+  all: unset;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  height: 2.5rem;
+  padding: 0 1.1rem;
+  font-family: ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  border-radius: 0.5rem;
+  cursor: pointer;
+  transition:
+    color 160ms ease,
+    background-color 160ms ease,
+    border-color 160ms ease,
+    transform 160ms ease,
+    opacity 160ms ease;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.overlay .file-preview-modal .fpm-btn:focus-visible {
+  outline: 2px solid var(--crystal-teal, #3dd9d3);
+  outline-offset: 2px;
+}
+
+.overlay .file-preview-modal .fpm-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+  transform: none;
+}
+
+/* Quiet — destructive-leaning ("還原"): no chrome, hover suggests undo */
+.overlay .file-preview-modal .fpm-btn-quiet {
+  color: rgba(255, 255, 255, 0.55);
+  padding: 0 0.5rem;
+}
+.overlay .file-preview-modal .fpm-btn-quiet:hover:not(:disabled) {
+  color: rgba(255, 200, 130, 0.95);
+}
+
+/* Ghost — neutral cancel/close */
+.overlay .file-preview-modal .fpm-btn-ghost {
+  color: rgba(255, 255, 255, 0.78);
+  padding: 0 0.85rem;
+}
+.overlay .file-preview-modal .fpm-btn-ghost:hover:not(:disabled) {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Primary — outline that fills on hover */
+.overlay .file-preview-modal .fpm-btn-primary {
+  color: var(--crystal-teal, #3dd9d3);
+  border: 1px solid rgba(61, 217, 211, 0.5);
+  background: rgba(61, 217, 211, 0.06);
+}
+.overlay .file-preview-modal .fpm-btn-primary:hover:not(:disabled) {
+  color: #0a0e27;
+  background: var(--crystal-teal, #3dd9d3);
+  border-color: var(--crystal-teal, #3dd9d3);
+  transform: translateY(-1px);
+}
+.overlay .file-preview-modal .fpm-btn-primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Dotted "saving" indicator */
+.overlay .file-preview-modal .fpm-btn-dots {
+  width: 0.85rem;
+  height: 0.4rem;
+  background:
+    radial-gradient(circle, currentColor 1.5px, transparent 2px) 0 50% / 0.3rem 100% no-repeat,
+    radial-gradient(circle, currentColor 1.5px, transparent 2px) 50% 50% / 0.3rem 100% no-repeat,
+    radial-gradient(circle, currentColor 1.5px, transparent 2px) 100% 50% / 0.3rem 100% no-repeat;
+  opacity: 0.7;
+  animation: fpm-dots 1s ease-in-out infinite;
+}
+@keyframes fpm-dots {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 1; }
+}
+
+/* Light theme — translucent dark text instead of white */
+[data-theme="light"] .overlay .file-preview-modal .fpm-actions {
+  border-top-color: rgba(15, 23, 42, 0.1);
+}
+[data-theme="light"] .overlay .file-preview-modal .fpm-btn-quiet {
+  color: rgba(30, 41, 59, 0.55);
+}
+[data-theme="light"] .overlay .file-preview-modal .fpm-btn-quiet:hover:not(:disabled) {
+  color: #b45309;
+}
+[data-theme="light"] .overlay .file-preview-modal .fpm-btn-ghost {
+  color: rgba(30, 41, 59, 0.75);
+}
+[data-theme="light"] .overlay .file-preview-modal .fpm-btn-ghost:hover:not(:disabled) {
+  color: #0f172a;
+  background: rgba(15, 23, 42, 0.06);
+}
+[data-theme="light"] .overlay .file-preview-modal .fpm-btn-primary {
+  color: #0f766e;
+  border-color: rgba(15, 118, 110, 0.45);
+  background: rgba(15, 118, 110, 0.06);
+}
+[data-theme="light"] .overlay .file-preview-modal .fpm-btn-primary:hover:not(:disabled) {
+  color: #fff;
+  background: #0f766e;
+  border-color: #0f766e;
 }

@@ -18,6 +18,35 @@ interface SidebarProps {
   onOpenFile?: (file: FileItem) => void;
 }
 
+interface ProjectGroup {
+  index: number;
+  name: string;
+  color: string;
+  stores: Store[];
+}
+
+function buildProjectGroups(stores: Store[], keyNames: string[]): ProjectGroup[] {
+  const effectiveKeyNames = keyNames.length > 0 ? keyNames : ['全部專案'];
+  const groups = effectiveKeyNames.map((name, index) => ({
+    index,
+    name: name || `Key #${index + 1}`,
+    color: PROJECT_COLORS[index % PROJECT_COLORS.length],
+    stores: stores.filter(
+      (store) => (typeof store.key_index === 'number' ? store.key_index : 0) === index,
+    ),
+  }));
+
+  const assignedIndexes = new Set(groups.map((group) => group.index));
+  const orphanStores = stores.filter(
+    (store) => typeof store.key_index !== 'number' || !assignedIndexes.has(store.key_index),
+  );
+  if (orphanStores.length > 0) {
+    groups[0].stores.push(...orphanStores);
+  }
+
+  return groups;
+}
+
 export default function Sidebar({
   isOpen,
   stores,
@@ -33,62 +62,48 @@ export default function Sidebar({
   onOpenFile,
 }: SidebarProps) {
   const [collapsedProjects, setCollapsedProjects] = useState<Record<string, boolean>>({});
-  const [creatingStore, setCreatingStore] = useState(false);
+  const [creatingForKey, setCreatingForKey] = useState<number | null>(null);
   const [newStoreName, setNewStoreName] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeTarget = knowledgeTargets.find((t) => t.id === currentTargetId);
-  const activeStore = activeTarget?.kind === 'store' ? stores.find((s) => s.name === activeTarget.storeName) : null;
+  const activeStore = activeTarget?.kind === 'store'
+    ? stores.find((store) => store.name === activeTarget.storeName)
+    : null;
 
   const toggleProject = (key: string) =>
     setCollapsedProjects((p) => ({ ...p, [key]: !p[key] }));
 
-  /* ── Group stores by key_index ── */
-  const projectGroups: Array<{ index: number; name: string; color: string; stores: Store[] }> = [];
-  const effectiveKeyNames = keyNames.length > 0 ? keyNames : ['全部專案'];
-  effectiveKeyNames.forEach((name, i) => {
-    const groupStores = stores.filter(
-      (s) => (typeof s.key_index === 'number' ? s.key_index : 0) === i,
-    );
-    if (groupStores.length > 0 || effectiveKeyNames.length <= 1) {
-      projectGroups.push({
-        index: i,
-        name: name || `Key #${i + 1}`,
-        color: PROJECT_COLORS[i % PROJECT_COLORS.length],
-        stores: groupStores,
-      });
-    }
-  });
-  // Catch stores with no key_index or out-of-range index
-  const assignedIndexes = new Set(projectGroups.map((g) => g.index));
-  const orphanStores = stores.filter(
-    (s) => typeof s.key_index !== 'number' || !assignedIndexes.has(s.key_index),
-  );
-  if (orphanStores.length > 0 && projectGroups.length > 0) {
-    projectGroups[0].stores.push(...orphanStores);
-  } else if (orphanStores.length > 0) {
-    projectGroups.push({
-      index: 0,
-      name: '全部專案',
-      color: PROJECT_COLORS[0],
-      stores: orphanStores,
-    });
-  }
+  const projectGroups = buildProjectGroups(stores, keyNames);
 
   const handleCreateStore = async () => {
-    if (!newStoreName.trim()) return;
-    await onCreateStore(newStoreName.trim(), 0);
+    if (!newStoreName.trim() || creatingForKey === null) return;
+    await onCreateStore(newStoreName.trim(), creatingForKey);
     setNewStoreName('');
-    setCreatingStore(false);
+    setCreatingForKey(null);
+  };
+
+  const beginCreate = (keyIndex: number) => {
+    setCreatingForKey(keyIndex);
+    setNewStoreName('');
+    setCollapsedProjects((p) => ({ ...p, [String(keyIndex)]: false }));
+  };
+
+  const cancelCreate = () => {
+    setCreatingForKey(null);
+    setNewStoreName('');
   };
 
   /* ── File upload ── */
   const handleUpload = async (file: File) => {
     setUploading(true);
-    try { await onUploadFile(file); }
-    finally { setUploading(false); }
+    try {
+      await onUploadFile(file);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleDrop = async (e: React.DragEvent) => {
@@ -124,12 +139,52 @@ export default function Sidebar({
               >
                 <div className="project-dot" style={{ background: group.color }} />
                 <span className="project-name">{group.name}</span>
+                <button
+                  className="project-add"
+                  title={`在 ${group.name} 建立知識庫`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    beginCreate(group.index);
+                  }}
+                >
+                  <Plus size={12} />
+                </button>
                 <span className={`project-chevron${isOpen ? ' open' : ''}`}>
                   <ChevronRight size={13} />
                 </span>
               </div>
               {isOpen && (
                 <ul className="store-list">
+                  {group.stores.length === 0 && creatingForKey !== group.index && (
+                    <li className="store-empty">尚無知識庫</li>
+                  )}
+                  {creatingForKey === group.index && (
+                    <li className="store-create-row">
+                      <input
+                        className="store-create-input"
+                        placeholder="知識庫名稱..."
+                        value={newStoreName}
+                        autoFocus
+                        onChange={(e) => setNewStoreName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') void handleCreateStore();
+                          if (e.key === 'Escape') cancelCreate();
+                        }}
+                      />
+                      <div className="store-create-actions">
+                        <button className="btn btn-ghost btn-sm" onClick={cancelCreate}>
+                          取消
+                        </button>
+                        <button
+                          className="btn btn-primary btn-sm"
+                          onClick={handleCreateStore}
+                          disabled={!newStoreName.trim()}
+                        >
+                          建立
+                        </button>
+                      </div>
+                    </li>
+                  )}
                   {group.stores.map((store) => {
                     const target = knowledgeTargets.find(
                       (t) => t.kind === 'store' && t.storeName === store.name,
@@ -168,7 +223,10 @@ export default function Sidebar({
         <div className="file-panel">
           <div className="fp-header">
             <span className="fp-title">文件</span>
-            <button className="icon-btn icon-btn-sm" title="上傳" onClick={() => fileInputRef.current?.click()}
+            <button
+              className="icon-btn icon-btn-sm"
+              title="上傳"
+              onClick={() => fileInputRef.current?.click()}
             >
               <Plus size={14} />
             </button>
@@ -227,33 +285,6 @@ export default function Sidebar({
         </div>
       )}
 
-      {/* Footer: new store */}
-      <div className="sb-footer">
-        {creatingStore ? (
-          <div className="create-inline">
-            <input
-              placeholder="知識庫名稱..."
-              value={newStoreName}
-              onChange={(e) => setNewStoreName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleCreateStore()}
-              autoFocus
-            />
-            <div className="create-actions">
-              <button className="btn btn-ghost btn-sm flex-1" onClick={() => { setCreatingStore(false); setNewStoreName(''); }}
-              >
-                取消
-              </button>
-              <button className="btn btn-primary btn-sm flex-1" onClick={handleCreateStore} disabled={!newStoreName.trim()} >
-                建立
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button className="new-store-btn" onClick={() => setCreatingStore(true)}>
-            <Plus size={14} /> 新增知識庫
-          </button>
-        )}
-      </div>
     </aside>
   );
 }

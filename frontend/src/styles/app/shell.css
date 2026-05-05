@@ -22,17 +22,21 @@
 
 /* ── Icon Buttons (also valid inside slide panels) ── */
 .app-shell .icon-btn,
-.rp-overlay .icon-btn { width: 2rem; height: 2rem; border: none; background: transparent; color: var(--text-2); border-radius: var(--r-sm); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background var(--trans), color var(--trans); position: relative; padding: 0; font-family: var(--font); }
+.rp-overlay .icon-btn,
+.overlay .icon-btn { width: 2rem; height: 2rem; border: none; background: transparent; color: var(--text-2); border-radius: var(--r-sm); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background var(--trans), color var(--trans); position: relative; padding: 0; font-family: var(--font); }
 .app-shell .icon-btn:hover,
-.rp-overlay .icon-btn:hover { background: var(--border); color: var(--text); }
+.rp-overlay .icon-btn:hover,
+.overlay .icon-btn:hover { background: var(--border); color: var(--text); }
 .app-shell .icon-btn svg,
-.rp-overlay .icon-btn svg { width: 1.125rem; height: 1.125rem; pointer-events: none; }
+.rp-overlay .icon-btn svg,
+.overlay .icon-btn svg { width: 1.125rem; height: 1.125rem; pointer-events: none; }
 .app-shell .icon-btn-pill,
 .rp-overlay .icon-btn-pill { width: auto; padding: 0 .625rem; font-size: .8125rem; font-weight: 500; gap: .375rem; white-space: nowrap; border: 1px solid var(--border); border-radius: var(--r-md); display: inline-flex; align-items: center; }
 .app-shell .icon-btn-pill:hover,
 .rp-overlay .icon-btn-pill:hover { background: var(--border); }
 .app-shell .icon-btn-sm,
-.rp-overlay .icon-btn-sm { width: 1.5rem; height: 1.5rem; }
+.rp-overlay .icon-btn-sm,
+.overlay .icon-btn-sm { width: 1.5rem; height: 1.5rem; }
 
 /* ── Settings Dropdown ── */
 .dd-wrap { position: relative; }
@@ -90,8 +94,17 @@
 .project-chevron { color: var(--text-3); display: flex; align-items: center; }
 .project-chevron svg { transition: transform var(--trans); }
 .project-chevron.open svg { transform: rotate(90deg); }
+.project-add { width: 1.25rem; height: 1.25rem; padding: 0; border: none; background: none; color: var(--text-3); cursor: pointer; border-radius: var(--r-sm); display: inline-flex; align-items: center; justify-content: center; opacity: 0; transition: opacity var(--trans), color var(--trans), background var(--trans); }
+.project-header:hover .project-add { opacity: 1; }
+.project-add:hover { color: var(--primary); background: var(--primary-lt); }
 
 .store-list { list-style: none; padding: .125rem .5rem .5rem; display: flex; flex-direction: column; gap: .1875rem; }
+.store-empty { padding: .375rem .75rem; font-size: .75rem; color: var(--text-3); font-style: italic; }
+.store-create-row { padding: .375rem .375rem; display: flex; flex-direction: column; gap: .375rem; background: var(--primary-lt); border-radius: var(--r-md); }
+.store-create-input { width: 100%; padding: .375rem .5rem; border: 1px solid var(--border-md); border-radius: var(--r-sm); font-size: .8125rem; font-family: var(--font); background: var(--bg); color: var(--text); outline: none; }
+.store-create-input:focus { border-color: var(--primary); }
+.store-create-actions { display: flex; gap: .375rem; }
+.store-create-actions .btn { flex: 1; }
 .store-item-btn { width: 100%; border: none; background: none; padding: .5rem .75rem; text-align: left; cursor: pointer; display: flex; align-items: center; gap: .5rem; border-radius: var(--r-md); transition: background var(--trans); color: var(--text); font-family: var(--font); font-size: .875rem; }
 .store-item-btn:hover { background: var(--border); }
 .store-item-btn.active { background: var(--primary-lt); }

@@ -390,3 +390,13 @@
   border-color: var(--crystal-teal);
   background: rgba(14, 116, 144, 0.1);
 }
+
+[data-theme="light"] .overlay .file-preview-modal .fpm-close,
+[data-theme="light"] .overlay button.fpm-close {
+  color: rgba(30, 41, 59, 0.55) !important;
+}
+
+[data-theme="light"] .overlay .file-preview-modal .fpm-close:hover,
+[data-theme="light"] .overlay button.fpm-close:hover {
+  color: #1e293b !important;
+}
