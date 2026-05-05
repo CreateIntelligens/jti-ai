@@ -121,6 +121,9 @@ class PersonaRouterConfig:
     max_response_chars_ge: int
     max_response_chars_le: int
     main_agent: Any
+    # App-specific prompt index attrs (independent from shared prompts[])
+    prompt_index_attr: str  # e.g. "hciot_prompt_index"
+    active_prompt_id_attr: str  # e.g. "hciot_active_prompt_id"
     max_custom_prompts: int = 3
     clone_success_message: str = "已複製預設人物設定並啟用"
     runtime_update_message: str = "已更新回覆規則"
@@ -265,18 +268,46 @@ def build_persona_router(config: PersonaRouterConfig) -> APIRouter:
         )
         config.runtime_settings_save(pm, base, prompt_id=prompt_id, store_name=store_name)
 
+    # --- App-specific index helpers ---
+
+    def _get_index(store_prompts) -> list:
+        """Read the app-specific prompt index list."""
+        raw = getattr(store_prompts, config.prompt_index_attr, None)
+        return list(raw) if isinstance(raw, list) else []
+
+    def _set_index(store_prompts, index: list) -> None:
+        """Write the app-specific prompt index list."""
+        setattr(store_prompts, config.prompt_index_attr, index)
+
+    def _get_app_active_id(store_prompts) -> Optional[str]:
+        """Read the app-specific active_prompt_id."""
+        return getattr(store_prompts, config.active_prompt_id_attr, None)
+
+    def _set_app_active_id(store_prompts, prompt_id: Optional[str]) -> None:
+        """Write the app-specific active_prompt_id."""
+        setattr(store_prompts, config.active_prompt_id_attr, prompt_id)
+
+    def _find_index_position(index: list, prompt_id: str) -> Optional[int]:
+        return next((i for i, entry in enumerate(index) if entry.id == prompt_id), None)
+
+    def _find_index_entry(index: list, prompt_id: str):
+        position = _find_index_position(index, prompt_id)
+        return index[position] if position is not None else None
+
     def validate_and_resolve_prompt_id(requested: Optional[str], store_name: str) -> str:
         if requested:
             if requested == config.system_default_prompt_id:
                 return config.system_default_prompt_id
-            prompt = require_prompt_manager().get_prompt(store_name, requested)
-            if not prompt:
+            pm = require_prompt_manager()
+            store_prompts = pm.get_store_prompts(store_name)
+            index = _get_index(store_prompts)
+            if _find_index_entry(index, requested) is None:
                 raise HTTPException(status_code=404, detail="人物設定不存在")
             return requested
         if not deps.prompt_manager:
             return config.system_default_prompt_id
         store_prompts = deps.prompt_manager.get_store_prompts(store_name)
-        return store_prompts.active_prompt_id or config.system_default_prompt_id
+        return _get_app_active_id(store_prompts) or config.system_default_prompt_id
 
     def merge_runtime_settings(current, request):
         data = current.model_dump()
@@ -314,8 +345,9 @@ def build_persona_router(config: PersonaRouterConfig) -> APIRouter:
 
         if deps.prompt_manager:
             store_prompts = deps.prompt_manager.get_store_prompts(store_name)
-            custom_prompts = [p.model_dump() for p in store_prompts.prompts]
-            active_prompt_id = store_prompts.active_prompt_id
+            index = _get_index(store_prompts)
+            custom_prompts = [entry.model_dump() for entry in index]
+            active_prompt_id = _get_app_active_id(store_prompts)
 
         for p in custom_prompts:
             p["content"] = prompt_content_for_language(
@@ -344,49 +376,47 @@ def build_persona_router(config: PersonaRouterConfig) -> APIRouter:
         pm = require_prompt_manager()
         lang = _normalize_language(language)
         store_name = store_name_for(lang)
-        prompts = pm.list_prompts(store_name)
-        enforce_custom_prompt_limit(prompts)
-
-        from app.prompts import Prompt
-
-        new_prompt = Prompt(name=request.name, content=request.content)
         store_prompts = pm.get_store_prompts(store_name)
-        store_prompts.prompts.append(new_prompt)
+        index = _get_index(store_prompts)
+        enforce_custom_prompt_limit(index)
+
+        from app.prompts import PromptIndexEntry
+
+        entry = PromptIndexEntry(name=request.name)
+        index.append(entry)
+        _set_index(store_prompts, index)
 
         persona_pair = default_persona_pair()
         persona_pair[lang] = request.content
-        config.persona_adapter.set(store_prompts, new_prompt.id, persona_pair)
+        config.persona_adapter.set(store_prompts, entry.id, persona_pair)
         pm.save_store_prompts(store_prompts)
 
-        copy_default_runtime(new_prompt.id, store_name)
+        copy_default_runtime(entry.id, store_name)
 
-        return new_prompt.model_dump()
+        return entry.model_dump()
 
     @router.post("/clone")
     def clone_default_prompt(language: str = "zh"):
         pm = require_prompt_manager()
         lang = _normalize_language(language)
         store_name = store_name_for(lang)
-        prompts = pm.list_prompts(store_name)
-        enforce_custom_prompt_limit(prompts)
-
-        from app.prompts import Prompt
-
-        clone = Prompt(
-            name=next_custom_prompt_name(prompts, lang),
-            content=config.persona_defaults.get(lang, config.persona_defaults.get("zh", "")),
-        )
-
         store_prompts = pm.get_store_prompts(store_name)
-        store_prompts.prompts.append(clone)
-        store_prompts.active_prompt_id = clone.id
-        config.persona_adapter.set(store_prompts, clone.id, default_persona_pair())
+        index = _get_index(store_prompts)
+        enforce_custom_prompt_limit(index)
+
+        from app.prompts import PromptIndexEntry
+
+        entry = PromptIndexEntry(name=next_custom_prompt_name(index, lang))
+        index.append(entry)
+        _set_index(store_prompts, index)
+        _set_app_active_id(store_prompts, entry.id)
+        config.persona_adapter.set(store_prompts, entry.id, default_persona_pair())
         pm.save_store_prompts(store_prompts)
 
-        copy_default_runtime(clone.id, store_name)
+        copy_default_runtime(entry.id, store_name)
 
         config.main_agent.remove_all_sessions()
-        return {"prompt": clone.model_dump(), "message": config.clone_success_message}
+        return {"prompt": entry.model_dump(), "message": config.clone_success_message}
 
     @router.put("/{prompt_id}")
     def update_prompt(prompt_id: str, request: _UpdatePromptRequest, language: str = "zh"):
@@ -399,32 +429,30 @@ def build_persona_router(config: PersonaRouterConfig) -> APIRouter:
         lang = _normalize_language(language)
         store_name = store_name_for(lang)
         store_prompts = pm.get_store_prompts(store_name)
-        prompt_index = next(
-            (i for i, p in enumerate(store_prompts.prompts) if p.id == prompt_id),
-            None,
-        )
-        if prompt_index is None:
+        index = _get_index(store_prompts)
+        entry_idx = _find_index_position(index, prompt_id)
+        if entry_idx is None:
             raise HTTPException(status_code=404, detail=f"Prompt {prompt_id} 不存在")
 
-        prompt = store_prompts.prompts[prompt_index]
+        entry = index[entry_idx]
         if request.name is not None:
-            prompt.name = request.name
+            entry.name = request.name
 
         persona_pair = normalize_persona_pair(
             config.persona_adapter.get(store_prompts, prompt_id),
-            prompt.content,
+            None,
         )
         if request.content is not None:
             persona_pair[lang] = request.content
             config.persona_adapter.set(store_prompts, prompt_id, persona_pair)
 
-        prompt.content = persona_pair.get(lang, prompt.content)
-        prompt.updated_at = datetime.now(timezone.utc).isoformat()
-        store_prompts.prompts[prompt_index] = prompt
+        entry.updated_at = datetime.now(timezone.utc).isoformat()
+        index[entry_idx] = entry
+        _set_index(store_prompts, index)
         pm.save_store_prompts(store_prompts)
 
-        payload = prompt.model_dump()
-        payload["content"] = persona_pair.get(lang, payload.get("content", ""))
+        payload = entry.model_dump()
+        payload["content"] = persona_pair.get(lang, "")
         return payload
 
     @router.delete("/{prompt_id}")
@@ -434,58 +462,64 @@ def build_persona_router(config: PersonaRouterConfig) -> APIRouter:
 
         pm = require_prompt_manager()
         store_name = store_name_for(language)
-
-        try:
-            pm.delete_prompt(store_name, prompt_id)
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e))
-
         store_prompts = pm.get_store_prompts(store_name)
-        changed = config.persona_adapter.remove(store_prompts, prompt_id)
+        index = _get_index(store_prompts)
+        if _find_index_entry(index, prompt_id) is None:
+            raise HTTPException(status_code=404, detail=f"Prompt {prompt_id} 不存在")
+        index = [entry for entry in index if entry.id != prompt_id]
+
+        # Clear active if deleted prompt was active
+        if _get_app_active_id(store_prompts) == prompt_id:
+            _set_app_active_id(store_prompts, index[0].id if index else None)
+
+        _set_index(store_prompts, index)
+        config.persona_adapter.remove(store_prompts, prompt_id)
 
         if config.delete_clears_runtime_overrides and config.runtime_overrides_attr:
             overrides = getattr(store_prompts, config.runtime_overrides_attr, None)
             if isinstance(overrides, dict) and prompt_id in overrides:
                 overrides.pop(prompt_id)
                 setattr(store_prompts, config.runtime_overrides_attr, overrides)
-                changed = True
 
-        if changed:
-            pm.save_store_prompts(store_prompts)
-
+        pm.save_store_prompts(store_prompts)
         return {"message": "人物設定已刪除"}
 
     @router.post("/active")
     def set_active_prompt(request: _SetActivePromptRequest, language: str = "zh"):
         pm = require_prompt_manager()
         store_name = store_name_for(language)
+        store_prompts = pm.get_store_prompts(store_name)
 
-        try:
-            if request.prompt_id and request.prompt_id != config.system_default_prompt_id:
-                pm.set_active_prompt(store_name, request.prompt_id)
-            else:
-                pm.clear_active_prompt(store_name)
-            config.main_agent.remove_all_sessions()
-            return {"message": "已設定啟用的人物設定", "prompt_id": request.prompt_id}
-        except ValueError as e:
-            raise HTTPException(status_code=404, detail=str(e))
+        if request.prompt_id and request.prompt_id != config.system_default_prompt_id:
+            index = _get_index(store_prompts)
+            if _find_index_entry(index, request.prompt_id) is None:
+                raise HTTPException(status_code=404, detail="人物設定不存在")
+            _set_app_active_id(store_prompts, request.prompt_id)
+        else:
+            _set_app_active_id(store_prompts, None)
+
+        pm.save_store_prompts(store_prompts)
+        config.main_agent.remove_all_sessions()
+        return {"message": "已設定啟用的人物設定", "prompt_id": request.prompt_id}
 
     @router.get("/active")
     def get_active_prompt(language: str = "zh"):
         pm = require_prompt_manager()
         lang = _normalize_language(language)
         store_name = store_name_for(lang)
-        prompt = pm.get_active_prompt(store_name)
-        if not prompt:
+        store_prompts = pm.get_store_prompts(store_name)
+        active_id = _get_app_active_id(store_prompts)
+        if not active_id:
             return {"prompt": default_prompt_dict(language), "is_default": True}
 
-        store_prompts = pm.get_store_prompts(store_name)
-        payload = prompt.model_dump()
+        index = _get_index(store_prompts)
+        entry = _find_index_entry(index, active_id)
+        if not entry:
+            return {"prompt": default_prompt_dict(language), "is_default": True}
+
+        payload = entry.model_dump()
         payload["content"] = prompt_content_for_language(
-            prompt.id,
-            prompt.content,
-            lang,
-            store_prompts,
+            entry.id, None, lang, store_prompts,
         )
         return {"prompt": payload, "is_default": False}
 

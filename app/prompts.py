@@ -37,11 +37,28 @@ class Prompt(BaseModel):
     updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
+class PromptIndexEntry(BaseModel):
+    """Lightweight prompt index for app-specific storage (HCIoT / JTI).
+
+    Unlike ``Prompt`` (used by General's prompts[]), this only stores
+    id / name / timestamps — persona and runtime settings live in their
+    own dedicated attrs (e.g. hciot_persona_by_prompt).
+    """
+    id: str = Field(default_factory=lambda: f"prompt_{uuid.uuid4().hex[:8]}")
+    name: str
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
 class StorePrompts(BaseModel):
     """Store 的所有 Prompts"""
     store_name: str
+    # --- General 主頁專用 ---
     prompts: List[Prompt] = Field(default_factory=list)
     active_prompt_id: Optional[str] = None
+    # --- JTI app-specific ---
+    jti_prompt_index: Optional[List[PromptIndexEntry]] = None
+    jti_active_prompt_id: Optional[str] = None
     # JTI 統一設定：每個人物設定綁定 persona + runtime settings
     # key = prompt_id / system_default
     # value = {"persona": {"zh": "...", "en": "..."}, "runtime_settings": {...}}
@@ -50,6 +67,9 @@ class StorePrompts(BaseModel):
     jti_runtime_settings: Optional[Dict[str, Any]] = None
     jti_runtime_settings_by_prompt: Optional[Dict[str, Dict[str, Any]]] = None
     jti_persona_by_prompt: Optional[Dict[str, Dict[str, str]]] = None
+    # --- HCIoT app-specific ---
+    hciot_prompt_index: Optional[List[PromptIndexEntry]] = None
+    hciot_active_prompt_id: Optional[str] = None
     # HCIoT：每個人物設定各自綁定 runtime 設定（key = prompt_id / system_default）
     hciot_runtime_settings_by_prompt: Optional[Dict[str, Dict[str, Any]]] = None
     # HCIoT 人物設定多語版本（key = prompt_id, value = {"zh": "...", "en": "..."}）

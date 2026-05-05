@@ -35,11 +35,12 @@ def _resolve_runtime_prompt_id(
     store_prompts,
     prompt_id: Optional[str],
     system_default_prompt_id: str = SYSTEM_DEFAULT_PROMPT_ID,
+    active_prompt_id_attr: str = "active_prompt_id",
 ) -> str:
     """Resolve runtime profile id. Falls back to active prompt, then system default."""
     if isinstance(prompt_id, str) and prompt_id.strip():
         return prompt_id
-    active_prompt_id = getattr(store_prompts, "active_prompt_id", None)
+    active_prompt_id = getattr(store_prompts, active_prompt_id_attr, None)
     return active_prompt_id or system_default_prompt_id
 
 
@@ -197,6 +198,7 @@ class RuntimeSettingsRepo(Generic[RuntimeSettingsModel]):
     storage_adapter: RuntimeSettingsStorageAdapter
     system_default_prompt_id: str = SYSTEM_DEFAULT_PROMPT_ID
     include_legacy_response_rules: bool = False
+    active_prompt_id_attr: str = "active_prompt_id"
 
     def get_default_runtime_settings(self) -> RuntimeSettingsModel:
         return self.default_settings_factory()
@@ -206,6 +208,7 @@ class RuntimeSettingsRepo(Generic[RuntimeSettingsModel]):
             store_prompts,
             prompt_id,
             self.system_default_prompt_id,
+            active_prompt_id_attr=self.active_prompt_id_attr,
         )
 
     def load_raw_runtime_settings(

@@ -69,6 +69,10 @@ class MainAgent(BaseAgent):
     def _persona_map_attr(self) -> str:
         return "jti_profiles_by_prompt"
 
+    @property
+    def _active_prompt_id_attr(self) -> str:
+        return "jti_active_prompt_id"
+
     @staticmethod
     def _get_store_name_for_language(language: str) -> str:
         return "__jti__en" if normalize_language(language) == "en" else "__jti__"

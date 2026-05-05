@@ -76,6 +76,11 @@ class MainAgent(BaseAgent):
         # General doesn't use persona-per-prompt map
         return "_unused_general_persona"
 
+    @property
+    def _active_prompt_id_attr(self) -> str:
+        # General uses the shared active_prompt_id field
+        return "active_prompt_id"
+
     @staticmethod
     def _get_store_name_for_language(language: str) -> str:
         # Not meaningful for general (store is dynamic), but provide a sane default

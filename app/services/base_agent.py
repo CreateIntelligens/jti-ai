@@ -52,6 +52,11 @@ class BaseAgent:
         """Attribute name on StorePrompts for persona mapping."""
         raise NotImplementedError
 
+    @property
+    def _active_prompt_id_attr(self) -> str:
+        """Attribute name on StorePrompts for the app-specific active prompt id."""
+        raise NotImplementedError
+
     @staticmethod
     def _get_store_name_for_language(language: str) -> str:
         raise NotImplementedError
@@ -117,7 +122,11 @@ class BaseAgent:
     # --- 共用 prompt / system instruction 邏輯 ---
 
     def _get_active_prompt_context(self, language: str = "zh"):
-        """取得目前啟用的人物設定資訊（prompt_manager / store_name / prompt_id / persona）。"""
+        """取得目前啟用的人物設定資訊（prompt_manager / store_name / prompt_id / persona）。
+
+        Reads from app-specific attrs (_active_prompt_id_attr / _persona_map_attr)
+        instead of the shared prompts[] + active_prompt_id used by General.
+        """
         store_name = self._get_store_name_for_language(language)
         lang = normalize_language(language)
 
@@ -130,32 +139,25 @@ class BaseAgent:
         if not prompt_manager:
             return None, store_name, None, None
 
-        active = prompt_manager.get_active_prompt(store_name)
-        if not active:
+        store_prompts = prompt_manager.get_store_prompts(store_name)
+        active_id = getattr(store_prompts, self._active_prompt_id_attr, None)
+        if not active_id:
             return prompt_manager, store_name, None, None
 
-        prompt_id = active.id
-        persona = active.content
-
-        store_prompts = prompt_manager.get_store_prompts(store_name)
+        persona = None
         persona_map = getattr(store_prompts, self._persona_map_attr, None)
-        if not isinstance(persona_map, dict):
-            return prompt_manager, store_name, prompt_id, persona
+        if isinstance(persona_map, dict):
+            raw_persona = persona_map.get(active_id)
+            if isinstance(raw_persona, dict):
+                # Unified profile map: {prompt_id: {"persona": {...}, ...}}
+                # Legacy map: {prompt_id: {"zh": "...", "en": "..."}}
+                inner_persona = raw_persona.get("persona")
+                persona_pair = inner_persona if isinstance(inner_persona, dict) else raw_persona
+                value = persona_pair.get(lang)
+                if isinstance(value, str) and value.strip():
+                    persona = value
 
-        raw_persona = persona_map.get(active.id)
-        if not isinstance(raw_persona, dict):
-            return prompt_manager, store_name, prompt_id, persona
-
-        # Unified profile map: {prompt_id: {"persona": {...}, ...}}
-        # Legacy map: {prompt_id: {"zh": "...", "en": "..."}}
-        inner_persona = raw_persona.get("persona")
-        persona_pair = inner_persona if isinstance(inner_persona, dict) else raw_persona
-
-        value = persona_pair.get(lang)
-        if isinstance(value, str) and value.strip():
-            persona = value
-
-        return prompt_manager, store_name, prompt_id, persona
+        return prompt_manager, store_name, active_id, persona
 
     def _get_system_instruction(self, session: Session) -> str:
         """取得靜態 System Instruction（persona from DB + system rules from code）"""

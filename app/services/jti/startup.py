@@ -76,6 +76,33 @@ def _normalize_persona_pair(raw_pair, fallback_content: Optional[str]) -> Dict[s
     return normalized
 
 
+def _entry_id(entry) -> Optional[str]:
+    if hasattr(entry, "id"):
+        return getattr(entry, "id")
+    if isinstance(entry, dict):
+        return entry.get("id")
+    return None
+
+
+def _collect_prompt_ids_with_content(store_prompts) -> list[tuple[str, Optional[str]]]:
+    """Collect prompt ids from legacy prompts[] and the app-specific index."""
+    prompts_with_content = [
+        (prompt.id, getattr(prompt, "content", None))
+        for prompt in store_prompts.prompts
+    ]
+    seen_ids = {prompt_id for prompt_id, _ in prompts_with_content}
+
+    jti_index = getattr(store_prompts, "jti_prompt_index", None)
+    if isinstance(jti_index, list):
+        for entry in jti_index:
+            prompt_id = _entry_id(entry)
+            if prompt_id and prompt_id not in seen_ids:
+                prompts_with_content.append((prompt_id, None))
+                seen_ids.add(prompt_id)
+
+    return prompts_with_content
+
+
 def _migrate_jti_profile_storage(prompt_manager) -> None:
     """Merge legacy persona/runtime maps into one `jti_profiles_by_prompt` map."""
     if not prompt_manager:
@@ -99,28 +126,28 @@ def _migrate_jti_profile_storage(prompt_manager) -> None:
         if not isinstance(default_legacy_runtime, dict):
             default_legacy_runtime = legacy_runtime_single
 
-        for prompt in store_prompts.prompts:
-            profile = profiles_map.get(prompt.id)
+        for prompt_id, prompt_content in _collect_prompt_ids_with_content(store_prompts):
+            profile = profiles_map.get(prompt_id)
             if not isinstance(profile, dict):
                 profile = {}
                 changed = True
 
             raw_persona = profile.get("persona")
             if not isinstance(raw_persona, dict):
-                legacy_persona = legacy_persona_map.get(prompt.id)
-                profile["persona"] = _normalize_persona_pair(legacy_persona, prompt.content)
+                legacy_persona = legacy_persona_map.get(prompt_id)
+                profile["persona"] = _normalize_persona_pair(legacy_persona, prompt_content)
                 changed = True
 
             raw_runtime = profile.get("runtime_settings")
             if not isinstance(raw_runtime, dict):
-                legacy_runtime = legacy_runtime_map.get(prompt.id)
+                legacy_runtime = legacy_runtime_map.get(prompt_id)
                 if not isinstance(legacy_runtime, dict):
                     legacy_runtime = default_legacy_runtime
                 if isinstance(legacy_runtime, dict):
                     profile["runtime_settings"] = legacy_runtime
                     changed = True
 
-            profiles_map[prompt.id] = profile
+            profiles_map[prompt_id] = profile
 
         default_profile = profiles_map.get(SYSTEM_DEFAULT_PROMPT_ID)
         if not isinstance(default_profile, dict):

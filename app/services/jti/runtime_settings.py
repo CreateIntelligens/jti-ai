@@ -81,6 +81,7 @@ _runtime_settings_repo = RuntimeSettingsRepo[JtiRuntimeSettings](
         default_persona_factory=_default_persona_pair,
     ),
     include_legacy_response_rules=True,
+    active_prompt_id_attr="jti_active_prompt_id",
 )
 
 

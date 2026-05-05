@@ -94,6 +94,10 @@ class MainAgent(BaseAgent):
     def _persona_map_attr(self) -> str:
         return "hciot_persona_by_prompt"
 
+    @property
+    def _active_prompt_id_attr(self) -> str:
+        return "hciot_active_prompt_id"
+
     @staticmethod
     def _get_store_name_for_language(language: str) -> str:
         return "__hciot__en" if normalize_language(language) == "en" else HCIOT_STORE_NAME

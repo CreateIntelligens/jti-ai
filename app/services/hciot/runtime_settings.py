@@ -76,6 +76,7 @@ _runtime_settings_repo = RuntimeSettingsRepo[HciotRuntimeSettings](
     default_settings_factory=get_default_runtime_settings,
     default_max_response_chars=DEFAULT_MAX_RESPONSE_CHARS,
     storage_adapter=FlatRuntimeSettingsAdapter(attr=HCIOT_RUNTIME_SETTINGS_ATTR),
+    active_prompt_id_attr="hciot_active_prompt_id",
 )
 
 
