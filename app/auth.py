@@ -9,7 +9,7 @@ API 認證模組
 """
 
 import os
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlsplit
 from fastapi import HTTPException, Request
 
 
@@ -34,6 +34,25 @@ def _extract_api_token(request: Request) -> str | None:
     return token
 
 
+def _hostname_from_host_header(value: str | None) -> str:
+    host = (value or "").split(",", 1)[0].strip()
+    if not host:
+        return ""
+    return urlsplit(f"//{host}").hostname or ""
+
+
+def _request_hostnames(request: Request) -> set[str]:
+    hosts = {
+        _hostname_from_host_header(request.headers.get("host")),
+        _hostname_from_host_header(request.headers.get("x-forwarded-host")),
+    }
+    return {host for host in hosts if host}
+
+
+def _is_allowed_frontend_host(hostname: str, request_hosts: set[str]) -> bool:
+    return hostname in request_hosts or hostname in _INTERNAL_HOSTS
+
+
 def extract_user_gemini_api_key(request: Request) -> str | None:
     """從獨立 header 提取使用者自己的 Gemini API key。"""
     api_key = (request.headers.get("x-gemini-api-key") or "").strip()
@@ -47,16 +66,14 @@ def _is_same_origin(request: Request) -> bool:
     瀏覽器發送的請求會帶 Origin 或 Referer header，
     如果 host 與 server 一致，視為前端請求。
     """
-    # 取得 server host
-    server_host = request.headers.get("host", "")
-    server_hostname = server_host.split(":")[0] if server_host else ""
+    request_hosts = _request_hostnames(request)
 
     # 檢查 Origin header
     origin = request.headers.get("origin", "")
     if origin:
         parsed = urlparse(origin)
         origin_host = parsed.hostname or ""
-        if origin_host == server_hostname or origin_host in _INTERNAL_HOSTS:
+        if _is_allowed_frontend_host(origin_host, request_hosts):
             return True
 
     # 檢查 Referer header
@@ -64,8 +81,12 @@ def _is_same_origin(request: Request) -> bool:
     if referer:
         parsed = urlparse(referer)
         referer_host = parsed.hostname or ""
-        if referer_host == server_hostname or referer_host in _INTERNAL_HOSTS:
+        if _is_allowed_frontend_host(referer_host, request_hosts):
             return True
+
+    # Fetch Metadata still identifies same-origin browser requests without Origin/Referer.
+    if request.headers.get("sec-fetch-site", "").lower() == "same-origin":
+        return True
 
     return False
 
