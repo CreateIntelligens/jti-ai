@@ -99,5 +99,47 @@ class TestRAGPipeline(unittest.TestCase):
         mock_lancedb_store.insert_chunks.assert_called_once()
         mock_mongodb_backup.sync_to_mongodb.assert_called_once()
 
+    def test_hciot_english_backfill_uses_topic_store_labels_for_prefix(self):
+        backfill = BackfillService()
+        mock_embedding_service.encode.return_value = np.random.rand(1, 1024)
+        topic_store = MagicMock()
+        topic_store.get_topic.return_value = {
+            "labels": {"zh": "各科介紹", "en": "Department Introductions"},
+            "category_labels": {"zh": "常見問題", "en": "FAQ"},
+        }
+
+        with patch("app.services.rag.backfill.get_hciot_topic_store", return_value=topic_store, create=True):
+            backfill.index_single_file(
+                source_type="hciot",
+                language="en",
+                filename="Department_Introductions.csv",
+                data=b"q,a\nIntroduction?,Answer",
+                topic_info={
+                    "topic_id": "常見問題/各科介紹",
+                    "topic_label_zh": "各科介紹",
+                    "topic_label_en": "各科介紹",
+                    "category_label_zh": "常見問題",
+                    "category_label_en": "常見問題",
+                },
+            )
+
+        records = mock_lancedb_store.insert_chunks.call_args.args[0]
+        self.assertTrue(records[0]["text"].startswith("【FAQ / Department Introductions】"))
+
+    def test_hciot_backfill_skips_topic_store_lookup_when_labels_are_usable(self):
+        topic_info = {
+            "topic_id": "faq/department-introductions",
+            "topic_label_zh": "各科介紹",
+            "topic_label_en": "Department Introductions",
+            "category_label_zh": "常見問題",
+            "category_label_en": "FAQ",
+        }
+
+        with patch("app.services.rag.backfill.get_hciot_topic_store") as get_topic_store:
+            result = BackfillService._merge_topic_store_labels("hciot", "en", topic_info)
+
+        self.assertIs(result, topic_info)
+        get_topic_store.assert_not_called()
+
 if __name__ == '__main__':
     unittest.main()

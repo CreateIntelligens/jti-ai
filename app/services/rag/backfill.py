@@ -9,6 +9,7 @@ from app.services.embedding.service import get_embedding_service
 from app.services.vector_store.lancedb import get_lancedb_store
 from app.services.vector_store.mongodb_backup import get_mongodb_backup
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
+from app.services.hciot.topic_store import get_hciot_topic_store
 from app.services.jti.knowledge_store import get_jti_knowledge_store
 
 logger = logging.getLogger(__name__)
@@ -118,6 +119,45 @@ class BackfillService:
         except Exception:
             doc = None
         return BackfillService._extract_topic_info(doc)
+
+    @staticmethod
+    def _merge_topic_store_labels(source_type: str, language: str, topic_info: dict[str, str]) -> dict[str, str]:
+        if source_type != "hciot":
+            return topic_info
+
+        topic_id = topic_info.get("topic_id") or ""
+        if not topic_id:
+            return topic_info
+
+        topic_label = topic_info.get(f"topic_label_{language}") or ""
+        category_label = topic_info.get(f"category_label_{language}") or ""
+        if topic_label and category_label:
+            if language != "en" or (
+                topic_label != (topic_info.get("topic_label_zh") or "") or
+                category_label != (topic_info.get("category_label_zh") or "")
+            ):
+                return topic_info
+
+        try:
+            topic = get_hciot_topic_store(language).get_topic(topic_id)
+        except Exception as e:
+            logger.warning(f"[Backfill] Failed to load HCIoT topic labels for {topic_id}/{language}: {e}")
+            return topic_info
+
+        if not topic:
+            return topic_info
+
+        merged = dict(topic_info)
+        labels = topic.get("labels") or {}
+        category_labels = topic.get("category_labels") or {}
+        for lang in ("zh", "en"):
+            topic_label = labels.get(lang)
+            if topic_label:
+                merged[f"topic_label_{lang}"] = topic_label
+            category_label = category_labels.get(lang)
+            if category_label:
+                merged[f"category_label_{lang}"] = category_label
+        return merged
 
     @staticmethod
     def _build_topic_prefix(topic_info: dict[str, str], language: str) -> str:
@@ -242,6 +282,7 @@ class BackfillService:
 
             if topic_info is None:
                 topic_info = self._fetch_topic_info(source_type, language, filename)
+            topic_info = self._merge_topic_store_labels(source_type, language, topic_info)
             topic_prefix = self._build_topic_prefix(topic_info, language)
 
             if filename.lower().endswith(".csv"):
