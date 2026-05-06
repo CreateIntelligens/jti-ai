@@ -53,6 +53,7 @@
   "hciot_hero_note": "The product direction is public-facing, but this stage is mainly for hospital testing. Adjust tone, restrictions, and response format through prompt settings.",
   "hciot_topic_heading": "Common Education Topics",
   "hciot_topic_subheading": "Pick a topic, then a question",
+  "hciot_topic_question_heading": "{{topic}} FAQ",
   "hciot_input_placeholder": "Ask about symptoms, self-care, diet advice, medication reminders, or follow-up timing...",
   "hciot_status_store_missing": "Knowledge store not ready",
   "hciot_store_missing_notice": "Store {{store}} was not found. Please create the store and upload the education documents first.",

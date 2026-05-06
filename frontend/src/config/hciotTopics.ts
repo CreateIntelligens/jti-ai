@@ -3,14 +3,14 @@ export type HciotLanguage = 'zh' | 'en';
 export interface HciotTopic {
   id: string;
   order?: number;
-  labels: Record<HciotLanguage, string>;
-  questions: Record<HciotLanguage, string[]>;
+  label: string;
+  questions: string[];
 }
 
 export interface HciotCategory {
   id: string;
   order?: number;
-  labels: Record<HciotLanguage, string>;
+  label: string;
   topics: HciotTopic[];
 }
 

@@ -153,7 +153,7 @@ export default function HciotKnowledgeWorkspace({
     try {
       const [knowledgeResponse, topicsResponse, imagesResponse] = await Promise.all([
         api.listHciotKnowledgeFiles(language),
-        api.listHciotTopicsAdmin(),
+        api.listHciotTopicsAdmin(language),
         api.listHciotImages(),
       ]);
 
@@ -624,8 +624,8 @@ export default function HciotKnowledgeWorkspace({
     if (!categoryLabels) {
       throw new Error(text('請輸入新科別的中英文名稱', 'Please enter both zh and en category labels'));
     }
-    await api.createHciotTopic(fullTopicId, labels, categoryLabels);
-    const topicData = await api.listHciotTopicsAdmin();
+    await api.createHciotTopic(fullTopicId, labels, categoryLabels, undefined, language);
+    const topicData = await api.listHciotTopicsAdmin(language);
     setCategories(topicData.categories || []);
 
     return {

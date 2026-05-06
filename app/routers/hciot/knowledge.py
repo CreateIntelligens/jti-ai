@@ -173,7 +173,7 @@ def _sync_topic_questions_from_store(
                 seen.add(question)
                 questions.append(question)
 
-    topic_store = get_hciot_topic_store()
+    topic_store = get_hciot_topic_store(language)
     prefix, suffix = topic_id.split("/", 1)
 
     existing = topic_store.get_topic(topic_id)

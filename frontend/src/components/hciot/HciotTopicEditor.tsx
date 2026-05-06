@@ -73,7 +73,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
   const [saving, setSaving] = useState(false);
 
   const reload = async () => {
-    const data = await api.listHciotTopicsAdmin();
+    const data = await api.listHciotTopicsAdmin(language);
     onCategoriesChange(data.categories || []);
   };
 
@@ -104,7 +104,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
       return;
     }
     await runSavingAction(async () => {
-      await Promise.all(cat.topics.map((topic) => api.updateHciotTopic(topic.id, { category_labels: labels })));
+      await Promise.all(cat.topics.map((topic) => api.updateHciotTopic(topic.id, { category_labels: labels }, language)));
       setEditingCatId(null);
       await reload();
     });
@@ -122,7 +122,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
     const topicId = `${catSlug}/default`;
     const topicLabels = DEFAULT_TOPIC_LABELS;
     await runSavingAction(async () => {
-      await api.createHciotTopic(topicId, topicLabels, catLabels);
+      await api.createHciotTopic(topicId, topicLabels, catLabels, undefined, language);
       resetCategoryDraft();
       await reload();
     });
@@ -132,7 +132,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
   const deleteCat = async (cat: HciotTopicCategory) => {
     await runSavingAction(
       async () => {
-        await Promise.all(cat.topics.map((topic) => api.deleteHciotTopic(topic.id)));
+        await Promise.all(cat.topics.map((topic) => api.deleteHciotTopic(topic.id, language)));
         if (expandedCatId === cat.id) setExpandedCatId(null);
         await reload();
       },
@@ -154,7 +154,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
       return;
     }
     await runSavingAction(async () => {
-      await api.updateHciotTopic(topicId, { labels });
+      await api.updateHciotTopic(topicId, { labels }, language);
       setEditingTopicId(null);
       await reload();
     });
@@ -170,7 +170,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
     if (!topicSlug) return;
     const topicId = `${cat.id}/${topicSlug}`;
     await runSavingAction(async () => {
-      await api.createHciotTopic(topicId, labels, cat.labels);
+      await api.createHciotTopic(topicId, labels, cat.labels, undefined, language);
       resetTopicDraft();
       await reload();
     });
@@ -178,7 +178,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
 
   const deleteTopic = async (topicId: string) => {
     await runSavingAction(
-      async () => { await api.deleteHciotTopic(topicId); await reload(); },
+      async () => { await api.deleteHciotTopic(topicId, language); await reload(); },
       () => setConfirmDelete(null),
     );
   };
@@ -196,7 +196,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
     const existingQuestions = existingTopic?.questions ?? { zh: [], en: [] };
     const updatedQuestions = { ...existingQuestions, [language]: lines };
     await runSavingAction(async () => {
-      await api.updateHciotTopic(topicId, { questions: updatedQuestions });
+      await api.updateHciotTopic(topicId, { questions: updatedQuestions }, language);
       setEditingQuestions(null);
       await reload();
     });

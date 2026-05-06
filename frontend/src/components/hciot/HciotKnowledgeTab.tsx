@@ -105,10 +105,10 @@ export default function HciotKnowledgeTab({
   const effectiveTopicId = isNewTopic && newTopicLabels ? slugify(newTopicLabels.en) : selectedTopicId;
 
   useEffect(() => {
-    api.listHciotTopicsAdmin()
+    api.listHciotTopicsAdmin(lang)
       .then((data) => setCategories(data.categories || []))
       .catch(() => setCategories([]));
-  }, []);
+  }, [lang]);
 
   // Reset topic when category changes
   useEffect(() => {

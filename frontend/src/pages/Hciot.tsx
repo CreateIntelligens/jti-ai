@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FileText, HeartPulse, History, Moon, RotateCcw, Settings, Sun } from 'lucide-react';
 import { fetchWithApiKey } from '../services/api';
@@ -40,6 +40,31 @@ const TTS_STALL_TIMEOUT_MS = 12000;
 const TTS_CHARACTER_STORAGE_KEY = 'hciot:tts-character';
 const WORKSPACE_STORAGE_KEY = 'hciot:workspace';
 type WorkspaceMode = 'chat' | 'files';
+interface TopicSelection {
+  categoryId: string | null;
+  topicId: string | null;
+}
+
+const EMPTY_TOPIC_SELECTION: TopicSelection = { categoryId: null, topicId: null };
+
+function resolveTopicSelection(
+  categories: HciotCategory[],
+  current: TopicSelection,
+): TopicSelection {
+  if (!categories.length) {
+    return EMPTY_TOPIC_SELECTION;
+  }
+
+  const category =
+    categories.find((item) => item.id === current.categoryId) ||
+    categories[0];
+  const topicId =
+    current.topicId && category.topics.some((topic) => topic.id === current.topicId)
+      ? current.topicId
+      : category.topics[0]?.id || null;
+
+  return { categoryId: category.id, topicId };
+}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -176,8 +201,7 @@ export default function Hciot() {
   const [workspace, setWorkspace] = useState<WorkspaceMode>(() => readStoredWorkspace());
   const [editingTurn, setEditingTurn] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
-  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
+  const [topicSelection, setTopicSelection] = useState<TopicSelection>(EMPTY_TOPIC_SELECTION);
   const [categories, setCategories] = useState<HciotCategory[]>([]);
   const [ttsStateMap, setTtsStateMap] = useState<Record<string, TtsState>>({});
   const [ttsCharacters, setTtsCharacters] = useState<string[]>([]);
@@ -185,6 +209,8 @@ export default function Hciot() {
     () => readStoredTtsCharacter(),
   );
 
+  const selectedCategoryId = topicSelection.categoryId;
+  const selectedTopicId = topicSelection.topicId;
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -201,6 +227,13 @@ export default function Hciot() {
   useEffect(() => {
     isUnmountedRef.current = false;
     return () => { isUnmountedRef.current = true; };
+  }, []);
+
+  const setSelectedTopicId = useCallback((next: SetStateAction<string | null>) => {
+    setTopicSelection((current) => ({
+      ...current,
+      topicId: typeof next === 'function' ? next(current.topicId) : next,
+    }));
   }, []);
 
   useEffect(() => {
@@ -400,24 +433,25 @@ export default function Hciot() {
 
   // Fetch categories from API.
   useEffect(() => {
-    fetchWithApiKey('/api/hciot/topics')
-      .then((res) => res.ok ? res.json() : Promise.reject(res.status))
-      .then((data: { categories: HciotCategory[] }) => {
-        if (data.categories?.length) {
-          setCategories(data.categories);
-          setSelectedCategoryId(data.categories[0].id);
-          const firstTopic = data.categories[0].topics[0];
-          if (firstTopic) setSelectedTopicId(firstTopic.id);
+    api.listHciotTopics(currentLanguage)
+      .then((data) => {
+        const nextCategories = data.categories || [];
+        if (nextCategories.length) {
+          setCategories(nextCategories);
+          setTopicSelection((current) => resolveTopicSelection(nextCategories, current));
           setTopicsError(false);
         } else {
+          setCategories([]);
+          setTopicSelection(EMPTY_TOPIC_SELECTION);
           setTopicsError(true);
         }
       })
       .catch(() => {
+        setCategories([]);
+        setTopicSelection(EMPTY_TOPIC_SELECTION);
         setTopicsError(true);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentLanguage]);
 
   const restartConversation = useCallback(async () => {
     if (!storeName) return;
@@ -673,16 +707,18 @@ export default function Hciot() {
                 selectedTopicId={selectedTopicId}
                 selectedCategoryId={selectedCategoryId}
                 onSelectCategory={(catId) => {
-                  setSelectedCategoryId(catId);
                   const cat = categories.find((c) => c.id === catId);
                   const firstTopic = cat?.topics[0];
-                  setSelectedTopicId(firstTopic?.id || null);
+                  setTopicSelection({
+                    categoryId: catId,
+                    topicId: firstTopic?.id || null,
+                  });
                 }}
                 heading={t('hciot_topic_heading')}
                 subheading={t('hciot_topic_subheading')}
                 questionHeading={
                   selectedTopic
-                    ? `${selectedTopic.labels[currentLanguage]} 常見問題`
+                    ? t('hciot_topic_question_heading', { topic: selectedTopic.label })
                     : undefined
                 }
                 disabledMessage={

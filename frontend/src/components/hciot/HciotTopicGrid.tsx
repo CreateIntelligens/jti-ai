@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import HciotSelect from './HciotSelect';
 import type { HciotCategory, HciotLanguage, HciotTopic } from '../../config/hciotTopics';
 
@@ -32,6 +33,7 @@ export default function HciotTopicGrid({
   questionHeading,
   disabledMessage,
 }: HciotTopicGridProps) {
+  const { t } = useTranslation();
   const selectedTopic = selectedTopicId ? topics.find((t) => t.id === selectedTopicId) ?? null : null;
   const categorySelectPlaceholder = language === 'en' ? 'All categories' : '全部科別';
 
@@ -64,7 +66,7 @@ export default function HciotTopicGrid({
           disabled={disabled}
           options={[
             { value: '__all__', label: categorySelectPlaceholder },
-            ...categories.map((cat) => ({ value: cat.id, label: cat.labels[language] })),
+            ...categories.map((cat) => ({ value: cat.id, label: cat.label })),
           ]}
         />
       ) : null}
@@ -75,17 +77,17 @@ export default function HciotTopicGrid({
           value={selectedTopicId || ''}
           onChange={handleTopicChange}
           disabled={disabled}
-          options={topics.map((topic, index) => ({ value: topic.id || `topic-${index}`, label: topic.labels[language] }))}
+          options={topics.map((topic, index) => ({ value: topic.id || `topic-${index}`, label: topic.label }))}
         />
       ) : null}
 
       {selectedTopic ? (
         <div className="hciot-topic-question-panel">
           <p className="hciot-q-section-head">
-            {questionHeading || `${selectedTopic.labels[language]} · 常見問題`}
+            {questionHeading || t('hciot_topic_question_heading', { topic: selectedTopic.label })}
           </p>
           <div className="hciot-topic-question-list custom-scrollbar">
-            {selectedTopic.questions[language].map((question, index) => {
+            {selectedTopic.questions.map((question, index) => {
               const key = `${selectedTopic.id}-${index}`;
               return (
                 <button

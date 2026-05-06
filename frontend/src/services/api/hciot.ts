@@ -1,4 +1,5 @@
 import type { StartChatResponse, ChatResponse, Prompt, KnowledgeFile, KnowledgeFileContent } from '../../types';
+import type { HciotCategory as HciotRuntimeCategory, HciotLanguage } from '../../config/hciotTopics';
 import { API_BASE, fetchAsAdmin, fetchWithApiKey, handleResponse, normLang, buildUrl } from './base';
 
 export interface HciotRuntimeSettings {
@@ -85,8 +86,12 @@ async function fetchAdminJson<T>(
   return handleResponse<T>(response);
 }
 
-async function fetchApiJson<T>(path: string, options?: RequestInit): Promise<T> {
-  const response = await fetchWithApiKey(buildApiUrl(path), options);
+async function fetchApiJson<T>(
+  path: string,
+  options?: RequestInit,
+  params?: Record<string, QueryValue>,
+): Promise<T> {
+  const response = await fetchWithApiKey(buildApiUrl(path, params), options);
   return handleResponse<T>(response);
 }
 
@@ -282,23 +287,30 @@ export interface HciotTopicCategory {
   }>;
 }
 
-export async function listHciotTopicsAdmin(): Promise<{ categories: HciotTopicCategory[] }> {
-  return fetchApiJson<{ categories: HciotTopicCategory[] }>('/topics');
+export async function listHciotTopics(language: HciotLanguage = 'zh'): Promise<{ categories: HciotRuntimeCategory[] }> {
+  const lang = normLang(language);
+  return fetchApiJson<{ categories: HciotRuntimeCategory[] }>(`/topics/${lang}`);
+}
+
+export async function listHciotTopicsAdmin(language: HciotLanguage = 'zh'): Promise<{ categories: HciotTopicCategory[] }> {
+  return fetchApiJson<{ categories: HciotTopicCategory[] }>('/topics', undefined, { language: normLang(language) });
 }
 
 export async function updateHciotTopic(
   topicId: string,
   data: { labels?: HciotLabels; category_labels?: HciotLabels; questions?: HciotTopicQuestions },
+  language: HciotLanguage = 'zh',
 ): Promise<Record<string, unknown>> {
   // topic_id contains "/" so we can't use encodeURIComponent — pass raw
   return fetchAdminJson<Record<string, unknown>>(
     `/topics/${topicId}`,
     jsonRequest('PUT', data),
+    { language: normLang(language) },
   );
 }
 
-export async function deleteHciotTopic(topicId: string): Promise<void> {
-  await fetchAdminJson<void>(`/topics/${topicId}`, { method: 'DELETE' });
+export async function deleteHciotTopic(topicId: string, language: HciotLanguage = 'zh'): Promise<void> {
+  await fetchAdminJson<void>(`/topics/${topicId}`, { method: 'DELETE' }, { language: normLang(language) });
 }
 
 export async function createHciotTopic(
@@ -306,17 +318,18 @@ export async function createHciotTopic(
   labels: HciotLabels,
   categoryLabels: HciotLabels,
   questions: HciotTopicQuestions = { zh: [], en: [] },
+  language: HciotLanguage = 'zh',
 ): Promise<Record<string, unknown>> {
   return fetchAdminJson<Record<string, unknown>>('/topics/', jsonRequest('POST', {
     topic_id: topicId,
     labels,
     category_labels: categoryLabels,
     questions,
-  }));
+  }), { language: normLang(language) });
 }
 
 export interface UploadWithTopicOptions {
-  language: string;
+  language: HciotLanguage;
   file: File;
   categoryId?: string;
   topicId?: string;
@@ -400,10 +413,9 @@ export interface HciotMergedCsvResponse {
   source_files: string[];
 }
 
-export async function getHciotTopicMergedCsv(topicId: string, language: string = 'zh'): Promise<HciotMergedCsvResponse> {
+export async function getHciotTopicMergedCsv(topicId: string, language: HciotLanguage = 'zh'): Promise<HciotMergedCsvResponse> {
   return fetchAdminJson<HciotMergedCsvResponse>('/knowledge/topic-csv-merged', undefined, {
     topic_id: topicId,
     language: normLang(language),
   });
 }
-

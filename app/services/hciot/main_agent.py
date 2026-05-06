@@ -43,8 +43,9 @@ _SEARCH_KNOWLEDGE_DECL = build_search_knowledge_decl(
         "若使用者一次提出多個獨立主題的問題，請在同一次呼叫中將每個獨立問題各自填入 queries 陣列。"
     ),
     queries_description=(
-        "使用者問題拆解後的獨立查詢列表，必須使用繁體中文，每一筆應為完整的問題描述（包含上下文）。"
-        "若使用者只有一個問題，仍以單元素陣列回傳。即使使用者用英文提問，每筆 query 也必須翻譯成中文。"
+        "使用者問題拆解後的獨立查詢列表，每一筆應為完整的問題描述（包含上下文）。"
+        "請使用與目前對話或使用者問題相同的語言撰寫 query；英文問題用英文查詢，中文問題用中文查詢。"
+        "若使用者只有一個問題，仍以單元素陣列回傳。"
     ),
 )
 
@@ -106,9 +107,8 @@ class MainAgent(BaseAgent):
     def _rag_source_type(self) -> str:
         return "hciot_knowledge"
 
-    @property
-    def _rag_search_language(self) -> str | None:
-        return "zh"
+    def _get_rag_search_language_for_session(self, session: Session) -> str | None:
+        return normalize_language(session.language)
 
     @property
     def _rag_tool_declaration(self) -> types.Tool | None:

@@ -4,6 +4,7 @@ MongoDB-backed HCIoT topic storage (flat).
 Each document in `hciot_topics` represents a single topic:
 
   {
+    "language": "en",
     "topic_id": "ortho-rehab/prp",
     "order": 0,
     "labels": { "zh": "PRP", "en": "PRP Therapy" },
@@ -15,11 +16,17 @@ Each document in `hciot_topics` represents a single topic:
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Literal
 
+from app.services.agent_utils import normalize_language
 from app.services.mongo_client import get_mongo_db
 
 Topic = dict[str, Any]
+Language = Literal["zh", "en"]
+
+
+def to_topic_language(language: str | None = None) -> Language:
+    return "en" if normalize_language(language) == "en" else "zh"
 
 
 class HciotTopicStore:
@@ -27,26 +34,31 @@ class HciotTopicStore:
 
     COLLECTION = "hciot_topics"
 
-    def __init__(self):
+    def __init__(self, language: Language = "zh"):
+        self.language = language
         self.db = get_mongo_db("hciot_app")
         self.collection = self.db[self.COLLECTION]
 
+    def _language_query(self) -> dict[str, Any]:
+        return {"language": self.language}
+
+    def _topic_query(self, topic_id: str) -> dict[str, Any]:
+        return {"topic_id": topic_id, **self._language_query()}
+
     def _prepare_payload(self, data: dict, topic_id: str | None = None) -> dict:
         """Strip _id and add updated_at timestamp."""
-        payload = {k: v for k, v in data.items() if k != "_id"}
+        payload = {k: v for k, v in data.items() if k not in {"_id", "language"}}
         if topic_id:
             payload["topic_id"] = topic_id
         payload["updated_at"] = datetime.now(timezone.utc)
         return payload
 
-    # ===================== Read =====================
-
     def list_topics(self) -> list[Topic]:
         """Return all topics sorted by order, without MongoDB _id."""
-        return list(self.collection.find({}, {"_id": 0}).sort("order", 1))
+        return list(self.collection.find(self._language_query(), {"_id": 0}).sort("order", 1))
 
     def get_topic(self, topic_id: str) -> Topic | None:
-        return self.collection.find_one({"topic_id": topic_id}, {"_id": 0})
+        return self.collection.find_one(self._topic_query(topic_id), {"_id": 0})
 
     def list_categories(self) -> list[dict[str, Any]]:
         """Group topics by category prefix into a hierarchical structure."""
@@ -62,25 +74,40 @@ class HciotTopicStore:
                 }
             groups[prefix]["topics"].append({**topic, "id": tid})
 
-        # Sort categories by the minimum order of their topics
         return sorted(groups.values(), key=lambda g: min((t.get("order", 0) for t in g["topics"]), default=0))
-
-    # ===================== Write =====================
 
     def upsert_topic(self, topic_id: str, data: dict) -> None:
         """Create or fully replace a topic document."""
         now = datetime.now(timezone.utc)
         payload = self._prepare_payload(data, topic_id)
+        query = self._topic_query(topic_id)
 
-        # Preserve order if not provided
-        if "order" not in payload:
-            existing = self.get_topic(topic_id)
-            payload["order"] = existing.get("order", 0) if existing else self.collection.count_documents({})
+        if "order" in payload:
+            self.collection.find_one_and_update(
+                query,
+                {"$set": payload, "$setOnInsert": {"created_at": now, "language": self.language}},
+                upsert=True,
+                projection={"_id": 0},
+            )
+            return
 
-        self.collection.update_one(
-            {"topic_id": topic_id},
-            {"$set": payload, "$setOnInsert": {"created_at": now}},
+        updated = self.collection.find_one_and_update(
+            query,
+            {"$set": payload},
+            projection={"_id": 0},
+        )
+        if updated is not None:
+            return
+
+        new_order = self.collection.count_documents(self._language_query())
+        self.collection.find_one_and_update(
+            query,
+            {
+                "$set": payload,
+                "$setOnInsert": {"created_at": now, "language": self.language, "order": new_order},
+            },
             upsert=True,
+            projection={"_id": 0},
         )
 
     def update_topic(self, topic_id: str, data: dict) -> bool:
@@ -89,13 +116,11 @@ class HciotTopicStore:
         if not payload:
             return False
 
-        result = self.collection.update_one({"topic_id": topic_id}, {"$set": payload})
+        result = self.collection.update_one(self._topic_query(topic_id), {"$set": payload})
         return result.matched_count > 0
 
     def delete_topic(self, topic_id: str) -> bool:
-        return self.collection.delete_one({"topic_id": topic_id}).deleted_count > 0
-
-    # ===================== Convenience =====================
+        return self.collection.delete_one(self._topic_query(topic_id)).deleted_count > 0
 
     def ensure_topic(self, topic_id: str, labels: dict, category_labels: dict) -> None:
         """Create topic if it doesn't exist yet."""
@@ -107,13 +132,12 @@ class HciotTopicStore:
             })
 
 
-# --- Singleton ---
-_hciot_topic_store: HciotTopicStore | None = None
+_hciot_topic_stores: dict[Language, HciotTopicStore] = {}
 
 
-def get_hciot_topic_store() -> HciotTopicStore:
+def get_hciot_topic_store(language: str | None = None) -> HciotTopicStore:
     """Return singleton HCIoT topic store."""
-    global _hciot_topic_store
-    if _hciot_topic_store is None:
-        _hciot_topic_store = HciotTopicStore()
-    return _hciot_topic_store
+    lang = to_topic_language(language)
+    if lang not in _hciot_topic_stores:
+        _hciot_topic_stores[lang] = HciotTopicStore(lang)
+    return _hciot_topic_stores[lang]
