@@ -116,10 +116,9 @@ class TestRAGPipeline(unittest.TestCase):
                 data=b"q,a\nIntroduction?,Answer",
                 topic_info={
                     "topic_id": "常見問題/各科介紹",
-                    "topic_label_zh": "各科介紹",
-                    "topic_label_en": "各科介紹",
-                    "category_label_zh": "常見問題",
-                    "category_label_en": "常見問題",
+                    # Doc-level en labels missing — fall back to topic_store.
+                    "topic_label": "",
+                    "category_label": "",
                 },
             )
 
@@ -129,10 +128,8 @@ class TestRAGPipeline(unittest.TestCase):
     def test_hciot_backfill_skips_topic_store_lookup_when_labels_are_usable(self):
         topic_info = {
             "topic_id": "faq/department-introductions",
-            "topic_label_zh": "各科介紹",
-            "topic_label_en": "Department Introductions",
-            "category_label_zh": "常見問題",
-            "category_label_en": "FAQ",
+            "topic_label": "Department Introductions",
+            "category_label": "FAQ",
         }
 
         with patch("app.services.rag.backfill.get_hciot_topic_store") as get_topic_store:

@@ -48,6 +48,10 @@ _FIELD_ALIASES: dict[str, list[str]] = {
 _QA_CONTENT_FIELDS = ("q", "a", "img", "url")
 
 
+class UnsupportedQaCsvError(ValueError):
+    """Raised when a CSV looks like HCIoT Q&A data but lacks required columns."""
+
+
 def _normalize_fieldname(raw: str) -> str:
     key = raw.strip().lower()
     for canonical, aliases in _FIELD_ALIASES.items():
@@ -85,6 +89,25 @@ def _parse_csv_rows(file_bytes: bytes) -> tuple[list[str], list[dict[str, str]]]
         for row in reader
     ]
     return fieldnames, rows
+
+
+def validate_supported_hciot_csv(file_bytes: bytes) -> None:
+    """Reject malformed HCIoT Q&A CSVs before they are stored.
+
+    A CSV with Q&A-like columns but missing question or answer columns is
+    almost certainly a bad export for this workspace. Plain non-Q&A CSVs are
+    still allowed so existing generic knowledge-file behavior remains intact.
+    """
+    parsed = _parse_csv_rows(file_bytes)
+    if parsed is None:
+        return
+
+    fieldnames, _ = parsed
+    has_qa_fields = any(field in fieldnames for field in _QA_CONTENT_FIELDS)
+    missing_required = [field for field in ("q", "a") if field not in fieldnames]
+    if has_qa_fields and missing_required:
+        missing = ", ".join(missing_required)
+        raise UnsupportedQaCsvError(f"CSV must include q and a columns for HCIoT Q&A uploads (missing: {missing})")
 
 
 def _rows_to_csv_bytes(fieldnames: list[str], rows: list[dict[str, str]]) -> bytes:

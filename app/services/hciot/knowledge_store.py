@@ -48,19 +48,14 @@ class HciotKnowledgeStore:
         cls,
         *,
         topic_id: str | None = None,
-        category_labels: dict[str, Any] | None = None,
-        topic_labels: dict[str, Any] | None = None,
+        category_label: str | None = None,
+        topic_label: str | None = None,
     ) -> dict[str, Any]:
         tid = cls._normalize_optional_text(topic_id)
-        cat = category_labels or {}
-        top = topic_labels or {}
-        
         return {
             "topic_id": tid,
-            "category_label_zh": cls._normalize_optional_text(cat.get("zh")) if tid else None,
-            "category_label_en": cls._normalize_optional_text(cat.get("en")) if tid else None,
-            "topic_label_zh": cls._normalize_optional_text(top.get("zh")) if tid else None,
-            "topic_label_en": cls._normalize_optional_text(top.get("en")) if tid else None,
+            "category_label": cls._normalize_optional_text(category_label) if tid else None,
+            "topic_label": cls._normalize_optional_text(topic_label) if tid else None,
         }
 
     @staticmethod
@@ -74,10 +69,8 @@ class HciotKnowledgeStore:
             "size": int(doc.get("size", 0)),
             "editable": bool(doc.get("editable", False)),
             "topic_id": doc.get("topic_id"),
-            "category_label_zh": doc.get("category_label_zh"),
-            "category_label_en": doc.get("category_label_en"),
-            "topic_label_zh": doc.get("topic_label_zh"),
-            "topic_label_en": doc.get("topic_label_en"),
+            "category_label": doc.get("category_label"),
+            "topic_label": doc.get("topic_label"),
             "created_at": doc.get("created_at"),
         }
 
@@ -131,10 +124,8 @@ class HciotKnowledgeStore:
                 "size": 1,
                 "editable": 1,
                 "topic_id": 1,
-                "category_label_zh": 1,
-                "category_label_en": 1,
-                "topic_label_zh": 1,
-                "topic_label_en": 1,
+                "category_label": 1,
+                "topic_label": 1,
                 "created_at": 1,
             },
         ).sort("filename", 1)
@@ -153,7 +144,7 @@ class HciotKnowledgeStore:
         base_name = self._safe_filename(filename)
         path = Path(base_name)
         stem, suffix = path.stem, path.suffix
-        
+
         candidate = base_name
         counter = 1
         while self.collection.find_one(self._query(language, candidate), {"_id": 1}):
@@ -170,8 +161,8 @@ class HciotKnowledgeStore:
         content_type: str = "application/octet-stream",
         editable: bool = True,
         topic_id: str | None = None,
-        category_labels: dict[str, Any] | None = None,
-        topic_labels: dict[str, Any] | None = None,
+        category_label: str | None = None,
+        topic_label: str | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
         candidate = self._resolve_filename(language, filename)
@@ -189,9 +180,9 @@ class HciotKnowledgeStore:
             "updated_at": now,
             **self._association_metadata(
                 topic_id=topic_id,
-                category_labels=category_labels,
-                topic_labels=topic_labels,
-            )
+                category_label=category_label,
+                topic_label=topic_label,
+            ),
         }
         self.collection.insert_one(doc)
         return self._metadata_from_doc(doc)
@@ -230,14 +221,8 @@ class HciotKnowledgeStore:
     ) -> dict[str, Any] | None:
         payload = self._association_metadata(
             topic_id=metadata.get("topic_id"),
-            category_labels={
-                "zh": metadata.get("category_label_zh"),
-                "en": metadata.get("category_label_en"),
-            },
-            topic_labels={
-                "zh": metadata.get("topic_label_zh"),
-                "en": metadata.get("topic_label_en"),
-            },
+            category_label=metadata.get("category_label"),
+            topic_label=metadata.get("topic_label"),
         )
         updated = self.collection.find_one_and_update(
             self._query(language, filename),

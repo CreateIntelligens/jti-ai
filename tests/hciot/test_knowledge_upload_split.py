@@ -24,8 +24,8 @@ class FakeKnowledgeStore:
         content_type: str = "application/octet-stream",
         editable: bool = True,
         topic_id: str | None = None,
-        category_labels: dict | None = None,
-        topic_labels: dict | None = None,
+        category_label: str | None = None,
+        topic_label: str | None = None,
     ) -> dict:
         record = {
             "language": language,
@@ -35,10 +35,8 @@ class FakeKnowledgeStore:
             "content_type": content_type,
             "editable": editable,
             "topic_id": topic_id,
-            "category_label_zh": (category_labels or {}).get("zh"),
-            "category_label_en": (category_labels or {}).get("en"),
-            "topic_label_zh": (topic_labels or {}).get("zh"),
-            "topic_label_en": (topic_labels or {}).get("en"),
+            "category_label": category_label,
+            "topic_label": topic_label,
         }
         self.files.append(record)
         return {
@@ -46,10 +44,8 @@ class FakeKnowledgeStore:
             "display_name": record["display_name"],
             "size": len(data),
             "topic_id": topic_id,
-            "category_label_zh": record["category_label_zh"],
-            "category_label_en": record["category_label_en"],
-            "topic_label_zh": record["topic_label_zh"],
-            "topic_label_en": record["topic_label_en"],
+            "category_label": record["category_label"],
+            "topic_label": record["topic_label"],
         }
 
     def get_file(self, language: str, filename: str) -> dict | None:
@@ -62,6 +58,20 @@ class FakeKnowledgeStore:
                 }
         return None
 
+    def list_files(self, language: str) -> list[dict]:
+        return [
+            {
+                "name": item["filename"],
+                "display_name": item["display_name"],
+                "size": len(item["data"]),
+                "topic_id": item["topic_id"],
+                "category_label": item["category_label"],
+                "topic_label": item["topic_label"],
+            }
+            for item in self.files
+            if item["language"] == language
+        ]
+
     def update_file_content(self, language: str, filename: str, new_data: bytes) -> dict | None:
         for item in self.files:
             if item["language"] == language and item["filename"] == filename:
@@ -71,10 +81,8 @@ class FakeKnowledgeStore:
                     "display_name": item["display_name"],
                     "size": len(new_data),
                     "topic_id": item["topic_id"],
-                    "category_label_zh": item["category_label_zh"],
-                    "category_label_en": item["category_label_en"],
-                    "topic_label_zh": item["topic_label_zh"],
-                    "topic_label_en": item["topic_label_en"],
+                    "category_label": item["category_label"],
+                    "topic_label": item["topic_label"],
                 }
         return None
 
@@ -102,16 +110,35 @@ def _post_upload(client: TestClient, fake_store: FakeKnowledgeStore, fake_topic_
             files={"file": ("prp.csv", csv_bytes, "text/csv")},
             data={
                 "topic_id": "ortho/prp",
-                "category_label_zh": "骨科",
-                "category_label_en": "Orthopedics",
-                "topic_label_zh": "PRP",
-                "topic_label_en": "PRP",
+                "category_label": "骨科",
+                "topic_label": "PRP",
             },
         )
 
 
 def _make_upload_context():
     return TestClient(app), FakeKnowledgeStore(), mock.Mock()
+
+
+def test_list_knowledge_files_returns_empty_language_partition_without_chinese_fallback():
+    client, fake_store, _ = _make_upload_context()
+    fake_store.insert_file(
+        language="zh",
+        filename="zh.csv",
+        data=b"index,q,a,img\n1,zh q,zh a,\n",
+        display_name="zh.csv",
+        content_type="text/csv",
+        editable=True,
+        topic_id="faq/hospital",
+        category_label="常見問題",
+        topic_label="醫院資訊",
+    )
+
+    with mock.patch("app.routers.hciot.knowledge.get_hciot_knowledge_store", return_value=fake_store):
+        response = client.get("/api/hciot-admin/knowledge/files/?language=en")
+
+    assert response.status_code == 200
+    assert response.json() == {"files": [], "language": "en"}
 
 
 def test_upload_knowledge_file_splits_mixed_qa_csv_and_syncs_all_questions():
@@ -204,6 +231,48 @@ def test_upload_knowledge_file_preserves_image_extension_in_split_filename():
     ]
 
 
+def test_upload_rejects_qa_like_csv_without_question_column():
+    client, fake_store, fake_topic_store = _make_upload_context()
+    fake_topic_store.get_topic.return_value = None
+
+    csv_bytes = "項目,內容,圖片 (img),網址 (URL)\n股四頭肌是什麼？,大腿前側肌肉,IMG_1,\n".encode()
+
+    response = _post_upload(client, fake_store, fake_topic_store, csv_bytes)
+
+    assert response.status_code == 400
+    assert "q" in response.json()["detail"]
+    assert fake_store.files == []
+    fake_topic_store.upsert_topic.assert_not_called()
+
+
+def test_upload_rejects_qa_csv_without_answer_column():
+    client, fake_store, fake_topic_store = _make_upload_context()
+    fake_topic_store.get_topic.return_value = None
+
+    csv_bytes = "q,img\n股四頭肌是什麼？,IMG_1\n".encode()
+
+    response = _post_upload(client, fake_store, fake_topic_store, csv_bytes)
+
+    assert response.status_code == 400
+    assert "a" in response.json()["detail"]
+    assert fake_store.files == []
+    fake_topic_store.upsert_topic.assert_not_called()
+
+
+def test_upload_accepts_qa_csv_without_index_and_backfills_it():
+    client, fake_store, fake_topic_store = _make_upload_context()
+    fake_topic_store.get_topic.return_value = None
+
+    csv_bytes = "q,a,img\n第一題,第一答,\n第二題,第二答,\n".encode()
+
+    response = _post_upload(client, fake_store, fake_topic_store, csv_bytes)
+
+    assert response.status_code == 200
+    saved = fake_store.get_file("zh", "prp.csv")
+    assert saved is not None
+    assert saved["data"].decode("utf-8-sig") == "index,q,a,img\n1,第一題,第一答,\n2,第二題,第二答,\n"
+
+
 def test_update_file_content_splits_legacy_single_csv_with_image_rows():
     client, fake_store, fake_topic_store = _make_upload_context()
     fake_topic_store.get_topic.return_value = None
@@ -215,8 +284,8 @@ def test_update_file_content_splits_legacy_single_csv_with_image_rows():
         content_type="text/csv",
         editable=True,
         topic_id="ortho/legacy",
-        category_labels={"zh": "骨科", "en": "Orthopedics"},
-        topic_labels={"zh": "舊題庫", "en": "Legacy"},
+        category_label="骨科",
+        topic_label="舊題庫",
     )
 
     with mock.patch("app.routers.hciot.knowledge.get_hciot_knowledge_store", return_value=fake_store), \
@@ -256,8 +325,8 @@ def test_update_file_content_keeps_canonical_name_for_existing_img_csv():
         content_type="text/csv",
         editable=True,
         topic_id="ortho/legacy",
-        category_labels={"zh": "骨科", "en": "Orthopedics"},
-        topic_labels={"zh": "舊題庫", "en": "Legacy"},
+        category_label="骨科",
+        topic_label="舊題庫",
     )
 
     with mock.patch("app.routers.hciot.knowledge.get_hciot_knowledge_store", return_value=fake_store), \
@@ -282,8 +351,8 @@ def test_update_file_content_drops_blank_rows_from_csv_save():
         content_type="text/csv",
         editable=True,
         topic_id="ortho/legacy",
-        category_labels={"zh": "骨科", "en": "Orthopedics"},
-        topic_labels={"zh": "舊題庫", "en": "Legacy"},
+        category_label="骨科",
+        topic_label="舊題庫",
     )
 
     with mock.patch("app.routers.hciot.knowledge.get_hciot_knowledge_store", return_value=fake_store), \
@@ -297,3 +366,61 @@ def test_update_file_content_drops_blank_rows_from_csv_save():
     saved = fake_store.get_file("zh", "legacy.csv")
     assert saved is not None
     assert saved["data"].decode("utf-8-sig") == "index,q,a,img\n1,第一題,第一答,\n"
+
+
+def test_update_file_content_rejects_qa_like_csv_without_question_column():
+    client, fake_store, fake_topic_store = _make_upload_context()
+    fake_topic_store.get_topic.return_value = None
+    fake_store.insert_file(
+        language="zh",
+        filename="legacy.csv",
+        data=b"index,q,a,img\n1,\xe8\x88\x8a\xe9\xa1\x8c,\xe8\x88\x8a\xe7\xad\x94,\n",
+        display_name="legacy.csv",
+        content_type="text/csv",
+        editable=True,
+        topic_id="ortho/legacy",
+        category_label="骨科",
+        topic_label="舊題庫",
+    )
+
+    with mock.patch("app.routers.hciot.knowledge.get_hciot_knowledge_store", return_value=fake_store), \
+         mock.patch("app.routers.hciot.knowledge.get_hciot_topic_store", return_value=fake_topic_store):
+        response = client.put(
+            "/api/hciot-admin/knowledge/files/legacy.csv/content?language=zh",
+            json={"content": "項目,內容,圖片 (img),網址 (URL)\n股四頭肌是什麼？,大腿前側肌肉,IMG_1,\n"},
+        )
+
+    assert response.status_code == 400
+    assert "q" in response.json()["detail"]
+    saved = fake_store.get_file("zh", "legacy.csv")
+    assert saved is not None
+    assert saved["data"].decode("utf-8-sig") == "index,q,a,img\n1,舊題,舊答,\n"
+
+
+def test_update_file_content_rejects_qa_csv_without_answer_column():
+    client, fake_store, fake_topic_store = _make_upload_context()
+    fake_topic_store.get_topic.return_value = None
+    fake_store.insert_file(
+        language="zh",
+        filename="legacy.csv",
+        data=b"index,q,a,img\n1,\xe8\x88\x8a\xe9\xa1\x8c,\xe8\x88\x8a\xe7\xad\x94,\n",
+        display_name="legacy.csv",
+        content_type="text/csv",
+        editable=True,
+        topic_id="ortho/legacy",
+        category_label="骨科",
+        topic_label="舊題庫",
+    )
+
+    with mock.patch("app.routers.hciot.knowledge.get_hciot_knowledge_store", return_value=fake_store), \
+         mock.patch("app.routers.hciot.knowledge.get_hciot_topic_store", return_value=fake_topic_store):
+        response = client.put(
+            "/api/hciot-admin/knowledge/files/legacy.csv/content?language=zh",
+            json={"content": "q,img\n股四頭肌是什麼？,IMG_1\n"},
+        )
+
+    assert response.status_code == 400
+    assert "a" in response.json()["detail"]
+    saved = fake_store.get_file("zh", "legacy.csv")
+    assert saved is not None
+    assert saved["data"].decode("utf-8-sig") == "index,q,a,img\n1,舊題,舊答,\n"

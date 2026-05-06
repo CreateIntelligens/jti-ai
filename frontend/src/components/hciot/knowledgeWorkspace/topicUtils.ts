@@ -100,19 +100,38 @@ export function getFileLabel(file: HciotKnowledgeFile): string {
   return (file.display_name || file.name || '').trim() || file.name;
 }
 
-function getCategoryLabels(file: HciotKnowledgeFile, category?: HciotTopicCategory): HciotLabels {
+function buildDraftLabels(
+  language: HciotLanguage,
+  fileLabel: string,
+  topicStoreLabels?: HciotLabels,
+): HciotLabels {
+  if (language === 'zh') {
+    return {
+      zh: topicStoreLabels?.zh || fileLabel,
+      en: topicStoreLabels?.en || '',
+    };
+  }
   return {
-    zh: category?.labels.zh || file.category_label_zh || '',
-    en: category?.labels.en || file.category_label_en || '',
+    zh: topicStoreLabels?.zh || '',
+    en: topicStoreLabels?.en || fileLabel,
   };
 }
 
-function getTopicLabels(file: HciotKnowledgeFile, category?: HciotTopicCategory): HciotLabels {
+function getCategoryLabels(
+  file: HciotKnowledgeFile,
+  language: HciotLanguage,
+  category?: HciotTopicCategory,
+): HciotLabels {
+  return buildDraftLabels(language, file.category_label || '', category?.labels);
+}
+
+function getTopicLabels(
+  file: HciotKnowledgeFile,
+  language: HciotLanguage,
+  category?: HciotTopicCategory,
+): HciotLabels {
   const topic = category?.topics.find((item) => item.id === file.topic_id);
-  return {
-    zh: topic?.labels.zh || file.topic_label_zh || '',
-    en: topic?.labels.en || file.topic_label_en || '',
-  };
+  return buildDraftLabels(language, file.topic_label || '', topic?.labels);
 }
 
 export function categoryPrefix(topicId: string | null | undefined): string {
@@ -127,11 +146,12 @@ export function categoryPrefix(topicId: string | null | undefined): string {
 export function draftFromFile(
   file: HciotKnowledgeFile,
   categories: HciotTopicCategory[],
+  language: HciotLanguage,
 ): FileMetadataDraft {
   const categoryId = categoryPrefix(file.topic_id);
   const category = categories.find((item) => item.id === categoryId);
-  const categoryLabels = getCategoryLabels(file, category);
-  const topicLabels = getTopicLabels(file, category);
+  const categoryLabels = getCategoryLabels(file, language, category);
+  const topicLabels = getTopicLabels(file, language, category);
 
   return {
     categoryId,
@@ -143,8 +163,13 @@ export function draftFromFile(
   };
 }
 
-export function getMetadataPayload(data: HciotKnowledgeFile | FileMetadataDraft) {
-  // Common logic for both HciotKnowledgeFile and FileMetadataDraft
+export function getMetadataPayload(
+  data: HciotKnowledgeFile | FileMetadataDraft,
+  language: HciotLanguage,
+) {
+  // Common logic for both HciotKnowledgeFile and FileMetadataDraft.
+  // Output uses the flattened single-label shape and only emits the label
+  // for the file's own language partition (`language`).
   const isDraft = 'categoryId' in data;
   const categoryId = isDraft
     ? (data.categoryId && data.categoryId !== NEW_VALUE ? data.categoryId : null)
@@ -155,21 +180,19 @@ export function getMetadataPayload(data: HciotKnowledgeFile | FileMetadataDraft)
     : data.topic_id;
 
   if (isDraft) {
+    const draftCategoryLabel = language === 'zh' ? data.categoryLabelZh : data.categoryLabelEn;
+    const draftTopicLabel = language === 'zh' ? data.topicLabelZh : data.topicLabelEn;
     return {
       topic_id: topicId,
-      category_label_zh: categoryId ? data.categoryLabelZh.trim() || null : null,
-      category_label_en: categoryId ? data.categoryLabelEn.trim() || null : null,
-      topic_label_zh: topicId ? data.topicLabelZh.trim() || null : null,
-      topic_label_en: topicId ? data.topicLabelEn.trim() || null : null,
+      category_label: categoryId ? draftCategoryLabel.trim() || null : null,
+      topic_label: topicId ? draftTopicLabel.trim() || null : null,
     };
   }
 
   return {
     topic_id: topicId,
-    category_label_zh: data.category_label_zh || null,
-    category_label_en: data.category_label_en || null,
-    topic_label_zh: data.topic_label_zh || null,
-    topic_label_en: data.topic_label_en || null,
+    category_label: data.category_label || null,
+    topic_label: data.topic_label || null,
   };
 }
 

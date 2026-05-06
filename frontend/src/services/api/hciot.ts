@@ -259,10 +259,8 @@ export async function updateHciotKnowledgeFileMetadata(
   filename: string,
   metadata: {
     topic_id?: string | null;
-    category_label_zh?: string | null;
-    category_label_en?: string | null;
-    topic_label_zh?: string | null;
-    topic_label_en?: string | null;
+    category_label?: string | null;
+    topic_label?: string | null;
   },
   language: string = 'zh',
 ): Promise<HciotKnowledgeFile & { topic_synced: boolean }> {
@@ -293,7 +291,8 @@ export async function listHciotTopics(language: HciotLanguage = 'zh'): Promise<{
 }
 
 export async function listHciotTopicsAdmin(language: HciotLanguage = 'zh'): Promise<{ categories: HciotTopicCategory[] }> {
-  return fetchApiJson<{ categories: HciotTopicCategory[] }>('/topics', undefined, { language: normLang(language) });
+  const lang = normLang(language);
+  return fetchAdminJson<{ categories: HciotTopicCategory[] }>(`/topics/${lang}`);
 }
 
 export async function updateHciotTopic(
@@ -333,10 +332,10 @@ export interface UploadWithTopicOptions {
   file: File;
   categoryId?: string;
   topicId?: string;
-  categoryLabelZh?: string;
-  categoryLabelEn?: string;
-  topicLabelZh?: string;
-  topicLabelEn?: string;
+  // Single labels — implicitly in `language`. Backend only stores the label
+  // for the doc's language partition.
+  categoryLabel?: string;
+  topicLabel?: string;
 }
 
 export async function uploadHciotKnowledgeFileWithTopic(
@@ -347,10 +346,8 @@ export async function uploadHciotKnowledgeFileWithTopic(
   // Backend still accepts category_id + topic_id as separate Form fields and merges them
   appendOptionalFormValue(formData, 'category_id', opts.categoryId);
   appendOptionalFormValue(formData, 'topic_id', opts.topicId);
-  appendOptionalFormValue(formData, 'category_label_zh', opts.categoryLabelZh);
-  appendOptionalFormValue(formData, 'category_label_en', opts.categoryLabelEn);
-  appendOptionalFormValue(formData, 'topic_label_zh', opts.topicLabelZh);
-  appendOptionalFormValue(formData, 'topic_label_en', opts.topicLabelEn);
+  appendOptionalFormValue(formData, 'category_label', opts.categoryLabel);
+  appendOptionalFormValue(formData, 'topic_label', opts.topicLabel);
 
   return fetchAdminJson<HciotKnowledgeFile & { synced: boolean; topic_synced: boolean; uploaded_count?: number; uploaded_files?: string[] }>(
     '/knowledge/upload/',

@@ -116,10 +116,49 @@ def test_public_topics_places_common_questions_first():
     ]
 
     with patch_topic_store(store):
-        result = topics_admin.list_topics()
+        result = topics_admin.list_topics_slim("zh")
 
     assert [category["id"] for category in result["categories"]] == ["faq", "ortho"]
     assert [topic["id"] for topic in result["categories"][1]["topics"]] == ["ortho/faq", "ortho/prp"]
+
+
+def test_public_topics_query_route_is_not_registered():
+    routes = [
+        (route.path, method)
+        for route in topics_admin.public_router.routes
+        for method in getattr(route, "methods", set())
+    ]
+
+    assert ("/topics", "GET") not in routes
+    assert ("/topics/{lang}", "GET") in routes
+
+
+def test_admin_topics_path_returns_full_metadata_for_management():
+    store = FakeStore()
+    store.categories_by_language = {
+        "en": [
+            {
+                "id": "faq",
+                "labels": {"zh": "FAQ", "en": "FAQ"},
+                "topics": [
+                    {
+                        "id": "faq/early-intervention",
+                        "topic_id": "faq/early-intervention",
+                        "labels": {"zh": "Early Intervention", "en": "Early Intervention"},
+                        "category_labels": {"zh": "FAQ", "en": "FAQ"},
+                        "questions": {"zh": [], "en": ["English question"]},
+                    },
+                ],
+            },
+        ],
+    }
+
+    with patch_topic_store(store):
+        result = topics_admin.list_topics_full("en")
+
+    assert result["categories"][0]["labels"] == {"zh": "FAQ", "en": "FAQ"}
+    assert result["categories"][0]["topics"][0]["category_labels"] == {"zh": "FAQ", "en": "FAQ"}
+    assert ("list_categories", "en") in store.calls
 
 
 def test_localized_public_topics_return_slim_single_language_shape():
@@ -151,8 +190,8 @@ def test_localized_public_topics_return_slim_single_language_shape():
     ]
 
     with patch_topic_store(store):
-        zh_result = topics_admin.list_topics_localized("zh")
-        en_result = topics_admin.list_topics_localized("en")
+        zh_result = topics_admin.list_topics_slim("zh")
+        en_result = topics_admin.list_topics_slim("en")
 
     assert zh_result == {
         "categories": [
@@ -217,8 +256,8 @@ def test_localized_public_topics_read_separate_language_partitions():
     }
 
     with patch_topic_store(store):
-        zh_result = topics_admin.list_topics_localized("zh")
-        en_result = topics_admin.list_topics_localized("en")
+        zh_result = topics_admin.list_topics_slim("zh")
+        en_result = topics_admin.list_topics_slim("en")
 
     assert zh_result["categories"][0]["id"] == "常見問題"
     assert en_result["categories"][0]["id"] == "faq"

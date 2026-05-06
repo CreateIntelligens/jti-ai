@@ -81,10 +81,9 @@ export interface KnowledgeFile {
   created_at?: string;
   editable?: boolean;
   topic_id?: string | null;
-  category_label_zh?: string | null;
-  category_label_en?: string | null;
-  topic_label_zh?: string | null;
-  topic_label_en?: string | null;
+  // Single label (in the file's own language partition).
+  category_label?: string | null;
+  topic_label?: string | null;
 }
 
 export interface KnowledgeFileContent {

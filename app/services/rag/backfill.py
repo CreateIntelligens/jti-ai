@@ -98,15 +98,14 @@ class BackfillService:
     @staticmethod
     def _extract_topic_info(doc: dict | None) -> dict[str, str]:
         """Pull topic/category labels out of a doc dict (e.g. from list_files
-        or get_file). Empty strings on miss."""
+        or get_file). Empty strings on miss. Labels are flat strings tied to
+        the doc's own language partition."""
         if not doc:
-            return {"topic_id": "", "topic_label_zh": "", "topic_label_en": "", "category_label_zh": "", "category_label_en": ""}
+            return {"topic_id": "", "topic_label": "", "category_label": ""}
         return {
             "topic_id": doc.get("topic_id") or "",
-            "topic_label_zh": doc.get("topic_label_zh") or "",
-            "topic_label_en": doc.get("topic_label_en") or "",
-            "category_label_zh": doc.get("category_label_zh") or "",
-            "category_label_en": doc.get("category_label_en") or "",
+            "topic_label": doc.get("topic_label") or "",
+            "category_label": doc.get("category_label") or "",
         }
 
     @staticmethod
@@ -122,6 +121,9 @@ class BackfillService:
 
     @staticmethod
     def _merge_topic_store_labels(source_type: str, language: str, topic_info: dict[str, str]) -> dict[str, str]:
+        """If the doc-level labels are usable, return as-is. Otherwise fall back
+        to topic_store, which still keeps bilingual `labels: {zh, en}` /
+        `category_labels: {zh, en}` dicts — pick the slot matching `language`."""
         if source_type != "hciot":
             return topic_info
 
@@ -129,14 +131,10 @@ class BackfillService:
         if not topic_id:
             return topic_info
 
-        topic_label = topic_info.get(f"topic_label_{language}") or ""
-        category_label = topic_info.get(f"category_label_{language}") or ""
+        topic_label = topic_info.get("topic_label") or ""
+        category_label = topic_info.get("category_label") or ""
         if topic_label and category_label:
-            if language != "en" or (
-                topic_label != (topic_info.get("topic_label_zh") or "") or
-                category_label != (topic_info.get("category_label_zh") or "")
-            ):
-                return topic_info
+            return topic_info
 
         try:
             topic = get_hciot_topic_store(language).get_topic(topic_id)
@@ -150,19 +148,18 @@ class BackfillService:
         merged = dict(topic_info)
         labels = topic.get("labels") or {}
         category_labels = topic.get("category_labels") or {}
-        for lang in ("zh", "en"):
-            topic_label = labels.get(lang)
-            if topic_label:
-                merged[f"topic_label_{lang}"] = topic_label
-            category_label = category_labels.get(lang)
-            if category_label:
-                merged[f"category_label_{lang}"] = category_label
+        store_topic_label = labels.get(language) or ""
+        store_category_label = category_labels.get(language) or ""
+        if store_topic_label and not merged.get("topic_label"):
+            merged["topic_label"] = store_topic_label
+        if store_category_label and not merged.get("category_label"):
+            merged["category_label"] = store_category_label
         return merged
 
     @staticmethod
     def _build_topic_prefix(topic_info: dict[str, str], language: str) -> str:
-        topic_label = topic_info.get(f"topic_label_{language}") or topic_info.get("topic_label_zh")
-        category_label = topic_info.get(f"category_label_{language}") or topic_info.get("category_label_zh")
+        topic_label = topic_info.get("topic_label") or ""
+        category_label = topic_info.get("category_label") or ""
         if topic_label and category_label:
             return f"【{category_label} / {topic_label}】"
         if topic_label:

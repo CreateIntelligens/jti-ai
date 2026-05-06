@@ -103,13 +103,13 @@ class TestHciotKnowledgeStore(unittest.TestCase):
             content_type="text/csv",
             editable=True,
             topic_id="general-medicine/diet",
-            category_labels={"zh": "一般醫學", "en": "General Medicine"},
-            topic_labels={"zh": "飲食", "en": "Diet"},
+            category_label="一般醫學",
+            topic_label="飲食",
         )
 
         self.assertEqual(created["topic_id"], "general-medicine/diet")
-        self.assertEqual(created["category_label_zh"], "一般醫學")
-        self.assertEqual(created["topic_label_en"], "Diet")
+        self.assertEqual(created["category_label"], "一般醫學")
+        self.assertEqual(created["topic_label"], "飲食")
 
         listed = self.store.list_files("zh")
         self.assertEqual(len(listed), 1)
@@ -130,17 +130,15 @@ class TestHciotKnowledgeStore(unittest.TestCase):
             filename="guide.txt",
             metadata={
                 "topic_id": "general-medicine/diet",
-                "category_label_zh": "一般醫學",
-                "category_label_en": "General Medicine",
-                "topic_label_zh": "飲食",
-                "topic_label_en": "Diet",
+                "category_label": "一般醫學",
+                "topic_label": "飲食",
             },
         )
 
         self.assertIsNotNone(updated)
         assert updated is not None
         self.assertEqual(updated["topic_id"], "general-medicine/diet")
-        self.assertEqual(updated["topic_label_zh"], "飲食")
+        self.assertEqual(updated["topic_label"], "飲食")
 
         fetched = self.store.get_file("zh", "guide.txt")
         self.assertIsNotNone(fetched)

@@ -22,7 +22,14 @@ from app.routers.knowledge_utils import (
     sync_to_rag,
     write_docx_text,
 )
-from app.services.hciot.csv_utils import extract_questions_from_csv, merge_csv_files, normalize_qa_csv_rows, split_qa_csv_by_image
+from app.services.hciot.csv_utils import (
+    UnsupportedQaCsvError,
+    extract_questions_from_csv,
+    merge_csv_files,
+    normalize_qa_csv_rows,
+    split_qa_csv_by_image,
+    validate_supported_hciot_csv,
+)
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.hciot.main_agent import invalidate_hciot_file_map
 from app.services.hciot.topic_store import get_hciot_topic_store
@@ -56,8 +63,6 @@ def _normalized_label(value: str | None, fallback: str) -> str:
     return (value or "").strip() or fallback
 
 
-
-
 def _build_merged_topic_id(category_id: str | None, topic_id: str | None) -> str | None:
     if category_id and topic_id:
         return f"{category_id.strip()}/{topic_id.strip()}"
@@ -77,6 +82,14 @@ def _get_doc_or_404(language: str, filename: str) -> tuple[str, dict]:
     return safe_name, doc
 
 
+def _prepare_csv_bytes(file_bytes: bytes) -> bytes:
+    try:
+        validate_supported_hciot_csv(file_bytes)
+    except UnsupportedQaCsvError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    return normalize_qa_csv_rows(file_bytes) or file_bytes
+
+
 def _insert_uploaded_file(
     *,
     language: str,
@@ -85,8 +98,8 @@ def _insert_uploaded_file(
     content_type: str,
     editable: bool,
     topic_id: str | None,
-    category_labels: dict[str, str | None],
-    topic_labels: dict[str, str | None],
+    category_label: str | None,
+    topic_label: str | None,
 ):
     return get_hciot_knowledge_store().insert_file(
         language=language,
@@ -96,8 +109,8 @@ def _insert_uploaded_file(
         content_type=content_type,
         editable=editable,
         topic_id=topic_id,
-        category_labels=category_labels,
-        topic_labels=topic_labels,
+        category_label=category_label,
+        topic_label=topic_label,
     )
 
 
@@ -139,10 +152,8 @@ def _sync_topic_questions_for_doc(language: str, doc: dict | None) -> bool:
     return _sync_topic_questions_from_store(
         language=language,
         topic_id=doc.get("topic_id"),
-        topic_label_zh=doc.get("topic_label_zh"),
-        topic_label_en=doc.get("topic_label_en"),
-        category_label_zh=doc.get("category_label_zh"),
-        category_label_en=doc.get("category_label_en"),
+        topic_label=doc.get("topic_label"),
+        category_label=doc.get("category_label"),
     )
 
 
@@ -150,10 +161,8 @@ def _sync_topic_questions_from_store(
     *,
     language: str,
     topic_id: str | None,
-    topic_label_zh: str | None,
-    topic_label_en: str | None,
-    category_label_zh: str | None,
-    category_label_en: str | None,
+    topic_label: str | None,
+    category_label: str | None,
 ) -> bool:
     """Merge question lists from all topic CSV files and sync topic store."""
     if not topic_id or "/" not in topic_id:
@@ -189,18 +198,21 @@ def _sync_topic_questions_from_store(
     if not questions:
         return False
 
+    other_lang = get_other_language(language)
+    topic_label_resolved = _normalized_label(topic_label, suffix)
+    category_label_resolved = _normalized_label(category_label, prefix)
     topic_store.upsert_topic(
         topic_id,
         {
             "labels": {
-                "zh": _normalized_label(topic_label_zh, suffix),
-                "en": _normalized_label(topic_label_en, suffix),
+                language: topic_label_resolved,
+                other_lang: "",
             },
             "category_labels": {
-                "zh": _normalized_label(category_label_zh, prefix),
-                "en": _normalized_label(category_label_en, prefix),
+                language: category_label_resolved,
+                other_lang: "",
             },
-            "questions": {language: questions, get_other_language(language): []},
+            "questions": {language: questions, other_lang: []},
         },
     )
     logger.info("[HCIoT KB] Synced %d questions -> %s", len(questions), topic_id)
@@ -211,11 +223,7 @@ def _sync_topic_questions_from_store(
 def list_knowledge_files(language: str = "zh"):
     store = get_hciot_knowledge_store()
     files = store.list_files(language)
-    effective_language = language
-    if not files and language != "zh":
-        files = store.list_files("zh")
-        effective_language = "zh"
-    return {"files": files, "language": effective_language}
+    return {"files": files, "language": language}
 
 
 @router.get("/files/{filename}/content")
@@ -257,10 +265,8 @@ class UpdateContentRequest(BaseModel):
 
 class UpdateFileMetadataRequest(BaseModel):
     topic_id: str | None = None
-    category_label_zh: str | None = None
-    category_label_en: str | None = None
-    topic_label_zh: str | None = None
-    topic_label_en: str | None = None
+    category_label: str | None = None
+    topic_label: str | None = None
 
 
 def _rewrite_csv_file_with_split_uploads(
@@ -310,14 +316,8 @@ def _rewrite_csv_file_with_split_uploads(
             content_type=doc.get("content_type") or "application/octet-stream",
             editable=bool(doc.get("editable", False)),
             topic_id=doc.get("topic_id"),
-            category_labels={
-                "zh": doc.get("category_label_zh"),
-                "en": doc.get("category_label_en"),
-            },
-            topic_labels={
-                "zh": doc.get("topic_label_zh"),
-                "en": doc.get("topic_label_en"),
-            },
+            category_label=doc.get("category_label"),
+            topic_label=doc.get("topic_label"),
         )
         _schedule_rag_sync(background_tasks, language, saved["name"], upload_bytes)
 
@@ -346,7 +346,7 @@ async def update_file_content(
         new_bytes = req.content.encode("utf-8")
 
     if ext == ".csv":
-        new_bytes = normalize_qa_csv_rows(new_bytes) or new_bytes
+        new_bytes = _prepare_csv_bytes(new_bytes)
 
     if ext == ".csv":
         _rewrite_csv_file_with_split_uploads(
@@ -424,10 +424,8 @@ async def upload_knowledge_file(
     file: UploadFile = File(...),
     category_id: str | None = Form(None),
     topic_id: str | None = Form(None),
-    category_label_zh: str | None = Form(None),
-    category_label_en: str | None = Form(None),
-    topic_label_zh: str | None = Form(None),
-    topic_label_en: str | None = Form(None),
+    category_label: str | None = Form(None),
+    topic_label: str | None = Form(None),
 ):
     display_name = file.filename or f"file_{uuid.uuid4().hex[:8]}"
     safe_name = safe_filename(display_name)
@@ -441,12 +439,10 @@ async def upload_knowledge_file(
     editable = ext in EDITABLE_EXTENSIONS
     content_type = file.content_type or mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
     if ext == ".csv":
-        file_bytes = normalize_qa_csv_rows(file_bytes) or file_bytes
+        file_bytes = _prepare_csv_bytes(file_bytes)
 
     merged_topic_id = _build_merged_topic_id(category_id, topic_id)
 
-    category_labels = {"zh": category_label_zh, "en": category_label_en}
-    topic_labels = {"zh": topic_label_zh, "en": topic_label_en}
     uploads = split_qa_csv_by_image(file_bytes, safe_name) or [(safe_name, file_bytes)]
     saved_files = []
     for upload_name, upload_bytes in uploads:
@@ -457,8 +453,8 @@ async def upload_knowledge_file(
             content_type=content_type,
             editable=editable,
             topic_id=merged_topic_id,
-            category_labels=category_labels,
-            topic_labels=topic_labels,
+            category_label=category_label,
+            topic_label=topic_label,
         )
         saved_files.append(saved)
         _schedule_rag_sync(background_tasks, language, saved["name"], upload_bytes)
@@ -466,10 +462,8 @@ async def upload_knowledge_file(
     topic_synced = _sync_topic_questions_from_store(
         language=language,
         topic_id=merged_topic_id,
-        topic_label_zh=topic_label_zh,
-        topic_label_en=topic_label_en,
-        category_label_zh=category_label_zh,
-        category_label_en=category_label_en,
+        topic_label=topic_label,
+        category_label=category_label,
     )
 
     primary = saved_files[0]
@@ -482,10 +476,8 @@ async def upload_knowledge_file(
         "synced": False,
         "topic_synced": topic_synced,
         "topic_id": primary.get("topic_id"),
-        "category_label_zh": primary.get("category_label_zh"),
-        "category_label_en": primary.get("category_label_en"),
-        "topic_label_zh": primary.get("topic_label_zh"),
-        "topic_label_en": primary.get("topic_label_en"),
+        "category_label": primary.get("category_label"),
+        "topic_label": primary.get("topic_label"),
         "uploaded_count": len(saved_files),
         "uploaded_files": [item["name"] for item in saved_files],
     }

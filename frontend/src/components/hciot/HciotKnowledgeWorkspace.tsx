@@ -124,9 +124,9 @@ export default function HciotKnowledgeWorkspace({
       return true;
     }
 
-    const cleanDraft = draftFromFile(selectedFile, categories);
+    const cleanDraft = draftFromFile(selectedFile, categories, language);
     return JSON.stringify(cleanDraft) !== JSON.stringify(draft);
-  }, [categories, draft, selectedFile]);
+  }, [categories, draft, language, selectedFile]);
 
   const contentDirty = fileEditable && editorText !== originalText;
   const hasUnsavedChanges = metadataDirty || contentDirty;
@@ -214,9 +214,9 @@ export default function HciotKnowledgeWorkspace({
     }
 
     if (selectedFile) {
-      setDraft(draftFromFile(selectedFile, categories));
+      setDraft(draftFromFile(selectedFile, categories, language));
     }
-  }, [categories, selectedFile, selectedFileName]);
+  }, [categories, language, selectedFile, selectedFileName]);
 
   useEffect(() => {
     if (!selectedFileName) {
@@ -335,15 +335,15 @@ export default function HciotKnowledgeWorkspace({
     }
     const catId = topicId.split('/')[0];
     const topicSlug = topicId.includes('/') ? topicId.split('/').slice(1).join('/') : '';
+    const categoryLabel = language === 'zh' ? labels?.categoryLabelZh : labels?.categoryLabelEn;
+    const topicLabel = language === 'zh' ? labels?.topicLabelZh : labels?.topicLabelEn;
     return api.uploadHciotKnowledgeFileWithTopic({
       language,
       file,
       categoryId: catId || undefined,
       topicId: topicSlug || undefined,
-      categoryLabelZh: labels?.categoryLabelZh || undefined,
-      categoryLabelEn: labels?.categoryLabelEn || undefined,
-      topicLabelZh: labels?.topicLabelZh || undefined,
-      topicLabelEn: labels?.topicLabelEn || undefined,
+      categoryLabel: categoryLabel || undefined,
+      topicLabel: topicLabel || undefined,
     });
   };
 
@@ -648,7 +648,7 @@ export default function HciotKnowledgeWorkspace({
       if (metadataDirty || draft.categoryId === NEW_VALUE || draft.topicId === NEW_VALUE) {
         const updatedMetadata = await api.updateHciotKnowledgeFileMetadata(
           selectedFile.name,
-          getMetadataPayload(nextDraft),
+          getMetadataPayload(nextDraft, language),
           language,
         );
         setFiles((previous) => previous.map((file) => (

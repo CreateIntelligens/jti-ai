@@ -126,14 +126,14 @@ export function getNoTopicLabel(_language: HciotLanguage): string {
 
 export function getCurrentPathLabel(
   selectedFile: HciotKnowledgeFile | null,
-  language: HciotLanguage,
+  _language: HciotLanguage,
 ): string {
   if (!selectedFile) {
     return '選擇檔案開始編輯';
   }
 
-  const categoryLabel = selectedFile[`category_label_${language}` as const] || categoryPrefix(selectedFile.topic_id);
-  const topicLabel = selectedFile[`topic_label_${language}` as const] || selectedFile.topic_id;
+  const categoryLabel = selectedFile.category_label || categoryPrefix(selectedFile.topic_id);
+  const topicLabel = selectedFile.topic_label || selectedFile.topic_id;
   if (!categoryLabel && !topicLabel) {
     return '未分類';
   }
@@ -163,15 +163,15 @@ export function buildExplorerTree(
     if (leftId && !rightId) return -1;
     const leftCategory = categories.find((item) => item.id === leftId);
     const rightCategory = categories.find((item) => item.id === rightId);
-    const leftLabel = leftCategory?.labels[language] || leftFiles[0]?.[`category_label_${language}` as const] || leftId;
-    const rightLabel = rightCategory?.labels[language] || rightFiles[0]?.[`category_label_${language}` as const] || rightId;
+    const leftLabel = leftCategory?.labels[language] || leftFiles[0]?.category_label || leftId;
+    const rightLabel = rightCategory?.labels[language] || rightFiles[0]?.category_label || rightId;
     return sortByLabel(leftLabel, rightLabel);
   });
 
   sortedCategoryEntries.forEach(([categoryId, categoryFiles]) => {
     const category = categories.find((item) => item.id === categoryId);
     const categoryLabel =
-      category?.labels[language] || categoryFiles[0]?.[`category_label_${language}` as const] || categoryId;
+      category?.labels[language] || categoryFiles[0]?.category_label || categoryId;
     const categoryKey = `category:${categoryId}`;
     const filesByTopic = new Map<string, HciotKnowledgeFile[]>();
 
@@ -185,7 +185,7 @@ export function buildExplorerTree(
     const resolveTopicLabel = (topicId: string, topicFiles: HciotKnowledgeFile[]): string => {
       if (topicId === NO_TOPIC_KEY) return getNoTopicLabel(language);
       return category?.topics.find((item) => item.id === topicId)?.labels[language]
-        || topicFiles[0]?.[`topic_label_${language}` as const]
+        || topicFiles[0]?.topic_label
         || topicId;
     };
 

@@ -99,13 +99,18 @@ def _build_categories(
 
 
 @public_router.get("/topics")
-def list_topics(language: Lang = "zh"):
-    return {"categories": _build_categories(language, _strip_topic)}
+def list_topics_bilingual():
+    return {"categories": _build_categories("zh", _strip_topic)}
 
 
 @public_router.get("/topics/{lang}")
-def list_topics_localized(lang: Lang):
+def list_topics_slim(lang: Lang):
     return {"categories": _build_categories(lang, _localize_topic, localize_category=True)}
+
+
+@router.get("/{lang}")
+def list_topics_full(lang: Lang):
+    return {"categories": _build_categories(lang, _strip_topic)}
 
 
 class BilingualLabels(BaseModel):

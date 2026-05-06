@@ -44,7 +44,11 @@ interface SavedTopicSelection {
   topicId: string;
 }
 
-function readSavedTopicSelection(categories: HciotTopicCategory[]): SavedTopicSelection {
+export function readSavedTopicSelection(categories: HciotTopicCategory[]): SavedTopicSelection {
+  if (!categories.length) {
+    return { categoryId: NEW_VALUE, topicId: NEW_VALUE };
+  }
+
   const savedCategory = localStorage.getItem(LS_CATEGORY_KEY);
   const category = categories.find((item) => item.id === savedCategory) ?? categories[0];
   const categoryId = category?.id ?? DEFAULT_CATEGORY;
@@ -54,6 +58,24 @@ function readSavedTopicSelection(categories: HciotTopicCategory[]): SavedTopicSe
     : '';
 
   return { categoryId, topicId };
+}
+
+type UploadTopicOption = { value: string; label: string };
+
+export function isUploadTopicSelectDisabled(categoryId: string): boolean {
+  return !categoryId;
+}
+
+export function buildUploadTopicOptions(
+  categoryId: string,
+  sortedTopics: HciotTopicCategory['topics'],
+  language: HciotLanguage,
+): UploadTopicOption[] {
+  return [
+    { value: '', label: '— 不指定 —' },
+    ...sortedTopics.map((t) => ({ value: t.id, label: t.labels[language] })),
+    ...(categoryId ? [{ value: NEW_VALUE, label: '＋ 新增主題' }] : []),
+  ];
 }
 
 function resolveTopicInfo(
@@ -109,15 +131,15 @@ function resolveTopicInfo(
 }
 
 function useTopicSelection(categories: HciotTopicCategory[], language: HciotLanguage, open: boolean) {
-  const [categoryId, setCategoryId] = useState(DEFAULT_CATEGORY);
-  const [topicId, setTopicId] = useState('');
+  const [categoryId, setCategoryId] = useState(NEW_VALUE);
+  const [topicId, setTopicId] = useState(NEW_VALUE);
   const [newCategoryZh, setNewCategoryZh] = useState('');
   const [newCategoryEn, setNewCategoryEn] = useState('');
   const [newTopicZh, setNewTopicZh] = useState('');
   const [newTopicEn, setNewTopicEn] = useState('');
 
   useEffect(() => {
-    if (!open || !categories.length) return;
+    if (!open) return;
     const savedSelection = readSavedTopicSelection(categories);
     setCategoryId(savedSelection.categoryId);
     setTopicId(savedSelection.topicId);
@@ -167,13 +189,16 @@ function useTopicSelection(categories: HciotTopicCategory[], language: HciotLang
     sortedTopics,
     handleCategoryChange: (value: string) => {
       setCategoryId(value);
-      setTopicId('');
+      setTopicId(value === NEW_VALUE ? NEW_VALUE : '');
       setNewTopicZh('');
       setNewTopicEn('');
       if (value !== NEW_VALUE) {
         setNewCategoryZh('');
         setNewCategoryEn('');
         localStorage.setItem(LS_CATEGORY_KEY, value);
+        localStorage.removeItem(LS_TOPIC_KEY);
+      } else {
+        localStorage.removeItem(LS_CATEGORY_KEY);
         localStorage.removeItem(LS_TOPIC_KEY);
       }
     },
@@ -247,14 +272,8 @@ function TopicSelectorSection({ language, topic }: TopicSelectorSectionProps) {
           className="hciot-file-select"
           value={topic.topicId}
           onChange={topic.handleTopicChange}
-          disabled={!topic.categoryId || topic.categoryId === NEW_VALUE}
-          options={[
-            { value: '', label: '— 不指定 —' },
-            ...topic.sortedTopics.map((t) => ({ value: t.id, label: t.labels[language] })),
-            ...(topic.categoryId && topic.categoryId !== NEW_VALUE
-              ? [{ value: NEW_VALUE, label: '＋ 新增主題' }]
-              : []),
-          ]}
+          disabled={isUploadTopicSelectDisabled(topic.categoryId)}
+          options={buildUploadTopicOptions(topic.categoryId, topic.sortedTopics, language)}
         />
       </div>
 
