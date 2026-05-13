@@ -36,16 +36,17 @@ export default function App() {
   const isRestricted = restrictedHosts.includes(window.location.hostname.toLowerCase());
 
   const allowedPages = (import.meta.env.VITE_PUBLIC_ALLOWED_PAGES || 'jti')
-    .split(',').map((s: string) => s.trim().toLowerCase());
+    .split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
   const canShow = (p: string) => !isRestricted || allowedPages.includes(p);
+  const fallback = isRestricted ? `/${allowedPages[0] || 'jti'}` : '/';
 
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/jti" element={canShow('jti') ? <Jti /> : <Navigate to="/" replace />} />
-        <Route path="/hciot" element={canShow('hciot') ? <Hciot /> : <Navigate to="/" replace />} />
-        <Route path="/" element={<HomeShell />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/jti" element={canShow('jti') ? <Jti /> : <Navigate to={fallback} replace />} />
+        <Route path="/hciot" element={canShow('hciot') ? <Hciot /> : <Navigate to={fallback} replace />} />
+        <Route path="/" element={canShow('home') ? <HomeShell /> : <Navigate to={fallback} replace />} />
+        <Route path="*" element={<Navigate to={fallback} replace />} />
       </Routes>
     </BrowserRouter>
   );
