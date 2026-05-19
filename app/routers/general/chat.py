@@ -34,6 +34,8 @@ from app.services.general.agent_prompts import (
 )
 from app.services.general.main_agent import main_agent
 
+logger = logging.getLogger(__name__)
+
 router = APIRouter(prefix="/api/chat", tags=["General Chat"])
 
 
@@ -121,7 +123,7 @@ def start_chat(req: ChatStartRequest, request: Request, auth: dict = Depends(ver
     """Start a generic homepage chat session backed by local RAG."""
     if req.previous_session_id:
         main_agent.remove_session(req.previous_session_id)
-        logging.info("Cleaned up previous general session: %s...", req.previous_session_id[:8])
+        logger.info("Cleaned up previous general session: %s...", req.previous_session_id[:8])
 
     user_gemini_api_key = extract_user_gemini_api_key(request)
     store_name = _resolve_request_store(
@@ -142,6 +144,11 @@ def start_chat(req: ChatStartRequest, request: Request, auth: dict = Depends(ver
         system_instruction=system_instruction,
         managed_app=managed_app,
         managed_language=managed_language,
+    )
+    logger.info(
+        "Created new general session: %s (store=%s)",
+        session.session_id,
+        store_name,
     )
 
     return {
@@ -185,7 +192,13 @@ async def send_message(req: ChatMessageRequest, request: Request, auth: dict = D
         try:
             _get_conversation_logger().delete_turns_from(session.session_id, req.turn_number)
         except Exception:
-            logging.exception("Failed to truncate general conversation logs")
+            logger.exception("Failed to truncate general conversation logs")
+
+    logger.info(
+        "[用戶訊息] Session: %s... | 訊息: '%s'",
+        session.session_id[:8],
+        req.message,
+    )
 
     # Core chat: function-calling RAG via BaseAgent
     result = await main_agent.chat(
@@ -195,6 +208,7 @@ async def send_message(req: ChatMessageRequest, request: Request, auth: dict = D
 
     answer = result.get("message", "")
     citations = result.get("citations") or []
+    logger.info("[AI回應] 一般對話 | %s...", answer[:80])
 
     log_result = _get_conversation_logger().log_conversation(
         session_id=session.session_id,
@@ -278,7 +292,7 @@ def get_general_conversations(
         }
 
     except Exception as e:
-        logging.error(f"Failed to get general conversations: {e}")
+        logger.error("Failed to get general conversations: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -330,7 +344,7 @@ def export_general_conversations(
             }
 
     except Exception as e:
-        logging.error(f"Failed to export general conversations: {e}")
+        logger.error("Failed to export general conversations: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -353,7 +367,11 @@ def get_general_conversation_detail(
         if conversations:
             store_name = conversations[0].get("session_snapshot", {}).get("store", "unknown")
 
-        logging.info(f"Retrieved {len(conversations)} general conversations for session {session_id[:8]}...")
+        logger.info(
+            "Retrieved %d general conversations for session %s...",
+            len(conversations),
+            session_id[:8],
+        )
 
         return {
             "session_id": session_id,
@@ -364,5 +382,5 @@ def get_general_conversation_detail(
         }
 
     except Exception as e:
-        logging.error(f"Failed to get general conversation detail: {e}")
+        logger.error("Failed to get general conversation detail: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

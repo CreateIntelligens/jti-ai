@@ -12,6 +12,8 @@ from typing import Optional
 
 import uvicorn.logging
 
+from .logging_config import configure_file_logging
+
 # ANSI color codes
 GREEN = "\033[32m"
 YELLOW = "\033[33m"
@@ -55,6 +57,8 @@ def _configure_app_logging() -> None:
 
     for logger_name in _NOISY_LOGGERS:
         logging.getLogger(logger_name).setLevel(logging.WARNING)
+
+    configure_file_logging()
 
 
 def _configure_warning_filters() -> None:

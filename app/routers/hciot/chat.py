@@ -81,6 +81,11 @@ async def create_session(request: CreateSessionRequest):
         session = session_manager.create_session(language=request.language)
         session.metadata["app_mode"] = "hciot"
         session_manager.update_session(session)
+        logger.info(
+            "Created new HCIoT session: %s (language=%s)",
+            session.session_id,
+            request.language,
+        )
         opening = _OPENING_MESSAGE.get(request.language, _OPENING_MESSAGE["zh"])
         return CreateSessionResponse(session_id=session.session_id, opening_message=opening)
     except Exception as e:
@@ -97,6 +102,12 @@ async def chat(request: ChatRequest):
         if not session:
             raise HTTPException(status_code=404, detail="Session not found")
 
+        logger.info(
+            "[用戶訊息] Session: %s... | 訊息: '%s'",
+            request.session_id[:8],
+            request.message,
+        )
+
         # Handle turn rollback if requested
         if request.turn_number is not None:
             conversation_logger.delete_turns_from(request.session_id, request.turn_number)
@@ -111,6 +122,8 @@ async def chat(request: ChatRequest):
             main_agent.remove_session(request.session_id)
 
         result = await main_agent.chat(session_id=request.session_id, user_message=request.message)
+        answer = result["message"]
+        logger.info("[AI回應] HCIoT | %s...", answer[:80])
 
         # Log conversation and prepare response
         updated_session = session_manager.get_session(request.session_id)
@@ -118,7 +131,7 @@ async def chat(request: ChatRequest):
         _, final_turn_number = conversation_logger.log_conversation(
             session_id=request.session_id,
             user_message=request.message,
-            agent_response=result["message"],
+            agent_response=answer,
             tool_calls=result.get("tool_calls", []),
             mode="hciot",
             citations=result.get("citations"),
@@ -152,12 +165,23 @@ async def get_conversations(
         # Single-session detail request (used by ConversationHistoryModal resume)
         if session_id:
             conversations = [c for c in conversation_logger.get_session_logs(session_id) if c.get("mode") == mode]
+            logger.info(
+                "Retrieved %d HCIoT conversations for session %s...",
+                len(conversations),
+                session_id[:8],
+            )
             return {"mode": mode, "conversations": conversations}
 
         query = build_date_query(mode, date_from, date_to)
         session_ids, total_sessions = conversation_logger.get_paginated_session_ids(query=query, page=1, page_size=100000)
         all_conversations = conversation_logger.get_logs_for_sessions(session_ids)
         session_list = group_conversations_by_session(all_conversations)
+        logger.info(
+            "Retrieved %d HCIoT conversations across %d sessions (total %d)",
+            len(all_conversations),
+            len(session_list),
+            total_sessions,
+        )
         return {"mode": mode, "sessions": session_list, "total_conversations": len(all_conversations), "total_sessions": total_sessions}
     except Exception as e:
         logger.error("Failed to get HCIoT conversations: %s", e)
