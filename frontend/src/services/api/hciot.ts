@@ -290,6 +290,11 @@ export async function listHciotTopicsAdmin(language: HciotLanguage = 'zh'): Prom
   return fetchApiJson<{ categories: HciotTopicCategory[] }>(`/topics/${lang}`);
 }
 
+function buildTopicAdminPath(language: HciotLanguage, topicId?: string): string {
+  const basePath = `/topics/${normLang(language)}`;
+  return topicId ? `${basePath}/${topicId}` : `${basePath}/`;
+}
+
 export async function updateHciotTopic(
   topicId: string,
   data: { labels?: string; category_labels?: string; questions?: string[] },
@@ -297,14 +302,13 @@ export async function updateHciotTopic(
 ): Promise<Record<string, unknown>> {
   // topic_id contains "/" so we can't use encodeURIComponent — pass raw
   return fetchAdminJson<Record<string, unknown>>(
-    `/topics/${topicId}`,
+    buildTopicAdminPath(language, topicId),
     jsonRequest('PUT', data),
-    { language: normLang(language) },
   );
 }
 
 export async function deleteHciotTopic(topicId: string, language: HciotLanguage = 'zh'): Promise<void> {
-  await fetchAdminJson<void>(`/topics/${topicId}`, { method: 'DELETE' }, { language: normLang(language) });
+  await fetchAdminJson<void>(buildTopicAdminPath(language, topicId), { method: 'DELETE' });
 }
 
 export async function createHciotTopic(
@@ -314,12 +318,12 @@ export async function createHciotTopic(
   questions: string[] = [],
   language: HciotLanguage = 'zh',
 ): Promise<Record<string, unknown>> {
-  return fetchAdminJson<Record<string, unknown>>('/topics/', jsonRequest('POST', {
+  return fetchAdminJson<Record<string, unknown>>(buildTopicAdminPath(language), jsonRequest('POST', {
     topic_id: topicId,
     labels: label,
     category_labels: categoryLabel,
     questions,
-  }), { language: normLang(language) });
+  }));
 }
 
 export interface UploadWithTopicOptions {

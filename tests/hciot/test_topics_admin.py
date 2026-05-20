@@ -61,7 +61,7 @@ def test_create_topic_stores_single_language_label_in_its_partition():
     )
 
     with patch_topic_store(store):
-        result = topics_admin.create_topic(request, language="zh")
+        result = topics_admin.create_topic("zh", request)
 
     # Single-language input is stored into the doc-level bilingual dict;
     # the other language slot stays blank.
@@ -85,7 +85,7 @@ def test_update_topic_writes_single_language_label_into_partition():
     )
 
     with patch_topic_store(store):
-        result = topics_admin.update_topic("ortho/prp", request, language="zh")
+        result = topics_admin.update_topic("zh", "ortho/prp", request)
 
     assert result["labels"] == {"zh": "PRP 治療", "en": ""}
     assert result["category_labels"] == {"zh": "骨科部", "en": ""}
@@ -257,7 +257,7 @@ def test_create_english_topic_does_not_conflict_with_existing_chinese_topic():
     )
 
     with patch_topic_store(store):
-        result = topics_admin.create_topic(request, language="en")
+        result = topics_admin.create_topic("en", request)
 
     # The English partition gets its own document; the Chinese one is untouched.
     assert result["labels"] == {"zh": "", "en": "Early Intervention"}

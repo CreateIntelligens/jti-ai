@@ -114,8 +114,8 @@ class UpdateTopicRequest(BaseModel):
     questions: list[str] | None = None
 
 
-@router.post("/", status_code=201)
-def create_topic(request: CreateTopicRequest, language: Lang = "zh"):
+@router.post("/{language}/", status_code=201)
+def create_topic(language: Lang, request: CreateTopicRequest):
     store = get_hciot_topic_store(language)
     if store.get_topic(request.topic_id):
         raise HTTPException(status_code=409, detail=f"Topic '{request.topic_id}' already exists")
@@ -128,8 +128,8 @@ def create_topic(request: CreateTopicRequest, language: Lang = "zh"):
     return store.get_topic(request.topic_id)
 
 
-@router.put("/{topic_id:path}")
-def update_topic(topic_id: str, request: UpdateTopicRequest, language: Lang = "zh"):
+@router.put("/{language}/{topic_id:path}")
+def update_topic(language: Lang, topic_id: str, request: UpdateTopicRequest):
     store = get_hciot_topic_store(language)
     update_data: dict = {}
     if request.labels is not None:
@@ -146,8 +146,8 @@ def update_topic(topic_id: str, request: UpdateTopicRequest, language: Lang = "z
     return store.get_topic(topic_id)
 
 
-@router.delete("/{topic_id:path}")
-def delete_topic(topic_id: str, language: Lang = "zh"):
+@router.delete("/{language}/{topic_id:path}")
+def delete_topic(language: Lang, topic_id: str):
     store = get_hciot_topic_store(language)
     deleted = store.delete_topic(topic_id)
     if not deleted:
