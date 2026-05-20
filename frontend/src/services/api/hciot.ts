@@ -39,16 +39,6 @@ export interface HciotPromptListResponse {
   max_custom_prompts?: number;
 }
 
-export interface HciotLabels {
-  zh: string;
-  en: string;
-}
-
-export interface HciotTopicQuestions {
-  zh: string[];
-  en: string[];
-}
-
 const HCIOT_ADMIN_BASE = `${API_BASE}/hciot-admin`;
 const HCIOT_API_BASE = `${API_BASE}/hciot`;
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
@@ -273,16 +263,21 @@ export async function updateHciotKnowledgeFileMetadata(
 
 // ========== Topic Admin ==========
 
+// Topics are single-language end-to-end: each request/response carries the
+// label for one language only. The category tree shape is identical for the
+// public chat area and the admin UI.
+export interface HciotTopic {
+  id: string;
+  order?: number;
+  label: string;
+  questions: string[];
+}
+
 export interface HciotTopicCategory {
   id: string;
-  labels: HciotLabels;
-  topics: Array<{
-    id: string;
-    order?: number;
-    labels: HciotLabels;
-    category_labels?: HciotLabels;
-    questions: HciotTopicQuestions;
-  }>;
+  order?: number;
+  label: string;
+  topics: HciotTopic[];
 }
 
 export async function listHciotTopics(language: HciotLanguage = 'zh'): Promise<{ categories: HciotRuntimeCategory[] }> {
@@ -292,12 +287,12 @@ export async function listHciotTopics(language: HciotLanguage = 'zh'): Promise<{
 
 export async function listHciotTopicsAdmin(language: HciotLanguage = 'zh'): Promise<{ categories: HciotTopicCategory[] }> {
   const lang = normLang(language);
-  return fetchAdminJson<{ categories: HciotTopicCategory[] }>(`/topics/${lang}`);
+  return fetchApiJson<{ categories: HciotTopicCategory[] }>(`/topics/${lang}`);
 }
 
 export async function updateHciotTopic(
   topicId: string,
-  data: { labels?: HciotLabels; category_labels?: HciotLabels; questions?: HciotTopicQuestions },
+  data: { labels?: string; category_labels?: string; questions?: string[] },
   language: HciotLanguage = 'zh',
 ): Promise<Record<string, unknown>> {
   // topic_id contains "/" so we can't use encodeURIComponent — pass raw
@@ -314,15 +309,15 @@ export async function deleteHciotTopic(topicId: string, language: HciotLanguage 
 
 export async function createHciotTopic(
   topicId: string,
-  labels: HciotLabels,
-  categoryLabels: HciotLabels,
-  questions: HciotTopicQuestions = { zh: [], en: [] },
+  label: string,
+  categoryLabel: string,
+  questions: string[] = [],
   language: HciotLanguage = 'zh',
 ): Promise<Record<string, unknown>> {
   return fetchAdminJson<Record<string, unknown>>('/topics/', jsonRequest('POST', {
     topic_id: topicId,
-    labels,
-    category_labels: categoryLabels,
+    labels: label,
+    category_labels: categoryLabel,
     questions,
   }), { language: normLang(language) });
 }

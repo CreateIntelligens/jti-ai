@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Callable, Iterable
+from typing import Iterable
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.auth import verify_admin
 from app.services.hciot.topic_store import Language, get_hciot_topic_store
+from app.utils import get_other_language
 
 router = APIRouter(tags=["HCIoT Topics"], dependencies=[Depends(verify_admin)])
 
-_STRIP_FIELDS = {"_id", "created_at", "updated_at"}
 _FIRST_TOPIC_LABELS = {
     "常見問題",
     "faq",
@@ -60,10 +60,6 @@ def _localized_questions(value, lang: Lang) -> list:
     return questions if isinstance(questions, list) else []
 
 
-def _strip_topic(topic: dict, _lang: Lang) -> dict:
-    return {k: v for k, v in topic.items() if k not in _STRIP_FIELDS}
-
-
 def _localize_topic(topic: dict, lang: Lang) -> dict:
     payload = {
         "id": topic.get("id") or topic.get("topic_id", ""),
@@ -75,65 +71,47 @@ def _localize_topic(topic: dict, lang: Lang) -> dict:
     return payload
 
 
-def _build_categories(
-    language: Lang,
-    project_topic: Callable[[dict, Lang], dict],
-    localize_category: bool = False,
-) -> list[dict]:
+def _build_categories(language: Lang) -> list[dict]:
+    """Build the single-language category tree consumed by the public endpoint."""
     store = get_hciot_topic_store(language)
     result = []
     for cat in store.list_categories():
         topics = _with_common_questions_first([
-            project_topic(t, language) for t in cat.get("topics", [])
+            _localize_topic(t, language) for t in cat.get("topics", [])
         ])
-        if localize_category:
-            result.append({
-                "id": cat.get("id", ""),
-                "label": _localized_text(cat.get("labels"), language, cat.get("id", "")),
-                "topics": topics,
-            })
-        else:
-            cat["topics"] = topics
-            result.append(cat)
+        result.append({
+            "id": cat.get("id", ""),
+            "label": _localized_text(cat.get("labels"), language, cat.get("id", "")),
+            "topics": topics,
+        })
     return _with_common_questions_first(result)
-
-
-@public_router.get("/topics")
-def list_topics_bilingual():
-    return {"categories": _build_categories("zh", _strip_topic)}
 
 
 @public_router.get("/topics/{lang}")
 def list_topics_slim(lang: Lang):
-    return {"categories": _build_categories(lang, _localize_topic, localize_category=True)}
+    return {"categories": _build_categories(lang)}
 
 
-@router.get("/{lang}")
-def list_topics_full(lang: Lang):
-    return {"categories": _build_categories(lang, _strip_topic)}
+def _partitioned_label(value: str, language: Lang) -> dict[str, str]:
+    """Store the label in the active language partition and blank the other slot."""
+    return {language: value, get_other_language(language): ""}
 
 
-class BilingualLabels(BaseModel):
-    zh: str
-    en: str
-
-
-class TopicQuestionsRequest(BaseModel):
-    zh: list[str]
-    en: list[str]
+def _partitioned_questions(value: list[str], language: Lang) -> dict[str, list[str]]:
+    return {language: value, get_other_language(language): []}
 
 
 class CreateTopicRequest(BaseModel):
     topic_id: str
-    labels: BilingualLabels
-    category_labels: BilingualLabels
-    questions: TopicQuestionsRequest | None = None
+    labels: str
+    category_labels: str
+    questions: list[str] | None = None
 
 
 class UpdateTopicRequest(BaseModel):
-    labels: BilingualLabels | None = None
-    category_labels: BilingualLabels | None = None
-    questions: TopicQuestionsRequest | None = None
+    labels: str | None = None
+    category_labels: str | None = None
+    questions: list[str] | None = None
 
 
 @router.post("/", status_code=201)
@@ -142,9 +120,9 @@ def create_topic(request: CreateTopicRequest, language: Lang = "zh"):
     if store.get_topic(request.topic_id):
         raise HTTPException(status_code=409, detail=f"Topic '{request.topic_id}' already exists")
     data = {
-        "labels": request.labels.model_dump(),
-        "category_labels": request.category_labels.model_dump(),
-        "questions": request.questions.model_dump() if request.questions else {"zh": [], "en": []},
+        "labels": _partitioned_label(request.labels, language),
+        "category_labels": _partitioned_label(request.category_labels, language),
+        "questions": _partitioned_questions(request.questions or [], language),
     }
     store.upsert_topic(request.topic_id, data)
     return store.get_topic(request.topic_id)
@@ -153,13 +131,15 @@ def create_topic(request: CreateTopicRequest, language: Lang = "zh"):
 @router.put("/{topic_id:path}")
 def update_topic(topic_id: str, request: UpdateTopicRequest, language: Lang = "zh"):
     store = get_hciot_topic_store(language)
-    update_data = request.model_dump(exclude_none=True)
+    update_data: dict = {}
+    if request.labels is not None:
+        update_data["labels"] = _partitioned_label(request.labels, language)
+    if request.category_labels is not None:
+        update_data["category_labels"] = _partitioned_label(request.category_labels, language)
+    if request.questions is not None:
+        update_data["questions"] = _partitioned_questions(request.questions, language)
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
-    if request.labels:
-        update_data["labels"] = request.labels.model_dump()
-    if request.category_labels:
-        update_data["category_labels"] = request.category_labels.model_dump()
     success = store.update_topic(topic_id, update_data)
     if not success:
         raise HTTPException(status_code=404, detail=f"Topic '{topic_id}' not found")

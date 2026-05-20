@@ -156,13 +156,13 @@ jtai/
 
 - `POST /api/jti/chat/start`, `POST /api/jti/chat/message`
 - `POST /api/hciot/chat/start`, `POST /api/hciot/chat/message`
-- `GET /api/hciot/topics`
+- `GET /api/hciot/topics/{lang}`
 - `GET /api/hciot/images/{image_id}`
 - `GET /api/jti-admin/conversations`, `GET /api/hciot-admin/conversations`
 - `GET/POST/PUT/DELETE /api/jti-admin/knowledge/...`
 - `GET/POST/PUT/DELETE /api/hciot-admin/knowledge/...`
 - `GET/POST/PUT/DELETE /api/hciot-admin/images/...`
-- `GET/POST/PUT/DELETE /api/hciot-admin/topics/...`
+- `POST/PUT/DELETE /api/hciot-admin/topics/...`
 - `GET/POST/PUT/DELETE /api/keys`
 - `POST /v1/chat/completions`
 

@@ -8,7 +8,7 @@ import FileDetailPane from './knowledgeWorkspace/detail/FileDetailPane';
 import MergedCsvPane from './knowledgeWorkspace/detail/MergedCsvPane';
 import UploadDialog from './knowledgeWorkspace/upload/UploadDialog';
 import ImageDetailPane from './knowledgeWorkspace/detail/ImageDetailPane';
-import { NEW_VALUE, buildLabels, buildCategoryOptions, buildTopicOptions, createEmptyDraft, draftFromFile, getErrorMessage, getMetadataPayload, slugify, type FileMetadataDraft, type TopicLabels } from './knowledgeWorkspace/topicUtils';
+import { NEW_VALUE, buildCategoryOptions, buildTopicOptions, createEmptyDraft, draftFromFile, getErrorMessage, getMetadataPayload, normalizeLabel, slugify, type FileMetadataDraft, type TopicLabels } from './knowledgeWorkspace/topicUtils';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { buildExplorerTree, filterExplorerNodes, flattenExplorerNodes, getCurrentPathLabel, readExpandedKeys, writeExpandedKeys } from './knowledgeWorkspace/explorer/explorerTree';
 import reindexRag from '../../services/api/general';
@@ -18,11 +18,10 @@ interface HciotKnowledgeWorkspaceProps {
   language: HciotLanguage;
 }
 
-function createEmptyTopicDraft(): Pick<FileMetadataDraft, 'topicId' | 'topicLabelZh' | 'topicLabelEn'> {
+function createEmptyTopicDraft(): Pick<FileMetadataDraft, 'topicId' | 'topicLabel'> {
   return {
     topicId: '',
-    topicLabelZh: '',
-    topicLabelEn: '',
+    topicLabel: '',
   };
 }
 
@@ -112,9 +111,9 @@ export default function HciotKnowledgeWorkspace({
     if (!selectedMergedTopicId) return null;
     const prefix = selectedMergedTopicId.split('/')[0];
     const cat = categories.find((c) => c.id === prefix);
-    return cat?.topics.find((t) => t.id === selectedMergedTopicId)?.labels[language]
+    return cat?.topics.find((t) => t.id === selectedMergedTopicId)?.label
       ?? selectedMergedTopicId;
-  }, [categories, language, selectedMergedTopicId]);
+  }, [categories, selectedMergedTopicId]);
 
   const metadataDirty = useMemo(() => {
     if (!selectedFile) {
@@ -124,9 +123,9 @@ export default function HciotKnowledgeWorkspace({
       return true;
     }
 
-    const cleanDraft = draftFromFile(selectedFile, categories, language);
+    const cleanDraft = draftFromFile(selectedFile, categories);
     return JSON.stringify(cleanDraft) !== JSON.stringify(draft);
-  }, [categories, draft, language, selectedFile]);
+  }, [categories, draft, selectedFile]);
 
   const contentDirty = fileEditable && editorText !== originalText;
   const hasUnsavedChanges = metadataDirty || contentDirty;
@@ -214,9 +213,9 @@ export default function HciotKnowledgeWorkspace({
     }
 
     if (selectedFile) {
-      setDraft(draftFromFile(selectedFile, categories, language));
+      setDraft(draftFromFile(selectedFile, categories));
     }
-  }, [categories, language, selectedFile, selectedFileName]);
+  }, [categories, selectedFile, selectedFileName]);
 
   useEffect(() => {
     if (!selectedFileName) {
@@ -335,15 +334,13 @@ export default function HciotKnowledgeWorkspace({
     }
     const catId = topicId.split('/')[0];
     const topicSlug = topicId.includes('/') ? topicId.split('/').slice(1).join('/') : '';
-    const categoryLabel = language === 'zh' ? labels?.categoryLabelZh : labels?.categoryLabelEn;
-    const topicLabel = language === 'zh' ? labels?.topicLabelZh : labels?.topicLabelEn;
     return api.uploadHciotKnowledgeFileWithTopic({
       language,
       file,
       categoryId: catId || undefined,
       topicId: topicSlug || undefined,
-      categoryLabel: categoryLabel || undefined,
-      topicLabel: topicLabel || undefined,
+      categoryLabel: labels?.categoryLabel || undefined,
+      topicLabel: labels?.topicLabel || undefined,
     });
   };
 
@@ -518,13 +515,13 @@ export default function HciotKnowledgeWorkspace({
   }, [categories, draft.categoryId]);
 
   const topicOptions = useMemo(
-    () => buildTopicOptions(currentCategory, draft, language),
-    [currentCategory, draft, language],
+    () => buildTopicOptions(currentCategory, draft),
+    [currentCategory, draft],
   );
 
   const categoryOptions = useMemo(
-    () => buildCategoryOptions(categories, draft, language),
-    [categories, draft, language],
+    () => buildCategoryOptions(categories, draft),
+    [categories, draft],
   );
 
   const handleCategoryChange = (value: string) => {
@@ -536,8 +533,7 @@ export default function HciotKnowledgeWorkspace({
     if (value === NEW_VALUE) {
       patchDraft({
         categoryId: NEW_VALUE,
-        categoryLabelZh: '',
-        categoryLabelEn: '',
+        categoryLabel: '',
         ...createEmptyTopicDraft(),
       });
       return;
@@ -546,8 +542,7 @@ export default function HciotKnowledgeWorkspace({
     const category = categoryOptions.find((item) => item.id === value);
     setDraft({
       categoryId: value,
-      categoryLabelZh: category?.labels.zh || '',
-      categoryLabelEn: category?.labels.en || '',
+      categoryLabel: category?.label || '',
       ...createEmptyTopicDraft(),
     });
   };
@@ -565,8 +560,7 @@ export default function HciotKnowledgeWorkspace({
       setDraft((previous) => ({
         ...previous,
         topicId: NEW_VALUE,
-        topicLabelZh: '',
-        topicLabelEn: '',
+        topicLabel: '',
       }));
       return;
     }
@@ -574,8 +568,7 @@ export default function HciotKnowledgeWorkspace({
     const topic = topicOptions.find((item) => item.id === value);
     patchDraft({
       topicId: value,
-      topicLabelZh: topic?.labels.zh || '',
-      topicLabelEn: topic?.labels.en || '',
+      topicLabel: topic?.label || '',
     });
   };
 
@@ -583,19 +576,18 @@ export default function HciotKnowledgeWorkspace({
     let nextDraft = { ...currentDraft };
 
     if (nextDraft.categoryId === NEW_VALUE) {
-      const labels = buildLabels(nextDraft.categoryLabelZh, nextDraft.categoryLabelEn);
-      if (!labels) {
-        throw new Error(text('請輸入新科別的中英文名稱', 'Please enter both zh and en category labels'));
+      const categoryLabel = normalizeLabel(nextDraft.categoryLabel);
+      if (!categoryLabel) {
+        throw new Error(text('請輸入新科別的名稱', 'Please enter a category label'));
       }
-      const createdCategoryId = slugify(labels.en);
+      const createdCategoryId = slugify(categoryLabel);
       if (!createdCategoryId) {
         throw new Error(text('無法建立科別 ID', 'Unable to create category id'));
       }
       nextDraft = {
         ...nextDraft,
         categoryId: createdCategoryId,
-        categoryLabelZh: labels.zh,
-        categoryLabelEn: labels.en,
+        categoryLabel,
       };
     }
 
@@ -610,29 +602,28 @@ export default function HciotKnowledgeWorkspace({
       return nextDraft;
     }
 
-    const labels = buildLabels(nextDraft.topicLabelZh, nextDraft.topicLabelEn);
-    if (!labels) {
-      throw new Error(text('請輸入新主題的中英文名稱', 'Please enter both zh and en topic labels'));
+    const topicLabel = normalizeLabel(nextDraft.topicLabel);
+    if (!topicLabel) {
+      throw new Error(text('請輸入新主題的名稱', 'Please enter a topic label'));
     }
-    const createdTopicSlug = slugify(labels.en);
+    const createdTopicSlug = slugify(topicLabel);
     if (!createdTopicSlug) {
       throw new Error(text('無法建立主題 ID', 'Unable to create topic id'));
     }
 
     const fullTopicId = `${nextDraft.categoryId}/${createdTopicSlug}`;
-    const categoryLabels = buildLabels(nextDraft.categoryLabelZh, nextDraft.categoryLabelEn);
-    if (!categoryLabels) {
-      throw new Error(text('請輸入新科別的中英文名稱', 'Please enter both zh and en category labels'));
+    const categoryLabel = normalizeLabel(nextDraft.categoryLabel);
+    if (!categoryLabel) {
+      throw new Error(text('請輸入新科別的名稱', 'Please enter a category label'));
     }
-    await api.createHciotTopic(fullTopicId, labels, categoryLabels, undefined, language);
+    await api.createHciotTopic(fullTopicId, topicLabel, categoryLabel, undefined, language);
     const topicData = await api.listHciotTopicsAdmin(language);
     setCategories(topicData.categories || []);
 
     return {
       ...nextDraft,
       topicId: fullTopicId,
-      topicLabelZh: labels.zh,
-      topicLabelEn: labels.en,
+      topicLabel,
     };
   };
 
@@ -648,7 +639,7 @@ export default function HciotKnowledgeWorkspace({
       if (metadataDirty || draft.categoryId === NEW_VALUE || draft.topicId === NEW_VALUE) {
         const updatedMetadata = await api.updateHciotKnowledgeFileMetadata(
           selectedFile.name,
-          getMetadataPayload(nextDraft, language),
+          getMetadataPayload(nextDraft),
           language,
         );
         setFiles((previous) => previous.map((file) => (

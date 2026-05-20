@@ -52,41 +52,43 @@ def patch_topic_store(store: FakeStore):
     return patch.object(topics_admin, "get_hciot_topic_store", side_effect=store.bind)
 
 
-def test_create_topic_preserves_blank_label_fields_without_auto_translation():
+def test_create_topic_stores_single_language_label_in_its_partition():
     store = FakeStore()
     request = topics_admin.CreateTopicRequest(
         topic_id="ortho/prp",
-        labels=topics_admin.BilingualLabels(zh="PRP", en=""),
-        category_labels=topics_admin.BilingualLabels(zh="骨科", en=""),
+        labels="PRP",
+        category_labels="骨科",
     )
 
     with patch_topic_store(store):
-        result = topics_admin.create_topic(request)
+        result = topics_admin.create_topic(request, language="zh")
 
+    # Single-language input is stored into the doc-level bilingual dict;
+    # the other language slot stays blank.
     assert result["labels"] == {"zh": "PRP", "en": ""}
     assert result["category_labels"] == {"zh": "骨科", "en": ""}
 
 
-def test_update_topic_preserves_blank_label_fields_without_auto_translation():
+def test_update_topic_writes_single_language_label_into_partition():
     store = FakeStore()
     store.bind("zh").upsert_topic(
         "ortho/prp",
         {
-            "labels": {"zh": "PRP", "en": "PRP Therapy"},
-            "category_labels": {"zh": "骨科", "en": "Orthopedics"},
+            "labels": {"zh": "PRP", "en": ""},
+            "category_labels": {"zh": "骨科", "en": ""},
             "questions": {"zh": [], "en": []},
         },
     )
     request = topics_admin.UpdateTopicRequest(
-        labels=topics_admin.BilingualLabels(zh="PRP", en=""),
-        category_labels=topics_admin.BilingualLabels(zh="骨科", en=""),
+        labels="PRP 治療",
+        category_labels="骨科部",
     )
 
     with patch_topic_store(store):
-        result = topics_admin.update_topic("ortho/prp", request)
+        result = topics_admin.update_topic("ortho/prp", request, language="zh")
 
-    assert result["labels"] == {"zh": "PRP", "en": ""}
-    assert result["category_labels"] == {"zh": "骨科", "en": ""}
+    assert result["labels"] == {"zh": "PRP 治療", "en": ""}
+    assert result["category_labels"] == {"zh": "骨科部", "en": ""}
 
 
 def test_public_topics_places_common_questions_first():
@@ -131,34 +133,6 @@ def test_public_topics_query_route_is_not_registered():
 
     assert ("/topics", "GET") not in routes
     assert ("/topics/{lang}", "GET") in routes
-
-
-def test_admin_topics_path_returns_full_metadata_for_management():
-    store = FakeStore()
-    store.categories_by_language = {
-        "en": [
-            {
-                "id": "faq",
-                "labels": {"zh": "FAQ", "en": "FAQ"},
-                "topics": [
-                    {
-                        "id": "faq/early-intervention",
-                        "topic_id": "faq/early-intervention",
-                        "labels": {"zh": "Early Intervention", "en": "Early Intervention"},
-                        "category_labels": {"zh": "FAQ", "en": "FAQ"},
-                        "questions": {"zh": [], "en": ["English question"]},
-                    },
-                ],
-            },
-        ],
-    }
-
-    with patch_topic_store(store):
-        result = topics_admin.list_topics_full("en")
-
-    assert result["categories"][0]["labels"] == {"zh": "FAQ", "en": "FAQ"}
-    assert result["categories"][0]["topics"][0]["category_labels"] == {"zh": "FAQ", "en": "FAQ"}
-    assert ("list_categories", "en") in store.calls
 
 
 def test_localized_public_topics_return_slim_single_language_shape():
@@ -271,20 +245,21 @@ def test_create_english_topic_does_not_conflict_with_existing_chinese_topic():
     store.bind("zh").upsert_topic(
         "faq/early-intervention",
         {
-            "labels": {"zh": "兒童早療", "en": "中文佔位"},
-            "category_labels": {"zh": "常見問題", "en": "中文佔位"},
+            "labels": {"zh": "兒童早療", "en": ""},
+            "category_labels": {"zh": "常見問題", "en": ""},
             "questions": {"zh": ["中文題"], "en": []},
         },
     )
     request = topics_admin.CreateTopicRequest(
         topic_id="faq/early-intervention",
-        labels=topics_admin.BilingualLabels(zh="Early Intervention", en="Early Intervention"),
-        category_labels=topics_admin.BilingualLabels(zh="FAQ", en="FAQ"),
+        labels="Early Intervention",
+        category_labels="FAQ",
     )
 
     with patch_topic_store(store):
         result = topics_admin.create_topic(request, language="en")
 
-    assert result["labels"] == {"zh": "Early Intervention", "en": "Early Intervention"}
+    # The English partition gets its own document; the Chinese one is untouched.
+    assert result["labels"] == {"zh": "", "en": "Early Intervention"}
     assert store.bind("zh").get_topic("faq/early-intervention")["labels"]["zh"] == "兒童早療"
     assert store.bind("en").get_topic("faq/early-intervention")["category_labels"]["en"] == "FAQ"

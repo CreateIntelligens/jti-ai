@@ -4,10 +4,9 @@ import type { HciotTopicCategory } from '../../services/api/hciot';
 import * as api from '../../services/api';
 import ConfirmDialog from '../ConfirmDialog';
 import {
-  buildLabels,
-  DEFAULT_TOPIC_LABELS,
+  DEFAULT_TOPIC_LABEL,
   getErrorMessage,
-  missingBilingualLabelMessage,
+  missingLabelMessage,
   slugify,
 } from './knowledgeWorkspace/topicUtils';
 
@@ -48,28 +47,23 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
     editQs: '編輯題目',
     noQs: '尚無題目',
     qsPlaceholder: '每行一題…',
-    catPlaceholderZh: '中文名稱',
-    catPlaceholderEn: '英文名稱',
-    newCatZh: '科別中文名',
-    newCatEn: '科別英文名',
-    newTopicZh: '主題中文名',
-    newTopicEn: '主題英文名',
+    catPlaceholder: '名稱',
+    newCat: '科別名稱',
+    newTopic: '主題名稱',
   };
 
   const [expandedCatId, setExpandedCatId] = useState<string | null>(null);
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
-  const [editCatLabels, setEditCatLabels] = useState({ zh: '', en: '' });
+  const [editCatLabel, setEditCatLabel] = useState('');
   const [editingTopicId, setEditingTopicId] = useState<string | null>(null);
-  const [editTopicLabels, setEditTopicLabels] = useState({ zh: '', en: '' });
+  const [editTopicLabel, setEditTopicLabel] = useState('');
   const [editingQuestions, setEditingQuestions] = useState<string | null>(null);
   const [questionsText, setQuestionsText] = useState('');
   const [confirmDelete, setConfirmDelete] = useState<DeleteTarget | null>(null);
   const [addingCat, setAddingCat] = useState(false);
-  const [newCatZh, setNewCatZh] = useState('');
-  const [newCatEn, setNewCatEn] = useState('');
+  const [newCatLabel, setNewCatLabel] = useState('');
   const [addingTopicInCat, setAddingTopicInCat] = useState<string | null>(null);
-  const [newTopicZh, setNewTopicZh] = useState('');
-  const [newTopicEn, setNewTopicEn] = useState('');
+  const [newTopicLabel, setNewTopicLabel] = useState('');
   const [saving, setSaving] = useState(false);
 
   const reload = async () => {
@@ -78,10 +72,10 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
   };
 
   const totalQuestions = (cat: HciotTopicCategory) =>
-    cat.topics.reduce((sum, t) => sum + (t.questions?.[language]?.length ?? 0), 0);
+    cat.topics.reduce((sum, topic) => sum + (topic.questions?.length ?? 0), 0);
 
-  const resetCategoryDraft = () => { setAddingCat(false); setNewCatZh(''); setNewCatEn(''); };
-  const resetTopicDraft = () => { setAddingTopicInCat(null); setNewTopicZh(''); setNewTopicEn(''); };
+  const resetCategoryDraft = () => { setAddingCat(false); setNewCatLabel(''); };
+  const resetTopicDraft = () => { setAddingTopicInCat(null); setNewTopicLabel(''); };
 
   const runSavingAction = async (action: () => Promise<void>, onFinally?: () => void) => {
     setSaving(true);
@@ -94,17 +88,17 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
 
   const startEditCat = (cat: HciotTopicCategory) => {
     setEditingCatId(cat.id);
-    setEditCatLabels({ ...cat.labels });
+    setEditCatLabel(cat.label);
   };
 
   const saveEditCat = async (cat: HciotTopicCategory) => {
-    const labels = buildLabels(editCatLabels.zh, editCatLabels.en);
-    if (!labels) {
-      alert(missingBilingualLabelMessage('category', language));
+    const label = editCatLabel.trim();
+    if (!label) {
+      alert(missingLabelMessage('category', language));
       return;
     }
     await runSavingAction(async () => {
-      await Promise.all(cat.topics.map((topic) => api.updateHciotTopic(topic.id, { category_labels: labels }, language)));
+      await Promise.all(cat.topics.map((topic) => api.updateHciotTopic(topic.id, { category_labels: label }, language)));
       setEditingCatId(null);
       await reload();
     });
@@ -112,17 +106,16 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
 
   // "Add category" = add a first topic under the new category prefix
   const confirmAddCat = async () => {
-    const catLabels = buildLabels(newCatZh, newCatEn);
-    if (!catLabels) {
-      alert(missingBilingualLabelMessage('category', language));
+    const catLabel = newCatLabel.trim();
+    if (!catLabel) {
+      alert(missingLabelMessage('category', language));
       return;
     }
-    const catSlug = slugify(catLabels.en);
+    const catSlug = slugify(catLabel);
     if (!catSlug) return;
     const topicId = `${catSlug}/default`;
-    const topicLabels = DEFAULT_TOPIC_LABELS;
     await runSavingAction(async () => {
-      await api.createHciotTopic(topicId, topicLabels, catLabels, undefined, language);
+      await api.createHciotTopic(topicId, DEFAULT_TOPIC_LABEL, catLabel, undefined, language);
       resetCategoryDraft();
       await reload();
     });
@@ -144,33 +137,33 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
 
   const startEditTopic = (topic: HciotTopic) => {
     setEditingTopicId(topic.id);
-    setEditTopicLabels({ ...topic.labels });
+    setEditTopicLabel(topic.label);
   };
 
   const saveEditTopic = async (topicId: string) => {
-    const labels = buildLabels(editTopicLabels.zh, editTopicLabels.en);
-    if (!labels) {
-      alert(missingBilingualLabelMessage('topic', language));
+    const label = editTopicLabel.trim();
+    if (!label) {
+      alert(missingLabelMessage('topic', language));
       return;
     }
     await runSavingAction(async () => {
-      await api.updateHciotTopic(topicId, { labels }, language);
+      await api.updateHciotTopic(topicId, { labels: label }, language);
       setEditingTopicId(null);
       await reload();
     });
   };
 
   const confirmAddTopic = async (cat: HciotTopicCategory) => {
-    const labels = buildLabels(newTopicZh, newTopicEn);
-    if (!labels) {
-      alert(missingBilingualLabelMessage('topic', language));
+    const label = newTopicLabel.trim();
+    if (!label) {
+      alert(missingLabelMessage('topic', language));
       return;
     }
-    const topicSlug = slugify(labels.en);
+    const topicSlug = slugify(label);
     if (!topicSlug) return;
     const topicId = `${cat.id}/${topicSlug}`;
     await runSavingAction(async () => {
-      await api.createHciotTopic(topicId, labels, cat.labels, undefined, language);
+      await api.createHciotTopic(topicId, label, cat.label, undefined, language);
       resetTopicDraft();
       await reload();
     });
@@ -187,16 +180,13 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
 
   const startEditQuestions = (topic: HciotTopic) => {
     setEditingQuestions(topic.id);
-    setQuestionsText((topic.questions?.[language] ?? []).join('\n'));
+    setQuestionsText((topic.questions ?? []).join('\n'));
   };
 
   const saveQuestions = async (topicId: string) => {
     const lines = toQuestionLines(questionsText);
-    const existingTopic = categories.flatMap((c) => c.topics).find((t) => t.id === topicId);
-    const existingQuestions = existingTopic?.questions ?? { zh: [], en: [] };
-    const updatedQuestions = { ...existingQuestions, [language]: lines };
     await runSavingAction(async () => {
-      await api.updateHciotTopic(topicId, { questions: updatedQuestions }, language);
+      await api.updateHciotTopic(topicId, { questions: lines }, language);
       setEditingQuestions(null);
       await reload();
     });
@@ -235,17 +225,15 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
 
               {isEditingThis ? (
                 <div className="hciot-te-inline-edit">
-                  <input className="hciot-kb-input" placeholder={t.catPlaceholderZh} value={editCatLabels.zh}
-                    onChange={(e) => setEditCatLabels(p => ({ ...p, zh: e.target.value }))} autoFocus />
-                  <input className="hciot-kb-input" placeholder={t.catPlaceholderEn} value={editCatLabels.en}
-                    onChange={(e) => setEditCatLabels(p => ({ ...p, en: e.target.value }))} />
+                  <input className="hciot-kb-input" placeholder={t.catPlaceholder} value={editCatLabel}
+                    onChange={(e) => setEditCatLabel(e.target.value)} autoFocus />
                   <button className="hciot-te-icon-btn confirm" onClick={() => saveEditCat(cat)} disabled={saving}><Check size={14} /></button>
                   <button className="hciot-te-icon-btn" onClick={() => setEditingCatId(null)}><X size={14} /></button>
                 </div>
               ) : (
                 <>
                   <span className="hciot-te-cat-name" onClick={() => setExpandedCatId(isExpanded ? null : cat.id)}>
-                    {cat.labels[language]}
+                    {cat.label}
                   </span>
                   <span className="hciot-te-badge">
                     {cat.topics.length} {t.topics} · {totalQuestions(cat)} {t.questions}
@@ -269,7 +257,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
                 {cat.topics.map((topic) => {
                   const isEditingTopic = editingTopicId === topic.id;
                   const isEditingQs = editingQuestions === topic.id;
-                  const qs = topic.questions?.[language] ?? [];
+                  const qs = topic.questions ?? [];
 
                   return (
                     <div key={topic.id} className="hciot-te-topic">
@@ -277,16 +265,14 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
                         <GripVertical size={14} className="hciot-te-grip" />
                         {isEditingTopic ? (
                           <div className="hciot-te-inline-edit">
-                            <input className="hciot-kb-input" placeholder={t.catPlaceholderZh} value={editTopicLabels.zh}
-                              onChange={(e) => setEditTopicLabels(p => ({ ...p, zh: e.target.value }))} autoFocus />
-                            <input className="hciot-kb-input" placeholder={t.catPlaceholderEn} value={editTopicLabels.en}
-                              onChange={(e) => setEditTopicLabels(p => ({ ...p, en: e.target.value }))} />
+                            <input className="hciot-kb-input" placeholder={t.catPlaceholder} value={editTopicLabel}
+                              onChange={(e) => setEditTopicLabel(e.target.value)} autoFocus />
                             <button className="hciot-te-icon-btn confirm" onClick={() => saveEditTopic(topic.id)} disabled={saving}><Check size={14} /></button>
                             <button className="hciot-te-icon-btn" onClick={() => setEditingTopicId(null)}><X size={14} /></button>
                           </div>
                         ) : (
                           <>
-                            <span className="hciot-te-topic-name">{topic.labels[language]}</span>
+                            <span className="hciot-te-topic-name">{topic.label}</span>
                             <span className="hciot-te-badge small">{qs.length} {t.questions}</span>
                             <div className="hciot-te-cat-actions">
                               <button className="hciot-te-icon-btn" onClick={() => startEditTopic(topic)} title={t.rename}>
@@ -344,10 +330,8 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
 
                 {addingTopicInCat === cat.id ? (
                   <div className="hciot-te-add-row">
-                    <input className="hciot-kb-input" placeholder={t.newTopicZh}
-                      value={newTopicZh} onChange={(e) => setNewTopicZh(e.target.value)} autoFocus />
-                    <input className="hciot-kb-input" placeholder={t.newTopicEn}
-                      value={newTopicEn} onChange={(e) => setNewTopicEn(e.target.value)} />
+                    <input className="hciot-kb-input" placeholder={t.newTopic}
+                      value={newTopicLabel} onChange={(e) => setNewTopicLabel(e.target.value)} autoFocus />
                     <button className="hciot-te-icon-btn confirm" onClick={() => confirmAddTopic(cat)} disabled={saving}><Check size={14} /></button>
                     <button className="hciot-te-icon-btn" onClick={resetTopicDraft}><X size={14} /></button>
                   </div>
@@ -364,10 +348,8 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
 
       {addingCat ? (
         <div className="hciot-te-add-row">
-          <input className="hciot-kb-input" placeholder={t.newCatZh}
-            value={newCatZh} onChange={(e) => setNewCatZh(e.target.value)} autoFocus />
-          <input className="hciot-kb-input" placeholder={t.newCatEn}
-            value={newCatEn} onChange={(e) => setNewCatEn(e.target.value)} />
+          <input className="hciot-kb-input" placeholder={t.newCat}
+            value={newCatLabel} onChange={(e) => setNewCatLabel(e.target.value)} autoFocus />
           <button className="hciot-te-icon-btn confirm" onClick={confirmAddCat} disabled={saving}><Check size={14} /></button>
           <button className="hciot-te-icon-btn" onClick={resetCategoryDraft}><X size={14} /></button>
         </div>

@@ -163,15 +163,15 @@ export function buildExplorerTree(
     if (leftId && !rightId) return -1;
     const leftCategory = categories.find((item) => item.id === leftId);
     const rightCategory = categories.find((item) => item.id === rightId);
-    const leftLabel = leftCategory?.labels[language] || leftFiles[0]?.category_label || leftId;
-    const rightLabel = rightCategory?.labels[language] || rightFiles[0]?.category_label || rightId;
+    const leftLabel = leftCategory?.label || leftFiles[0]?.category_label || leftId;
+    const rightLabel = rightCategory?.label || rightFiles[0]?.category_label || rightId;
     return sortByLabel(leftLabel, rightLabel);
   });
 
   sortedCategoryEntries.forEach(([categoryId, categoryFiles]) => {
     const category = categories.find((item) => item.id === categoryId);
     const categoryLabel =
-      category?.labels[language] || categoryFiles[0]?.category_label || categoryId;
+      category?.label || categoryFiles[0]?.category_label || categoryId;
     const categoryKey = `category:${categoryId}`;
     const filesByTopic = new Map<string, HciotKnowledgeFile[]>();
 
@@ -184,7 +184,7 @@ export function buildExplorerTree(
 
     const resolveTopicLabel = (topicId: string, topicFiles: HciotKnowledgeFile[]): string => {
       if (topicId === NO_TOPIC_KEY) return getNoTopicLabel(language);
-      return category?.topics.find((item) => item.id === topicId)?.labels[language]
+      return category?.topics.find((item) => item.id === topicId)?.label
         || topicFiles[0]?.topic_label
         || topicId;
     };

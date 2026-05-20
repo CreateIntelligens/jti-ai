@@ -72,7 +72,7 @@ class _AccessLogNoiseFilter(logging.Filter):
     # Successful GETs the frontend polls frequently — they spam the log without
     # any operational signal. Only filter the 200 case so real failures still surface.
     _QUIET_GET_PATHS = (
-        "/api/hciot/topics",
+        "/api/hciot/topics/",
         "/api/stores",
         "/api/keys/count",
     )

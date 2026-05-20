@@ -27,11 +27,11 @@ describe('HCIoT topic API paths', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/hciot/topics/en', expect.any(Object));
   });
 
-  it('loads admin topic metadata with language in the path', async () => {
+  it('loads admin topic metadata from the public single-language endpoint', async () => {
     const fetchMock = stubSuccessfulFetch();
 
     await listHciotTopicsAdmin('en');
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/hciot-admin/topics/en', {});
+    expect(fetchMock).toHaveBeenCalledWith('/api/hciot/topics/en', expect.any(Object));
   });
 });

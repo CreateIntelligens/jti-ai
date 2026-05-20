@@ -8,7 +8,7 @@ import type { HciotImage, HciotTopicCategory } from '../../../../services/api/hc
 import FileUploadTab from './FileUploadTab';
 import ImageUploadTab from './ImageUploadTab';
 import QaUploadTab from './QaUploadTab';
-import { buildLabels, NEW_VALUE, slugify, sortByLabel, type TopicLabels } from '../topicUtils';
+import { NEW_VALUE, normalizeLabel, slugify, sortByLabel, type TopicLabels } from '../topicUtils';
 import type { DeleteImageHandler, UploadedImageResult } from '../imageUpload';
 import type { ResolvedUploadTopic } from './types';
 
@@ -69,11 +69,10 @@ export function isUploadTopicSelectDisabled(categoryId: string): boolean {
 export function buildUploadTopicOptions(
   categoryId: string,
   sortedTopics: HciotTopicCategory['topics'],
-  language: HciotLanguage,
 ): UploadTopicOption[] {
   return [
     { value: '', label: '— 不指定 —' },
-    ...sortedTopics.map((t) => ({ value: t.id, label: t.labels[language] })),
+    ...sortedTopics.map((t) => ({ value: t.id, label: t.label })),
     ...(categoryId ? [{ value: NEW_VALUE, label: '＋ 新增主題' }] : []),
   ];
 }
@@ -81,77 +80,69 @@ export function buildUploadTopicOptions(
 function resolveTopicInfo(
   categoryId: string,
   topicId: string,
-  newCategoryZh: string,
-  newCategoryEn: string,
-  newTopicZh: string,
-  newTopicEn: string,
+  newCategoryLabel: string,
+  newTopicLabel: string,
   currentCategory: HciotTopicCategory | null | undefined,
 ): ResolvedUploadTopic | null {
   if (!categoryId) return null;
 
   let catId = categoryId;
-  let catLabels = { zh: '', en: '' };
+  let categoryLabel = '';
 
   if (categoryId === NEW_VALUE) {
-    const b = buildLabels(newCategoryZh, newCategoryEn);
-    if (!b) return null;
-    catLabels = b;
-    catId = slugify(catLabels.en);
+    const normalized = normalizeLabel(newCategoryLabel);
+    if (!normalized) return null;
+    categoryLabel = normalized;
+    catId = slugify(categoryLabel);
   } else {
     if (!currentCategory) return null;
-    catLabels = { zh: currentCategory.labels.zh, en: currentCategory.labels.en };
+    categoryLabel = currentCategory.label;
   }
 
   let topSlug = '';
-  let topLabels = { zh: '', en: '' };
+  let topicLabel = '';
 
   if (topicId === NEW_VALUE) {
-    const b = buildLabels(newTopicZh, newTopicEn);
-    if (b) {
-      topLabels = b;
-      topSlug = slugify(topLabels.en);
+    const normalized = normalizeLabel(newTopicLabel);
+    if (normalized) {
+      topicLabel = normalized;
+      topSlug = slugify(topicLabel);
     }
   } else if (topicId && currentCategory) {
     const existing = currentCategory.topics.find((t) => t.id === topicId);
     if (existing) {
       topSlug = topicId.split('/').pop() || topicId;
-      topLabels = { zh: existing.labels.zh, en: existing.labels.en };
+      topicLabel = existing.label;
     }
   }
 
   return {
     fullTopicId: topSlug ? `${catId}/${topSlug}` : catId,
     labels: {
-      categoryLabelZh: catLabels.zh,
-      categoryLabelEn: catLabels.en,
-      topicLabelZh: topLabels.zh,
-      topicLabelEn: topLabels.en,
+      categoryLabel,
+      topicLabel,
     },
   };
 }
 
-function useTopicSelection(categories: HciotTopicCategory[], language: HciotLanguage, open: boolean) {
+function useTopicSelection(categories: HciotTopicCategory[], open: boolean) {
   const [categoryId, setCategoryId] = useState(NEW_VALUE);
   const [topicId, setTopicId] = useState(NEW_VALUE);
-  const [newCategoryZh, setNewCategoryZh] = useState('');
-  const [newCategoryEn, setNewCategoryEn] = useState('');
-  const [newTopicZh, setNewTopicZh] = useState('');
-  const [newTopicEn, setNewTopicEn] = useState('');
+  const [newCategoryLabel, setNewCategoryLabel] = useState('');
+  const [newTopicLabel, setNewTopicLabel] = useState('');
 
   useEffect(() => {
     if (!open) return;
     const savedSelection = readSavedTopicSelection(categories);
     setCategoryId(savedSelection.categoryId);
     setTopicId(savedSelection.topicId);
-    setNewCategoryZh('');
-    setNewCategoryEn('');
-    setNewTopicZh('');
-    setNewTopicEn('');
+    setNewCategoryLabel('');
+    setNewTopicLabel('');
   }, [open, categories]);
 
   const sortedCategories = useMemo(
-    () => [...categories].sort((a, b) => sortByLabel(a.labels[language], b.labels[language])),
-    [categories, language],
+    () => [...categories].sort((a, b) => sortByLabel(a.label, b.label)),
+    [categories],
   );
 
   const currentCategory = useMemo(
@@ -161,40 +152,34 @@ function useTopicSelection(categories: HciotTopicCategory[], language: HciotLang
 
   const sortedTopics = useMemo(() => {
     if (!currentCategory) return [];
-    return [...currentCategory.topics].sort((a, b) => sortByLabel(a.labels[language], b.labels[language]));
-  }, [currentCategory, language]);
+    return [...currentCategory.topics].sort((a, b) => sortByLabel(a.label, b.label));
+  }, [currentCategory]);
 
   const resolvedTopic = useMemo(
-    () => resolveTopicInfo(categoryId, topicId, newCategoryZh, newCategoryEn, newTopicZh, newTopicEn, currentCategory),
-    [categoryId, topicId, newCategoryZh, newCategoryEn, newTopicZh, newTopicEn, currentCategory],
+    () => resolveTopicInfo(categoryId, topicId, newCategoryLabel, newTopicLabel, currentCategory),
+    [categoryId, topicId, newCategoryLabel, newTopicLabel, currentCategory],
   );
 
   const hasIncompleteNewLabels = (
-    (categoryId === NEW_VALUE && !buildLabels(newCategoryZh, newCategoryEn))
-    || (topicId === NEW_VALUE && !buildLabels(newTopicZh, newTopicEn))
+    (categoryId === NEW_VALUE && !normalizeLabel(newCategoryLabel))
+    || (topicId === NEW_VALUE && !normalizeLabel(newTopicLabel))
   );
 
   return {
     categoryId,
     topicId,
-    newCategoryZh,
-    newCategoryEn,
-    newTopicZh,
-    newTopicEn,
-    setNewCategoryZh,
-    setNewCategoryEn,
-    setNewTopicZh,
-    setNewTopicEn,
+    newCategoryLabel,
+    newTopicLabel,
+    setNewCategoryLabel,
+    setNewTopicLabel,
     sortedCategories,
     sortedTopics,
     handleCategoryChange: (value: string) => {
       setCategoryId(value);
       setTopicId(value === NEW_VALUE ? NEW_VALUE : '');
-      setNewTopicZh('');
-      setNewTopicEn('');
+      setNewTopicLabel('');
       if (value !== NEW_VALUE) {
-        setNewCategoryZh('');
-        setNewCategoryEn('');
+        setNewCategoryLabel('');
         localStorage.setItem(LS_CATEGORY_KEY, value);
         localStorage.removeItem(LS_TOPIC_KEY);
       } else {
@@ -205,8 +190,7 @@ function useTopicSelection(categories: HciotTopicCategory[], language: HciotLang
     handleTopicChange: (value: string) => {
       setTopicId(value);
       if (value !== NEW_VALUE) {
-        setNewTopicZh('');
-        setNewTopicEn('');
+        setNewTopicLabel('');
         localStorage.setItem(LS_TOPIC_KEY, value);
       }
     },
@@ -216,42 +200,27 @@ function useTopicSelection(categories: HciotTopicCategory[], language: HciotLang
 }
 
 interface TopicSelectorSectionProps {
-  language: HciotLanguage;
   topic: ReturnType<typeof useTopicSelection>;
 }
 
-interface LocalizedNameInputProps {
-  language: HciotLanguage;
-  zhPlaceholder: string;
-  enPlaceholder: string;
-  zhValue: string;
-  enValue: string;
-  onZhChange: (value: string) => void;
-  onEnChange: (value: string) => void;
+interface LabelNameInputProps {
+  placeholder: string;
+  value: string;
+  onChange: (value: string) => void;
 }
 
-function LocalizedNameInput({
-  language,
-  zhPlaceholder,
-  enPlaceholder,
-  zhValue,
-  enValue,
-  onZhChange,
-  onEnChange,
-}: LocalizedNameInputProps) {
-  const isZh = language === 'zh';
-
+function LabelNameInput({ placeholder, value, onChange }: LabelNameInputProps) {
   return (
     <input
       className="hciot-file-input"
-      placeholder={isZh ? zhPlaceholder : enPlaceholder}
-      value={isZh ? zhValue : enValue}
-      onChange={(event) => (isZh ? onZhChange : onEnChange)(event.target.value)}
+      placeholder={placeholder}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
     />
   );
 }
 
-function TopicSelectorSection({ language, topic }: TopicSelectorSectionProps) {
+function TopicSelectorSection({ topic }: TopicSelectorSectionProps) {
   return (
     <div className="hciot-qa-topic-section">
       <label className="hciot-qa-topic-label">
@@ -263,7 +232,7 @@ function TopicSelectorSection({ language, topic }: TopicSelectorSectionProps) {
           value={topic.categoryId}
           onChange={topic.handleCategoryChange}
           options={[
-            ...topic.sortedCategories.map((c) => ({ value: c.id, label: c.labels[language] })),
+            ...topic.sortedCategories.map((c) => ({ value: c.id, label: c.label })),
             { value: NEW_VALUE, label: '＋ 新增科別' },
           ]}
         />
@@ -273,34 +242,26 @@ function TopicSelectorSection({ language, topic }: TopicSelectorSectionProps) {
           value={topic.topicId}
           onChange={topic.handleTopicChange}
           disabled={isUploadTopicSelectDisabled(topic.categoryId)}
-          options={buildUploadTopicOptions(topic.categoryId, topic.sortedTopics, language)}
+          options={buildUploadTopicOptions(topic.categoryId, topic.sortedTopics)}
         />
       </div>
 
       {topic.categoryId === NEW_VALUE && (
         <div className="hciot-qa-new-fields">
-          <LocalizedNameInput
-            language={language}
-            zhPlaceholder="新科別中文名稱"
-            enPlaceholder="New category name (English)"
-            zhValue={topic.newCategoryZh}
-            enValue={topic.newCategoryEn}
-            onZhChange={topic.setNewCategoryZh}
-            onEnChange={topic.setNewCategoryEn}
+          <LabelNameInput
+            placeholder="新科別名稱"
+            value={topic.newCategoryLabel}
+            onChange={topic.setNewCategoryLabel}
           />
         </div>
       )}
 
       {topic.topicId === NEW_VALUE && (
         <div className="hciot-qa-new-fields">
-          <LocalizedNameInput
-            language={language}
-            zhPlaceholder="新主題中文名稱"
-            enPlaceholder="New topic name (English)"
-            zhValue={topic.newTopicZh}
-            enValue={topic.newTopicEn}
-            onZhChange={topic.setNewTopicZh}
-            onEnChange={topic.setNewTopicEn}
+          <LabelNameInput
+            placeholder="新主題名稱"
+            value={topic.newTopicLabel}
+            onChange={topic.setNewTopicLabel}
           />
         </div>
       )}
@@ -323,7 +284,7 @@ export default function UploadDialog({
   onUploadImageComplete,
 }: UploadDialogProps) {
   const [tab, setTab] = useState<Tab>('file');
-  const topic = useTopicSelection(categories, language, open);
+  const topic = useTopicSelection(categories, open);
   const resolvedTopic = topic.resolvedTopic;
 
   useEffect(() => {
@@ -360,7 +321,7 @@ export default function UploadDialog({
           ))}
         </div>
 
-        {tab !== 'image' && <TopicSelectorSection language={language} topic={topic} />}
+        {tab !== 'image' && <TopicSelectorSection topic={topic} />}
 
         {tab === 'file' && (
           <FileUploadTab

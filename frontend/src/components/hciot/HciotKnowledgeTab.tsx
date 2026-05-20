@@ -3,7 +3,7 @@ import { Upload, FileText, Trash2, Download, Pencil, X } from 'lucide-react';
 import HciotSelect from './HciotSelect';
 import ConfirmDialog from '../ConfirmDialog';
 import HciotTopicEditor from './HciotTopicEditor';
-import { buildLabels, missingBilingualLabelMessage, NEW_VALUE, slugify } from './knowledgeWorkspace/topicUtils';
+import { missingLabelMessage, NEW_VALUE, normalizeLabel, slugify } from './knowledgeWorkspace/topicUtils';
 import * as api from '../../services/api';
 
 interface KBFile {
@@ -44,10 +44,8 @@ export interface HciotKnowledgeTabProps {
 export interface TopicUploadOpts {
   categoryId?: string;
   topicId?: string;
-  categoryLabelZh?: string;
-  categoryLabelEn?: string;
-  topicLabelZh?: string;
-  topicLabelEn?: string;
+  categoryLabel?: string;
+  topicLabel?: string;
 }
 
 export default function HciotKnowledgeTab({
@@ -85,16 +83,14 @@ export default function HciotKnowledgeTab({
   const [categories, setCategories] = useState<api.HciotTopicCategory[]>([]);
   const [selectedCategoryId, setSelectedCategoryId] = useState('');
   const [selectedTopicId, setSelectedTopicId] = useState('');
-  const [newCategoryLabelZh, setNewCategoryLabelZh] = useState('');
-  const [newCategoryLabelEn, setNewCategoryLabelEn] = useState('');
-  const [newTopicLabelZh, setNewTopicLabelZh] = useState('');
-  const [newTopicLabelEn, setNewTopicLabelEn] = useState('');
+  const [newCategoryLabel, setNewCategoryLabel] = useState('');
+  const [newTopicLabel, setNewTopicLabel] = useState('');
 
   const isNewCategory = selectedCategoryId === NEW_VALUE;
   const isNewTopic = selectedTopicId === NEW_VALUE;
-  const newCategoryLabels = buildLabels(newCategoryLabelZh, newCategoryLabelEn);
-  const newTopicLabels = buildLabels(newTopicLabelZh, newTopicLabelEn);
-  const effectiveCategoryId = isNewCategory && newCategoryLabels ? slugify(newCategoryLabels.en) : selectedCategoryId;
+  const newCategoryLabelValue = normalizeLabel(newCategoryLabel);
+  const newTopicLabelValue = normalizeLabel(newTopicLabel);
+  const effectiveCategoryId = isNewCategory && newCategoryLabelValue ? slugify(newCategoryLabelValue) : selectedCategoryId;
 
   const selectedCategory = useMemo(
     () => categories.find((c) => c.id === selectedCategoryId),
@@ -102,7 +98,7 @@ export default function HciotKnowledgeTab({
   );
   const topicsInCategory = selectedCategory?.topics ?? [];
 
-  const effectiveTopicId = isNewTopic && newTopicLabels ? slugify(newTopicLabels.en) : selectedTopicId;
+  const effectiveTopicId = isNewTopic && newTopicLabelValue ? slugify(newTopicLabelValue) : selectedTopicId;
 
   useEffect(() => {
     api.listHciotTopicsAdmin(lang)
@@ -113,8 +109,7 @@ export default function HciotKnowledgeTab({
   // Reset topic when category changes
   useEffect(() => {
     setSelectedTopicId('');
-    setNewTopicLabelZh('');
-    setNewTopicLabelEn('');
+    setNewTopicLabel('');
   }, [selectedCategoryId]);
 
   const t = {
@@ -124,10 +119,8 @@ export default function HciotKnowledgeTab({
     none: '— 不指定 —',
     newCat: '＋ 新增科別',
     newTopic: '＋ 新增主題',
-    zhName: '中文名稱',
-    enName: '英文名稱',
-    topicZh: '主題中文名',
-    topicEn: '主題英文名',
+    catName: '科別名稱',
+    topicName: '主題名稱',
     upload: '點擊或拖放檔案上傳',
     uploading: '上傳中...',
     formatHint: '支援 PDF、TXT、Word、CSV 等格式',
@@ -147,20 +140,18 @@ export default function HciotKnowledgeTab({
     return {
       categoryId: effectiveCategoryId,
       topicId: topicSlug,
-      categoryLabelZh: isNewCategory ? newCategoryLabels?.zh : undefined,
-      categoryLabelEn: isNewCategory ? newCategoryLabels?.en : undefined,
-      topicLabelZh: isNewTopic ? newTopicLabels?.zh : existingTopic?.labels.zh,
-      topicLabelEn: isNewTopic ? newTopicLabels?.en : existingTopic?.labels.en,
+      categoryLabel: isNewCategory ? newCategoryLabelValue ?? undefined : undefined,
+      topicLabel: isNewTopic ? newTopicLabelValue ?? undefined : existingTopic?.label,
     };
   };
 
   const handleUpload = (files: FileList | File[]) => {
-    if (isNewCategory && !newCategoryLabels) {
-      alert(missingBilingualLabelMessage('category', lang));
+    if (isNewCategory && !newCategoryLabelValue) {
+      alert(missingLabelMessage('category', lang));
       return;
     }
-    if (isNewTopic && !newTopicLabels) {
-      alert(missingBilingualLabelMessage('topic', lang));
+    if (isNewTopic && !newTopicLabelValue) {
+      alert(missingLabelMessage('topic', lang));
       return;
     }
     void onUploadFiles(files, buildTopicOpts());
@@ -189,7 +180,7 @@ export default function HciotKnowledgeTab({
               onChange={setSelectedCategoryId}
               options={[
                 { value: '', label: t.none },
-                ...categories.map((cat) => ({ value: cat.id, label: cat.labels[lang] })),
+                ...categories.map((cat) => ({ value: cat.id, label: cat.label })),
                 { value: NEW_VALUE, label: t.newCat },
               ]}
             />
@@ -205,7 +196,7 @@ export default function HciotKnowledgeTab({
                 disabled={isNewCategory && !effectiveCategoryId}
                 options={[
                   { value: '', label: t.none },
-                  ...(!isNewCategory ? topicsInCategory.map((t) => ({ value: t.id, label: t.labels[lang] })) : []),
+                  ...(!isNewCategory ? topicsInCategory.map((t) => ({ value: t.id, label: t.label })) : []),
                   { value: NEW_VALUE, label: t.newTopic },
                 ]}
               />
@@ -215,15 +206,13 @@ export default function HciotKnowledgeTab({
 
         {isNewCategory && (
           <div className="hciot-kb-new-fields">
-            <input className="hciot-kb-input" placeholder={t.zhName} value={newCategoryLabelZh} onChange={(e) => setNewCategoryLabelZh(e.target.value)} />
-            <input className="hciot-kb-input" placeholder={t.enName} value={newCategoryLabelEn} onChange={(e) => setNewCategoryLabelEn(e.target.value)} />
+            <input className="hciot-kb-input" placeholder={t.catName} value={newCategoryLabel} onChange={(e) => setNewCategoryLabel(e.target.value)} />
           </div>
         )}
 
         {isNewTopic && effectiveCategoryId && (
           <div className="hciot-kb-new-fields">
-            <input className="hciot-kb-input" placeholder={t.topicZh} value={newTopicLabelZh} onChange={(e) => setNewTopicLabelZh(e.target.value)} />
-            <input className="hciot-kb-input" placeholder={t.topicEn} value={newTopicLabelEn} onChange={(e) => setNewTopicLabelEn(e.target.value)} />
+            <input className="hciot-kb-input" placeholder={t.topicName} value={newTopicLabel} onChange={(e) => setNewTopicLabel(e.target.value)} />
           </div>
         )}
       </div>

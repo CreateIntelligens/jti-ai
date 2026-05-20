@@ -130,7 +130,7 @@ export default function FileDetailPane({
                   onChange={onCategoryChange}
                   disabled={saving}
                   options={[
-                    ...categoryOptions.map((category) => ({ value: category.id, label: category.labels[language] })),
+                    ...categoryOptions.map((category) => ({ value: category.id, label: category.label })),
                     { value: NEW_VALUE, label: '＋ 新增科別' },
                   ]}
                 />
@@ -149,7 +149,7 @@ export default function FileDetailPane({
                         ? getNoTopicLabel(language)
                         : '先選科別',
                     },
-                    ...topicOptions.map((topic) => ({ value: topic.id, label: topic.labels[language] })),
+                    ...topicOptions.map((topic) => ({ value: topic.id, label: topic.label })),
                     ...(draft.categoryId
                       ? [{ value: NEW_VALUE, label: '＋ 新增主題' }]
                       : []),
@@ -163,8 +163,8 @@ export default function FileDetailPane({
                 <input
                   className="hciot-file-input"
                   placeholder="新科別名稱"
-                  value={draft.categoryLabelZh}
-                  onChange={(event) => onDraftChange({ categoryLabelZh: event.target.value })}
+                  value={draft.categoryLabel}
+                  onChange={(event) => onDraftChange({ categoryLabel: event.target.value })}
                 />
               </div>
             ) : null}
@@ -174,8 +174,8 @@ export default function FileDetailPane({
                 <input
                   className="hciot-file-input"
                   placeholder="新主題名稱"
-                  value={draft.topicLabelZh}
-                  onChange={(event) => onDraftChange({ topicLabelZh: event.target.value })}
+                  value={draft.topicLabel}
+                  onChange={(event) => onDraftChange({ topicLabel: event.target.value })}
                 />
               </div>
             ) : null}

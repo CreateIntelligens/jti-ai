@@ -1,18 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildLabels } from '../../src/components/hciot/knowledgeWorkspace/topicUtils';
+import { normalizeLabel } from '../../src/components/hciot/knowledgeWorkspace/topicUtils';
 
-describe('buildLabels', () => {
-  it('returns null when either language label is missing', () => {
-    expect(buildLabels('', '')).toBeNull();
-    expect(buildLabels('骨科', '')).toBeNull();
-    expect(buildLabels('', 'Orthopedics')).toBeNull();
+describe('normalizeLabel', () => {
+  it('returns null for empty or whitespace-only input', () => {
+    expect(normalizeLabel('')).toBeNull();
+    expect(normalizeLabel('   ')).toBeNull();
   });
 
-  it('returns exact trimmed bilingual labels when both are provided', () => {
-    expect(buildLabels(' 骨科 ', ' Orthopedics ')).toEqual({
-      zh: '骨科',
-      en: 'Orthopedics',
-    });
+  it('returns the trimmed label when non-empty', () => {
+    expect(normalizeLabel(' 骨科 ')).toBe('骨科');
+    expect(normalizeLabel('Orthopedics')).toBe('Orthopedics');
   });
 });
