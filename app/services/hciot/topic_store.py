@@ -122,6 +122,22 @@ class HciotTopicStore:
     def delete_topic(self, topic_id: str) -> bool:
         return self.collection.delete_one(self._topic_query(topic_id)).deleted_count > 0
 
+    def reorder_topics(self, topic_ids: list[str]) -> int:
+        """Rewrite the `order` field of the given topics to match list position.
+
+        Only topics present in `topic_ids` are touched; others keep their order.
+        Returns the number of topics actually updated.
+        """
+        now = datetime.now(timezone.utc)
+        updated = 0
+        for index, topic_id in enumerate(topic_ids):
+            result = self.collection.update_one(
+                self._topic_query(topic_id),
+                {"$set": {"order": index, "updated_at": now}},
+            )
+            updated += result.matched_count
+        return updated
+
     def ensure_topic(self, topic_id: str, labels: dict, category_labels: dict) -> None:
         """Create topic if it doesn't exist yet."""
         if self.get_topic(topic_id) is None:

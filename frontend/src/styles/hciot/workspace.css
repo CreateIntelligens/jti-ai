@@ -182,6 +182,37 @@
   min-width: 0;
 }
 
+.hciot-explorer-row-wrap.is-dragging {
+  opacity: 0.5;
+}
+
+/* Drag handle — hidden until row hover, like the rename/delete actions. */
+.hciot-explorer-row-grip {
+  position: absolute;
+  left: 0.05rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.1rem;
+  height: 1.6rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--hciot-ink-soft);
+  cursor: grab;
+  touch-action: none;
+}
+
+.hciot-explorer-row-grip:active {
+  cursor: grabbing;
+}
+
+.hciot-explorer-row-wrap:hover .hciot-explorer-row-grip {
+  display: inline-flex;
+}
+
 .hciot-explorer-row-delete,
 .hciot-explorer-row-rename {
   position: absolute;

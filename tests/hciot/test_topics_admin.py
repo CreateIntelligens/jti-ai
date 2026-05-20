@@ -45,7 +45,12 @@ class FakeStore:
     def list_categories(self):
         root = self._root
         root.calls.append(("list_categories", self.language))
-        return root.categories_by_language.get(self.language, root.categories)
+        categories = root.categories_by_language.get(self.language, root.categories)
+        # Mirror HciotTopicStore: topics within a category arrive sorted by `order`.
+        return [
+            {**cat, "topics": sorted(cat.get("topics", []), key=lambda t: t.get("order", 0))}
+            for cat in categories
+        ]
 
 
 def patch_topic_store(store: FakeStore):
@@ -91,8 +96,10 @@ def test_update_topic_writes_single_language_label_into_partition():
     assert result["category_labels"] == {"zh": "骨科部", "en": ""}
 
 
-def test_public_topics_places_common_questions_first():
+def test_public_topics_are_ordered_by_stored_order_field():
     store = FakeStore()
+    # Topics carry explicit `order`; categories inherit the smallest order
+    # among their topics. "faq" (order 0) therefore sorts before "ortho".
     store.categories = [
         {
             "id": "ortho",
@@ -102,26 +109,37 @@ def test_public_topics_places_common_questions_first():
                     "id": "ortho/prp",
                     "labels": {"zh": "PRP 治療", "en": "PRP Therapy"},
                     "questions": {"zh": [], "en": []},
+                    "order": 2,
                 },
                 {
-                    "id": "ortho/faq",
-                    "labels": {"zh": "常見問題", "en": "FAQ"},
+                    "id": "ortho/knee",
+                    "labels": {"zh": "膝關節", "en": "Knee"},
                     "questions": {"zh": [], "en": []},
+                    "order": 1,
                 },
             ],
         },
         {
             "id": "faq",
             "labels": {"zh": "常見問題", "en": "FAQ"},
-            "topics": [],
+            "topics": [
+                {
+                    "id": "faq/general",
+                    "labels": {"zh": "一般問題", "en": "General"},
+                    "questions": {"zh": [], "en": []},
+                    "order": 0,
+                },
+            ],
         },
     ]
 
     with patch_topic_store(store):
         result = topics_admin.list_topics_slim("zh")
 
+    # Category order: faq (min order 0) before ortho (min order 1).
     assert [category["id"] for category in result["categories"]] == ["faq", "ortho"]
-    assert [topic["id"] for topic in result["categories"][1]["topics"]] == ["ortho/faq", "ortho/prp"]
+    # Within ortho: knee (order 1) before prp (order 2).
+    assert [topic["id"] for topic in result["categories"][1]["topics"]] == ["ortho/knee", "ortho/prp"]
 
 
 def test_public_topics_query_route_is_not_registered():
@@ -172,6 +190,7 @@ def test_localized_public_topics_return_slim_single_language_shape():
             {
                 "id": "ortho",
                 "label": "骨科",
+                "order": 1,
                 "topics": [
                     {
                         "id": "ortho/faq",

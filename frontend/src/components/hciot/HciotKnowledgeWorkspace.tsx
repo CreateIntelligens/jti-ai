@@ -8,7 +8,7 @@ import FileDetailPane from './knowledgeWorkspace/detail/FileDetailPane';
 import MergedCsvPane from './knowledgeWorkspace/detail/MergedCsvPane';
 import UploadDialog from './knowledgeWorkspace/upload/UploadDialog';
 import ImageDetailPane from './knowledgeWorkspace/detail/ImageDetailPane';
-import { NEW_VALUE, buildCategoryOptions, buildTopicOptions, createEmptyDraft, draftFromFile, getErrorMessage, getMetadataPayload, normalizeLabel, slugify, type FileMetadataDraft, type TopicLabels } from './knowledgeWorkspace/topicUtils';
+import { NEW_VALUE, buildCategoryOptions, buildTopicOptions, categoryPrefix, createEmptyDraft, draftFromFile, getErrorMessage, getMetadataPayload, normalizeLabel, slugify, type FileMetadataDraft, type TopicLabels } from './knowledgeWorkspace/topicUtils';
 import { useEscapeKey } from '../../hooks/useEscapeKey';
 import { buildExplorerTree, filterExplorerNodes, flattenExplorerNodes, getCurrentPathLabel, readExpandedKeys, writeExpandedKeys } from './knowledgeWorkspace/explorer/explorerTree';
 import reindexRag from '../../services/api/general';
@@ -27,6 +27,24 @@ function createEmptyTopicDraft(): Pick<FileMetadataDraft, 'topicId' | 'topicLabe
 
 function getLocalizedText(_language: HciotLanguage, zh: string, _en: string): string {
   return zh;
+}
+
+function parseExplorerKey(key: string): { kind: string; id: string } {
+  const separatorIndex = key.indexOf(':');
+  return separatorIndex === -1
+    ? { kind: key, id: '' }
+    : { kind: key.slice(0, separatorIndex), id: key.slice(separatorIndex + 1) };
+}
+
+function moveItem<T>(items: T[], from: number, to: number): T[] | null {
+  if (from === -1 || to === -1) {
+    return null;
+  }
+
+  const nextItems = [...items];
+  const [moved] = nextItems.splice(from, 1);
+  nextItems.splice(to, 0, moved);
+  return nextItems;
 }
 
 export default function HciotKnowledgeWorkspace({
@@ -511,6 +529,58 @@ export default function HciotKnowledgeWorkspace({
     }
   };
 
+  const handleReorder = async (activeKey: string, overKey: string) => {
+    const active = parseExplorerKey(activeKey);
+    const over = parseExplorerKey(overKey);
+    if (active.kind !== over.kind || !active.id || !over.id) {
+      return;
+    }
+
+    let orderedCategories: HciotTopicCategory[] | null = null;
+
+    if (active.kind === 'category') {
+      orderedCategories = moveItem(
+        categories,
+        categories.findIndex((category) => category.id === active.id),
+        categories.findIndex((category) => category.id === over.id),
+      );
+    } else if (active.kind === 'topic') {
+      const activeCategoryId = categoryPrefix(active.id);
+      if (activeCategoryId !== categoryPrefix(over.id)) return;
+
+      const categoryIndex = categories.findIndex((category) => category.id === activeCategoryId);
+      if (categoryIndex === -1) {
+        return;
+      }
+
+      const category = categories[categoryIndex];
+      const topics = moveItem(
+        category.topics,
+        category.topics.findIndex((topic) => topic.id === active.id),
+        category.topics.findIndex((topic) => topic.id === over.id),
+      );
+      if (!topics) return;
+      orderedCategories = [...categories];
+      orderedCategories[categoryIndex] = { ...category, topics };
+    }
+
+    if (!orderedCategories) {
+      return;
+    }
+
+    const topicIds = orderedCategories.flatMap((cat) => cat.topics.map((topic) => topic.id));
+    if (!topicIds.length) return;
+
+    try {
+      await api.reorderHciotTopics(topicIds, language);
+      await refreshWorkspace(selectedFileName);
+      showStatus(text('順序已更新', 'Order updated'));
+    } catch (error) {
+      console.error('Failed to reorder HCIoT topics:', error);
+      alert(getErrorMessage(error));
+    }
+  };
+
   const handleDeleteImage = async () => {
     if (!selectedImage) return;
     const referenceCount = selectedImage.reference_count ?? 0;
@@ -801,6 +871,7 @@ export default function HciotKnowledgeWorkspace({
         onStartRename={handleStartRename}
         onCommitRename={handleCommitRename}
         onCancelRename={handleCancelRename}
+        onReorder={handleReorder}
       />
 
       <UploadDialog

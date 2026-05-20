@@ -6,6 +6,7 @@ import {
   FileText,
   Folder,
   FolderOpen,
+  GripVertical,
   Pencil,
   Plus,
   Search,
@@ -15,22 +16,33 @@ import {
   Table as TableIcon,
   RefreshCw,
 } from 'lucide-react';
+import {
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 
 import type { ExplorerNode, ExplorerRow } from './explorerTree';
 import { isFolderNode } from './explorerTree';
 
 const IMAGES_CATEGORY_KEY = 'category:__images__';
 
-function getRenameableKey(node: ExplorerNode): string | null {
+function getEditableNodeKey(node: ExplorerNode): string | null {
   if (!isFolderNode(node)) {
     return node.kind === 'merged-csv' ? `topic:${node.topicId}` : null;
   }
-
-  if (node.tone === 'topic') {
-    return node.topicId ? `topic:${node.topicId}` : null;
+  if (node.tone === 'category') {
+    return node.key === IMAGES_CATEGORY_KEY ? null : node.key;
   }
-
-  return node.tone === 'category' && node.key !== IMAGES_CATEGORY_KEY ? node.key : null;
+  if (node.tone === 'topic') {
+    return node.topicId ? node.key : null;
+  }
+  return null;
 }
 
 interface ExplorerSidebarProps {
@@ -60,6 +72,9 @@ interface ExplorerSidebarProps {
   onStartRename: (key: string) => void;
   onCommitRename: (key: string, nextLabel: string) => void;
   onCancelRename: () => void;
+  // Called when a category/topic row is dropped onto another. Keys are node
+  // keys ("category:<id>" / "topic:<id>"). The workspace recomputes ordering.
+  onReorder: (activeKey: string, overKey: string) => void;
 }
 
 function getDeletableTopicId(node: ExplorerNode): string | null {
@@ -124,7 +139,23 @@ export default function ExplorerSidebar({
   onStartRename,
   onCommitRename,
   onCancelRename,
+  onReorder,
 }: ExplorerSidebarProps) {
+  // Require a small drag distance so a plain click still selects/expands.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) {
+      return;
+    }
+    onReorder(String(active.id), String(over.id));
+  };
+
+  const sortableKeys = visibleRows
+    .map(({ node }) => getEditableNodeKey(node))
+    .filter((id): id is string => id !== null);
+
   return (
     <aside
       className={`hciot-explorer${sidebarCollapsed ? ' is-collapsed' : ''}`}
@@ -173,102 +204,55 @@ export default function ExplorerSidebar({
         {loadingWorkspace ? (
           <div className="hciot-explorer-empty">載入中...</div>
         ) : visibleRows.length > 0 ? (
-          <div className="hciot-explorer-tree" role="tree">
-            {visibleRows.map(({ node, depth }) => {
-              const isSelected =
-                (node.kind === 'file' && node.file.name === selectedFileName) ||
-                (node.kind === 'image' && node.image.image_id === selectedImageName) ||
-                (node.kind === 'merged-csv' && node.topicId === selectedMergedTopicId);
-              const isExpanded = isFolderNode(node) && (
-                Boolean(deferredSearchQuery) || visibleExpandedKeys.has(node.key)
-              );
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={sortableKeys} strategy={verticalListSortingStrategy}>
+              <div className="hciot-explorer-tree" role="tree">
+                {visibleRows.map(({ node, depth }) => {
+                  const isExpanded = isFolderNode(node) && (
+                    Boolean(deferredSearchQuery) || visibleExpandedKeys.has(node.key)
+                  );
+                  const nodeKey = getEditableNodeKey(node);
 
-              const deletableTopicId = getDeletableTopicId(node);
-              const nodeIconTone = getNodeIconTone(node);
-              const renameKey = getRenameableKey(node);
-              const isRenaming = renameKey !== null && renamingKey === renameKey;
+                  if (nodeKey !== null && renamingKey === nodeKey) {
+                    return (
+                      <div
+                        key={node.key}
+                        className="hciot-explorer-row-wrap is-renaming"
+                        style={{ '--row-depth': depth } as CSSProperties}
+                      >
+                        <RenameRow
+                          initialLabel={node.label}
+                          saving={renaming}
+                          onCommit={(value) => onCommitRename(nodeKey, value)}
+                          onCancel={onCancelRename}
+                        />
+                      </div>
+                    );
+                  }
 
-              if (isRenaming && renameKey) {
-                return (
-                  <div
-                    key={node.key}
-                    className="hciot-explorer-row-wrap is-renaming"
-                    style={{ '--row-depth': depth } as CSSProperties}
-                  >
-                    <RenameRow
-                      initialLabel={node.label}
-                      saving={renaming}
-                      onCommit={(value) => onCommitRename(renameKey, value)}
-                      onCancel={onCancelRename}
+                  return (
+                    <ExplorerRowItem
+                      key={node.key}
+                      node={node}
+                      nodeKey={nodeKey}
+                      depth={depth}
+                      isExpanded={isExpanded}
+                      selectedFileName={selectedFileName}
+                      selectedImageName={selectedImageName}
+                      selectedMergedTopicId={selectedMergedTopicId}
+                      renaming={renaming}
+                      onSelectFile={onSelectFile}
+                      onSelectImage={onSelectImage}
+                      onSelectMergedCsv={onSelectMergedCsv}
+                      onToggleExpanded={onToggleExpanded}
+                      onStartRename={onStartRename}
+                      onDeleteTopic={onDeleteTopic}
                     />
-                  </div>
-                );
-              }
-
-              return (
-                <div
-                  key={node.key}
-                  className={`hciot-explorer-row-wrap${isSelected ? ' is-selected' : ''}`}
-                  style={{ '--row-depth': depth } as CSSProperties}
-                >
-                  <button
-                    type="button"
-                    className={`hciot-explorer-row${isSelected ? ' is-selected' : ''}`}
-                    onClick={() => {
-                      if (node.kind === 'file') {
-                        onSelectFile(node.file.name);
-                      } else if (node.kind === 'image') {
-                        onSelectImage(node.image.image_id);
-                      } else if (node.kind === 'merged-csv') {
-                        onSelectMergedCsv(node.topicId);
-                      } else {
-                        onToggleExpanded(node.key);
-                      }
-                    }}
-                    role="treeitem"
-                    aria-expanded={isFolderNode(node) ? isExpanded : undefined}
-                  >
-                    <span className="hciot-explorer-row-indent" />
-                    <span className="hciot-explorer-row-caret">
-                      {isFolderNode(node) ? (
-                        isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
-                      ) : null}
-                    </span>
-                    <span className={`hciot-explorer-row-icon tone-${nodeIconTone}`}>
-                      {renderNodeIcon(node, isExpanded)}
-                    </span>
-                    <span className="hciot-explorer-row-label">{node.label}</span>
-                  </button>
-                  {renameKey && !renaming && (
-                    <button
-                      type="button"
-                      className="hciot-explorer-row-rename"
-                      title="重新命名"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onStartRename(renameKey);
-                      }}
-                    >
-                      <Pencil size={12} />
-                    </button>
-                  )}
-                  {deletableTopicId && onDeleteTopic && (
-                    <button
-                      type="button"
-                      className="hciot-explorer-row-delete"
-                      title="刪除整個主題"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onDeleteTopic(deletableTopicId, node.label);
-                      }}
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            </SortableContext>
+          </DndContext>
         ) : (
           <div className="hciot-explorer-empty">
             {searchQuery ? '找不到符合的節點' : '目前沒有知識檔案'}
@@ -276,6 +260,135 @@ export default function ExplorerSidebar({
         )}
       </div>
     </aside>
+  );
+}
+
+interface ExplorerRowItemProps {
+  node: ExplorerNode;
+  nodeKey: string | null;
+  depth: number;
+  isExpanded: boolean;
+  selectedFileName: string | null;
+  selectedImageName: string | null;
+  selectedMergedTopicId: string | null;
+  renaming: boolean;
+  onSelectFile: (fileName: string) => void;
+  onSelectImage: (fileName: string) => void;
+  onSelectMergedCsv: (topicId: string) => void;
+  onToggleExpanded: (key: string) => void;
+  onStartRename: (key: string) => void;
+  onDeleteTopic?: (topicId: string, topicLabel: string) => void;
+}
+
+/** A single explorer tree row. Category/topic folders are drag-sortable. */
+function ExplorerRowItem({
+  node,
+  nodeKey,
+  depth,
+  isExpanded,
+  selectedFileName,
+  selectedImageName,
+  selectedMergedTopicId,
+  renaming,
+  onSelectFile,
+  onSelectImage,
+  onSelectMergedCsv,
+  onToggleExpanded,
+  onStartRename,
+  onDeleteTopic,
+}: ExplorerRowItemProps) {
+  // useSortable is always called (hooks rule); when the node is not reorderable
+  // we simply ignore its drag handles.
+  const sortable = useSortable({ id: nodeKey ?? node.key, disabled: nodeKey === null });
+
+  const isSelected =
+    (node.kind === 'file' && node.file.name === selectedFileName) ||
+    (node.kind === 'image' && node.image.image_id === selectedImageName) ||
+    (node.kind === 'merged-csv' && node.topicId === selectedMergedTopicId);
+
+  const deletableTopicId = getDeletableTopicId(node);
+  const nodeIconTone = getNodeIconTone(node);
+  const rowClassName = `hciot-explorer-row-wrap${isSelected ? ' is-selected' : ''}${sortable.isDragging ? ' is-dragging' : ''}`;
+
+  const style: CSSProperties = {
+    '--row-depth': depth,
+    transform: CSS.Transform.toString(sortable.transform),
+    transition: sortable.transition,
+  } as CSSProperties;
+
+  return (
+    <div
+      ref={sortable.setNodeRef}
+      className={rowClassName}
+      style={style}
+    >
+      {nodeKey && (
+        <button
+          type="button"
+          className="hciot-explorer-row-grip"
+          title="拖曳排序"
+          aria-label="拖曳排序"
+          {...sortable.attributes}
+          {...sortable.listeners}
+        >
+          <GripVertical size={13} />
+        </button>
+      )}
+      <button
+        type="button"
+        className={`hciot-explorer-row${isSelected ? ' is-selected' : ''}`}
+        onClick={() => {
+          if (node.kind === 'file') {
+            onSelectFile(node.file.name);
+          } else if (node.kind === 'image') {
+            onSelectImage(node.image.image_id);
+          } else if (node.kind === 'merged-csv') {
+            onSelectMergedCsv(node.topicId);
+          } else {
+            onToggleExpanded(node.key);
+          }
+        }}
+        role="treeitem"
+        aria-expanded={isFolderNode(node) ? isExpanded : undefined}
+      >
+        <span className="hciot-explorer-row-indent" />
+        <span className="hciot-explorer-row-caret">
+          {isFolderNode(node) ? (
+            isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
+          ) : null}
+        </span>
+        <span className={`hciot-explorer-row-icon tone-${nodeIconTone}`}>
+          {renderNodeIcon(node, isExpanded)}
+        </span>
+        <span className="hciot-explorer-row-label">{node.label}</span>
+      </button>
+      {nodeKey && !renaming && (
+        <button
+          type="button"
+          className="hciot-explorer-row-rename"
+          title="重新命名"
+          onClick={(e) => {
+            e.stopPropagation();
+            onStartRename(nodeKey);
+          }}
+        >
+          <Pencil size={12} />
+        </button>
+      )}
+      {deletableTopicId && onDeleteTopic && (
+        <button
+          type="button"
+          className="hciot-explorer-row-delete"
+          title="刪除整個主題"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDeleteTopic(deletableTopicId, node.label);
+          }}
+        >
+          <Trash2 size={13} />
+        </button>
+      )}
+    </div>
   );
 }
 

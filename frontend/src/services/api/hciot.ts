@@ -326,6 +326,20 @@ export async function createHciotTopic(
   }));
 }
 
+/**
+ * Persist a new topic ordering. `topicIds` is the full flat list of topic ids
+ * in the desired display order; the backend rewrites each topic's `order`.
+ */
+export async function reorderHciotTopics(
+  topicIds: string[],
+  language: HciotLanguage = 'zh',
+): Promise<{ updated: number }> {
+  return fetchAdminJson<{ updated: number }>(
+    `${buildTopicAdminPath(language)}reorder`,
+    jsonRequest('PUT', { topic_ids: topicIds }),
+  );
+}
+
 export interface UploadWithTopicOptions {
   language: HciotLanguage;
   file: File;

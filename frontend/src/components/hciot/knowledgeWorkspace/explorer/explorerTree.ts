@@ -158,9 +158,17 @@ export function buildExplorerTree(
     filesByCategory.set(categoryId, group);
   });
 
+  // Categories and topics are ordered by their stored `order` (set via
+  // drag-to-reorder); fall back to label sort only when `order` is absent.
+  const LARGE_ORDER = Number.MAX_SAFE_INTEGER;
+  const categoryOrder = (id: string): number =>
+    categories.find((item) => item.id === id)?.order ?? LARGE_ORDER;
+
   const sortedCategoryEntries = [...filesByCategory.entries()].sort(([leftId, leftFiles], [rightId, rightFiles]) => {
     if (!leftId && rightId) return 1;
     if (leftId && !rightId) return -1;
+    const orderDelta = categoryOrder(leftId) - categoryOrder(rightId);
+    if (orderDelta !== 0) return orderDelta;
     const leftCategory = categories.find((item) => item.id === leftId);
     const rightCategory = categories.find((item) => item.id === rightId);
     const leftLabel = leftCategory?.label || leftFiles[0]?.category_label || leftId;
@@ -189,7 +197,12 @@ export function buildExplorerTree(
         || topicId;
     };
 
+    const topicOrder = (topicId: string): number =>
+      category?.topics.find((item) => item.id === topicId)?.order ?? LARGE_ORDER;
+
     const sortedTopicEntries = [...filesByTopic.entries()].sort(([leftId, leftFiles], [rightId, rightFiles]) => {
+      const orderDelta = topicOrder(leftId) - topicOrder(rightId);
+      if (orderDelta !== 0) return orderDelta;
       return sortByLabel(resolveTopicLabel(leftId, leftFiles), resolveTopicLabel(rightId, rightFiles));
     });
 

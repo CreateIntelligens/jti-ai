@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Iterable
-
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -13,35 +11,9 @@ from app.utils import get_other_language
 
 router = APIRouter(tags=["HCIoT Topics"], dependencies=[Depends(verify_admin)])
 
-_FIRST_TOPIC_LABELS = {
-    "常見問題",
-    "faq",
-    "common questions",
-    "frequently asked questions",
-}
-
 Lang = Language
 
 public_router = APIRouter(tags=["HCIoT Topics"])
-
-
-def _label_strings(value) -> list[str]:
-    if isinstance(value, dict):
-        return [str(v) for v in value.values()]
-    if isinstance(value, str):
-        return [value]
-    return []
-
-
-def _is_first_topic_label(values: Iterable[str]) -> bool:
-    return any(v.strip().casefold() in _FIRST_TOPIC_LABELS for v in values)
-
-
-def _with_common_questions_first(items: list[dict]) -> list[dict]:
-    def key(item: dict) -> int:
-        labels = _label_strings(item.get("labels") or item.get("label"))
-        return 0 if _is_first_topic_label(labels) else 1
-    return sorted(items, key=key)
 
 
 def _localized_text(value, lang: Lang, fallback: str = "") -> str:
@@ -71,20 +43,29 @@ def _localize_topic(topic: dict, lang: Lang) -> dict:
     return payload
 
 
+def _category_order(cat: dict) -> int:
+    """A category's order is the smallest `order` among its topics."""
+    return min((t.get("order", 0) for t in cat.get("topics", [])), default=0)
+
+
 def _build_categories(language: Lang) -> list[dict]:
-    """Build the single-language category tree consumed by the public endpoint."""
+    """Build the single-language category tree consumed by the public endpoint.
+
+    Both categories and topics are ordered purely by their stored `order`
+    field (topics already arrive sorted from `list_categories`); drag-to-reorder
+    in the admin UI is what writes those values.
+    """
     store = get_hciot_topic_store(language)
-    result = []
-    for cat in store.list_categories():
-        topics = _with_common_questions_first([
-            _localize_topic(t, language) for t in cat.get("topics", [])
-        ])
-        result.append({
+    categories = [
+        {
             "id": cat.get("id", ""),
             "label": _localized_text(cat.get("labels"), language, cat.get("id", "")),
-            "topics": topics,
-        })
-    return _with_common_questions_first(result)
+            "order": _category_order(cat),
+            "topics": [_localize_topic(t, language) for t in cat.get("topics", [])],
+        }
+        for cat in store.list_categories()
+    ]
+    return sorted(categories, key=lambda category: category["order"])
 
 
 @public_router.get("/topics/{lang}")
@@ -114,6 +95,13 @@ class UpdateTopicRequest(BaseModel):
     questions: list[str] | None = None
 
 
+class ReorderTopicsRequest(BaseModel):
+    # Flat list of topic_ids in the desired display order. Categories are
+    # ordered implicitly by the smallest order among their topics, so a single
+    # flat list expresses both category and within-category topic ordering.
+    topic_ids: list[str]
+
+
 @router.post("/{language}/", status_code=201)
 def create_topic(language: Lang, request: CreateTopicRequest):
     store = get_hciot_topic_store(language)
@@ -126,6 +114,18 @@ def create_topic(language: Lang, request: CreateTopicRequest):
     }
     store.upsert_topic(request.topic_id, data)
     return store.get_topic(request.topic_id)
+
+
+@router.put("/{language}/reorder")
+def reorder_topics(language: Lang, request: ReorderTopicsRequest):
+    """Rewrite topic `order` fields to match the supplied flat ordering.
+
+    Declared before the `{topic_id:path}` route so "reorder" is not captured
+    as a topic id.
+    """
+    store = get_hciot_topic_store(language)
+    updated = store.reorder_topics(request.topic_ids)
+    return {"updated": updated}
 
 
 @router.put("/{language}/{topic_id:path}")
