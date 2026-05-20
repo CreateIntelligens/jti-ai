@@ -3,22 +3,14 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import HciotTopicGrid from '../../src/components/hciot/HciotTopicGrid';
+import type { HciotTopic } from '../../src/config/hciotTopics';
 
 it('renders a second-level question list for the selected topic', () => {
-  const topics = [
+  const topics: HciotTopic[] = [
     {
       id: 'prp',
-      icon: '🩸',
-      accent: '#8f5cf7',
-      labels: { zh: 'PRP', en: 'PRP Therapy' },
-      summaries: {
-        zh: '了解適應症、術後照護與常見疑問。',
-        en: 'Learn indications, post-procedure care, and common questions.',
-      },
-      questions: {
-        zh: ['PRP 治療會痛嗎？', 'PRP 注射後多久會見效？'],
-        en: ['PRP 治療會痛嗎？', 'PRP 注射後多久會見效？'],
-      },
+      label: 'PRP',
+      questions: ['PRP 治療會痛嗎？', 'PRP 注射後多久會見效？'],
     },
   ];
   const html = renderToStaticMarkup(

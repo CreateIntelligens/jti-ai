@@ -1,13 +1,16 @@
-import { type CSSProperties } from 'react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import {
+  Check,
   ChevronDown,
   ChevronRight,
   FileText,
   Folder,
   FolderOpen,
+  Pencil,
   Plus,
   Search,
   Trash2,
+  X,
   Image as ImageIcon,
   Table as TableIcon,
   RefreshCw,
@@ -15,6 +18,20 @@ import {
 
 import type { ExplorerNode, ExplorerRow } from './explorerTree';
 import { isFolderNode } from './explorerTree';
+
+const IMAGES_CATEGORY_KEY = 'category:__images__';
+
+function getRenameableKey(node: ExplorerNode): string | null {
+  if (!isFolderNode(node)) {
+    return node.kind === 'merged-csv' ? `topic:${node.topicId}` : null;
+  }
+
+  if (node.tone === 'topic') {
+    return node.topicId ? `topic:${node.topicId}` : null;
+  }
+
+  return node.tone === 'category' && node.key !== IMAGES_CATEGORY_KEY ? node.key : null;
+}
 
 interface ExplorerSidebarProps {
   sidebarCollapsed: boolean;
@@ -38,6 +55,11 @@ interface ExplorerSidebarProps {
   onDeleteTopic?: (topicId: string, topicLabel: string) => void;
   onReindex?: () => void;
   reindexing?: boolean;
+  renamingKey: string | null;
+  renaming: boolean;
+  onStartRename: (key: string) => void;
+  onCommitRename: (key: string, nextLabel: string) => void;
+  onCancelRename: () => void;
 }
 
 function getDeletableTopicId(node: ExplorerNode): string | null {
@@ -97,6 +119,11 @@ export default function ExplorerSidebar({
   onDeleteTopic,
   onReindex,
   reindexing,
+  renamingKey,
+  renaming,
+  onStartRename,
+  onCommitRename,
+  onCancelRename,
 }: ExplorerSidebarProps) {
   return (
     <aside
@@ -158,6 +185,25 @@ export default function ExplorerSidebar({
 
               const deletableTopicId = getDeletableTopicId(node);
               const nodeIconTone = getNodeIconTone(node);
+              const renameKey = getRenameableKey(node);
+              const isRenaming = renameKey !== null && renamingKey === renameKey;
+
+              if (isRenaming && renameKey) {
+                return (
+                  <div
+                    key={node.key}
+                    className="hciot-explorer-row-wrap is-renaming"
+                    style={{ '--row-depth': depth } as CSSProperties}
+                  >
+                    <RenameRow
+                      initialLabel={node.label}
+                      saving={renaming}
+                      onCommit={(value) => onCommitRename(renameKey, value)}
+                      onCancel={onCancelRename}
+                    />
+                  </div>
+                );
+              }
 
               return (
                 <div
@@ -193,6 +239,19 @@ export default function ExplorerSidebar({
                     </span>
                     <span className="hciot-explorer-row-label">{node.label}</span>
                   </button>
+                  {renameKey && !renaming && (
+                    <button
+                      type="button"
+                      className="hciot-explorer-row-rename"
+                      title="重新命名"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onStartRename(renameKey);
+                      }}
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  )}
                   {deletableTopicId && onDeleteTopic && (
                     <button
                       type="button"
@@ -217,5 +276,69 @@ export default function ExplorerSidebar({
         )}
       </div>
     </aside>
+  );
+}
+
+interface RenameRowProps {
+  initialLabel: string;
+  saving: boolean;
+  onCommit: (nextLabel: string) => void;
+  onCancel: () => void;
+}
+
+function RenameRow({ initialLabel, saving, onCommit, onCancel }: RenameRowProps) {
+  const [value, setValue] = useState(initialLabel);
+
+  useEffect(() => {
+    setValue(initialLabel);
+  }, [initialLabel]);
+
+  const commit = () => {
+    const nextLabel = value.trim();
+    if (!nextLabel || nextLabel === initialLabel) {
+      onCancel();
+      return;
+    }
+    onCommit(nextLabel);
+  };
+
+  return (
+    <div className="hciot-explorer-rename">
+      <input
+        type="text"
+        className="hciot-explorer-rename-input"
+        value={value}
+        autoFocus
+        disabled={saving}
+        onChange={(event) => setValue(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            commit();
+          } else if (event.key === 'Escape') {
+            event.preventDefault();
+            onCancel();
+          }
+        }}
+      />
+      <button
+        type="button"
+        className="hciot-explorer-rename-confirm"
+        title="儲存"
+        disabled={saving}
+        onClick={commit}
+      >
+        <Check size={13} />
+      </button>
+      <button
+        type="button"
+        className="hciot-explorer-rename-cancel"
+        title="取消"
+        disabled={saving}
+        onClick={onCancel}
+      >
+        <X size={13} />
+      </button>
+    </div>
   );
 }

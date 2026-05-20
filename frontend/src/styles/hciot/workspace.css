@@ -182,9 +182,9 @@
   min-width: 0;
 }
 
-.hciot-explorer-row-delete {
+.hciot-explorer-row-delete,
+.hciot-explorer-row-rename {
   position: absolute;
-  right: 0.3rem;
   top: 50%;
   transform: translateY(-50%);
   display: none;
@@ -200,7 +200,16 @@
   cursor: pointer;
 }
 
-.hciot-explorer-row-wrap:hover .hciot-explorer-row-delete {
+.hciot-explorer-row-delete {
+  right: 0.3rem;
+}
+
+.hciot-explorer-row-rename {
+  right: 1.9rem;
+}
+
+.hciot-explorer-row-wrap:hover .hciot-explorer-row-delete,
+.hciot-explorer-row-wrap:hover .hciot-explorer-row-rename {
   display: inline-flex;
 }
 
@@ -208,6 +217,78 @@
   border-color: rgba(220, 38, 38, 0.25);
   background: rgba(220, 38, 38, 0.08);
   color: rgb(220, 38, 38);
+}
+
+.hciot-explorer-row-rename:hover {
+  border-color: rgba(2, 132, 199, 0.25);
+  background: rgba(2, 132, 199, 0.1);
+  color: #0369a1;
+}
+
+.hciot-explorer-row-wrap.is-renaming {
+  padding: 0.12rem 0.3rem;
+}
+
+.hciot-explorer-rename {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.hciot-explorer-rename-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.3rem 0.5rem;
+  border: 1px solid var(--hciot-accent, #0369a1);
+  border-radius: 0.45rem;
+  background: var(--hciot-panel, #fff);
+  color: var(--hciot-ink);
+  font-size: 0.86rem;
+  font-family: inherit;
+  outline: none;
+}
+
+.hciot-explorer-rename-input:focus {
+  box-shadow: 0 0 0 0.125rem rgba(2, 132, 199, 0.2);
+}
+
+.hciot-explorer-rename-input:disabled {
+  opacity: 0.5;
+}
+
+.hciot-explorer-rename-confirm,
+.hciot-explorer-rename-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: var(--hciot-ink-soft);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.hciot-explorer-rename-confirm:hover:not(:disabled) {
+  background: rgba(2, 132, 199, 0.12);
+  color: #0369a1;
+}
+
+.hciot-explorer-rename-cancel:hover:not(:disabled) {
+  background: var(--hciot-border, rgba(0, 0, 0, 0.06));
+  color: var(--hciot-ink);
+}
+
+.hciot-explorer-rename-confirm:disabled,
+.hciot-explorer-rename-cancel:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .hciot-explorer-row {

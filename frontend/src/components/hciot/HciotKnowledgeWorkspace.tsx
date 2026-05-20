@@ -60,6 +60,8 @@ export default function HciotKnowledgeWorkspace({
   const [draft, setDraft] = useState<FileMetadataDraft>(createEmptyDraft());
   const [qaDialogOpen, setQaDialogOpen] = useState(false);
   const [reindexing, setReindexing] = useState(false);
+  const [renamingKey, setRenamingKey] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
 
   const deferredSearchQuery = useDeferredValue(searchQuery.trim().toLowerCase());
   const text = (zh: string, en: string) => getLocalizedText(language, zh, en);
@@ -198,6 +200,16 @@ export default function HciotKnowledgeWorkspace({
       window.setTimeout(() => setReindexing(false), 5000);
     }
   };
+
+  // Selections (file / image / merged-csv topic) belong to one language's
+  // dataset. When the language switches, the previously selected item may not
+  // exist in the new dataset — clear all selections so no detail pane is left
+  // pointing at a stale id.
+  useEffect(() => {
+    setSelectedFileName(null);
+    setSelectedImageName(null);
+    setSelectedMergedTopicId(null);
+  }, [language]);
 
   useEffect(() => {
     if (!active) {
@@ -436,6 +448,66 @@ export default function HciotKnowledgeWorkspace({
       alert(getErrorMessage(error));
     } finally {
       setDeleting(false);
+    }
+  };
+
+  const handleStartRename = (key: string) => {
+    if (!discardChanges()) return;
+    setRenamingKey(key);
+  };
+
+  const handleCancelRename = () => {
+    setRenamingKey(null);
+  };
+
+  const handleCommitRename = async (key: string, nextLabel: string) => {
+    const label = nextLabel.trim();
+    if (!label) {
+      setRenamingKey(null);
+      return;
+    }
+
+    const separatorIndex = key.indexOf(':');
+    const kind = separatorIndex === -1 ? key : key.slice(0, separatorIndex);
+    const targetId = separatorIndex === -1 ? '' : key.slice(separatorIndex + 1);
+    if (!targetId) {
+      setRenamingKey(null);
+      return;
+    }
+
+    const isCategoryRename = kind === 'category';
+    const topicIds =
+      isCategoryRename
+        ? (categories.find((cat) => cat.id === targetId)?.topics ?? []).map((topic) => topic.id)
+        : [targetId];
+
+    if (!topicIds.length) {
+      setRenamingKey(null);
+      return;
+    }
+
+    setRenaming(true);
+    try {
+      const payload = isCategoryRename ? { category_labels: label } : { labels: label };
+      const results = await Promise.allSettled(
+        topicIds.map((topicId) => api.updateHciotTopic(topicId, payload, language)),
+      );
+      const failed = results.filter((result) => result.status === 'rejected').length;
+      setRenamingKey(null);
+      await refreshWorkspace(selectedFileName);
+      if (failed) {
+        alert(text(
+          `改名完成，但有 ${failed} 個項目失敗`,
+          `Rename completed with ${failed} failure(s)`,
+        ));
+      } else {
+        showStatus(text('名稱已更新', 'Name updated'));
+      }
+    } catch (error) {
+      console.error('Failed to rename HCIoT category/topic:', error);
+      alert(getErrorMessage(error));
+    } finally {
+      setRenaming(false);
     }
   };
 
@@ -724,6 +796,11 @@ export default function HciotKnowledgeWorkspace({
         onDeleteTopic={handleDeleteTopic}
         onReindex={handleReindex}
         reindexing={reindexing}
+        renamingKey={renamingKey}
+        renaming={renaming}
+        onStartRename={handleStartRename}
+        onCommitRename={handleCommitRename}
+        onCancelRename={handleCancelRename}
       />
 
       <UploadDialog
