@@ -49,7 +49,7 @@
 .hciot-topic-select {
   width: 100%;
   padding: 0.7rem 2.2rem 0.7rem 0.9rem;
-  border: 1px solid var(--hciot-border);
+  border: 0.0625rem solid var(--hciot-border);
   border-radius: 0.6rem;
   background-color: var(--hciot-panel-strong);
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
@@ -112,7 +112,7 @@
   align-items: flex-start;
   width: 100%;
   padding: 0.8rem 0.9rem;
-  border: 1px solid var(--hciot-border);
+  border: 0.0625rem solid var(--hciot-border);
   border-radius: 0.85rem;
   background: var(--hciot-panel-strong);
   color: var(--hciot-ink);
@@ -121,7 +121,7 @@
 }
 
 .hciot-topic-question-chip:hover:not(:disabled) {
-  transform: translateY(-1px);
+  transform: translateY(-0.0625rem);
   border-color: var(--topic-accent, var(--hciot-accent));
   box-shadow: 0 0.5rem 1.125rem rgba(15, 23, 42, 0.08);
 }
@@ -137,7 +137,7 @@
   justify-content: center;
   width: 1.6rem;
   height: 1.6rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--topic-accent, var(--hciot-accent)) 14%, transparent);
   color: var(--topic-accent, var(--hciot-accent));
   font-size: 0.78rem;
@@ -163,7 +163,7 @@
   gap: 0.625rem;
   margin-bottom: 1rem;
   padding: 1rem;
-  border: 1px solid var(--hciot-border);
+  border: 0.0625rem solid var(--hciot-border);
   border-radius: 0.75rem;
   background: var(--hciot-panel-strong);
 }
@@ -200,7 +200,7 @@
 .hciot-kb-select {
   width: 100%;
   padding: 0.6rem 0.75rem;
-  border: 1px solid var(--hciot-border);
+  border: 0.0625rem solid var(--hciot-border);
   border-radius: 0.5rem;
   background: var(--hciot-panel);
   color: var(--hciot-ink);
@@ -235,7 +235,7 @@
   flex: 1 1 7.5rem;
   min-width: 0;
   padding: 0.55rem 0.75rem;
-  border: 1px solid var(--hciot-border);
+  border: 0.0625rem solid var(--hciot-border);
   border-radius: 0.5rem;
   background: var(--hciot-panel);
   color: var(--hciot-ink);
@@ -260,7 +260,7 @@
 .hciot-te {
   margin-top: 1.25rem;
   padding-top: 1.25rem;
-  border-top: 1px solid var(--hciot-border);
+  border-top: 0.0625rem solid var(--hciot-border);
 }
 
 .hciot-te-header {
@@ -276,7 +276,7 @@
 
 /* Category accordion item */
 .hciot-te-cat {
-  border: 1px solid var(--hciot-border);
+  border: 0.0625rem solid var(--hciot-border);
   border-radius: 0.6rem;
   margin-bottom: 0.4rem;
   overflow: hidden;
@@ -330,7 +330,7 @@
 .hciot-te-badge {
   flex-shrink: 0;
   padding: 0.15rem 0.5rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--hciot-accent) 12%, transparent);
   color: var(--hciot-accent);
   font-size: 0.72rem;
@@ -357,7 +357,7 @@
   width: 1.6rem;
   height: 1.6rem;
   padding: 0;
-  border: 1px solid transparent;
+  border: 0.0625rem solid transparent;
   border-radius: 0.35rem;
   background: transparent;
   color: var(--hciot-ink-soft);
@@ -412,7 +412,7 @@
 }
 
 .hciot-te-topic {
-  border: 1px solid var(--hciot-border);
+  border: 0.0625rem solid var(--hciot-border);
   border-radius: 0.5rem;
   background: var(--hciot-panel);
   overflow: hidden;
@@ -480,7 +480,7 @@
   justify-content: center;
   width: 1.3rem;
   height: 1.3rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--hciot-accent) 12%, transparent);
   color: var(--hciot-accent);
   font-size: 0.68rem;
@@ -511,7 +511,7 @@
   width: 100%;
   min-height: 5rem;
   padding: 0.5rem 0.6rem;
-  border: 1px solid var(--hciot-border);
+  border: 0.0625rem solid var(--hciot-border);
   border-radius: 0.4rem;
   background: var(--hciot-panel-strong);
   color: var(--hciot-ink);
@@ -544,7 +544,7 @@
   align-items: center;
   gap: 0.3rem;
   padding: 0.3rem 0.65rem;
-  border: 1px solid var(--hciot-border);
+  border: 0.0625rem solid var(--hciot-border);
   border-radius: 0.35rem;
   background: transparent;
   color: var(--hciot-ink-soft);
@@ -598,7 +598,7 @@
   align-items: center;
   gap: 0.3rem;
   padding: 0.4rem 0.7rem;
-  border: 1px dashed var(--hciot-border);
+  border: 0.0625rem dashed var(--hciot-border);
   border-radius: 0.4rem;
   background: transparent;
   color: var(--hciot-ink-soft);

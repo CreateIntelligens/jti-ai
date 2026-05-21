@@ -18,7 +18,7 @@
   display: flex;
   flex-direction: column;
   background: linear-gradient(135deg, rgba(26, 31, 58, 0.95), rgba(10, 14, 39, 0.95));
-  border: 1px solid var(--glass-border);
+  border: 0.0625rem solid var(--glass-border);
   border-radius: 1.5rem;
   box-shadow: var(--shadow-deep), 0 0 5rem rgba(61, 217, 211, 0.15);
   overflow: hidden;
@@ -27,7 +27,7 @@
 
 .conversation-header {
   padding: 1.5rem 2rem;
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 0.0625rem solid var(--glass-border);
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -46,7 +46,7 @@
   height: 3rem;
   border-radius: 0.875rem;
   background: rgba(61, 217, 211, 0.1);
-  border: 1px solid rgba(61, 217, 211, 0.25);
+  border: 0.0625rem solid rgba(61, 217, 211, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -75,7 +75,7 @@
   height: 2.25rem;
   border-radius: 0.625rem;
   background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 0.0625rem solid rgba(255, 255, 255, 0.1);
   color: var(--text-muted);
   display: flex;
   align-items: center;
@@ -100,7 +100,7 @@
 
 .conversation-toolbar {
   padding: 1rem 2rem;
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 0.0625rem solid var(--glass-border);
   display: flex;
   align-items: center;
   gap: 0.625rem;
@@ -127,7 +127,7 @@
   width: 100%;
   height: var(--tb-h);
   padding: 0 1rem 0 2.8rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   font-size: 0.9rem;
 }
 
@@ -165,7 +165,7 @@
 .date-picker-input input {
   background: none;
   border: none;
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 0.0625rem solid var(--glass-border);
   color: var(--text-primary);
   font-size: 0.82rem;
   width: 5.625rem;
@@ -218,7 +218,7 @@
   left: 0;
   z-index: 100;
   background: var(--crystal-deep);
-  border: 1px solid var(--glass-border);
+  border: 0.0625rem solid var(--glass-border);
   border-radius: 0.875rem;
   box-shadow: var(--shadow-deep);
   overflow: hidden;
@@ -226,7 +226,7 @@
 
 .date-picker-tabs {
   display: flex;
-  border-bottom: 1px solid var(--glass-border);
+  border-bottom: 0.0625rem solid var(--glass-border);
 }
 
 .date-picker-tabs button {
@@ -401,7 +401,7 @@
 /* Session Card */
 .session-card {
   background: rgba(26, 31, 58, 0.4);
-  border: 1px solid var(--glass-border);
+  border: 0.0625rem solid var(--glass-border);
   border-radius: 1rem;
   overflow: hidden;
   transition: var(--transition-smooth);
@@ -420,7 +420,7 @@
   width: 1.125rem;
   height: 1.125rem;
   min-width: 1.125rem;
-  border: 2px solid var(--glass-border);
+  border: 0.125rem solid var(--glass-border);
   border-radius: 0.25rem;
   background: transparent;
   cursor: pointer;
@@ -518,8 +518,8 @@
 .session-badge {
   padding: 0.25rem 0.875rem;
   background: rgba(61, 217, 211, 0.12);
-  border: 1px solid rgba(61, 217, 211, 0.3);
-  border-radius: 999px;
+  border: 0.0625rem solid rgba(61, 217, 211, 0.3);
+  border-radius: var(--radius-pill);
   color: var(--crystal-teal);
   font-size: 0.8rem;
   font-weight: 700;
@@ -528,11 +528,27 @@
 .session-count {
   padding: 0.25rem 0.75rem;
   background: rgba(100, 116, 139, 0.15);
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 999px;
+  border: 0.0625rem solid rgba(148, 163, 184, 0.2);
+  border-radius: var(--radius-pill);
   color: var(--text-muted);
   font-size: 0.75rem;
   font-weight: 600;
+}
+
+.session-language {
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  color: white;
+  font-size: 0.6875rem;
+  font-weight: 600;
+}
+
+.session-language.is-english {
+  background: #3b82f6;
+}
+
+.session-language.is-chinese {
+  background: #10b981;
 }
 
 .session-time {
@@ -564,7 +580,7 @@
 .session-card-actions {
   display: flex;
   align-items: stretch;
-  border-left: 1px solid var(--glass-border);
+  border-left: 0.0625rem solid var(--glass-border);
 }
 
 .session-card-actions button {
@@ -598,12 +614,12 @@
 }
 
 .session-card-actions button+button {
-  border-left: 1px solid var(--glass-border);
+  border-left: 0.0625rem solid var(--glass-border);
 }
 
 /* Session Conversations (expanded) */
 .session-conversations {
-  border-top: 1px solid var(--glass-border);
+  border-top: 0.0625rem solid var(--glass-border);
   padding: 1rem;
   background: rgba(7, 8, 21, 0.25);
   display: flex;
@@ -614,7 +630,7 @@
 /* Turn Card */
 .turn-card {
   background: rgba(26, 31, 58, 0.45);
-  border: 1px solid rgba(61, 217, 211, 0.1);
+  border: 0.0625rem solid rgba(61, 217, 211, 0.1);
   border-radius: 0.75rem;
   overflow: hidden;
   transition: border-color 0.3s;
@@ -658,8 +674,8 @@
 .turn-badge {
   padding: 0.1875rem 0.625rem;
   background: rgba(61, 217, 211, 0.1);
-  border: 1px solid rgba(61, 217, 211, 0.25);
-  border-radius: 999px;
+  border: 0.0625rem solid rgba(61, 217, 211, 0.25);
+  border-radius: var(--radius-pill);
   color: var(--crystal-teal);
   font-size: 0.72rem;
   font-weight: 700;
@@ -698,7 +714,7 @@
 
 /* Turn Detail (expanded) */
 .turn-detail {
-  border-top: 1px solid rgba(61, 217, 211, 0.08);
+  border-top: 0.0625rem solid rgba(61, 217, 211, 0.08);
   padding: 1.125rem;
   background: rgba(7, 8, 21, 0.35);
 }
@@ -712,7 +728,7 @@
 
 .turn-detail-response {
   background: rgba(61, 217, 211, 0.05);
-  border: 1px solid rgba(61, 217, 211, 0.12);
+  border: 0.0625rem solid rgba(61, 217, 211, 0.12);
   border-radius: 0.625rem;
   padding: 1rem;
   margin-bottom: 1rem;
@@ -737,7 +753,7 @@
   font-weight: 500;
   border-radius: 0.5rem;
   background: rgba(61, 217, 211, 0.08);
-  border: 1px solid rgba(61, 217, 211, 0.2);
+  border: 0.0625rem solid rgba(61, 217, 211, 0.2);
   color: var(--crystal-teal);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -768,7 +784,7 @@
 
 .turn-tool-card {
   background: rgba(255, 169, 89, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 0.0625rem solid rgba(255, 255, 255, 0.1);
   border-radius: 0.5rem;
   padding: 0.75rem;
   margin-bottom: 0.5rem;
@@ -797,7 +813,7 @@
   gap: 0.375rem;
   margin-top: 0.75rem;
   padding: 0.375rem 0.875rem;
-  border: 1px solid var(--crystal-teal);
+  border: 0.0625rem solid var(--crystal-teal);
   border-radius: 0.375rem;
   background: rgba(61, 217, 211, 0.1);
   color: var(--crystal-teal);
@@ -824,7 +840,7 @@
 
 /* Footer */
 .conversation-footer {
-  border-top: 1px solid var(--glass-border);
+  border-top: 0.0625rem solid var(--glass-border);
   padding: 1rem 2rem;
   flex-shrink: 0;
 }
@@ -861,14 +877,14 @@
   padding: 0.375rem 0.75rem;
   font-size: 0.85rem;
   background: rgba(61, 217, 211, 0.1);
-  border: 1px solid rgba(61, 217, 211, 0.25);
+  border: 0.0625rem solid rgba(61, 217, 211, 0.25);
   color: var(--crystal-teal);
   box-shadow: none;
 }
 
 .pagination-controls button:hover:not(:disabled) {
   background: rgba(61, 217, 211, 0.2);
-  transform: translateY(-1px);
+  transform: translateY(-0.0625rem);
 }
 
 .pagination-controls button:disabled {

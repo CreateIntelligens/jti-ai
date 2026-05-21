@@ -11,13 +11,13 @@
 @keyframes fadeOv { from { opacity: 0; } to { opacity: 1; } }
 .rp-panel {
   width: min(30rem, 92vw); height: 100%; background: var(--surface);
-  border-left: 1px solid var(--border); display: flex; flex-direction: column;
+  border-left: 0.0625rem solid var(--border); display: flex; flex-direction: column;
   box-shadow: var(--shadow-lg); animation: slideP .2s cubic-bezier(.4,0,.2,1);
   font-family: var(--font); color: var(--text);
 }
 @keyframes slideP { from { transform: translateX(100%); } to { transform: translateX(0); } }
 .rp-header {
-  padding: 1rem 1.25rem; border-bottom: 1px solid var(--border);
+  padding: 1rem 1.25rem; border-bottom: 0.0625rem solid var(--border);
   display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
 }
 .rp-title { font-size: 1rem; font-weight: 600; color: var(--text); }
@@ -38,14 +38,14 @@
 .rp-overlay .field label { font-size: .8125rem; font-weight: 500; color: var(--text-2); }
 .field-hint { font-size: .75rem; color: var(--text-3); }
 .input-base {
-  width: 100%; padding: .5rem .75rem; border: 1px solid var(--border-md);
+  width: 100%; padding: .5rem .75rem; border: 0.0625rem solid var(--border-md);
   border-radius: var(--r-md); font-size: .875rem; font-family: var(--font);
   background: var(--bg); color: var(--text); outline: none;
   transition: border-color var(--trans), box-shadow var(--trans);
 }
 .input-base:focus { border-color: var(--primary); box-shadow: 0 0 0 .1875rem rgba(15,118,110,.1); }
 .textarea-base {
-  width: 100%; padding: .5rem .75rem; border: 1px solid var(--border-md);
+  width: 100%; padding: .5rem .75rem; border: 0.0625rem solid var(--border-md);
   border-radius: var(--r-md); font-size: .875rem; font-family: var(--font);
   background: var(--bg); color: var(--text); outline: none;
   resize: vertical; min-height: 7rem;
@@ -72,7 +72,7 @@ select.input-base { cursor: pointer; }
 /* ── Key Card ── */
 .key-card {
   display: flex; align-items: center; gap: .75rem; padding: .75rem;
-  border: 1px solid var(--border); border-radius: var(--r-md);
+  border: 0.0625rem solid var(--border); border-radius: var(--r-md);
   transition: background var(--trans);
 }
 .key-card:hover { background: var(--border); }
@@ -93,7 +93,7 @@ select.input-base { cursor: pointer; }
 .kc-meta-pre { white-space: pre-wrap; margin-top: .25rem; }
 .kc-badge {
   font-size: .625rem; font-weight: 600; padding: .125rem .375rem;
-  border-radius: 9999px; text-transform: uppercase; letter-spacing: .04em;
+  border-radius: var(--radius-pill); text-transform: uppercase; letter-spacing: .04em;
 }
 .kc-badge.system   { background: var(--primary-lt); color: var(--primary); }
 .kc-badge.user     { background: var(--violet-100); color: var(--violet-600); }
@@ -121,7 +121,7 @@ select.input-base { cursor: pointer; }
 /* ── New ext-key result row ── */
 .rp-overlay .rp-key-result {
   margin-top: .75rem; padding: .75rem;
-  background: var(--primary-lt); border: 1px solid var(--primary);
+  background: var(--primary-lt); border: 0.0625rem solid var(--primary);
   border-radius: var(--r-md);
 }
 .rp-overlay .rp-key-result-label {
@@ -137,7 +137,7 @@ select.input-base { cursor: pointer; }
 
 /* ── Separator with optional label ── */
 .sep-row { display: flex; align-items: center; gap: .75rem; margin: .25rem 0; }
-.sep-line { flex: 1; height: 1px; background: var(--border); }
+.sep-line { flex: 1; height: 0.0625rem; background: var(--border); }
 .sep-label { font-size: .75rem; color: var(--text-3); }
 
 /* ── Prompt Panel Tabs ── */
@@ -156,7 +156,7 @@ select.input-base { cursor: pointer; }
 /* ── Edit Card (PromptPanel system tab) ── */
 .rp-overlay .rp-edit-card {
   display: flex; flex-direction: column; gap: .75rem;
-  padding: .875rem; border: 1px solid var(--primary);
+  padding: .875rem; border: 0.0625rem solid var(--primary);
   border-radius: var(--r-md); background: var(--surface);
 }
 .rp-overlay .rp-card-actions {

@@ -52,13 +52,13 @@
 /* Messages */
 [data-theme="light"] .app-container .message.user {
   background: linear-gradient(135deg, rgba(15, 118, 110, 0.12), rgba(14, 116, 144, 0.08));
-  border: 1px solid rgba(15, 118, 110, 0.2);
+  border: 0.0625rem solid rgba(15, 118, 110, 0.2);
   color: var(--text-primary);
 }
 
 [data-theme="light"] .app-container .message.model {
   background: linear-gradient(135deg, rgba(180, 83, 9, 0.08), rgba(161, 98, 7, 0.05));
-  border: 1px solid rgba(180, 83, 9, 0.15);
+  border: 0.0625rem solid rgba(180, 83, 9, 0.15);
   color: var(--text-primary);
 }
 
@@ -78,7 +78,7 @@
 [data-theme="light"] .app-container select,
 [data-theme="light"] .app-container textarea {
   background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(15, 118, 110, 0.15);
+  border: 0.0625rem solid rgba(15, 118, 110, 0.15);
   color: var(--text-primary);
 }
 
@@ -98,7 +98,7 @@
 /* Custom Select */
 [data-theme="light"] .custom-select-trigger {
   background: rgba(255, 255, 255, 0.9);
-  border: 1px solid rgba(15, 118, 110, 0.15);
+  border: 0.0625rem solid rgba(15, 118, 110, 0.15);
   color: var(--text-muted);
 }
 
@@ -118,7 +118,7 @@
 
 [data-theme="light"] .custom-select-dropdown {
   background: rgba(255, 255, 255, 0.98);
-  border: 1px solid rgba(15, 118, 110, 0.15);
+  border: 0.0625rem solid rgba(15, 118, 110, 0.15);
   box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.1);
 }
 
@@ -155,7 +155,7 @@
 [data-theme="light"] .overlay button.secondary {
   background: rgba(255, 255, 255, 0.9);
   color: var(--crystal-teal);
-  border: 1px solid rgba(15, 118, 110, 0.2);
+  border: 0.0625rem solid rgba(15, 118, 110, 0.2);
   box-shadow: none;
 }
 

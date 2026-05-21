@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode, RefObject } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { Upload } from 'lucide-react';
 
 import type { HciotLanguage } from '../../../../config/hciotTopics';
@@ -23,7 +23,7 @@ interface UploadTabBodyProps<T> {
   dropSubEn: string;
   countZh: string;
   countEn: string;
-  listStyle?: CSSProperties;
+  fileListClassName?: string;
   hint?: ReactNode;
 }
 
@@ -47,9 +47,15 @@ export default function UploadTabBody<T>({
   dropSubEn: _dropSubEn,
   countZh,
   countEn: _countEn,
-  listStyle,
+  fileListClassName,
   hint,
 }: UploadTabBodyProps<T>) {
+  const fileListClasses = [
+    'hciot-upload-file-list',
+    'custom-scrollbar',
+    fileListClassName,
+  ].filter(Boolean).join(' ');
+
   return (
     <div className="hciot-upload-file-body">
       <div
@@ -78,7 +84,7 @@ export default function UploadTabBody<T>({
       {hint}
 
       {items.length > 0 && (
-        <div className="hciot-upload-file-list custom-scrollbar" style={listStyle}>
+        <div className={fileListClasses}>
           {items.map((item, index) => renderItem(item, index))}
         </div>
       )}

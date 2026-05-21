@@ -89,7 +89,7 @@
   max-width: 42.5rem;
   max-height: 85vh;
   background: var(--s-modal-bg);
-  border: 1px solid var(--s-border);
+  border: 0.0625rem solid var(--s-border);
   border-radius: 1rem;
   box-shadow: 0 0.625rem 2.5rem rgba(0, 0, 0, 0.5), 0 0 3.75rem rgba(var(--s-accent-rgb), 0.06);
   display: flex;
@@ -100,7 +100,7 @@
 @keyframes jtiModalIn {
   from {
     opacity: 0;
-    transform: scale(0.95) translateY(10px);
+    transform: scale(0.95) translateY(0.625rem);
   }
 
   to {
@@ -114,7 +114,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid rgba(var(--s-accent-rgb), 0.12);
+  border-bottom: 0.0625rem solid rgba(var(--s-accent-rgb), 0.12);
 }
 
 .jti-settings-title {
@@ -131,7 +131,7 @@
   width: 2.25rem;
   height: 2.25rem;
   border-radius: 50%;
-  border: 1px solid rgba(var(--s-accent-rgb), 0.15);
+  border: 0.0625rem solid rgba(var(--s-accent-rgb), 0.15);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
@@ -149,7 +149,7 @@
   display: flex;
   gap: 0;
   padding: 0.5rem 1.5rem 0;
-  border-bottom: 1px solid rgba(var(--s-accent-rgb), 0.08);
+  border-bottom: 0.0625rem solid rgba(var(--s-accent-rgb), 0.08);
 }
 
 .jti-settings-tab {
@@ -161,7 +161,7 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  border-bottom: 2px solid transparent;
+  border-bottom: 0.125rem solid transparent;
   font-family: inherit;
 }
 
@@ -208,7 +208,7 @@
 }
 
 .jti-prompt-card {
-  border: 1px solid rgba(var(--s-accent-rgb), 0.12);
+  border: 0.0625rem solid rgba(var(--s-accent-rgb), 0.12);
   border-radius: 0.625rem;
   padding: 1rem 1.25rem;
   background: var(--s-surface);
@@ -249,9 +249,9 @@
   font-size: 0.7rem;
   font-weight: 600;
   padding: 0.15rem 0.5rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(var(--s-accent-rgb), 0.12);
-  border: 1px solid rgba(var(--s-accent-rgb), 0.3);
+  border: 0.0625rem solid rgba(var(--s-accent-rgb), 0.3);
   color: var(--s-accent);
   letter-spacing: 0.05em;
 }
@@ -260,9 +260,9 @@
   font-size: 0.7rem;
   font-weight: 600;
   padding: 0.15rem 0.5rem;
-  border-radius: 999px;
+  border-radius: var(--radius-pill);
   background: rgba(76, 175, 80, 0.12);
-  border: 1px solid rgba(76, 175, 80, 0.3);
+  border: 0.0625rem solid rgba(76, 175, 80, 0.3);
   color: #81c784;
   letter-spacing: 0.05em;
 }
@@ -277,7 +277,7 @@
 .jti-btn {
   padding: 0.5rem 1rem;
   border-radius: 0.5rem;
-  border: 1px solid transparent;
+  border: 0.0625rem solid transparent;
   font-size: 0.85rem;
   font-weight: 500;
   cursor: pointer;
@@ -310,7 +310,7 @@
 .jti-btn.secondary {
   background: var(--s-surface);
   color: var(--text-muted);
-  border: 1px solid var(--s-border-subtle);
+  border: 0.0625rem solid var(--s-border-subtle);
 }
 
 .jti-btn.secondary:hover {
@@ -321,7 +321,7 @@
 .jti-btn.danger {
   background: transparent;
   color: var(--s-danger);
-  border: 1px solid color-mix(in srgb, var(--s-danger) 30%, transparent);
+  border: 0.0625rem solid color-mix(in srgb, var(--s-danger) 30%, transparent);
 }
 
 .jti-btn.danger:hover {
@@ -364,7 +364,7 @@
 .jti-prompt-input {
   width: 100%;
   padding: 0.6rem 0.8rem;
-  border: 1px solid var(--s-border);
+  border: 0.0625rem solid var(--s-border);
   border-radius: 0.5rem;
   background: rgba(0, 0, 0, 0.25);
   color: var(--text);
@@ -381,7 +381,7 @@
 .jti-prompt-textarea {
   width: 100%;
   padding: 0.6rem 0.8rem;
-  border: 1px solid var(--s-border);
+  border: 0.0625rem solid var(--s-border);
   border-radius: 0.5rem;
   background: rgba(0, 0, 0, 0.25);
   color: var(--text);
@@ -406,7 +406,7 @@
 
 /* Create section */
 .jti-prompt-create {
-  border-top: 1px solid rgba(var(--s-accent-rgb), 0.08);
+  border-top: 0.0625rem solid rgba(var(--s-accent-rgb), 0.08);
   padding-top: 1.25rem;
   display: flex;
   flex-direction: column;
@@ -425,12 +425,12 @@
   color: var(--text-muted);
   font-size: 0.85rem;
   padding: 1rem 0;
-  border-top: 1px solid rgba(var(--s-accent-rgb), 0.08);
+  border-top: 0.0625rem solid rgba(var(--s-accent-rgb), 0.08);
 }
 
 /* Runtime settings section */
 .jti-runtime-settings {
-  border-top: 1px solid rgba(var(--s-accent-rgb), 0.08);
+  border-top: 0.0625rem solid rgba(var(--s-accent-rgb), 0.08);
   margin-top: 1.25rem;
   padding-top: 1.25rem;
   display: flex;
@@ -446,7 +446,7 @@
 
 .jti-runtime-readonly-value {
   background: rgba(0, 0, 0, 0.2);
-  border: 1px solid var(--s-border);
+  border: 0.0625rem solid var(--s-border);
   border-radius: 0.375rem;
   padding: 0.55rem 0.8rem;
   color: var(--text-muted);
@@ -527,7 +527,7 @@
 
 /* ========== KB Upload Zone ========== */
 .jti-kb-upload-zone {
-  border: 2px dashed var(--s-dashed);
+  border: 0.125rem dashed var(--s-dashed);
   border-radius: 0.75rem;
   padding: 1.5rem;
   text-align: center;
@@ -589,7 +589,7 @@
   padding: 0.6rem 0.75rem;
   background: var(--s-surface);
   border-radius: 0.5rem;
-  border: 1px solid var(--s-border-faint);
+  border: 0.0625rem solid var(--s-border-faint);
 }
 
 .jti-kb-file-info {
@@ -640,7 +640,7 @@
 
 .jti-confirm-box {
   background: var(--s-confirm-bg);
-  border: 1px solid var(--s-border-subtle);
+  border: 0.0625rem solid var(--s-border-subtle);
   border-radius: 0.75rem;
   padding: 1.5rem;
   max-width: 20rem;
@@ -674,7 +674,7 @@
 
 .jti-viewer-modal {
   background: var(--s-modal-solid);
-  border: 1px solid var(--s-border-subtle);
+  border: 0.0625rem solid var(--s-border-subtle);
   border-radius: 0.75rem;
   width: 90%;
   max-width: 43.75rem;
@@ -689,7 +689,7 @@
   align-items: center;
   justify-content: space-between;
   padding: 1rem 1.25rem;
-  border-bottom: 1px solid var(--s-border-faint);
+  border-bottom: 0.0625rem solid var(--s-border-faint);
 }
 
 .jti-viewer-title {
@@ -733,7 +733,7 @@
   width: 100%;
   min-height: 18.75rem;
   background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(var(--s-accent-rgb), 0.3);
+  border: 0.0625rem solid rgba(var(--s-accent-rgb), 0.3);
   border-radius: 0.5rem;
   color: var(--s-text);
   padding: 0.75rem;
@@ -768,7 +768,7 @@
   justify-content: flex-end;
   gap: 0.5rem;
   padding: 0.75rem 1.25rem;
-  border-top: 1px solid var(--s-border-faint);
+  border-top: 0.0625rem solid var(--s-border-faint);
 }
 
 .jti-btn.save {
@@ -781,7 +781,7 @@
   background: color-mix(in srgb, var(--s-accent) 80%, black);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 48rem) {
   .jti-settings-modal {
     width: 95%;
     max-height: 90vh;

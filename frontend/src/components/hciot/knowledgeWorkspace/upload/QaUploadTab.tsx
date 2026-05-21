@@ -115,7 +115,7 @@ function QaRowItem({
                 </button>
               </div>
             )}
-            <div style={{ display: 'flex', gap: '6px', marginTop: hasImage ? '4px' : 0 }}>
+            <div className={`hciot-qa-image-actions${hasImage ? ' has-preview' : ''}`}>
               <button
                 type="button"
                 className="hciot-qa-image-btn"

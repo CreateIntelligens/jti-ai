@@ -36,10 +36,10 @@
   --sidebar-w: 17rem; --header-h: 3.5rem;
 
   /* ── Breakpoints (reference, used in @media queries) ──
-     --bp-sm: 40rem (640px)   phones landscape
-     --bp-md: 48rem (768px)   tablets
-     --bp-lg: 64rem (1024px)  small laptops
-     --bp-xl: 80rem (1280px)  desktops
+     --bp-sm: 40rem   phones landscape
+     --bp-md: 48rem   tablets
+     --bp-lg: 64rem   small laptops
+     --bp-xl: 80rem   desktops
   */
 
   /* ── Font ── */

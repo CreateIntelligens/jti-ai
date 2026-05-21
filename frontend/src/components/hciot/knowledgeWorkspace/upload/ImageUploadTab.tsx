@@ -107,7 +107,7 @@ export default function ImageUploadTab({
       dropSubEn="支援 JPG、PNG、GIF、WEBP (最大 10MB)"
       countZh="張圖片"
       countEn="張圖片"
-      listStyle={{ maxHeight: '300px', overflowY: 'auto' }}
+      fileListClassName="is-image-list"
       onDrop={(event) => {
         event.preventDefault();
         setDragOver(false);

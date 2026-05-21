@@ -30,6 +30,7 @@
   /* Borders & Dividers */
   --border-color: #5f6368;
   --border-light: #3c4043;
+  --radius-pill: 999rem;
 
   /* Shadows (Material Elevation) */
   --shadow-sm: 0 0.0625rem 0.125rem 0 rgba(0, 0, 0, 0.3), 0 0.0625rem 0.1875rem 0.0625rem rgba(0, 0, 0, 0.15);
@@ -152,7 +153,7 @@ body::before {
 @keyframes modalSlide {
   from {
     opacity: 0;
-    transform: translateY(-50px) scale(0.9);
+    transform: translateY(-3.125rem) scale(0.9);
   }
 
   to {
@@ -164,7 +165,7 @@ body::before {
 @keyframes fadeIn {
   from {
     opacity: 0;
-    transform: translateY(20px);
+    transform: translateY(1.25rem);
   }
 
   to {
@@ -260,7 +261,7 @@ body::before {
 
 .citations-toggle {
   background: color-mix(in srgb, var(--gold, var(--primary-color)) 12%, transparent) !important;
-  border: 1px solid color-mix(in srgb, var(--gold, var(--primary-color)) 25%, transparent) !important;
+  border: 0.0625rem solid color-mix(in srgb, var(--gold, var(--primary-color)) 25%, transparent) !important;
   outline: none !important;
   box-shadow: none !important;
   padding: 0.35rem 0.6rem;
@@ -295,7 +296,7 @@ body::before {
   color: var(--gold, var(--primary-color)) !important;
   background: color-mix(in srgb, var(--gold, var(--primary-color)) 25%, transparent) !important;
   border-color: color-mix(in srgb, var(--gold, var(--primary-color)) 50%, transparent) !important;
-  transform: translateY(-1px);
+  transform: translateY(-0.0625rem);
 }
 
 .citations-icon {
@@ -329,7 +330,7 @@ body::before {
   gap: 0.4rem;
   padding: 0.35rem 0.75rem;
   background: var(--bg-surface);
-  border: 1px solid var(--border-light);
+  border: 0.0625rem solid var(--border-light);
   border-radius: 0.5rem;
   font-size: 0.75rem;
   color: var(--text-secondary);
@@ -351,7 +352,7 @@ body::before {
   background: var(--bg-hover);
   border-color: var(--gold, var(--primary-color));
   color: var(--gold, var(--primary-color));
-  transform: translateY(-2px);
+  transform: translateY(-0.125rem);
   box-shadow: var(--shadow-md);
 }
 
@@ -393,7 +394,7 @@ body::before {
   line-height: 1.5;
   padding: 0.5rem 0.75rem;
   background: var(--preview-bg, rgba(0, 0, 0, 0.15));
-  border-left: 2px solid var(--accent-color, #6366f1);
+  border-left: 0.125rem solid var(--accent-color, #6366f1);
   border-radius: 0 0.25rem 0.25rem 0;
   white-space: pre-wrap;
   word-break: break-word;
@@ -407,7 +408,7 @@ body::before {
 .hciot-image-attachment {
   margin-top: 0.85rem;
   overflow: hidden;
-  border: 1px solid var(--hciot-border, var(--border-color));
+  border: 0.0625rem solid var(--hciot-border, var(--border-color));
   border-radius: 1rem;
   background: var(--hciot-panel, var(--bg-secondary));
   box-shadow: var(--hciot-shadow, var(--shadow-sm));
@@ -419,7 +420,7 @@ body::before {
 }
 
 .hciot-image-link:focus-visible {
-  outline: 2px solid var(--hciot-accent, var(--primary-color));
+  outline: 0.125rem solid var(--hciot-accent, var(--primary-color));
   outline-offset: 0.125rem;
 }
 
@@ -438,7 +439,7 @@ body::before {
 
 .hciot-image-caption {
   padding: 0.7rem 0.85rem;
-  border-top: 1px solid var(--hciot-border, var(--border-color));
+  border-top: 0.0625rem solid var(--hciot-border, var(--border-color));
   color: var(--hciot-ink-soft, var(--text-secondary));
   font-size: 0.78rem;
   font-weight: 600;

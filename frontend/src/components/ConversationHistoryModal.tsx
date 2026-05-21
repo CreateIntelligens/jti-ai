@@ -72,6 +72,24 @@ interface ConversationHistoryModalProps {
   onResumeSession?: (sessionId: string, messages: Array<{ role: 'user' | 'assistant'; text: string; turnNumber?: number; citations?: Array<{ title: string; uri: string; text?: string }>; imageId?: string }>, language?: string) => void;
 }
 
+function getSessionLanguageBadge(language?: string) {
+  if (!language) {
+    return null;
+  }
+
+  if (language === 'en') {
+    return {
+      className: 'session-language is-english',
+      label: 'EN',
+    };
+  }
+
+  return {
+    className: 'session-language is-chinese',
+    label: 'ZH',
+  };
+}
+
 export default function ConversationHistoryModal({
   isOpen,
   onClose,
@@ -639,6 +657,7 @@ export default function ConversationHistoryModal({
               const isSessionExpanded = expandedSessionId === session.session_id;
               const sessionTurnMap = expandedTurnMap[session.session_id] ?? null;
               const msgCount = (session as SessionSummary).message_count ?? (session as unknown as Session).total ?? 0;
+              const sessionLanguageBadge = getSessionLanguageBadge(session.language);
 
               // 取得展開時的 conversations：general 模式用 detailCache，JTI 用 session 自帶的
               const conversations: ConversationEntry[] = mode === 'general'
@@ -674,16 +693,9 @@ export default function ConversationHistoryModal({
                         <div className="session-card-meta">
                           <span className="session-badge">Session {sessionIndex + 1}</span>
                           <span className="session-count">{msgCount} {t('conversations_count')}</span>
-                          {session.language && (
-                            <span className="session-language" style={{
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              fontSize: '11px',
-                              background: session.language === 'en' ? '#3b82f6' : '#10b981',
-                              color: 'white',
-                              fontWeight: 600
-                            }}>
-                              {session.language === 'en' ? 'EN' : 'ZH'}
+                          {sessionLanguageBadge && (
+                            <span className={sessionLanguageBadge.className}>
+                              {sessionLanguageBadge.label}
                             </span>
                           )}
                           <span className="session-time">
