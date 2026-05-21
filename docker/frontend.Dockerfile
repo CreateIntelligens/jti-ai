@@ -2,8 +2,9 @@ FROM node:20-alpine
 
 WORKDIR /app
 
-# 安裝 nginx 和 envsubst (gettext)
+# 安裝 nginx 和 envsubst (gettext)，並透過 corepack 啟用 pnpm
 RUN apk add --no-cache nginx gettext && \
+    corepack enable && \
     mkdir -p /var/lib/nginx/tmp/client_body /run/nginx /app/node_modules /app/dist && \
     chown -R node:node /app
 
