@@ -90,12 +90,12 @@ class MainAgent(BaseAgent):
         """Override: pull store_name from session.metadata (set during create)."""
         return session.metadata.get("store_name") or "__general__"
 
-    def _get_rag_source_type_for_session(self, session: Session) -> str:
-        """Dynamic source_type based on whether the store is managed."""
+    def _get_rag_source_type_for_session(self, session: Session) -> list[str]:
+        """Dynamic source_type list based on whether the store is managed."""
         managed_app = session.metadata.get("managed_app")
         if managed_app:
-            return f"{managed_app}_knowledge"
-        return "general_knowledge"
+            return [f"{managed_app}_knowledge", f"{managed_app}_doc_knowledge"]
+        return ["general_knowledge", "general_doc_knowledge"]
 
     def _get_rag_search_language_for_session(self, session: Session) -> str | None:
         """Override: dynamic stores key RAG entries by store_name (not zh/en).

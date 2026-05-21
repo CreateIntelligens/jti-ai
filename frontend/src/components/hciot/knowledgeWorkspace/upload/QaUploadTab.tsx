@@ -31,8 +31,16 @@ interface QaUploadTabProps {
   availableImages: HciotImage[];
   resolvedTopic: ResolvedUploadTopic | null;
   hasTopicSelection: boolean;
+  skipTopic?: boolean;
   onClose: () => void;
   onSubmitQA: (file: File, topicId: string, labels: ResolvedUploadTopic['labels']) => Promise<void>;
+  onUploadFile: (
+    file: File,
+    topicId: string | null,
+    labels: ResolvedUploadTopic['labels'] | null,
+    skipTopic?: boolean,
+  ) => Promise<{ name: string }>;
+  onUploadComplete: (firstUploadedFileName: string | null, count: number) => Promise<void>;
   onUploadImage: (file: File, imageId?: string) => Promise<UploadedImageResult>;
   onDeleteImage?: DeleteImageHandler;
 }
@@ -149,8 +157,11 @@ export default function QaUploadTab({
   availableImages,
   resolvedTopic,
   hasTopicSelection,
+  skipTopic = false,
   onClose,
   onSubmitQA,
+  onUploadFile,
+  onUploadComplete,
   onUploadImage,
   onDeleteImage,
 }: QaUploadTabProps) {
@@ -159,6 +170,8 @@ export default function QaUploadTab({
   const [pendingRowImageIndex, setPendingRowImageIndex] = useState<number | null>(null);
   const [pickerRowIndex, setPickerRowIndex] = useState<number | null>(null);
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
+  const [docTitle, setDocTitle] = useState('');
+  const [docText, setDocText] = useState('');
   const rowImageInputRef = useRef<HTMLInputElement>(null);
   const pendingUrls = usePendingImageUrls(rows);
 
@@ -168,11 +181,31 @@ export default function QaUploadTab({
       setUploadingLocal(false);
       setPendingRowImageIndex(null);
       setPickerRowIndex(null);
+      setDocTitle('');
+      setDocText('');
     }
   }, [open]);
 
   const validRows = rows.filter((row) => row.q.trim());
   const canSubmitQA = validRows.length > 0 && hasTopicSelection && !uploadingLocal && !uploading;
+  const canSubmitDoc = docText.trim().length > 0 && !uploadingLocal && !uploading;
+
+  const handleSubmitDoc = async () => {
+    const text = docText.trim();
+    if (!text) return;
+
+    setUploadingLocal(true);
+    try {
+      const safeTitle = docTitle.trim().replace(/[^\w一-鿿-]+/g, '_') || 'document';
+      const file = new File([text], `${safeTitle}_${Date.now()}.txt`, { type: 'text/plain' });
+      const response = await onUploadFile(file, null, null, true);
+      await onUploadComplete(response.name, 1);
+    } catch (error) {
+      alert(toErrorMessage(error));
+    } finally {
+      setUploadingLocal(false);
+    }
+  };
 
   const updateRow = (index: number, updates: Partial<QARow>) => {
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, ...updates } : row)));
@@ -281,6 +314,44 @@ export default function QaUploadTab({
         onClose={() => setPreviewImageUrl(null)}
       />
 
+      {skipTopic ? (
+        <div className="hciot-upload-qa-body">
+          <div className="hciot-doc-text-area">
+            <input
+              className="hciot-file-input"
+              placeholder="文件標題（用於檔名，可留空）"
+              value={docTitle}
+              onChange={(event) => setDocTitle(event.target.value)}
+            />
+            <textarea
+              className="hciot-doc-text-input"
+              placeholder="貼上一整段文字內容，系統會自動切塊建立語意 RAG（不分問答）"
+              value={docText}
+              onChange={(event) => setDocText(event.target.value)}
+            />
+          </div>
+
+          <div className="hciot-qa-footer">
+            <span className="hciot-qa-count">
+              {docText.trim().length} 字
+            </span>
+            <div className="hciot-qa-footer-actions">
+              <button type="button" className="hciot-file-action-button" onClick={onClose}>
+                取消
+              </button>
+              <button
+                type="button"
+                className="hciot-file-action-button primary"
+                disabled={!canSubmitDoc}
+                onClick={() => { void handleSubmitDoc(); }}
+              >
+                <Upload size={14} />
+                {uploadingLocal || uploading ? '上傳中...' : '上傳'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : (
       <div className="hciot-upload-qa-body">
         <div className="hciot-qa-rows custom-scrollbar">
           {rows.map((row, index) => (
@@ -340,6 +411,7 @@ export default function QaUploadTab({
           </div>
         </div>
       </div>
+      )}
     </>
   );
 }

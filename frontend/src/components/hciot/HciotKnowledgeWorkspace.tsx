@@ -29,11 +29,21 @@ function getLocalizedText(_language: HciotLanguage, zh: string, _en: string): st
   return zh;
 }
 
-function parseExplorerKey(key: string): { kind: string; id: string } {
+interface ParsedExplorerKey {
+  kind: string;
+  id: string;
+}
+
+function parseExplorerKey(key: string): ParsedExplorerKey {
   const separatorIndex = key.indexOf(':');
   return separatorIndex === -1
     ? { kind: key, id: '' }
     : { kind: key.slice(0, separatorIndex), id: key.slice(separatorIndex + 1) };
+}
+
+function splitTopicId(topicId: string): { categoryId: string; topicSlug: string } {
+  const [categoryId = '', ...topicParts] = topicId.split('/');
+  return { categoryId, topicSlug: topicParts.join('/') };
 }
 
 function moveItem<T>(items: T[], from: number, to: number): T[] | null {
@@ -128,11 +138,14 @@ export default function HciotKnowledgeWorkspace({
   );
 
   const selectedMergedLabel = useMemo(() => {
-    if (!selectedMergedTopicId) return null;
-    const prefix = selectedMergedTopicId.split('/')[0];
-    const cat = categories.find((c) => c.id === prefix);
-    return cat?.topics.find((t) => t.id === selectedMergedTopicId)?.label
-      ?? selectedMergedTopicId;
+    if (!selectedMergedTopicId) {
+      return null;
+    }
+
+    const categoryId = categoryPrefix(selectedMergedTopicId);
+    const category = categories.find((item) => item.id === categoryId);
+    const topic = category?.topics.find((item) => item.id === selectedMergedTopicId);
+    return topic?.label ?? selectedMergedTopicId;
   }, [categories, selectedMergedTopicId]);
 
   const metadataDirty = useMemo(() => {
@@ -358,16 +371,23 @@ export default function HciotKnowledgeWorkspace({
     file: File,
     topicId: string | null,
     labels: TopicLabels | null,
+    skipTopic?: boolean,
   ) => {
+    if (skipTopic) {
+      return api.uploadHciotKnowledgeFileWithTopic({
+        language,
+        file,
+        skipTopic: true,
+      });
+    }
     if (!topicId) {
       return api.uploadHciotKnowledgeFile(language, file);
     }
-    const catId = topicId.split('/')[0];
-    const topicSlug = topicId.includes('/') ? topicId.split('/').slice(1).join('/') : '';
+    const { categoryId, topicSlug } = splitTopicId(topicId);
     return api.uploadHciotKnowledgeFileWithTopic({
       language,
       file,
-      categoryId: catId || undefined,
+      categoryId: categoryId || undefined,
       topicId: topicSlug || undefined,
       categoryLabel: labels?.categoryLabel || undefined,
       topicLabel: labels?.topicLabel || undefined,
@@ -431,7 +451,7 @@ export default function HciotKnowledgeWorkspace({
   };
 
   const handleDeleteTopic = async (topicId: string, topicLabel: string) => {
-    const targets = files.filter((f) => f.topic_id === topicId);
+    const targets = files.filter((file) => file.topic_id === topicId);
     if (!targets.length) return;
     const confirmed = window.confirm(text(
       `確定要刪除主題「${topicLabel}」？無法復原。`,
@@ -442,13 +462,13 @@ export default function HciotKnowledgeWorkspace({
     setDeleting(true);
     try {
       const results = await Promise.allSettled(
-        targets.map((f) => api.deleteHciotKnowledgeFile(f.name, language))
+        targets.map((file) => api.deleteHciotKnowledgeFile(file.name, language)),
       );
-      const failed = results.filter((r) => r.status === 'rejected').length;
+      const failed = results.filter((result) => result.status === 'rejected').length;
       if (selectedMergedTopicId === topicId) {
         setSelectedMergedTopicId(null);
       }
-      const targetNames = new Set(targets.map((f) => f.name));
+      const targetNames = new Set(targets.map((file) => file.name));
       if (selectedFileName && targetNames.has(selectedFileName)) {
         setSelectedFileName(null);
       }
@@ -485,9 +505,7 @@ export default function HciotKnowledgeWorkspace({
       return;
     }
 
-    const separatorIndex = key.indexOf(':');
-    const kind = separatorIndex === -1 ? key : key.slice(0, separatorIndex);
-    const targetId = separatorIndex === -1 ? '' : key.slice(separatorIndex + 1);
+    const { kind, id: targetId } = parseExplorerKey(key);
     if (!targetId) {
       setRenamingKey(null);
       return;
@@ -546,7 +564,9 @@ export default function HciotKnowledgeWorkspace({
       );
     } else if (active.kind === 'topic') {
       const activeCategoryId = categoryPrefix(active.id);
-      if (activeCategoryId !== categoryPrefix(over.id)) return;
+      if (activeCategoryId !== categoryPrefix(over.id)) {
+        return;
+      }
 
       const categoryIndex = categories.findIndex((category) => category.id === activeCategoryId);
       if (categoryIndex === -1) {
@@ -838,7 +858,6 @@ export default function HciotKnowledgeWorkspace({
       }, 300);
     }
   };
-
 
   return (
     <section

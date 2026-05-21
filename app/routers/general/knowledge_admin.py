@@ -16,14 +16,13 @@ from app.auth import verify_admin, verify_auth
 from app.routers.knowledge_utils import (
     EDITABLE_EXTENSIONS,
     TEXT_PREVIEW_EXTENSIONS,
-    delete_from_rag,
     extract_docx_text,
     safe_filename,
-    sync_to_rag,
     write_docx_text,
 )
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.jti.knowledge_store import get_jti_knowledge_store
+from app.services.rag.document_service import get_document_rag_service
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +46,12 @@ def _store_for(namespace: str):
     return get_jti_knowledge_store()
 
 
+def _sync_document_to_rag(namespace: str, language: str, filename: str, file_bytes: bytes) -> None:
+    get_document_rag_service().sync_document(namespace, language, filename, file_bytes)
+
+
+def _delete_document_from_rag(namespace: str, language: str, filename: str) -> None:
+    get_document_rag_service().delete_document(namespace, language, filename)
 
 
 class UpdateContentRequest(BaseModel):
@@ -163,7 +168,7 @@ async def update_file_content(
         raise HTTPException(status_code=404, detail="檔案不存在")
 
     try:
-        sync_to_rag(namespace, language, safe_name, new_bytes)
+        _sync_document_to_rag(namespace, language, safe_name, new_bytes)
     except Exception as e:
         return {"message": f"已更新，但 RAG 同步失敗: {e}", "synced": False, "app": namespace}
 
@@ -198,7 +203,7 @@ async def upload_knowledge_file(
 
     rag_synced = False
     try:
-        sync_to_rag(namespace, language, saved["name"], file_bytes)
+        _sync_document_to_rag(namespace, language, saved["name"], file_bytes)
         rag_synced = True
     except Exception as e:
         logger.warning("[Knowledge] RAG sync failed for %s/%s: %s", namespace, saved["name"], e)
@@ -227,7 +232,7 @@ def delete_knowledge_file(
         raise HTTPException(status_code=404, detail="檔案不存在")
 
     try:
-        delete_from_rag(namespace, language, safe_name)
+        _delete_document_from_rag(namespace, language, safe_name)
     except Exception as e:
         logger.warning("[Knowledge] RAG delete failed for %s/%s: %s", namespace, safe_name, e)
         raise HTTPException(status_code=502, detail="RAG 同步刪除失敗，Mongo 未刪除")

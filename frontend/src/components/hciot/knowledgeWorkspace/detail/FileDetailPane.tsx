@@ -70,6 +70,9 @@ export default function FileDetailPane({
     onDraftChange,
     onEditorTextChange,
   } = actions;
+
+  const showTopicMetadata = Boolean(selectedFile?.topic_id);
+
   return (
     <div className="hciot-file-editor">
       <div className="hciot-file-header">
@@ -118,68 +121,70 @@ export default function FileDetailPane({
 
       {selectedFile ? (
         <>
-          <section className="hciot-file-metadata">
-            <div className="hciot-file-metadata-group">
-              <label className="hciot-file-metadata-label">
-                科別 / 主題
-              </label>
-              <div className="hciot-file-metadata-controls">
-                <HciotSelect
-                  className="hciot-file-select"
-                  value={draft.categoryId}
-                  onChange={onCategoryChange}
-                  disabled={saving}
-                  options={[
-                    ...categoryOptions.map((category) => ({ value: category.id, label: category.label })),
-                    { value: NEW_VALUE, label: '＋ 新增科別' },
-                  ]}
-                />
+          {showTopicMetadata ? (
+            <section className="hciot-file-metadata">
+              <div className="hciot-file-metadata-group">
+                <label className="hciot-file-metadata-label">
+                  科別 / 主題
+                </label>
+                <div className="hciot-file-metadata-controls">
+                  <HciotSelect
+                    className="hciot-file-select"
+                    value={draft.categoryId}
+                    onChange={onCategoryChange}
+                    disabled={saving}
+                    options={[
+                      ...categoryOptions.map((category) => ({ value: category.id, label: category.label })),
+                      { value: NEW_VALUE, label: '＋ 新增科別' },
+                    ]}
+                  />
 
-                <span className="hciot-file-path-separator">/</span>
+                  <span className="hciot-file-path-separator">/</span>
 
-                <HciotSelect
-                  className="hciot-file-select"
-                  value={draft.topicId}
-                  onChange={onTopicChange}
-                  disabled={saving || !draft.categoryId}
-                  options={[
-                    {
-                      value: '',
-                      label: draft.categoryId
-                        ? getNoTopicLabel(language)
-                        : '先選科別',
-                    },
-                    ...topicOptions.map((topic) => ({ value: topic.id, label: topic.label })),
-                    ...(draft.categoryId
-                      ? [{ value: NEW_VALUE, label: '＋ 新增主題' }]
-                      : []),
-                  ]}
-                />
+                  <HciotSelect
+                    className="hciot-file-select"
+                    value={draft.topicId}
+                    onChange={onTopicChange}
+                    disabled={saving || !draft.categoryId}
+                    options={[
+                      {
+                        value: '',
+                        label: draft.categoryId
+                          ? getNoTopicLabel(language)
+                          : '先選科別',
+                      },
+                      ...topicOptions.map((topic) => ({ value: topic.id, label: topic.label })),
+                      ...(draft.categoryId
+                        ? [{ value: NEW_VALUE, label: '＋ 新增主題' }]
+                        : []),
+                    ]}
+                  />
+                </div>
               </div>
-            </div>
 
-            {draft.categoryId === NEW_VALUE ? (
-              <div className="hciot-file-inline-create">
-                <input
-                  className="hciot-file-input"
-                  placeholder="新科別名稱"
-                  value={draft.categoryLabel}
-                  onChange={(event) => onDraftChange({ categoryLabel: event.target.value })}
-                />
-              </div>
-            ) : null}
+              {draft.categoryId === NEW_VALUE ? (
+                <div className="hciot-file-inline-create">
+                  <input
+                    className="hciot-file-input"
+                    placeholder="新科別名稱"
+                    value={draft.categoryLabel}
+                    onChange={(event) => onDraftChange({ categoryLabel: event.target.value })}
+                  />
+                </div>
+              ) : null}
 
-            {draft.topicId === NEW_VALUE ? (
-              <div className="hciot-file-inline-create">
-                <input
-                  className="hciot-file-input"
-                  placeholder="新主題名稱"
-                  value={draft.topicLabel}
-                  onChange={(event) => onDraftChange({ topicLabel: event.target.value })}
-                />
-              </div>
-            ) : null}
-          </section>
+              {draft.topicId === NEW_VALUE ? (
+                <div className="hciot-file-inline-create">
+                  <input
+                    className="hciot-file-input"
+                    placeholder="新主題名稱"
+                    value={draft.topicLabel}
+                    onChange={(event) => onDraftChange({ topicLabel: event.target.value })}
+                  />
+                </div>
+              ) : null}
+            </section>
+          ) : null}
 
           <section className="hciot-file-editor-panel">
             <div className="hciot-file-editor-meta">

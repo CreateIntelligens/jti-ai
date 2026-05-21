@@ -44,7 +44,6 @@ const HCIOT_API_BASE = `${API_BASE}/hciot`;
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 type QueryValue = string | null | undefined;
 
-
 function buildAdminUrl(path: string, params?: Record<string, string | number | boolean | null | undefined>): string {
   return buildUrl(`${HCIOT_ADMIN_BASE}${path}`, params);
 }
@@ -318,12 +317,13 @@ export async function createHciotTopic(
   questions: string[] = [],
   language: HciotLanguage = 'zh',
 ): Promise<Record<string, unknown>> {
-  return fetchAdminJson<Record<string, unknown>>(buildTopicAdminPath(language), jsonRequest('POST', {
+  const payload = {
     topic_id: topicId,
     labels: label,
     category_labels: categoryLabel,
     questions,
-  }));
+  };
+  return fetchAdminJson<Record<string, unknown>>(buildTopicAdminPath(language), jsonRequest('POST', payload));
 }
 
 /**
@@ -335,7 +335,7 @@ export async function reorderHciotTopics(
   language: HciotLanguage = 'zh',
 ): Promise<{ updated: number }> {
   return fetchAdminJson<{ updated: number }>(
-    `${buildTopicAdminPath(language)}reorder`,
+    buildTopicAdminPath(language, 'reorder'),
     jsonRequest('PUT', { topic_ids: topicIds }),
   );
 }
@@ -349,6 +349,7 @@ export interface UploadWithTopicOptions {
   // for the doc's language partition.
   categoryLabel?: string;
   topicLabel?: string;
+  skipTopic?: boolean;
 }
 
 export async function uploadHciotKnowledgeFileWithTopic(
@@ -361,6 +362,9 @@ export async function uploadHciotKnowledgeFileWithTopic(
   appendOptionalFormValue(formData, 'topic_id', opts.topicId);
   appendOptionalFormValue(formData, 'category_label', opts.categoryLabel);
   appendOptionalFormValue(formData, 'topic_label', opts.topicLabel);
+  if (opts.skipTopic !== undefined) {
+    formData.append('skip_topic', String(opts.skipTopic));
+  }
 
   return fetchAdminJson<HciotKnowledgeFile & { synced: boolean; topic_synced: boolean; uploaded_count?: number; uploaded_files?: string[] }>(
     '/knowledge/upload/',

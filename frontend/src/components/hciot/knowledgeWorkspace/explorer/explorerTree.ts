@@ -35,6 +35,8 @@ export interface ExplorerImageNode {
 
 export type ExplorerNode = ExplorerFolderNode | ExplorerFileNode | ExplorerImageNode | ExplorerMergedCsvNode;
 
+const DOCUMENT_CATEGORY_KEY = 'category:__documents__';
+
 export interface ExplorerRow {
   node: ExplorerNode;
   depth: number;
@@ -52,7 +54,11 @@ export function readExpandedKeys(language: HciotLanguage): string[] {
   try {
     const raw = localStorage.getItem(storageKeyForExpanded(language));
     const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string') : [];
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.filter((item): item is string => typeof item === 'string');
   } catch {
     return [];
   }
@@ -124,6 +130,33 @@ export function getNoTopicLabel(_language: HciotLanguage): string {
   return '未指定主題';
 }
 
+function isCsvFile(file: HciotKnowledgeFile): boolean {
+  return (file.name || '').toLowerCase().endsWith('.csv');
+}
+
+function sortFilesByDisplayLabel(files: HciotKnowledgeFile[]): HciotKnowledgeFile[] {
+  return files.slice().sort((left, right) => sortByLabel(getFileLabel(left), getFileLabel(right)));
+}
+
+function createFileNode(file: HciotKnowledgeFile): ExplorerFileNode {
+  return {
+    key: `file:${file.name}`,
+    kind: 'file',
+    label: getFileLabel(file),
+    file,
+  };
+}
+
+function appendFileNode(
+  nodes: ExplorerNode[],
+  filePathKeys: Map<string, string[]>,
+  file: HciotKnowledgeFile,
+  pathKeys: string[],
+): void {
+  filePathKeys.set(file.name, pathKeys);
+  nodes.push(createFileNode(file));
+}
+
 export function getCurrentPathLabel(
   selectedFile: HciotKnowledgeFile | null,
   _language: HciotLanguage,
@@ -132,12 +165,12 @@ export function getCurrentPathLabel(
     return '選擇檔案開始編輯';
   }
 
-  const categoryLabel = selectedFile.category_label || categoryPrefix(selectedFile.topic_id);
-  const topicLabel = selectedFile.topic_label || selectedFile.topic_id;
-  if (!categoryLabel && !topicLabel) {
-    return '未分類';
+  if (!selectedFile.topic_id) {
+    return '文件';
   }
 
+  const categoryLabel = selectedFile.category_label || categoryPrefix(selectedFile.topic_id);
+  const topicLabel = selectedFile.topic_label || selectedFile.topic_id;
   return topicLabel ? `${categoryLabel} / ${topicLabel}` : categoryLabel;
 }
 
@@ -150,8 +183,14 @@ export function buildExplorerTree(
   const roots: ExplorerNode[] = [];
   const filePathKeys = new Map<string, string[]>();
   const filesByCategory = new Map<string, HciotKnowledgeFile[]>();
+  const documentFiles: HciotKnowledgeFile[] = [];
 
   files.forEach((file) => {
+    if (!file.topic_id) {
+      documentFiles.push(file);
+      return;
+    }
+
     const categoryId = categoryPrefix(file.topic_id);
     const group = filesByCategory.get(categoryId) || [];
     group.push(file);
@@ -210,8 +249,15 @@ export function buildExplorerTree(
       const topicLabel = resolveTopicLabel(topicId, topicFiles);
       const topicKey = `topic:${topicId}`;
 
-      const csvFiles = topicFiles.filter((f) => (f.name || '').toLowerCase().endsWith('.csv'));
-      const nonCsvFiles = topicFiles.filter((f) => !(f.name || '').toLowerCase().endsWith('.csv'));
+      const csvFiles: HciotKnowledgeFile[] = [];
+      const nonCsvFiles: HciotKnowledgeFile[] = [];
+      topicFiles.forEach((file) => {
+        if (isCsvFile(file)) {
+          csvFiles.push(file);
+        } else {
+          nonCsvFiles.push(file);
+        }
+      });
 
       const childNodes: ExplorerNode[] = [];
 
@@ -227,32 +273,14 @@ export function buildExplorerTree(
           filePathKeys.set(file.name, [categoryKey, topicKey]);
         });
       } else {
-        csvFiles
-          .slice()
-          .sort((left, right) => sortByLabel(getFileLabel(left), getFileLabel(right)))
-          .forEach((file) => {
-            filePathKeys.set(file.name, [categoryKey, topicKey]);
-            childNodes.push({
-              key: `file:${file.name}`,
-              kind: 'file',
-              label: getFileLabel(file),
-              file,
-            } satisfies ExplorerFileNode);
-          });
+        sortFilesByDisplayLabel(csvFiles).forEach((file) => {
+          appendFileNode(childNodes, filePathKeys, file, [categoryKey, topicKey]);
+        });
       }
 
-      nonCsvFiles
-        .slice()
-        .sort((left, right) => sortByLabel(getFileLabel(left), getFileLabel(right)))
-        .forEach((file) => {
-          filePathKeys.set(file.name, [categoryKey, topicKey]);
-          childNodes.push({
-            key: `file:${file.name}`,
-            kind: 'file',
-            label: getFileLabel(file),
-            file,
-          } satisfies ExplorerFileNode);
-        });
+      sortFilesByDisplayLabel(nonCsvFiles).forEach((file) => {
+        appendFileNode(childNodes, filePathKeys, file, [categoryKey, topicKey]);
+      });
 
       if (childNodes.length === 1 && childNodes[0].kind === 'merged-csv') {
         return {
@@ -280,15 +308,30 @@ export function buildExplorerTree(
     });
   });
 
+  if (documentFiles.length > 0) {
+    const docNodes: ExplorerNode[] = [];
+    sortFilesByDisplayLabel(documentFiles).forEach((file) => {
+      appendFileNode(docNodes, filePathKeys, file, [DOCUMENT_CATEGORY_KEY]);
+    });
+
+    roots.push({
+      key: DOCUMENT_CATEGORY_KEY,
+      kind: 'folder',
+      label: '文件',
+      tone: 'category',
+      children: docNodes,
+    });
+  }
+
   if (images.length > 0) {
     const imageNodes: ExplorerNode[] = images
       .slice()
-      .sort((a, b) => sortByLabel(a.image_id, b.image_id))
-      .map((img) => ({
-        key: `image:${img.image_id}`,
+      .sort((left, right) => sortByLabel(left.image_id, right.image_id))
+      .map((image) => ({
+        key: `image:${image.image_id}`,
         kind: 'image',
-        label: img.image_id,
-        image: img,
+        label: image.image_id,
+        image,
       }));
 
     roots.push({

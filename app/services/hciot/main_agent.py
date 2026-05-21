@@ -107,6 +107,9 @@ class MainAgent(BaseAgent):
     def _rag_source_type(self) -> str:
         return "hciot_knowledge"
 
+    def _get_rag_source_type_for_session(self, session: Session) -> list[str]:
+        return ["hciot_knowledge", "hciot_doc_knowledge"]
+
     def _get_rag_search_language_for_session(self, session: Session) -> str | None:
         return normalize_language(session.language)
 

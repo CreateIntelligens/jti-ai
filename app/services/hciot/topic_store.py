@@ -81,31 +81,21 @@ class HciotTopicStore:
         now = datetime.now(timezone.utc)
         payload = self._prepare_payload(data, topic_id)
         query = self._topic_query(topic_id)
+        set_on_insert = {"created_at": now, "language": self.language}
 
-        if "order" in payload:
-            self.collection.find_one_and_update(
+        if "order" not in payload:
+            updated = self.collection.find_one_and_update(
                 query,
-                {"$set": payload, "$setOnInsert": {"created_at": now, "language": self.language}},
-                upsert=True,
+                {"$set": payload},
                 projection={"_id": 0},
             )
-            return
+            if updated is not None:
+                return
+            set_on_insert["order"] = self.collection.count_documents(self._language_query())
 
-        updated = self.collection.find_one_and_update(
-            query,
-            {"$set": payload},
-            projection={"_id": 0},
-        )
-        if updated is not None:
-            return
-
-        new_order = self.collection.count_documents(self._language_query())
         self.collection.find_one_and_update(
             query,
-            {
-                "$set": payload,
-                "$setOnInsert": {"created_at": now, "language": self.language, "order": new_order},
-            },
+            {"$set": payload, "$setOnInsert": set_on_insert},
             upsert=True,
             projection={"_id": 0},
         )
@@ -141,11 +131,14 @@ class HciotTopicStore:
     def ensure_topic(self, topic_id: str, labels: dict, category_labels: dict) -> None:
         """Create topic if it doesn't exist yet."""
         if self.get_topic(topic_id) is None:
-            self.upsert_topic(topic_id, {
-                "labels": labels,
-                "category_labels": category_labels,
-                "questions": {"zh": [], "en": []},
-            })
+            self.upsert_topic(
+                topic_id,
+                {
+                    "labels": labels,
+                    "category_labels": category_labels,
+                    "questions": {"zh": [], "en": []},
+                },
+            )
 
 
 _hciot_topic_stores: dict[Language, HciotTopicStore] = {}

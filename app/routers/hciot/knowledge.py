@@ -33,6 +33,7 @@ from app.services.hciot.csv_utils import (
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.hciot.main_agent import invalidate_hciot_file_map
 from app.services.hciot.topic_store import get_hciot_topic_store
+from app.services.rag.document_service import get_document_rag_service
 from app.utils import get_other_language
 
 logger = logging.getLogger(__name__)
@@ -57,6 +58,34 @@ def _schedule_rag_delete(
     filename: str,
 ) -> None:
     background_tasks.add_task(delete_from_rag, SOURCE_TYPE, language, filename)
+
+
+def _schedule_document_rag_sync(
+    background_tasks: BackgroundTasks,
+    language: str,
+    filename: str,
+    file_bytes: bytes,
+) -> None:
+    background_tasks.add_task(
+        get_document_rag_service().sync_document,
+        SOURCE_TYPE,
+        language,
+        filename,
+        file_bytes,
+    )
+
+
+def _schedule_document_rag_delete(
+    background_tasks: BackgroundTasks,
+    language: str,
+    filename: str,
+) -> None:
+    background_tasks.add_task(
+        get_document_rag_service().delete_document,
+        SOURCE_TYPE,
+        language,
+        filename,
+    )
 
 
 def _normalized_label(value: str | None, fallback: str) -> str:
@@ -345,10 +374,13 @@ async def update_file_content(
     else:
         new_bytes = req.content.encode("utf-8")
 
-    if ext == ".csv":
+    is_document = not doc.get("topic_id")
+    is_topic_csv = ext == ".csv" and not is_document
+
+    if is_topic_csv:
         new_bytes = _prepare_csv_bytes(new_bytes)
 
-    if ext == ".csv":
+    if is_topic_csv:
         _rewrite_csv_file_with_split_uploads(
             store=store,
             language=language,
@@ -362,9 +394,12 @@ async def update_file_content(
         if not updated:
             raise HTTPException(status_code=404, detail="檔案不存在")
 
-        _schedule_rag_sync(background_tasks, language, safe_name, new_bytes)
+        if is_document:
+            _schedule_document_rag_sync(background_tasks, language, safe_name, new_bytes)
+        else:
+            _schedule_rag_sync(background_tasks, language, safe_name, new_bytes)
 
-    topic_synced = _sync_topic_questions_for_doc(language, doc)
+    topic_synced = _sync_topic_questions_for_doc(language, doc) if not is_document else False
 
     return {"message": "已更新", "synced": False, "topic_synced": topic_synced}
 
@@ -426,6 +461,7 @@ async def upload_knowledge_file(
     topic_id: str | None = Form(None),
     category_label: str | None = Form(None),
     topic_label: str | None = Form(None),
+    skip_topic: bool = Form(False),
 ):
     display_name = file.filename or f"file_{uuid.uuid4().hex[:8]}"
     safe_name = safe_filename(display_name)
@@ -438,12 +474,19 @@ async def upload_knowledge_file(
         ext = ".csv"
     editable = ext in EDITABLE_EXTENSIONS
     content_type = file.content_type or mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
-    if ext == ".csv":
+    if ext == ".csv" and not skip_topic:
         file_bytes = _prepare_csv_bytes(file_bytes)
 
-    merged_topic_id = _build_merged_topic_id(category_id, topic_id)
+    merged_topic_id = None if skip_topic else _build_merged_topic_id(category_id, topic_id)
+    category_label_val = None if skip_topic else category_label
+    topic_label_val = None if skip_topic else topic_label
 
-    uploads = split_qa_csv_by_image(file_bytes, safe_name) or [(safe_name, file_bytes)]
+    uploads = (
+        [(safe_name, file_bytes)]
+        if skip_topic
+        else split_qa_csv_by_image(file_bytes, safe_name) or [(safe_name, file_bytes)]
+    )
+
     saved_files = []
     for upload_name, upload_bytes in uploads:
         saved = _insert_uploaded_file(
@@ -453,18 +496,23 @@ async def upload_knowledge_file(
             content_type=content_type,
             editable=editable,
             topic_id=merged_topic_id,
-            category_label=category_label,
-            topic_label=topic_label,
+            category_label=category_label_val,
+            topic_label=topic_label_val,
         )
         saved_files.append(saved)
-        _schedule_rag_sync(background_tasks, language, saved["name"], upload_bytes)
+        if skip_topic:
+            _schedule_document_rag_sync(background_tasks, language, saved["name"], upload_bytes)
+        else:
+            _schedule_rag_sync(background_tasks, language, saved["name"], upload_bytes)
 
-    topic_synced = _sync_topic_questions_from_store(
-        language=language,
-        topic_id=merged_topic_id,
-        topic_label=topic_label,
-        category_label=category_label,
-    )
+    topic_synced = False
+    if not skip_topic:
+        topic_synced = _sync_topic_questions_from_store(
+            language=language,
+            topic_id=merged_topic_id,
+            topic_label=topic_label_val,
+            category_label=category_label_val,
+        )
 
     primary = saved_files[0]
     invalidate_hciot_file_map(language)
@@ -493,9 +541,13 @@ async def delete_knowledge_file(
     if not deleted:
         raise HTTPException(status_code=404, detail="檔案不存在")
 
-    _schedule_rag_delete(background_tasks, language, safe_name)
+    has_topic = bool(existing.get("topic_id"))
+    if has_topic:
+        _schedule_rag_delete(background_tasks, language, safe_name)
+    else:
+        _schedule_document_rag_delete(background_tasks, language, safe_name)
 
-    topic_synced = _sync_topic_questions_for_doc(language, existing)
+    topic_synced = _sync_topic_questions_for_doc(language, existing) if has_topic else False
     invalidate_hciot_file_map(language)
 
     return {

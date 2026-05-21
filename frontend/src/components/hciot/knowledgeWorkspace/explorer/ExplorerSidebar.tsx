@@ -154,7 +154,7 @@ export default function ExplorerSidebar({
 
   const sortableKeys = visibleRows
     .map(({ node }) => getEditableNodeKey(node))
-    .filter((id): id is string => id !== null);
+    .filter((key): key is string => key !== null);
 
   return (
     <aside
@@ -316,6 +316,18 @@ function ExplorerRowItem({
     transition: sortable.transition,
   } as CSSProperties;
 
+  const handleSelect = () => {
+    if (node.kind === 'file') {
+      onSelectFile(node.file.name);
+    } else if (node.kind === 'image') {
+      onSelectImage(node.image.image_id);
+    } else if (node.kind === 'merged-csv') {
+      onSelectMergedCsv(node.topicId);
+    } else {
+      onToggleExpanded(node.key);
+    }
+  };
+
   return (
     <div
       ref={sortable.setNodeRef}
@@ -337,17 +349,7 @@ function ExplorerRowItem({
       <button
         type="button"
         className={`hciot-explorer-row${isSelected ? ' is-selected' : ''}`}
-        onClick={() => {
-          if (node.kind === 'file') {
-            onSelectFile(node.file.name);
-          } else if (node.kind === 'image') {
-            onSelectImage(node.image.image_id);
-          } else if (node.kind === 'merged-csv') {
-            onSelectMergedCsv(node.topicId);
-          } else {
-            onToggleExpanded(node.key);
-          }
-        }}
+        onClick={handleSelect}
         role="treeitem"
         aria-expanded={isFolderNode(node) ? isExpanded : undefined}
       >
@@ -367,8 +369,8 @@ function ExplorerRowItem({
           type="button"
           className="hciot-explorer-row-rename"
           title="重新命名"
-          onClick={(e) => {
-            e.stopPropagation();
+          onClick={(event) => {
+            event.stopPropagation();
             onStartRename(nodeKey);
           }}
         >
@@ -380,8 +382,8 @@ function ExplorerRowItem({
           type="button"
           className="hciot-explorer-row-delete"
           title="刪除整個主題"
-          onClick={(e) => {
-            e.stopPropagation();
+          onClick={(event) => {
+            event.stopPropagation();
             onDeleteTopic(deletableTopicId, node.label);
           }}
         >

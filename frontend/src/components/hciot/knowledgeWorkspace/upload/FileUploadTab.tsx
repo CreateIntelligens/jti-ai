@@ -14,8 +14,14 @@ interface FileUploadTabProps {
   uploading: boolean;
   resolvedTopic: ResolvedUploadTopic | null;
   topicSelectionIncomplete: boolean;
+  skipTopic?: boolean;
   onClose: () => void;
-  onUploadFile: (file: File, topicId: string | null, labels: TopicLabels | null) => Promise<{ name: string }>;
+  onUploadFile: (
+    file: File,
+    topicId: string | null,
+    labels: TopicLabels | null,
+    skipTopic?: boolean,
+  ) => Promise<{ name: string }>;
   onUploadComplete: (firstUploadedFileName: string | null, count: number) => Promise<void>;
 }
 
@@ -150,6 +156,7 @@ export default function FileUploadTab({
   uploading,
   resolvedTopic,
   topicSelectionIncomplete,
+  skipTopic = false,
   onClose,
   onUploadFile,
   onUploadComplete,
@@ -169,7 +176,9 @@ export default function FileUploadTab({
 
   const isBusy = uploadingLocal || uploading;
   const hasPending = selectedFiles.some((item) => item.status === 'pending' || item.status === 'error');
-  const canSubmitFile = hasPending && !isBusy && !topicSelectionIncomplete;
+  const canSubmitFile = hasPending && !isBusy && (skipTopic || !topicSelectionIncomplete);
+  const dropSubZh = skipTopic ? '支援 .txt, .md, .docx, .csv (純文字)' : '只支援 CSV/XLSX';
+  const dropSubEn = skipTopic ? 'Supports .txt, .md, .docx, .csv (Plain text)' : 'CSV/XLSX only';
 
   const handleFileSelect = (fileList: FileList | null) => {
     if (!fileList?.length) return;
@@ -206,7 +215,7 @@ export default function FileUploadTab({
     if (!pendingFiles.length) {
       return;
     }
-    if (topicSelectionIncomplete) {
+    if (!skipTopic && topicSelectionIncomplete) {
       alert('新增科別或主題時，請完整填寫中英文名稱');
       return;
     }
@@ -223,6 +232,7 @@ export default function FileUploadTab({
           item.file,
           resolvedTopic?.fullTopicId || null,
           resolvedTopic?.labels || null,
+          skipTopic,
         );
         if (!firstUploadedFileName) {
           firstUploadedFileName = response.name;
@@ -251,11 +261,11 @@ export default function FileUploadTab({
       disabled={!canSubmitFile}
       dropLabelZh="點擊或拖放檔案"
       dropLabelEn="點擊或拖放檔案"
-      dropSubZh="只支援 CSV"
-      dropSubEn="只支援 CSV"
+      dropSubZh={dropSubZh}
+      dropSubEn={dropSubEn}
       countZh="個檔案"
       countEn="個檔案"
-      hint={<CsvFormatHint language={language} />}
+      hint={skipTopic ? undefined : <CsvFormatHint language={language} />}
       onDrop={(event) => {
         event.preventDefault();
         setDragOver(false);

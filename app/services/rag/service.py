@@ -39,7 +39,7 @@ class RAGPipeline:
         self,
         query: str,
         language: str = "zh",
-        source_type: Optional[str] = None,
+        source_type: Optional[str | List[str]] = None,
         top_k: int = 5
     ) -> Tuple[Optional[str], Optional[List[Dict[str, Any]]]]:
         """Retrieves relevant context from the local vector store.

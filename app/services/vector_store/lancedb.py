@@ -60,7 +60,7 @@ class LanceDBStore:
         query_vector: np.ndarray,
         top_k: int = 5,
         language: str = "zh",
-        source_type: Optional[str] = None
+        source_type: Optional[str | List[str]] = None
     ) -> List[Dict[str, Any]]:
         tbl = self.table
         if tbl is None:
@@ -68,7 +68,11 @@ class LanceDBStore:
 
         where = f"source_language = '{language}'"
         if source_type:
-            where += f" AND source_type = '{source_type}'"
+            if isinstance(source_type, (list, tuple, set)):
+                source_types_str = ", ".join(f"'{st}'" for st in source_type)
+                where += f" AND source_type IN ({source_types_str})"
+            else:
+                where += f" AND source_type = '{source_type}'"
 
         try:
             return tbl.search(query_vector).where(where).limit(top_k).to_list()

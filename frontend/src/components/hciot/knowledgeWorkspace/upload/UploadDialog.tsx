@@ -27,7 +27,12 @@ interface UploadDialogProps {
   availableImages: HciotImage[];
   uploading: boolean;
   onClose: () => void;
-  onUploadFile: (file: File, topicId: string | null, labels: TopicLabels | null) => Promise<{ name: string }>;
+  onUploadFile: (
+    file: File,
+    topicId: string | null,
+    labels: TopicLabels | null,
+    skipTopic?: boolean,
+  ) => Promise<{ name: string }>;
   onUploadComplete: (firstUploadedFileName: string | null, count: number) => Promise<void>;
   onSubmitQA: (file: File, topicId: string, labels: TopicLabels) => Promise<void>;
   onUploadImage: (file: File, imageId?: string) => Promise<UploadedImageResult>;
@@ -38,6 +43,7 @@ interface UploadDialogProps {
 const DEFAULT_CATEGORY = 'other';
 const LS_CATEGORY_KEY = 'hciot_upload_category';
 const LS_TOPIC_KEY = 'hciot_upload_topic';
+const SKIP_TOPIC_CONTROL_ID = 'skip-topic-checkbox';
 
 interface SavedTopicSelection {
   categoryId: string;
@@ -201,6 +207,9 @@ function useTopicSelection(categories: HciotTopicCategory[], open: boolean) {
 
 interface TopicSelectorSectionProps {
   topic: ReturnType<typeof useTopicSelection>;
+  skipTopic: boolean;
+  onSkipTopicChange: (val: boolean) => void;
+  showSkipTopic: boolean;
 }
 
 interface LabelNameInputProps {
@@ -220,17 +229,34 @@ function LabelNameInput({ placeholder, value, onChange }: LabelNameInputProps) {
   );
 }
 
-function TopicSelectorSection({ topic }: TopicSelectorSectionProps) {
+function TopicSelectorSection({ topic, skipTopic, onSkipTopicChange, showSkipTopic }: TopicSelectorSectionProps) {
+  const sectionClassName = `hciot-qa-topic-section${skipTopic ? ' is-topic-disabled' : ''}`;
+  const selectorsClassName = `hciot-qa-selectors${skipTopic ? ' is-disabled' : ''}`;
+
   return (
-    <div className="hciot-qa-topic-section">
+    <div className={sectionClassName}>
+      {showSkipTopic && (
+        <div className="hciot-topic-skip-toggle">
+          <input
+            type="checkbox"
+            id={SKIP_TOPIC_CONTROL_ID}
+            checked={skipTopic}
+            onChange={(event) => onSkipTopicChange(event.target.checked)}
+          />
+          <label htmlFor={SKIP_TOPIC_CONTROL_ID}>
+            一般文件知識（非 Q&A）
+          </label>
+        </div>
+      )}
       <label className="hciot-qa-topic-label">
         指定科別 / 主題（可選）
       </label>
-      <div className="hciot-qa-selectors">
+      <div className={selectorsClassName}>
         <HciotSelect
           className="hciot-file-select"
-          value={topic.categoryId}
+          value={skipTopic ? '' : topic.categoryId}
           onChange={topic.handleCategoryChange}
+          disabled={skipTopic}
           options={[
             ...topic.sortedCategories.map((c) => ({ value: c.id, label: c.label })),
             { value: NEW_VALUE, label: '＋ 新增科別' },
@@ -239,14 +265,14 @@ function TopicSelectorSection({ topic }: TopicSelectorSectionProps) {
         <span className="hciot-file-path-separator">/</span>
         <HciotSelect
           className="hciot-file-select"
-          value={topic.topicId}
+          value={skipTopic ? '' : topic.topicId}
           onChange={topic.handleTopicChange}
-          disabled={isUploadTopicSelectDisabled(topic.categoryId)}
+          disabled={skipTopic || isUploadTopicSelectDisabled(topic.categoryId)}
           options={buildUploadTopicOptions(topic.categoryId, topic.sortedTopics)}
         />
       </div>
 
-      {topic.categoryId === NEW_VALUE && (
+      {!skipTopic && topic.categoryId === NEW_VALUE && (
         <div className="hciot-qa-new-fields">
           <LabelNameInput
             placeholder="新科別名稱"
@@ -256,7 +282,7 @@ function TopicSelectorSection({ topic }: TopicSelectorSectionProps) {
         </div>
       )}
 
-      {topic.topicId === NEW_VALUE && (
+      {!skipTopic && topic.topicId === NEW_VALUE && (
         <div className="hciot-qa-new-fields">
           <LabelNameInput
             placeholder="新主題名稱"
@@ -284,11 +310,15 @@ export default function UploadDialog({
   onUploadImageComplete,
 }: UploadDialogProps) {
   const [tab, setTab] = useState<Tab>('file');
+  const [skipTopic, setSkipTopic] = useState(false);
   const topic = useTopicSelection(categories, open);
   const resolvedTopic = topic.resolvedTopic;
 
   useEffect(() => {
-    if (open) setTab('file');
+    if (open) {
+      setTab('file');
+      setSkipTopic(false);
+    }
   }, [open]);
 
   useEscapeKey(onClose, open);
@@ -312,7 +342,12 @@ export default function UploadDialog({
               type="button"
               role="tab"
               className={`hciot-upload-tab${tab === item.id ? ' is-active' : ''}`}
-              onClick={() => setTab(item.id as Tab)}
+              onClick={() => {
+                setTab(item.id);
+                if (item.id === 'image') {
+                  setSkipTopic(false);
+                }
+              }}
               aria-selected={tab === item.id}
             >
               <item.icon size={14} />
@@ -321,15 +356,23 @@ export default function UploadDialog({
           ))}
         </div>
 
-        {tab !== 'image' && <TopicSelectorSection topic={topic} />}
+        {tab !== 'image' && (
+          <TopicSelectorSection
+            topic={topic}
+            skipTopic={skipTopic}
+            onSkipTopicChange={setSkipTopic}
+            showSkipTopic={tab === 'file' || tab === 'qa'}
+          />
+        )}
 
         {tab === 'file' && (
           <FileUploadTab
             open={open}
             language={language}
             uploading={uploading}
-            resolvedTopic={resolvedTopic}
-            topicSelectionIncomplete={topic.hasIncompleteNewLabels}
+            resolvedTopic={skipTopic ? null : resolvedTopic}
+            topicSelectionIncomplete={skipTopic ? false : topic.hasIncompleteNewLabels}
+            skipTopic={skipTopic}
             onClose={onClose}
             onUploadFile={onUploadFile}
             onUploadComplete={onUploadComplete}
@@ -342,10 +385,13 @@ export default function UploadDialog({
             language={language}
             uploading={uploading}
             availableImages={availableImages}
-            resolvedTopic={resolvedTopic}
-            hasTopicSelection={Boolean(resolvedTopic)}
+            resolvedTopic={skipTopic ? null : resolvedTopic}
+            hasTopicSelection={skipTopic ? true : Boolean(resolvedTopic)}
+            skipTopic={skipTopic}
             onClose={onClose}
             onSubmitQA={onSubmitQA}
+            onUploadFile={onUploadFile}
+            onUploadComplete={onUploadComplete}
             onUploadImage={onUploadImage}
             onDeleteImage={onDeleteImage}
           />

@@ -19,14 +19,18 @@ _SUPPORTED_KNOWLEDGE_EXTENSIONS = (".csv", ".txt", ".md", ".docx")
 class BackfillService:
     """Handles incremental document indexing into the local vector store."""
 
-    # SemanticChunker tuning. Only applies to free-form text (.txt/.md/.docx).
-    # JTI/HCIoT use CSV files which go through _chunk_csv_by_row instead, so
-    # this never touches their chunking.
+    # Default text chunking for legacy free-form uploads. QA CSVs still use row
+    # chunking through _chunk_csv_by_row.
     _CHUNK_SIZE_TOKENS = 200
     _CHUNK_OVERLAP_TOKENS = 30
 
+    # Larger chunks for non-QA document uploads so paragraphs stay intact.
+    _DOC_CHUNK_SIZE_TOKENS = 500
+    _DOC_CHUNK_OVERLAP_TOKENS = 80
+
     def __init__(self):
         self._chunker: Optional[SemanticChunker] = None
+        self._doc_chunker: Optional[SemanticChunker] = None
         self._embedding_service = None
         self._lancedb_store = None
         self._mongodb_backup = None
@@ -39,6 +43,16 @@ class BackfillService:
                 chunk_overlap_tokens=self._CHUNK_OVERLAP_TOKENS,
             )
         return self._chunker
+
+    @property
+    def doc_chunker(self) -> SemanticChunker:
+        """Chunker for the non-QA document channel (larger chunks)."""
+        if self._doc_chunker is None:
+            self._doc_chunker = SemanticChunker(
+                chunk_size_tokens=self._DOC_CHUNK_SIZE_TOKENS,
+                chunk_overlap_tokens=self._DOC_CHUNK_OVERLAP_TOKENS,
+            )
+        return self._doc_chunker
 
     @property
     def embedding_service(self):
@@ -173,6 +187,14 @@ class BackfillService:
         return hashlib.sha256(data).hexdigest()
 
     @staticmethod
+    def _extract_file_text(filename: str, data: bytes) -> str:
+        if filename.lower().endswith(".docx"):
+            from app.routers.knowledge_utils import extract_docx_text
+
+            return extract_docx_text(data).strip()
+        return data.decode("utf-8-sig", errors="ignore").strip()
+
+    @staticmethod
     def _is_supported_knowledge_file(filename: str) -> bool:
         return filename.lower().endswith(_SUPPORTED_KNOWLEDGE_EXTENSIONS)
 
@@ -260,7 +282,17 @@ class BackfillService:
             logger.error(f"[RAG] Failed to delete {filename} from mongodb_backup: {e}")
         logger.info(f"[RAG] Removed {filename} from {full_source_type}")
 
-    def index_single_file(self, source_type: str, language: str, filename: str, data: bytes, metadata: Optional[Dict] = None, force: bool = False, topic_info: Optional[Dict[str, str]] = None):
+    def index_single_file(
+        self,
+        source_type: str,
+        language: str,
+        filename: str,
+        data: bytes,
+        metadata: Optional[Dict] = None,
+        force: bool = False,
+        topic_info: Optional[Dict[str, str]] = None,
+        force_text_chunking: bool = False,
+    ):
         """Indexes a single file into the local RAG store. Skips if content is unchanged unless force=True.
         Pass topic_info if already fetched (e.g. from list_files) to avoid an extra Mongo query."""
         full_source_type = f"{source_type}_knowledge"
@@ -273,7 +305,8 @@ class BackfillService:
                 return
         
         try:
-            text = data.decode("utf-8-sig", errors="ignore").strip()
+            filename_lower = filename.lower()
+            text = self._extract_file_text(filename, data)
             if not text:
                 return
 
@@ -282,13 +315,14 @@ class BackfillService:
             topic_info = self._merge_topic_store_labels(source_type, language, topic_info)
             topic_prefix = self._build_topic_prefix(topic_info, language)
 
-            if filename.lower().endswith(".csv"):
+            if filename_lower.endswith(".csv") and not force_text_chunking:
                 csv_rows = self._chunk_csv_by_row(text, topic_prefix=topic_prefix)
                 chunks_text = [t for t, _, _ in csv_rows]
                 image_ids = [img for _, img, _ in csv_rows]
                 urls = [u for _, _, u in csv_rows]
             else:
-                raw_chunks = self.chunker.chunk_text(text)
+                chunker = self.doc_chunker if force_text_chunking else self.chunker
+                raw_chunks = chunker.chunk_text(text)
                 chunks_text = [f"{topic_prefix}{c}" if topic_prefix else c for c in raw_chunks]
                 image_ids = [None] * len(chunks_text)
                 urls = [""] * len(chunks_text)
