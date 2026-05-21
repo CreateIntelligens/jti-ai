@@ -34,7 +34,12 @@ interface UploadDialogProps {
     skipTopic?: boolean,
   ) => Promise<{ name: string }>;
   onUploadComplete: (firstUploadedFileName: string | null, count: number) => Promise<void>;
-  onSubmitQA: (file: File, topicId: string, labels: TopicLabels) => Promise<void>;
+  onSubmitQA: (
+    file: File,
+    topicId: string,
+    labels: TopicLabels,
+    hiddenQuestions: string[],
+  ) => Promise<{ name: string; uploaded_count: number }>;
   onUploadImage: (file: File, imageId?: string) => Promise<UploadedImageResult>;
   onDeleteImage?: DeleteImageHandler;
   onUploadImageComplete: (count: number) => Promise<void>;

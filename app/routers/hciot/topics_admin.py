@@ -32,14 +32,29 @@ def _localized_questions(value, lang: Lang) -> list:
     return questions if isinstance(questions, list) else []
 
 
-def _localize_topic(topic: dict, lang: Lang) -> dict:
+def _localize_topic(topic: dict, lang: Lang, filter_hidden: bool = True) -> dict:
     payload = {
         "id": topic.get("id") or topic.get("topic_id", ""),
         "label": _localized_text(topic.get("labels"), lang),
     }
     if "order" in topic:
         payload["order"] = topic["order"]
-    payload["questions"] = _localized_questions(topic.get("questions"), lang)
+
+    questions = _localized_questions(topic.get("questions"), lang)
+    hidden_questions = _localized_questions(topic.get("hidden_questions"), lang)
+
+    if filter_hidden:
+        # Public callers: return only the visible questions, and do not expose
+        # the hidden_questions field at all — the response carries exactly what
+        # end users may see, nothing more.
+        hidden_question_set = set(hidden_questions)
+        payload["questions"] = [q for q in questions if q not in hidden_question_set]
+    else:
+        # Admin callers: return the full question list plus hidden_questions so
+        # the editing UI can render each question's checkbox state.
+        payload["questions"] = questions
+        payload["hidden_questions"] = hidden_questions
+
     return payload
 
 
@@ -48,7 +63,7 @@ def _category_order(cat: dict) -> int:
     return min((t.get("order", 0) for t in cat.get("topics", [])), default=0)
 
 
-def _build_categories(language: Lang) -> list[dict]:
+def _build_categories(language: Lang, filter_hidden: bool = True) -> list[dict]:
     """Build the single-language category tree consumed by the public endpoint.
 
     Both categories and topics are ordered purely by their stored `order`
@@ -61,7 +76,7 @@ def _build_categories(language: Lang) -> list[dict]:
             "id": cat.get("id", ""),
             "label": _localized_text(cat.get("labels"), language, cat.get("id", "")),
             "order": _category_order(cat),
-            "topics": [_localize_topic(t, language) for t in cat.get("topics", [])],
+            "topics": [_localize_topic(t, language, filter_hidden) for t in cat.get("topics", [])],
         }
         for cat in store.list_categories()
     ]
@@ -70,7 +85,14 @@ def _build_categories(language: Lang) -> list[dict]:
 
 @public_router.get("/topics/{lang}")
 def list_topics_slim(lang: Lang):
-    return {"categories": _build_categories(lang)}
+    """Public topic listing — always filters hidden questions."""
+    return {"categories": _build_categories(lang, filter_hidden=True)}
+
+
+@public_router.get("/topics/{lang}/all")
+def list_topics_admin(lang: Lang):
+    """Unfiltered topic listing — returns all questions plus hidden_questions."""
+    return {"categories": _build_categories(lang, filter_hidden=False)}
 
 
 def _partitioned_label(value: str, language: Lang) -> dict[str, str]:
@@ -93,6 +115,7 @@ class UpdateTopicRequest(BaseModel):
     labels: str | None = None
     category_labels: str | None = None
     questions: list[str] | None = None
+    hidden_questions: list[str] | None = None
 
 
 class ReorderTopicsRequest(BaseModel):
@@ -111,6 +134,7 @@ def create_topic(language: Lang, request: CreateTopicRequest):
         "labels": _partitioned_label(request.labels, language),
         "category_labels": _partitioned_label(request.category_labels, language),
         "questions": _partitioned_questions(request.questions or [], language),
+        "hidden_questions": {"zh": [], "en": []},
     }
     store.upsert_topic(request.topic_id, data)
     return store.get_topic(request.topic_id)
@@ -138,6 +162,8 @@ def update_topic(language: Lang, topic_id: str, request: UpdateTopicRequest):
         update_data["category_labels"] = _partitioned_label(request.category_labels, language)
     if request.questions is not None:
         update_data["questions"] = _partitioned_questions(request.questions, language)
+    if request.hidden_questions is not None:
+        update_data["hidden_questions"] = _partitioned_questions(request.hidden_questions, language)
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
     success = store.update_topic(topic_id, update_data)

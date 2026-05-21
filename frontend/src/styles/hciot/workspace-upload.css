@@ -709,3 +709,22 @@
 .hciot-upload-icon-spin    { color: #3b82f6; animation: spin 1s linear infinite; }
 .hciot-upload-icon-success { color: #22c55e; }
 .hciot-upload-icon-error   { color: #ef4444; }
+
+/* ==================== Per-row question-visibility checkbox ==================== */
+.hciot-qa-row-visible {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin-top: 0.15rem;
+  cursor: pointer;
+}
+
+.hciot-qa-row-visible-checkbox {
+  width: 0.9rem;
+  height: 0.9rem;
+  cursor: pointer;
+  accent-color: var(--hciot-accent, #6366f1);
+}

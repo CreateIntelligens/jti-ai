@@ -151,6 +151,7 @@ def test_public_topics_query_route_is_not_registered():
 
     assert ("/topics", "GET") not in routes
     assert ("/topics/{lang}", "GET") in routes
+    assert ("/topics/{lang}/all", "GET") in routes
 
 
 def test_localized_public_topics_return_slim_single_language_shape():
@@ -282,3 +283,80 @@ def test_create_english_topic_does_not_conflict_with_existing_chinese_topic():
     assert result["labels"] == {"zh": "", "en": "Early Intervention"}
     assert store.bind("zh").get_topic("faq/early-intervention")["labels"]["zh"] == "兒童早療"
     assert store.bind("en").get_topic("faq/early-intervention")["category_labels"]["en"] == "FAQ"
+
+
+def test_update_topic_saves_hidden_questions():
+    store = FakeStore()
+    store.bind("zh").upsert_topic(
+        "ortho/prp",
+        {
+            "labels": {"zh": "PRP 治療", "en": ""},
+            "category_labels": {"zh": "骨科", "en": ""},
+            "questions": {"zh": ["Q1", "Q2"], "en": []},
+            "hidden_questions": {"zh": [], "en": []},
+        },
+    )
+    request = topics_admin.UpdateTopicRequest(
+        hidden_questions=["Q2"],
+    )
+
+    with patch_topic_store(store):
+        result = topics_admin.update_topic("zh", "ortho/prp", request)
+
+    assert result["hidden_questions"] == {"zh": ["Q2"], "en": []}
+
+
+def test_list_topics_slim_filters_hidden_questions_for_public_users():
+    store = FakeStore()
+    store.categories = [
+        {
+            "id": "ortho",
+            "labels": {"zh": "骨科", "en": "Orthopedics"},
+            "topics": [
+                {
+                    "id": "ortho/prp",
+                    "topic_id": "ortho/prp",
+                    "labels": {"zh": "PRP 治療", "en": "PRP Therapy"},
+                    "category_labels": {"zh": "骨科", "en": "Orthopedics"},
+                    "order": 1,
+                    "questions": {"zh": ["Q1", "Q2", "Q3"], "en": []},
+                    "hidden_questions": {"zh": ["Q2"], "en": []},
+                },
+            ],
+        },
+    ]
+
+    with patch_topic_store(store):
+        result = topics_admin.list_topics_slim("zh")
+
+    topic = result["categories"][0]["topics"][0]
+    assert topic["questions"] == ["Q1", "Q3"]
+    assert "hidden_questions" not in topic
+
+
+def test_list_topics_admin_retains_hidden_questions():
+    store = FakeStore()
+    store.categories = [
+        {
+            "id": "ortho",
+            "labels": {"zh": "骨科", "en": "Orthopedics"},
+            "topics": [
+                {
+                    "id": "ortho/prp",
+                    "topic_id": "ortho/prp",
+                    "labels": {"zh": "PRP 治療", "en": "PRP Therapy"},
+                    "category_labels": {"zh": "骨科", "en": "Orthopedics"},
+                    "order": 1,
+                    "questions": {"zh": ["Q1", "Q2", "Q3"], "en": []},
+                    "hidden_questions": {"zh": ["Q2"], "en": []},
+                },
+            ],
+        },
+    ]
+
+    with patch_topic_store(store):
+        result = topics_admin.list_topics_admin("zh")
+
+    topic = result["categories"][0]["topics"][0]
+    assert topic["questions"] == ["Q1", "Q2", "Q3"]
+    assert topic["hidden_questions"] == ["Q2"]

@@ -15,6 +15,10 @@ export interface QARow {
   pendingImageName?: string;
   imgStatus?: FileStatus;
   imgError?: string;
+  // Whether this question shows in the topic's preset-question chips.
+  // Unchecked rows still upload and still enter the RAG knowledge base — only
+  // the chip is hidden (via the topic's hidden_questions field).
+  visible: boolean;
 }
 
 export interface FileItem {
@@ -32,7 +36,7 @@ export interface ImageItem {
 }
 
 export function createEmptyRow(): QARow {
-  return { q: '', a: '', img: '', imgStatus: 'pending' };
+  return { q: '', a: '', img: '', imgStatus: 'pending', visible: true };
 }
 
 export function clearRowImageState(row: QARow): QARow {

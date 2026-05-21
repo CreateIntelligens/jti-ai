@@ -42,10 +42,16 @@ interface MergedCsvTableProps {
   loading: boolean;
   error: string | null;
   isEditing: boolean;
+  // Question texts currently hidden from the topic's preset-question chips.
+  hiddenQuestions: Set<string>;
   onUpdateRow: (index: number, updated: Partial<EditableMergedCsvRow>) => void;
   onDeleteRow: (index: number) => void;
   onAddRow: () => void;
+  onToggleVisible: (questionText: string, visible: boolean) => void;
 }
+
+const VISIBILITY_HINT =
+  '勾選：顯示為預設問題按鈕。取消：不顯示在按鈕列，但仍會進知識庫。';
 
 export default function MergedCsvTable({
   language,
@@ -55,9 +61,11 @@ export default function MergedCsvTable({
   loading,
   error,
   isEditing,
+  hiddenQuestions,
   onUpdateRow,
   onDeleteRow,
   onAddRow,
+  onToggleVisible,
 }: MergedCsvTableProps) {
   const pendingUrls = usePendingImageUrls(rows);
   const [pickerIndex, setPickerIndex] = useState<number | null>(null);
@@ -118,6 +126,9 @@ export default function MergedCsvTable({
           <thead>
             <tr>
               <th className="hciot-csv-col-num">編號</th>
+              {isEditing && (
+                <th className="hciot-csv-col-visible" title={VISIBILITY_HINT}>顯示</th>
+              )}
               <th>問題 (Q)</th>
               <th>回答 (A)</th>
               <th className="hciot-csv-col-wide">圖片 (IMG)</th>
@@ -133,9 +144,23 @@ export default function MergedCsvTable({
                 ? (row.pendingImageFile ? pendingUrls.get(row.pendingImageFile) || '' : '')
                 : getHciotImageUrl(row.img);
               const imageLabel = row.pendingImageName || normalizeImageId(row.img) || row.img;
+              const questionText = row.q.trim();
+              const hasQuestionText = questionText.length > 0;
               return (
                 <tr key={`${row.index}-${i}`}>
                   <td>{i + 1}</td>
+                  {isEditing && (
+                    <td className="hciot-csv-cell-center">
+                      <input
+                        type="checkbox"
+                        className="hciot-csv-visible-checkbox"
+                        checked={hasQuestionText && !hiddenQuestions.has(questionText)}
+                        disabled={!hasQuestionText}
+                        title={VISIBILITY_HINT}
+                        onChange={(e) => onToggleVisible(questionText, e.target.checked)}
+                      />
+                    </td>
+                  )}
                   <td>
                     {isEditing ? (
                       <textarea className="hciot-file-textarea hciot-csv-textarea" value={row.q} onChange={(e) => onUpdateRow(i, { q: e.target.value })}

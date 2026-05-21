@@ -1,16 +1,64 @@
-# React + Vite
+# JTAI Frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React/Vite frontend for the JTAI multi-app chat platform. The frontend serves:
 
-Currently, two official plugins are available:
+- `/` general knowledge-base chat and admin panels
+- `/jti` JTI assistant, quiz, knowledge, prompt, and history UI
+- `/hciot` HCIoT hospital education assistant, knowledge workspace, topics, images, and prompt UI
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Requirements
 
-## React Compiler
+- Node 20+
+- pnpm 9.15+
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+The root Docker setup runs this app through the frontend container and nginx. For local frontend-only work:
 
-## Expanding the ESLint configuration
+```bash
+pnpm install
+pnpm dev
+```
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Useful scripts:
+
+```bash
+pnpm build
+pnpm lint
+pnpm test
+pnpm exec tsc --noEmit
+```
+
+## Environment
+
+The Docker compose file sets these for the frontend container:
+
+```env
+VITE_API_URL=http://localhost:${PORT:-8008}
+VITE_PUBLIC_ALLOWED_PAGES=jti
+VITE_PUBLIC_RESTRICTED_HOSTS=
+```
+
+For local development outside Docker, create a local env file if you need to point at a different backend:
+
+```env
+VITE_API_URL=http://localhost:8008
+```
+
+## Structure
+
+```text
+src/
+├── pages/                 # Route-level app pages
+├── components/            # Shared and app-specific UI
+├── components/hciot/      # HCIoT workspace and operator docs
+├── components/jti/        # JTI settings, quiz, and knowledge UI
+├── services/api/          # Typed API clients
+├── hooks/                 # Shared frontend hooks
+├── styles/                # App-specific and shared CSS
+└── locales/               # i18n strings
+
+tests/
+├── hciot/                 # HCIoT component and API-path tests
+└── *.test.ts              # Shared app tests
+```
+
+Use `pnpm` for all frontend package and script operations.

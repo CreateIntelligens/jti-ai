@@ -137,6 +137,7 @@ class HciotTopicStore:
                     "labels": labels,
                     "category_labels": category_labels,
                     "questions": {"zh": [], "en": []},
+                    "hidden_questions": {"zh": [], "en": []},
                 },
             )
 

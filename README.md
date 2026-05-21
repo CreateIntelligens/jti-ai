@@ -1,15 +1,17 @@
 # JTAI - AI 對話與知識庫平台
 
-JTAI 是一個以 FastAPI、React/Vite、Google Gemini 和本地 RAG 組成的多應用對話平台。現行主要應用包含 JTI 活動助理、HCIoT 醫院衛教助理，以及可綁定知識庫的 OpenAI-compatible API。
+JTAI 是一個以 FastAPI、React/Vite、Google Gemini 和 self-hosted RAG 組成的多應用對話平台。現行主要應用包含 JTI 活動助理、HCIoT 醫院衛教助理，以及可綁定知識庫的 OpenAI-compatible API。
 
-系統目前以 self-hosted RAG 為核心：知識庫文件存放於 MongoDB，啟動與文件異動時會以 BAAI/bge-m3 產生 embedding，寫入 LanceDB 進行本地向量檢索，Gemini 主要負責最後的回答生成。
+系統以 MongoDB 保存知識庫與 session/log 資料，使用 BAAI/bge-m3 產生本地 embedding，寫入 LanceDB 做向量檢索，再由 Gemini 產生最後回答。
 
 ## 功能特色
 
 - **多應用模式**：JTI、HCIoT 與通用知識庫聊天共用後端基礎設施，但各自保有 session、prompt、TTS 與知識庫邏輯。
 - **Self-hosted RAG**：FlagEmbedding + BAAI/bge-m3 產生本地 embedding，LanceDB 做主要檢索，MongoDB 做知識庫與向量備份。
 - **自動索引同步**：服務啟動時背景 backfill JTI/HCIoT 中英知識庫；知識庫上傳、更新、刪除時會排程同步到 RAG。
-- **知識庫管理**：支援上傳、線上預覽、下載、編輯與刪除文字、CSV、Markdown、DOCX 等文件。
+- **知識庫管理**：支援上傳、線上預覽、下載、編輯與刪除 TXT、Markdown、CSV、DOCX 等文件。
+- **HCIoT 文件通道**：HCIoT 可上傳一般文件知識（非 Q&A），不掛 topic，走獨立的 `hciot_doc_knowledge` RAG 池。
+- **HCIoT 題目顯示控制**：topic 預設問題可逐題隱藏；隱藏只影響前端問題 chips，不影響 RAG 知識檢索。
 - **Session 與歷史紀錄**：MongoDB 持久化 session、conversation logs、分頁查詢、匯出、批次刪除與 rollback 重建。
 - **Prompt 與 API Key 管理**：可管理各應用 prompt/runtime settings，也可建立綁定知識庫的 API key。
 - **OpenAI-compatible API**：提供 `/v1/chat/completions`，會先查本地 RAG，再呼叫 Gemini 產生回答。
@@ -46,7 +48,7 @@ FastAPI backend
 ### 1. 環境需求
 
 - Docker 與 Docker Compose
-- Google Gemini API Key，可設定多把
+- Google Gemini API key，可設定多把
 - MongoDB，Atlas 或自架皆可
 - NVIDIA GPU + nvidia-container-toolkit 建議用於 BGE embedding；現行 `docker-compose.yml` 預設預留 GPU，CPU-only 環境需要覆寫 compose device reservation 並設定 `EMBEDDING_DEVICE=cpu`
 
@@ -60,11 +62,13 @@ cp .env.example .env
 
 ```env
 GEMINI_API_KEYS=your_key_1,your_key_2
-GEMINI_MODEL_NAME=gemini-3.1-flash-lite-preview
+GEMINI_MODEL_NAME=gemini-3.1-flash-lite
 MONGODB_URI=mongodb+srv://...
 ADMIN_API_KEY=your_admin_key
 PORT=8008
 ```
+
+`gemini-3.1-flash-lite` 是穩定 model id；若要測試 preview model，可自行把 `GEMINI_MODEL_NAME` 改成當前可用的 preview id。
 
 常用選配：
 
@@ -120,7 +124,7 @@ jtai/
 │   │   └── _shared/                    # 共用 persona router factory
 │   ├── services/
 │   │   ├── embedding/                  # BGE-m3 embedding service
-│   │   ├── rag/                        # chunker、retrieval pipeline、backfill service
+│   │   ├── rag/                        # chunker、retrieval pipeline、backfill、document RAG service
 │   │   ├── vector_store/               # LanceDB primary store、MongoDB vector backup
 │   │   ├── session/                    # session managers and factories
 │   │   ├── logging/                    # conversation loggers
@@ -136,17 +140,10 @@ jtai/
 │   ├── src/services/api/               # typed API clients
 │   └── tests/                          # frontend test files
 ├── tests/                              # backend unit/integration tests
-├── docker/
-│   ├── backend.Dockerfile              # builder -> deps -> runner image
-│   ├── backend-entrypoint.sh           # bind-mount ownership fix, runs as appuser
-│   ├── frontend.Dockerfile             # Node + nginx frontend container
-│   ├── frontend-start.sh               # generates nginx config and starts Vite
-│   └── nginx.conf.template             # single-port routing
-├── data/
-│   ├── lancedb/                        # LanceDB vector data
-│   └── tts_cache/                      # TTS job metadata/audio cache
-├── docs/
-├── openspec/
+├── docker/                             # backend/frontend Dockerfiles and nginx template
+├── data/                               # LanceDB vector data and TTS cache
+├── docs/                               # current docs and archived plans when present
+├── openspec/                           # OpenSpec artifacts
 ├── docker-compose.yml
 ├── .env.example
 └── CHANGELOG.md
@@ -154,17 +151,26 @@ jtai/
 
 ## 主要 API
 
+Runtime:
+
 - `POST /api/jti/chat/start`, `POST /api/jti/chat/message`
 - `POST /api/hciot/chat/start`, `POST /api/hciot/chat/message`
+- `POST /api/jti/quiz/start`, `POST /api/jti/quiz/pause`
 - `GET /api/hciot/topics/{lang}`
+- `GET /api/hciot/topics/{lang}/all`
 - `GET /api/hciot/images/{image_id}`
+- `POST /v1/chat/completions`
+
+Admin:
+
 - `GET /api/jti-admin/conversations`, `GET /api/hciot-admin/conversations`
 - `GET/POST/PUT/DELETE /api/jti-admin/knowledge/...`
 - `GET/POST/PUT/DELETE /api/hciot-admin/knowledge/...`
 - `GET/POST/PUT/DELETE /api/hciot-admin/images/...`
 - `POST/PUT/DELETE /api/hciot-admin/topics/...`
+- `GET/POST/PUT/DELETE /api/jti-admin/quiz-bank/...`
+- `POST /api/admin/rag/reindex`
 - `GET/POST/PUT/DELETE /api/keys`
-- `POST /v1/chat/completions`
 
 完整 request/response schema 請看 `/docs`。
 
@@ -172,6 +178,7 @@ jtai/
 
 1. Admin API 或前端工作台把知識庫文件寫入 MongoDB。
 2. 上傳、更新、刪除會排程同步到 RAG；服務啟動時也會背景掃描 JTI/HCIoT 的 `zh`、`en` 知識庫。
-3. CSV 以 row 為 chunk，並會保留 `img` 欄位解析出的 `image_id`；其他文字類文件走 sentence-aware chunking。
-4. BGE-m3 產生 embedding 後寫入 LanceDB，並同步一份到 MongoDB vector backup。
-5. Chat 或 `/v1/chat/completions` 查詢時會依 `language`、`source_type` 和 distance threshold 篩選檢索結果。
+3. Q&A CSV 以 row 為 chunk，並會保留 `img` 欄位解析出的 `image_id` 與 `url`。
+4. HCIoT 一般文件知識（非 Q&A）會走 `DocumentRagService`，用較大的 semantic chunks 寫入 `{app}_doc_knowledge`，不掛 topic、不產生預設問題。
+5. BGE-m3 產生 embedding 後寫入 LanceDB，並同步一份到 MongoDB vector backup。
+6. Chat 或 `/v1/chat/completions` 查詢時會依 `language`、`source_type` 和 distance threshold 篩選檢索結果。

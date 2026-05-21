@@ -33,7 +33,12 @@ interface QaUploadTabProps {
   hasTopicSelection: boolean;
   skipTopic?: boolean;
   onClose: () => void;
-  onSubmitQA: (file: File, topicId: string, labels: ResolvedUploadTopic['labels']) => Promise<void>;
+  onSubmitQA: (
+    file: File,
+    topicId: string,
+    labels: ResolvedUploadTopic['labels'],
+    hiddenQuestions: string[],
+  ) => Promise<{ name: string; uploaded_count: number }>;
   onUploadFile: (
     file: File,
     topicId: string | null,
@@ -48,8 +53,8 @@ interface QaUploadTabProps {
 interface QaRowItemProps {
   index: number;
   row: QARow;
-  language: HciotLanguage;
   previewUrl: string;
+  visibilityHint: string;
   onUpdate: (updates: Partial<QARow>) => void;
   onRemove: () => void;
   onClearImage: () => void;
@@ -61,8 +66,8 @@ interface QaRowItemProps {
 function QaRowItem({
   index,
   row,
-  language: _language,
   previewUrl,
+  visibilityHint,
   onUpdate,
   onRemove,
   onClearImage,
@@ -76,6 +81,14 @@ function QaRowItem({
   return (
     <div className="hciot-qa-row">
       <span className="hciot-qa-row-number">{index + 1}</span>
+      <label className="hciot-qa-row-visible" title={visibilityHint}>
+        <input
+          type="checkbox"
+          className="hciot-qa-row-visible-checkbox"
+          checked={row.visible}
+          onChange={(event) => onUpdate({ visible: event.target.checked })}
+        />
+      </label>
       <div className="hciot-qa-row-fields">
         <input
           className="hciot-qa-input"
@@ -186,18 +199,23 @@ export default function QaUploadTab({
     }
   }, [open]);
 
-  const validRows = rows.filter((row) => row.q.trim());
+  const visibilityHint = language === 'en'
+    ? 'Checked: shown as a preset question. Unchecked: hidden from the chips but still added to the knowledge base.'
+    : '勾選：顯示為預設問題按鈕。取消：不顯示在按鈕列，但仍會進知識庫。';
+
+  const hasQuestion = (row: QARow) => row.q.trim().length > 0;
+  const validRows = rows.filter(hasQuestion);
   const canSubmitQA = validRows.length > 0 && hasTopicSelection && !uploadingLocal && !uploading;
   const canSubmitDoc = docText.trim().length > 0 && !uploadingLocal && !uploading;
 
   const handleSubmitDoc = async () => {
-    const text = docText.trim();
-    if (!text) return;
+    const trimmed = docText.trim();
+    if (!trimmed) return;
 
     setUploadingLocal(true);
     try {
       const safeTitle = docTitle.trim().replace(/[^\w一-鿿-]+/g, '_') || 'document';
-      const file = new File([text], `${safeTitle}_${Date.now()}.txt`, { type: 'text/plain' });
+      const file = new File([trimmed], `${safeTitle}_${Date.now()}.txt`, { type: 'text/plain' });
       const response = await onUploadFile(file, null, null, true);
       await onUploadComplete(response.name, 1);
     } catch (error) {
@@ -243,13 +261,13 @@ export default function QaUploadTab({
     const uploadedImageIds: string[] = [];
     let failedIndex: number | null = null;
     let failedMsg: string | undefined;
-    let stage: 'images' | 'submit' = 'images';
+    let submitStage: 'images' | 'submit' = 'images';
 
     try {
       const preparedRows = [...originalRows];
       for (let i = 0; i < preparedRows.length; i++) {
         const row = preparedRows[i];
-        if (!row.q.trim() || !row.pendingImageFile) continue;
+        if (!hasQuestion(row) || !row.pendingImageFile) continue;
 
         updateRow(i, { imgStatus: 'uploading', imgError: undefined });
 
@@ -273,15 +291,27 @@ export default function QaUploadTab({
         }
       }
 
-      stage = 'submit';
+      submitStage = 'submit';
+      const submittedRows = preparedRows.filter(hasQuestion);
+      // Question text is the identity key. Match the backend's CSV extraction
+      // (which strips each `q`), so a trimmed text is what lands in
+      // hidden_questions.
+      const hiddenQuestions = Array.from(
+        new Set(
+          submittedRows
+            .filter((row) => !row.visible)
+            .map((row) => row.q.trim()),
+        ),
+      );
       const prefix = (resolvedTopic.fullTopicId.split('/').pop() || resolvedTopic.fullTopicId)
         .toUpperCase()
         .replace(/-/g, '_');
-      const blob = buildCsvBlob(preparedRows.filter((row) => row.q.trim()));
+      const blob = buildCsvBlob(submittedRows);
       const file = new File([blob], `${prefix.toLowerCase()}_qa_${Date.now()}.csv`, { type: 'text/csv' });
-      await onSubmitQA(file, resolvedTopic.fullTopicId, resolvedTopic.labels);
+      const result = await onSubmitQA(file, resolvedTopic.fullTopicId, resolvedTopic.labels, hiddenQuestions);
+      await onUploadComplete(result.name, result.uploaded_count);
     } catch (error) {
-      if (stage === 'images') {
+      if (submitStage === 'images') {
         await rollbackUploadedImages(uploadedImageIds, onDeleteImage);
         if (failedIndex !== null) {
           updateRow(failedIndex, { imgStatus: 'error', imgError: failedMsg });
@@ -352,65 +382,71 @@ export default function QaUploadTab({
           </div>
         </div>
       ) : (
-      <div className="hciot-upload-qa-body">
-        <div className="hciot-qa-rows custom-scrollbar">
-          {rows.map((row, index) => (
-            <QaRowItem
-              key={index}
-              index={index}
-              row={row}
-              language={language}
-              previewUrl={row.pendingImageFile ? pendingUrls.get(row.pendingImageFile) || '' : getHciotImageUrl(row.img) || ''}
-              onUpdate={(updates) => updateRow(index, updates)}
-              onRemove={() => removeRow(index)}
-              onClearImage={() => updateRow(index, clearRowImageState(row))}
-              onUploadImage={() => {
-                setPendingRowImageIndex(index);
-                rowImageInputRef.current?.click();
-              }}
-              onChooseExisting={() => setPickerRowIndex(index)}
-              onPreviewImage={setPreviewImageUrl}
-            />
-          ))}
-        </div>
+        <div className="hciot-upload-qa-body">
+          <div className="hciot-qa-rows custom-scrollbar">
+            {rows.map((row, index) => {
+              const previewUrl = row.pendingImageFile
+                ? pendingUrls.get(row.pendingImageFile) || ''
+                : getHciotImageUrl(row.img) || '';
 
-        <input
-          ref={rowImageInputRef}
-          type="file"
-          hidden
-          accept="image/*"
-          onChange={(event) => handleRowImageSelect(event.target.files)}
-        />
+              return (
+                <QaRowItem
+                  key={index}
+                  index={index}
+                  row={row}
+                  previewUrl={previewUrl}
+                  visibilityHint={visibilityHint}
+                  onUpdate={(updates) => updateRow(index, updates)}
+                  onRemove={() => removeRow(index)}
+                  onClearImage={() => updateRow(index, clearRowImageState(row))}
+                  onUploadImage={() => {
+                    setPendingRowImageIndex(index);
+                    rowImageInputRef.current?.click();
+                  }}
+                  onChooseExisting={() => setPickerRowIndex(index)}
+                  onPreviewImage={setPreviewImageUrl}
+                />
+              );
+            })}
+          </div>
 
-        <button
-          type="button"
-          className="hciot-qa-add-row"
-          onClick={() => setRows((prev) => [...prev, createEmptyRow()])}
-        >
-          <Plus size={14} />
-          新增一題
-        </button>
+          <input
+            ref={rowImageInputRef}
+            type="file"
+            hidden
+            accept="image/*"
+            onChange={(event) => handleRowImageSelect(event.target.files)}
+          />
 
-        <div className="hciot-qa-footer">
-          <span className="hciot-qa-count">
-            {validRows.length} 題有效
-          </span>
-          <div className="hciot-qa-footer-actions">
-            <button type="button" className="hciot-file-action-button" onClick={onClose}>
-              取消
-            </button>
-            <button
-              type="button"
-              className="hciot-file-action-button primary"
-              disabled={!canSubmitQA}
-              onClick={() => { void handleSubmit(); }}
-            >
-              <Upload size={14} />
-              {uploadingLocal || uploading ? '上傳中...' : '上傳'}
-            </button>
+          <button
+            type="button"
+            className="hciot-qa-add-row"
+            onClick={() => setRows((prev) => [...prev, createEmptyRow()])}
+          >
+            <Plus size={14} />
+            新增一題
+          </button>
+
+          <div className="hciot-qa-footer">
+            <span className="hciot-qa-count">
+              {validRows.length} 題有效
+            </span>
+            <div className="hciot-qa-footer-actions">
+              <button type="button" className="hciot-file-action-button" onClick={onClose}>
+                取消
+              </button>
+              <button
+                type="button"
+                className="hciot-file-action-button primary"
+                disabled={!canSubmitQA}
+                onClick={() => { void handleSubmit(); }}
+              >
+                <Upload size={14} />
+                {uploadingLocal || uploading ? '上傳中...' : '上傳'}
+              </button>
+            </div>
           </div>
         </div>
-      </div>
       )}
     </>
   );

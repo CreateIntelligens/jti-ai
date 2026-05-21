@@ -137,16 +137,17 @@ export default function HciotKnowledgeWorkspace({
     [images],
   );
 
-  const selectedMergedLabel = useMemo(() => {
+  const selectedMergedTopic = useMemo(() => {
     if (!selectedMergedTopicId) {
       return null;
     }
 
     const categoryId = categoryPrefix(selectedMergedTopicId);
     const category = categories.find((item) => item.id === categoryId);
-    const topic = category?.topics.find((item) => item.id === selectedMergedTopicId);
-    return topic?.label ?? selectedMergedTopicId;
+    return category?.topics.find((item) => item.id === selectedMergedTopicId) ?? null;
   }, [categories, selectedMergedTopicId]);
+
+  const selectedMergedLabel = selectedMergedTopic?.label ?? selectedMergedTopicId;
 
   const metadataDirty = useMemo(() => {
     if (!selectedFile) {
@@ -372,6 +373,7 @@ export default function HciotKnowledgeWorkspace({
     topicId: string | null,
     labels: TopicLabels | null,
     skipTopic?: boolean,
+    hiddenQuestions?: string[],
   ) => {
     if (skipTopic) {
       return api.uploadHciotKnowledgeFileWithTopic({
@@ -391,6 +393,7 @@ export default function HciotKnowledgeWorkspace({
       topicId: topicSlug || undefined,
       categoryLabel: labels?.categoryLabel || undefined,
       topicLabel: labels?.topicLabel || undefined,
+      hiddenQuestions,
     });
   };
 
@@ -411,14 +414,14 @@ export default function HciotKnowledgeWorkspace({
     file: File,
     topicId: string,
     labels: TopicLabels,
-  ) => {
+    hiddenQuestions: string[],
+  ): Promise<{ name: string; uploaded_count: number }> => {
     setUploading(true);
     try {
-      const response = await uploadFileWithTopic(file, topicId, labels);
-      await handleUploadComplete(response.name, response.uploaded_count ?? 1);
-    } catch (error) {
-      console.error('Failed to upload HCIoT files:', error);
-      alert(getErrorMessage(error));
+      // hidden_questions is written atomically with the extracted questions in
+      // a single backend call — QaUploadTab then calls onUploadComplete itself.
+      const response = await uploadFileWithTopic(file, topicId, labels, false, hiddenQuestions);
+      return { name: response.name, uploaded_count: response.uploaded_count ?? 1 };
     } finally {
       setUploading(false);
     }
@@ -925,6 +928,7 @@ export default function HciotKnowledgeWorkspace({
           language={language}
           availableImages={images}
           statusMessage={statusMessage}
+          hiddenQuestions={selectedMergedTopic?.hidden_questions}
           onRefreshWorkspace={() => refreshWorkspace()}
           onUploadImage={api.uploadHciotImage}
           onDeleteImage={api.deleteHciotImage}

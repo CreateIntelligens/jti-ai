@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Table as TableIcon, Download, Edit, Save, Trash2, X } from 'lucide-react';
 
 import type { HciotLanguage } from '../../../../config/hciotTopics';
-import { getHciotTopicMergedCsv, deleteHciotKnowledgeFile, updateHciotKnowledgeFileContent, type HciotImage, type HciotMergedCsvRow } from '../../../../services/api/hciot';
+import { getHciotTopicMergedCsv, deleteHciotKnowledgeFile, updateHciotKnowledgeFileContent, updateHciotTopic, type HciotImage, type HciotMergedCsvRow } from '../../../../services/api/hciot';
 import { buildCsvString } from '../../../../utils/csv';
 import { downloadBlob } from '../../../../utils/download';
 import { extractUploadedImageId, rollbackUploadedImages, type DeleteImageHandler, type UploadedImageResult } from '../imageUpload';
@@ -17,6 +17,9 @@ interface MergedCsvPaneProps {
   language: HciotLanguage;
   availableImages: HciotImage[];
   statusMessage: string | null;
+  // Question texts currently hidden from this topic's preset-question chips.
+  // Seeds the per-row visibility checkboxes; defaults to all-visible when absent.
+  hiddenQuestions?: string[];
   onRefreshWorkspace?: () => Promise<void> | void;
   onUploadImage?: (file: File) => Promise<UploadedImageResult>;
   onDeleteImage?: DeleteImageHandler;
@@ -44,12 +47,17 @@ function hasMeaningfulRowContent(row: Pick<HciotMergedCsvRow, 'q' | 'a' | 'img' 
   return Boolean(row.q.trim() || row.a.trim() || row.img?.trim() || row.url?.trim());
 }
 
+function toHiddenQuestionSet(hiddenQuestions?: string[]): Set<string> {
+  return new Set(hiddenQuestions ?? []);
+}
+
 export default function MergedCsvPane({
   topicId,
   topicLabel,
   language,
   availableImages,
   statusMessage,
+  hiddenQuestions,
   onRefreshWorkspace,
   onUploadImage,
   onDeleteImage,
@@ -65,6 +73,15 @@ export default function MergedCsvPane({
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
+
+  // Question texts hidden from the topic's preset-question chips. Kept as a
+  // text-keyed set (the data model's identity key). Seeded from the prop and
+  // re-synced whenever the parent reloads the topic data.
+  const [hiddenSet, setHiddenSet] = useState<Set<string>>(() => toHiddenQuestionSet(hiddenQuestions));
+
+  useEffect(() => {
+    setHiddenSet(toHiddenQuestionSet(hiddenQuestions));
+  }, [hiddenQuestions]);
 
   const applyMergedCsvResponse = useCallback((response: { rows: EditableMergedCsvRow[]; source_files: string[] }) => {
     setRows(response.rows);
@@ -90,8 +107,9 @@ export default function MergedCsvPane({
       return;
     }
     setIsEditing(false);
+    setHiddenSet(toHiddenQuestionSet(hiddenQuestions));
     void fetchCsv();
-  }, [dirty, fetchCsv]);
+  }, [dirty, fetchCsv, hiddenQuestions]);
 
   useEffect(() => {
     setIsEditing(false);
@@ -161,9 +179,10 @@ export default function MergedCsvPane({
       }
 
       stage = 'save';
+      const savedRows = preparedRows.filter(hasMeaningfulRowContent);
       const grouped = new Map<string, HciotMergedCsvRow[]>();
 
-      for (const row of preparedRows.filter(hasMeaningfulRowContent)) {
+      for (const row of savedRows) {
         const file = row.source_file ?? mainFile;
         const group = grouped.get(file) ?? [];
         group.push(row);
@@ -178,6 +197,15 @@ export default function MergedCsvPane({
           deleteHciotKnowledgeFile(file, language)
         )
       ]);
+
+      // Persist question visibility after the CSV saves: the content update
+      // re-extracts `questions`, so we send only hidden texts that still exist
+      // among the saved rows (matching the backend's text-keyed identity).
+      const survivingQuestions = new Set(
+        savedRows.map(row => row.q.trim()).filter(text => text.length > 0),
+      );
+      const nextHidden = Array.from(hiddenSet).filter(text => survivingQuestions.has(text));
+      await updateHciotTopic(topicId, { hidden_questions: nextHidden }, language);
 
       setIsEditing(false);
       if (onRefreshWorkspace) {
@@ -201,6 +229,20 @@ export default function MergedCsvPane({
 
   const handleUpdateRow = (index: number, updated: Partial<EditableMergedCsvRow>) => {
     setRows(prev => prev.map((r, i) => i === index ? { ...r, ...updated } : r));
+    setDirty(true);
+  };
+
+  const handleToggleVisible = (questionText: string, visible: boolean) => {
+    if (!questionText) return;
+    setHiddenSet(prev => {
+      const next = new Set(prev);
+      if (visible) {
+        next.delete(questionText);
+      } else {
+        next.add(questionText);
+      }
+      return next;
+    });
     setDirty(true);
   };
 
@@ -305,9 +347,11 @@ export default function MergedCsvPane({
           loading={loading}
           error={error}
           isEditing={isEditing}
+          hiddenQuestions={hiddenSet}
           onUpdateRow={handleUpdateRow}
           onDeleteRow={handleDeleteRow}
           onAddRow={handleAddRow}
+          onToggleVisible={handleToggleVisible}
         />
       </section>
     </div>

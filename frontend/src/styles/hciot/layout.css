@@ -310,3 +310,64 @@
 .hciot-shell .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: color-mix(in srgb, var(--hciot-accent) 55%, transparent);
 }
+
+/* Apply the thin themed scrollbar to every scrollable hciot container without
+   touching JSX. Keep this selector list in sync with the `overflow: auto`
+   containers across the hciot stylesheets. */
+.hciot-shell :is(
+  .hciot-explorer-body,
+  .hciot-merged-csv-table-wrapper,
+  .hciot-image-picker-body,
+  .hciot-topic-question-list,
+  .hciot-te-qs-list,
+  .hciot-messages-area
+) {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--hciot-accent) 35%, transparent) transparent;
+}
+
+.hciot-shell :is(
+  .hciot-explorer-body,
+  .hciot-merged-csv-table-wrapper,
+  .hciot-image-picker-body,
+  .hciot-topic-question-list,
+  .hciot-te-qs-list,
+  .hciot-messages-area
+)::-webkit-scrollbar {
+  width: 0.375rem;
+  height: 0.375rem;
+}
+
+.hciot-shell :is(
+  .hciot-explorer-body,
+  .hciot-merged-csv-table-wrapper,
+  .hciot-image-picker-body,
+  .hciot-topic-question-list,
+  .hciot-te-qs-list,
+  .hciot-messages-area
+)::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.hciot-shell :is(
+  .hciot-explorer-body,
+  .hciot-merged-csv-table-wrapper,
+  .hciot-image-picker-body,
+  .hciot-topic-question-list,
+  .hciot-te-qs-list,
+  .hciot-messages-area
+)::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--hciot-accent) 35%, transparent);
+  border-radius: 0.1875rem;
+}
+
+.hciot-shell :is(
+  .hciot-explorer-body,
+  .hciot-merged-csv-table-wrapper,
+  .hciot-image-picker-body,
+  .hciot-topic-question-list,
+  .hciot-te-qs-list,
+  .hciot-messages-area
+)::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--hciot-accent) 55%, transparent);
+}

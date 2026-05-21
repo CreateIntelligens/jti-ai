@@ -270,6 +270,7 @@ export interface HciotTopic {
   order?: number;
   label: string;
   questions: string[];
+  hidden_questions?: string[];
 }
 
 export interface HciotTopicCategory {
@@ -286,7 +287,7 @@ export async function listHciotTopics(language: HciotLanguage = 'zh'): Promise<{
 
 export async function listHciotTopicsAdmin(language: HciotLanguage = 'zh'): Promise<{ categories: HciotTopicCategory[] }> {
   const lang = normLang(language);
-  return fetchApiJson<{ categories: HciotTopicCategory[] }>(`/topics/${lang}`);
+  return fetchApiJson<{ categories: HciotTopicCategory[] }>(`/topics/${lang}/all`);
 }
 
 function buildTopicAdminPath(language: HciotLanguage, topicId?: string): string {
@@ -296,7 +297,7 @@ function buildTopicAdminPath(language: HciotLanguage, topicId?: string): string 
 
 export async function updateHciotTopic(
   topicId: string,
-  data: { labels?: string; category_labels?: string; questions?: string[] },
+  data: { labels?: string; category_labels?: string; questions?: string[]; hidden_questions?: string[] },
   language: HciotLanguage = 'zh',
 ): Promise<Record<string, unknown>> {
   // topic_id contains "/" so we can't use encodeURIComponent — pass raw
@@ -350,6 +351,10 @@ export interface UploadWithTopicOptions {
   categoryLabel?: string;
   topicLabel?: string;
   skipTopic?: boolean;
+  // Question texts the admin un-checked while typing the Q&A. Sent as a JSON
+  // string Form field; the backend writes them to hidden_questions atomically
+  // with the extracted questions.
+  hiddenQuestions?: string[];
 }
 
 export async function uploadHciotKnowledgeFileWithTopic(
@@ -364,6 +369,9 @@ export async function uploadHciotKnowledgeFileWithTopic(
   appendOptionalFormValue(formData, 'topic_label', opts.topicLabel);
   if (opts.skipTopic !== undefined) {
     formData.append('skip_topic', String(opts.skipTopic));
+  }
+  if (opts.hiddenQuestions !== undefined) {
+    formData.append('hidden_questions', JSON.stringify(opts.hiddenQuestions));
   }
 
   return fetchAdminJson<HciotKnowledgeFile & { synced: boolean; topic_synced: boolean; uploaded_count?: number; uploaded_files?: string[] }>(

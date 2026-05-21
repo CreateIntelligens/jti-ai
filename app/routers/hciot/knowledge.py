@@ -2,6 +2,7 @@
 HCIoT knowledge management API.
 """
 
+import json
 import logging
 import mimetypes
 import uuid
@@ -192,8 +193,17 @@ def _sync_topic_questions_from_store(
     topic_id: str | None,
     topic_label: str | None,
     category_label: str | None,
+    hidden_questions: list[str] | None = None,
 ) -> bool:
-    """Merge question lists from all topic CSV files and sync topic store."""
+    """Merge question lists from all topic CSV files and sync topic store.
+
+    When ``hidden_questions`` is provided (e.g. the admin picked which questions
+    to hide at upload time), its intersection with the freshly extracted
+    questions is written to ``hidden_questions.{language}`` in the *same*
+    ``update_topic`` call as ``questions`` — an atomic write with no transient
+    "all visible" state. When ``None`` (CSV edits, deletes, metadata moves), the
+    existing ``hidden_questions`` is preserved and only stale entries pruned.
+    """
     if not topic_id or "/" not in topic_id:
         return False
 
@@ -213,6 +223,19 @@ def _sync_topic_questions_from_store(
 
     topic_store = get_hciot_topic_store(language)
     prefix, suffix = topic_id.split("/", 1)
+    current_questions = set(questions)
+
+    def _resolve_hidden(existing_topic: dict | None) -> list[str]:
+        """Intersect the desired hidden list with questions that actually exist."""
+        if hidden_questions is not None:
+            return [q for q in hidden_questions if q in current_questions]
+        hidden_by_language = (existing_topic or {}).get("hidden_questions") or {}
+        if not isinstance(hidden_by_language, dict):
+            return []
+        lang_hidden = hidden_by_language.get(language) or []
+        if not isinstance(lang_hidden, list):
+            return []
+        return [q for q in lang_hidden if q in current_questions]
 
     existing = topic_store.get_topic(topic_id)
     if existing:
@@ -220,7 +243,10 @@ def _sync_topic_questions_from_store(
             topic_store.delete_topic(topic_id)
             logger.info("[HCIoT KB] Deleted empty topic %s", topic_id)
         else:
-            topic_store.update_topic(topic_id, {f"questions.{language}": questions})
+            topic_store.update_topic(topic_id, {
+                f"questions.{language}": questions,
+                f"hidden_questions.{language}": _resolve_hidden(existing),
+            })
             logger.info("[HCIoT KB] Synced %d questions -> %s", len(questions), topic_id)
         return True
 
@@ -242,6 +268,7 @@ def _sync_topic_questions_from_store(
                 other_lang: "",
             },
             "questions": {language: questions, other_lang: []},
+            "hidden_questions": {language: _resolve_hidden(None), other_lang: []},
         },
     )
     logger.info("[HCIoT KB] Synced %d questions -> %s", len(questions), topic_id)
@@ -452,6 +479,34 @@ def _xlsx_to_csv_bytes(xlsx_bytes: bytes) -> bytes:
     return buffer.getvalue().encode("utf-8")
 
 
+def _parse_hidden_questions(raw: str | None) -> list[str] | None:
+    """Parse the optional ``hidden_questions`` Form field (a JSON string array).
+
+    Returns ``None`` when absent — preserving the existing sync behaviour — and
+    a list of stripped question texts when present (so it matches the values
+    produced by ``extract_questions_from_csv``).
+    """
+    if raw is None:
+        return None
+
+    try:
+        parsed = json.loads(raw)
+    except (json.JSONDecodeError, TypeError) as e:
+        raise HTTPException(status_code=400, detail="hidden_questions 必須是 JSON 字串陣列") from e
+
+    if not isinstance(parsed, list):
+        raise HTTPException(status_code=400, detail="hidden_questions 必須是 JSON 字串陣列")
+
+    hidden: list[str] = []
+    for item in parsed:
+        if not isinstance(item, str):
+            continue
+        stripped = item.strip()
+        if stripped:
+            hidden.append(stripped)
+    return hidden
+
+
 @router.post("/upload/")
 async def upload_knowledge_file(
     background_tasks: BackgroundTasks,
@@ -462,6 +517,7 @@ async def upload_knowledge_file(
     category_label: str | None = Form(None),
     topic_label: str | None = Form(None),
     skip_topic: bool = Form(False),
+    hidden_questions: str | None = Form(None),
 ):
     display_name = file.filename or f"file_{uuid.uuid4().hex[:8]}"
     safe_name = safe_filename(display_name)
@@ -480,6 +536,7 @@ async def upload_knowledge_file(
     merged_topic_id = None if skip_topic else _build_merged_topic_id(category_id, topic_id)
     category_label_val = None if skip_topic else category_label
     topic_label_val = None if skip_topic else topic_label
+    hidden_questions_val = None if skip_topic else _parse_hidden_questions(hidden_questions)
 
     uploads = (
         [(safe_name, file_bytes)]
@@ -512,6 +569,7 @@ async def upload_knowledge_file(
             topic_id=merged_topic_id,
             topic_label=topic_label_val,
             category_label=category_label_val,
+            hidden_questions=hidden_questions_val,
         )
 
     primary = saved_files[0]

@@ -8,4 +8,4 @@ For current behavior, prefer:
 
 - the codebase
 - tests
-- current docs in [`../../plans/`](../../plans/)
+- active docs/specs that still exist in `docs/` or `openspec/`

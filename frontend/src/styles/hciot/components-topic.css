@@ -616,3 +616,46 @@
   color: var(--hciot-accent);
   background: color-mix(in srgb, var(--hciot-accent) 6%, transparent);
 }
+
+.hciot-te-qs-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.hciot-te-qs-header {
+  padding: 0.25rem 0.4rem;
+  border-bottom: 0.0625rem solid var(--hciot-border);
+  display: flex;
+  align-items: center;
+}
+
+.hciot-te-qs-select-all {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--hciot-ink-soft);
+  cursor: pointer;
+  user-select: none;
+}
+
+.hciot-te-q-label-wrapper {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  width: 100%;
+  cursor: pointer;
+}
+
+.hciot-te-checkbox {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 0.2rem;
+  border: 0.0625rem solid var(--hciot-border-strong, var(--hciot-ink-soft));
+  cursor: pointer;
+  accent-color: var(--hciot-accent);
+  margin-top: 0.15rem;
+}

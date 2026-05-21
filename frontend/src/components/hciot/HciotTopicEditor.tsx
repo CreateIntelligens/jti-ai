@@ -50,6 +50,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
     catPlaceholder: '名稱',
     newCat: '科別名稱',
     newTopic: '主題名稱',
+    selectAll: language === 'zh' ? '顯示全部' : 'Select All',
   };
 
   const [expandedCatId, setExpandedCatId] = useState<string | null>(null);
@@ -192,6 +193,29 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
     });
   };
 
+  const handleHeaderCheckboxChange = async (topic: HciotTopic, checked: boolean) => {
+    const qs = topic.questions ?? [];
+    const newHidden = checked ? [] : [...qs];
+    await runSavingAction(async () => {
+      await api.updateHciotTopic(topic.id, { hidden_questions: newHidden }, language);
+      await reload();
+    });
+  };
+
+  const handleQuestionCheckboxChange = async (topic: HciotTopic, question: string, checked: boolean) => {
+    const hqs = topic.hidden_questions ?? [];
+    let newHidden: string[];
+    if (checked) {
+      newHidden = hqs.filter((q) => q !== question);
+    } else {
+      newHidden = [...hqs, question];
+    }
+    await runSavingAction(async () => {
+      await api.updateHciotTopic(topic.id, { hidden_questions: newHidden }, language);
+      await reload();
+    });
+  };
+
   // ===== Delete confirm =====
 
   const handleDeleteConfirm = async () => {
@@ -258,6 +282,11 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
                   const isEditingTopic = editingTopicId === topic.id;
                   const isEditingQs = editingQuestions === topic.id;
                   const qs = topic.questions ?? [];
+                  const hiddenQuestions = topic.hidden_questions ?? [];
+                  const hiddenQuestionSet = new Set(hiddenQuestions);
+                  const visibleCount = qs.filter((q) => !hiddenQuestionSet.has(q)).length;
+                  const allVisible = visibleCount === qs.length;
+                  const isIndeterminate = visibleCount > 0 && visibleCount < qs.length;
 
                   return (
                     <div key={topic.id} className="hciot-te-topic">
@@ -307,14 +336,43 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
                         ) : (
                           <>
                             {qs.length > 0 ? (
-                              <ul className="hciot-te-qs-list custom-scrollbar">
-                                {qs.map((q, i) => (
-                                  <li key={i} className="hciot-te-q-item">
-                                    <span className="hciot-te-q-index">{i + 1}</span>
-                                    <span className="hciot-te-q-text">{q}</span>
-                                  </li>
-                                ))}
-                              </ul>
+                              <div className="hciot-te-qs-container">
+                                <div className="hciot-te-qs-header">
+                                  <label className="hciot-te-qs-select-all">
+                                    <input
+                                      type="checkbox"
+                                      className="hciot-te-checkbox"
+                                      checked={allVisible}
+                                      ref={(el) => {
+                                        if (el) el.indeterminate = isIndeterminate;
+                                      }}
+                                      onChange={(e) => handleHeaderCheckboxChange(topic, e.target.checked)}
+                                      disabled={saving}
+                                    />
+                                    <span className="hciot-te-qs-select-all-label">{t.selectAll}</span>
+                                  </label>
+                                </div>
+                                <ul className="hciot-te-qs-list custom-scrollbar">
+                                  {qs.map((q, i) => {
+                                    const isVisible = !hiddenQuestionSet.has(q);
+                                    return (
+                                      <li key={i} className="hciot-te-q-item">
+                                        <label className="hciot-te-q-label-wrapper">
+                                          <input
+                                            type="checkbox"
+                                            className="hciot-te-checkbox"
+                                            checked={isVisible}
+                                            onChange={(e) => handleQuestionCheckboxChange(topic, q, e.target.checked)}
+                                            disabled={saving}
+                                          />
+                                          <span className="hciot-te-q-index">{i + 1}</span>
+                                          <span className="hciot-te-q-text">{q}</span>
+                                        </label>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
                             ) : (
                               <p className="hciot-te-empty">{t.noQs}</p>
                             )}

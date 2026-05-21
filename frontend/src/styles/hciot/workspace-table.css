@@ -189,8 +189,16 @@
 
 /* Merged CSV table cells */
 .hciot-csv-col-num    { width: 3.75rem; }
+.hciot-csv-col-visible { width: 3.25rem; text-align: center; }
 .hciot-csv-col-wide   { width: 11.25rem; }
 .hciot-csv-col-action { width: 3.75rem; text-align: center; }
+.hciot-csv-visible-checkbox {
+  width: 0.9rem;
+  height: 0.9rem;
+  cursor: pointer;
+  accent-color: var(--hciot-accent, #6366f1);
+}
+.hciot-csv-visible-checkbox:disabled { cursor: not-allowed; opacity: 0.4; }
 .hciot-csv-textarea   { min-height: 3.75rem; padding: 0.25rem; }
 .hciot-csv-cell-pre   { white-space: pre-wrap; }
 .hciot-csv-cell-break { word-break: break-all; }
