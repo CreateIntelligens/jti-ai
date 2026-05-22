@@ -334,6 +334,57 @@ def test_list_topics_slim_filters_hidden_questions_for_public_users():
     assert "hidden_questions" not in topic
 
 
+def test_list_topics_slim_removes_topics_and_categories_without_visible_questions():
+    store = FakeStore()
+    store.categories = [
+        {
+            "id": "ortho",
+            "labels": {"zh": "骨科", "en": "Orthopedics"},
+            "topics": [
+                {
+                    "id": "ortho/prp",
+                    "topic_id": "ortho/prp",
+                    "labels": {"zh": "PRP 治療", "en": "PRP Therapy"},
+                    "category_labels": {"zh": "骨科", "en": "Orthopedics"},
+                    "order": 1,
+                    "questions": {"zh": ["Q1", "Q2"], "en": []},
+                    "hidden_questions": {"zh": ["Q1", "Q2"], "en": []},
+                },
+                {
+                    "id": "ortho/faq",
+                    "topic_id": "ortho/faq",
+                    "labels": {"zh": "常見問題", "en": "FAQ"},
+                    "category_labels": {"zh": "骨科", "en": "Orthopedics"},
+                    "order": 2,
+                    "questions": {"zh": ["Q3"], "en": []},
+                    "hidden_questions": {"zh": [], "en": []},
+                },
+            ],
+        },
+        {
+            "id": "rehab",
+            "labels": {"zh": "復健科", "en": "Rehab"},
+            "topics": [
+                {
+                    "id": "rehab/only-hidden",
+                    "topic_id": "rehab/only-hidden",
+                    "labels": {"zh": "全部隱藏", "en": "Hidden"},
+                    "category_labels": {"zh": "復健科", "en": "Rehab"},
+                    "order": 3,
+                    "questions": {"zh": ["Q4"], "en": []},
+                    "hidden_questions": {"zh": ["Q4"], "en": []},
+                },
+            ],
+        },
+    ]
+
+    with patch_topic_store(store):
+        result = topics_admin.list_topics_slim("zh")
+
+    assert [category["id"] for category in result["categories"]] == ["ortho"]
+    assert [topic["id"] for topic in result["categories"][0]["topics"]] == ["ortho/faq"]
+
+
 def test_list_topics_admin_retains_hidden_questions():
     store = FakeStore()
     store.categories = [

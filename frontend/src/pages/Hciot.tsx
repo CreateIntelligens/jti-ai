@@ -431,27 +431,30 @@ export default function Hciot() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Fetch categories from API.
-  useEffect(() => {
-    api.listHciotTopics(currentLanguage)
-      .then((data) => {
-        const nextCategories = data.categories || [];
-        if (nextCategories.length) {
-          setCategories(nextCategories);
-          setTopicSelection((current) => resolveTopicSelection(nextCategories, current));
-          setTopicsError(false);
-        } else {
-          setCategories([]);
-          setTopicSelection(EMPTY_TOPIC_SELECTION);
-          setTopicsError(true);
-        }
-      })
-      .catch(() => {
+  const refreshPublicTopics = useCallback(async () => {
+    try {
+      const data = await api.listHciotTopics(currentLanguage);
+      const nextCategories = data.categories || [];
+      if (nextCategories.length) {
+        setCategories(nextCategories);
+        setTopicSelection((current) => resolveTopicSelection(nextCategories, current));
+        setTopicsError(false);
+      } else {
         setCategories([]);
         setTopicSelection(EMPTY_TOPIC_SELECTION);
         setTopicsError(true);
-      });
+      }
+    } catch {
+      setCategories([]);
+      setTopicSelection(EMPTY_TOPIC_SELECTION);
+      setTopicsError(true);
+    }
   }, [currentLanguage]);
+
+  // Fetch categories from API.
+  useEffect(() => {
+    void refreshPublicTopics();
+  }, [refreshPublicTopics]);
 
   const restartConversation = useCallback(async () => {
     if (!storeName) return;
@@ -771,6 +774,7 @@ export default function Hciot() {
         <HciotKnowledgeWorkspace
           active={workspace === 'files'}
           language={currentLanguage}
+          onTopicsChanged={refreshPublicTopics}
         />
       </main>
 

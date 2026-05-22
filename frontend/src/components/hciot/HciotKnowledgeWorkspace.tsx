@@ -16,6 +16,7 @@ import reindexRag from '../../services/api/general';
 interface HciotKnowledgeWorkspaceProps {
   active: boolean;
   language: HciotLanguage;
+  onTopicsChanged?: () => Promise<void> | void;
 }
 
 function createEmptyTopicDraft(): Pick<FileMetadataDraft, 'topicId' | 'topicLabel'> {
@@ -60,6 +61,7 @@ function moveItem<T>(items: T[], from: number, to: number): T[] | null {
 export default function HciotKnowledgeWorkspace({
   active,
   language,
+  onTopicsChanged,
 }: HciotKnowledgeWorkspaceProps) {
   const statusTimerRef = useRef<number | null>(null);
   const suppressHoverRef = useRef(false);
@@ -208,6 +210,11 @@ export default function HciotKnowledgeWorkspace({
     } finally {
       setLoadingWorkspace(false);
     }
+  };
+
+  const refreshWorkspaceAfterTopicChange = async (preferredFileName?: string | null) => {
+    await refreshWorkspace(preferredFileName);
+    await onTopicsChanged?.();
   };
 
   const handleReindex = async () => {
@@ -398,7 +405,7 @@ export default function HciotKnowledgeWorkspace({
   };
 
   const completeUpload = async (firstUploadedFileName: string | null, message: string) => {
-    await refreshWorkspace(firstUploadedFileName);
+    await refreshWorkspaceAfterTopicChange(firstUploadedFileName);
     setQaDialogOpen(false);
     showStatus(message);
   };
@@ -443,7 +450,7 @@ export default function HciotKnowledgeWorkspace({
     setDeleting(true);
     try {
       await api.deleteHciotKnowledgeFile(selectedFile.name, language);
-      await refreshWorkspace();
+      await refreshWorkspaceAfterTopicChange();
       showStatus(text('檔案已刪除', 'File deleted'));
     } catch (error) {
       console.error('Failed to delete HCIoT file:', error);
@@ -475,7 +482,7 @@ export default function HciotKnowledgeWorkspace({
       if (selectedFileName && targetNames.has(selectedFileName)) {
         setSelectedFileName(null);
       }
-      await refreshWorkspace();
+      await refreshWorkspaceAfterTopicChange();
       if (failed) {
         alert(text(
           `主題「${topicLabel}」刪除完成，但有 ${failed} 個檔案失敗`,
@@ -533,7 +540,7 @@ export default function HciotKnowledgeWorkspace({
       );
       const failed = results.filter((result) => result.status === 'rejected').length;
       setRenamingKey(null);
-      await refreshWorkspace(selectedFileName);
+      await refreshWorkspaceAfterTopicChange(selectedFileName);
       if (failed) {
         alert(text(
           `改名完成，但有 ${failed} 個項目失敗`,
@@ -596,7 +603,7 @@ export default function HciotKnowledgeWorkspace({
 
     try {
       await api.reorderHciotTopics(topicIds, language);
-      await refreshWorkspace(selectedFileName);
+      await refreshWorkspaceAfterTopicChange(selectedFileName);
       showStatus(text('順序已更新', 'Order updated'));
     } catch (error) {
       console.error('Failed to reorder HCIoT topics:', error);
@@ -820,7 +827,7 @@ export default function HciotKnowledgeWorkspace({
       }
 
       setDraft(nextDraft);
-      await refreshWorkspace(selectedFile.name);
+      await refreshWorkspaceAfterTopicChange(selectedFile.name);
       showStatus(text('變更已儲存', 'Changes saved'));
     } catch (error) {
       console.error('Failed to save HCIoT file changes:', error);
@@ -929,7 +936,7 @@ export default function HciotKnowledgeWorkspace({
           availableImages={images}
           statusMessage={statusMessage}
           hiddenQuestions={selectedMergedTopic?.hidden_questions}
-          onRefreshWorkspace={() => refreshWorkspace()}
+          onRefreshWorkspace={() => refreshWorkspaceAfterTopicChange()}
           onUploadImage={api.uploadHciotImage}
           onDeleteImage={api.deleteHciotImage}
           onDeleteTopic={handleDeleteTopic}
