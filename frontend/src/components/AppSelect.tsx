@@ -33,13 +33,15 @@ export default function AppSelect({
   contentClassName = '',
   disabled = false,
 }: AppSelectProps) {
+  // When the trigger label is truncated by CSS, expose the full text on hover.
+  const triggerTitle = title ?? options.find((o) => o.value === value)?.label;
   return (
     <RadixSelect.Root
       value={toRadix(value)}
       onValueChange={(v) => onChange(fromRadix(v))}
       disabled={disabled}
     >
-      <RadixSelect.Trigger className={`app-select-trigger ${className}`} title={title}>
+      <RadixSelect.Trigger className={`app-select-trigger ${className}`} title={triggerTitle}>
         <RadixSelect.Value placeholder={placeholder} />
         <RadixSelect.Icon className="app-select-icon">
           <ChevronDown size={14} />

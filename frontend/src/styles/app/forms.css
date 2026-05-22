@@ -395,6 +395,7 @@
   justify-content: space-between;
   gap: 0.5rem;
   width: 100%;
+  min-width: 0;
   height: 2.5rem;
   padding: 0 0.75rem;
   border: 0.0625rem solid var(--border-color);
@@ -406,6 +407,16 @@
   cursor: pointer;
   transition: border-color 0.15s, box-shadow 0.15s;
   outline: none;
+}
+
+/* Radix renders Select.Value as the trigger's first child; truncate long labels
+   so they never push the chevron out of the box. Full text shows via title. */
+.app-select-trigger > span:first-child {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .app-select-trigger:hover:not([data-disabled]) {
@@ -460,6 +471,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 0.5rem;
   padding: 0.5rem 0.75rem;
   border-radius: 0.375rem;
   font-size: 0.875rem;
@@ -468,6 +480,8 @@
   outline: none;
   transition: background 0.1s;
   user-select: none;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .app-select-item:hover,
