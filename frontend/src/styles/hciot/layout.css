@@ -241,6 +241,26 @@
   color: var(--hciot-accent);
 }
 
+.hciot-header-divider {
+  width: 0.0625rem;
+  height: 1.25rem;
+  margin: 0 0.25rem;
+  background: var(--hciot-border);
+  align-self: center;
+}
+
+.hciot-external-link {
+  text-decoration: none;
+}
+
+.hciot-external-link svg {
+  transition: transform 0.2s ease;
+}
+
+.hciot-external-link:hover svg {
+  transform: translate(0.125rem, -0.125rem);
+}
+
 .hciot-main {
   flex: 1;
   min-height: 0;

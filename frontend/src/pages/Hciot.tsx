@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject, type SetStateAction } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FileText, HeartPulse, History, Moon, RotateCcw, Settings, Sun } from 'lucide-react';
+import { ExternalLink, FileText, HeartPulse, History, Moon, RotateCcw, Settings, Sun } from 'lucide-react';
 import { fetchWithApiKey } from '../services/api';
 
 import HciotSelect from '../components/hciot/HciotSelect';
@@ -39,6 +39,9 @@ const TTS_POLL_INTERVAL_MS = 3000;
 const TTS_STALL_TIMEOUT_MS = 12000;
 const TTS_CHARACTER_STORAGE_KEY = 'hciot:tts-character';
 const WORKSPACE_STORAGE_KEY = 'hciot:workspace';
+const HCIOT_EXTERNAL_LINK_URL =
+  (import.meta.env.VITE_HCIOT_EXTERNAL_LINK_URL as string | undefined)?.trim() || '';
+const HCIOT_EXTERNAL_LINK_LABEL = 'TTS 管理後台';
 type WorkspaceMode = 'chat' | 'files';
 interface TopicSelection {
   categoryId: string | null;
@@ -693,6 +696,21 @@ export default function Hciot() {
           <button className="hciot-icon-button" onClick={toggleTheme} title={t('hciot_toggle_theme')}>
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
+          {HCIOT_EXTERNAL_LINK_URL && (
+            <>
+              <span className="hciot-header-divider" aria-hidden="true" />
+              <a
+                className="hciot-icon-button hciot-external-link"
+                href={HCIOT_EXTERNAL_LINK_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={HCIOT_EXTERNAL_LINK_LABEL}
+                aria-label={HCIOT_EXTERNAL_LINK_LABEL}
+              >
+                <ExternalLink size={18} />
+              </a>
+            </>
+          )}
         </div>
       </header>
 

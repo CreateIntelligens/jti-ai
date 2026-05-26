@@ -16,7 +16,7 @@ type Tab = 'file' | 'qa' | 'image';
 
 const TABS = [
   { id: 'file' as Tab, label: '上傳知識檔', icon: Upload },
-  { id: 'qa' as Tab, label: '手動輸入 Q&A', icon: Plus },
+  { id: 'qa' as Tab, label: '手動輸入', icon: Plus },
   { id: 'image' as Tab, label: '上傳圖片', icon: ImageIcon },
 ];
 
