@@ -41,7 +41,7 @@ const TTS_CHARACTER_STORAGE_KEY = 'hciot:tts-character';
 const WORKSPACE_STORAGE_KEY = 'hciot:workspace';
 const HCIOT_EXTERNAL_LINK_URL =
   (import.meta.env.VITE_HCIOT_EXTERNAL_LINK_URL as string | undefined)?.trim() || '';
-const HCIOT_EXTERNAL_LINK_LABEL = 'TTS 管理後台';
+const HCIOT_EXTERNAL_LINK_LABEL = '語音管理';
 type WorkspaceMode = 'chat' | 'files';
 interface TopicSelection {
   categoryId: string | null;
@@ -668,6 +668,20 @@ export default function Hciot() {
               <span>檔案管理</span>
             </button>
           </div>
+          {HCIOT_EXTERNAL_LINK_URL && (
+            <a
+              className="hciot-external-pill"
+              href={HCIOT_EXTERNAL_LINK_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={HCIOT_EXTERNAL_LINK_LABEL}
+              aria-label={HCIOT_EXTERNAL_LINK_LABEL}
+            >
+              <span>{HCIOT_EXTERNAL_LINK_LABEL}</span>
+              <ExternalLink size={14} />
+            </a>
+          )}
+          <span className="hciot-header-divider" aria-hidden="true" />
           {ttsCharacters.length > 0 && (
             <label className="hciot-voice-select-wrap">
               <span className="hciot-voice-select-label">
@@ -696,21 +710,6 @@ export default function Hciot() {
           <button className="hciot-icon-button" onClick={toggleTheme} title={t('hciot_toggle_theme')}>
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          {HCIOT_EXTERNAL_LINK_URL && (
-            <>
-              <span className="hciot-header-divider" aria-hidden="true" />
-              <a
-                className="hciot-icon-button hciot-external-link"
-                href={HCIOT_EXTERNAL_LINK_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={HCIOT_EXTERNAL_LINK_LABEL}
-                aria-label={HCIOT_EXTERNAL_LINK_LABEL}
-              >
-                <ExternalLink size={18} />
-              </a>
-            </>
-          )}
         </div>
       </header>
 
