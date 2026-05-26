@@ -470,29 +470,59 @@ class BaseAgent:
             )
             (_, ai_citations), (_, user_citations) = await asyncio.gather(ai_future, user_future)
 
-        # Merge, dedupe by text, keep the smallest distance per duplicate
-        by_text: dict[str, dict] = {}
-        for c in (ai_citations or []) + (user_citations or []):
-            txt = c.get("text", "")
-            if not txt:
-                continue
-            existing = by_text.get(txt)
-            if existing is None or c.get("_distance", 999) < existing.get("_distance", 999):
-                by_text[txt] = c
-
-        # Sort by distance (lower = more relevant) and cap to top N
-        merged = sorted(by_text.values(), key=lambda c: c.get("_distance", 999))[:self._RAG_MAX_CITATIONS]
+        # Fuse the two result lists with Reciprocal Rank Fusion.
+        # Each ranked list is sorted by its own distance, then every doc gets
+        # 1/(k+rank). Distances across queries aren't comparable, ranks are.
+        citation_lists = [ai_citations or [], user_citations or []]
+        merged = self._rrf_merge(citation_lists, cap=self._RAG_MAX_CITATIONS)
 
         if not merged:
             return "知識庫中沒有找到相關資料。", None
 
         kb_text = "\n---\n".join(c["text"] for c in merged)
+        scores = [f"{c.get('_rrf_score', 0):.4f}" for c in merged]
         distances = [f"{c.get('_distance', 999):.3f}" for c in merged]
-        logger.info(f"[RAG Dual] ai={len(ai_citations or [])} + user={len(user_citations or [])} → top {len(merged)} | distances={distances}")
+        logger.info(
+            f"[RAG Dual] ai={len(ai_citations or [])} + user={len(user_citations or [])} "
+            f"→ top {len(merged)} | rrf={scores} | distances={distances}"
+        )
 
         # Strip internal fields before returning to caller
         cleaned = [{k: v for k, v in c.items() if not k.startswith("_")} for c in merged]
         return kb_text, cleaned
+
+    @staticmethod
+    def _rrf_merge(
+        ranked_lists: list[list[dict]],
+        cap: int,
+        k: int = 60,
+    ) -> list[dict]:
+        """Reciprocal Rank Fusion over multiple ranked citation lists.
+
+        For each list, sort by ascending distance (best = rank 1) and award
+        1/(k+rank) to every doc. A doc that appears in multiple lists
+        accumulates contributions from each. Final order is by total score
+        descending; the kept dict is whichever copy had the smallest distance
+        (so existing _distance / text / uri stay meaningful).
+        """
+        scores_by_text: dict[str, float] = {}
+        best_doc_by_text: dict[str, dict] = {}
+        for ranked_list in ranked_lists:
+            ordered_docs = sorted(ranked_list, key=lambda c: c.get("_distance", 999))
+            for rank, doc in enumerate(ordered_docs, start=1):
+                text = doc.get("text", "")
+                if not text:
+                    continue
+                scores_by_text[text] = scores_by_text.get(text, 0.0) + 1.0 / (k + rank)
+                existing = best_doc_by_text.get(text)
+                if existing is None or doc.get("_distance", 999) < existing.get("_distance", 999):
+                    best_doc_by_text[text] = doc
+
+        scored_docs = [
+            {**doc, "_rrf_score": scores_by_text[text]}
+            for text, doc in best_doc_by_text.items()
+        ]
+        return sorted(scored_docs, key=lambda c: c["_rrf_score"], reverse=True)[:cap]
 
     @staticmethod
     def _clean_enriched_history(chat_session, original_user_message: str):
