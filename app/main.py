@@ -113,8 +113,9 @@ from google.genai.errors import ClientError
 
 from .auth import verify_auth, _extract_bearer_token
 from .services.agent_utils import strip_citations
+from .services.model_discovery import get_available_models
 from .routers.jti import chat as jti_chat, quiz as jti_quiz, prompts as jti_prompts, knowledge as jti_knowledge, quiz_bank as jti_quiz_bank
-from .routers.general import chat, prompts, stores, api_keys, knowledge_admin
+from .routers.general import chat, prompts, stores, api_keys, knowledge_admin, models
 from .routers.hciot import chat as hciot_chat, prompts as hciot_prompts, knowledge as hciot_knowledge, images as hciot_images
 from .routers.hciot import topics_admin as hciot_topics_admin
 from .routers.admin_rag import router as admin_rag_router
@@ -286,13 +287,15 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
 
     system_prompt = _get_system_prompt(api_key_info, store_name, request.messages)
 
-    # Validate model
+    # Validate against API-advertised models when discovery succeeds.
+    available_names = {model.name for model in get_available_models(gemini_client)}
     warning = None
-    if request.model in SUPPORTED_MODELS:
-        model_name = request.model
-    else:
+    if available_names and request.model not in available_names:
         model_name = DEFAULT_MODEL
-        warning = f"Unsupported model '{request.model}', using default '{DEFAULT_MODEL}'. Supported: {', '.join(SUPPORTED_MODELS)}"
+        available_list = ", ".join(sorted(available_names))
+        warning = f"Unsupported model '{request.model}', using default '{DEFAULT_MODEL}'. Available: {available_list}"
+    else:
+        model_name = request.model
 
     try:
         # Use local RAG pipeline for retrieval
@@ -424,3 +427,4 @@ app.include_router(prompts.router)  # before stores (more specific path patterns
 app.include_router(knowledge_admin.router)
 app.include_router(stores.router)
 app.include_router(api_keys.router)
+app.include_router(models.router)

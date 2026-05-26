@@ -17,7 +17,6 @@ interface PromptPanelProps {
 type RuleSectionKey = 'role_scope' | 'scope_limits' | 'response_style' | 'knowledge_rules';
 
 const NEW_PROMPT_ID = '__new__';
-const DEFAULT_MODEL = 'gemini-2.5-flash-lite';
 const RULE_SECTION_KEYS: RuleSectionKey[] = [
   'role_scope',
   'scope_limits',
@@ -109,6 +108,21 @@ function buildSectionsPayload(draft: DraftState): { zh: RuleSections } | null {
   return Object.keys(trimmed).length > 0 ? { zh: trimmed } : null;
 }
 
+function getStoredSelectedModel(): string {
+  return localStorage.getItem('selectedModel') || '';
+}
+
+function storeSelectedModel(modelId: string): void {
+  localStorage.setItem('selectedModel', modelId);
+}
+
+function resolveSelectedModel(models: api.ModelInfo[], defaultModel: string): string {
+  const storedModel = getStoredSelectedModel();
+  return storedModel && models.some((model) => model.name === storedModel)
+    ? storedModel
+    : defaultModel;
+}
+
 export default function PromptPanel({
   isOpen,
   onClose,
@@ -127,15 +141,42 @@ export default function PromptPanel({
   const [saving, setSaving] = useState(false);
   const [maxPrompts, setMaxPrompts] = useState(3);
 
-  const [selectedModel, setSelectedModel] = useState(() =>
-    localStorage.getItem('selectedModel') || DEFAULT_MODEL,
-  );
+  const [availableModels, setAvailableModels] = useState<api.ModelInfo[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(getStoredSelectedModel);
 
   useEscapeKey(onClose, isOpen);
 
   useEffect(() => {
     if (isOpen && currentStore) void loadPrompts();
   }, [isOpen, currentStore]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    let cancelled = false;
+
+    const loadModels = async () => {
+      setModelsLoading(true);
+      try {
+        const { models, default_model } = await api.fetchModels();
+        if (cancelled) return;
+
+        setAvailableModels(models);
+        const nextModel = resolveSelectedModel(models, default_model);
+        setSelectedModel(nextModel);
+        storeSelectedModel(nextModel);
+      } catch {
+        // Keep the previous local selection if model discovery is unavailable.
+      } finally {
+        if (!cancelled) {
+          setModelsLoading(false);
+        }
+      }
+    };
+
+    void loadModels();
+    return () => { cancelled = true; };
+  }, [isOpen]);
 
   const editingPrompt = prompts.find((p) => p.id === editingId) || null;
   const isCreatingPrompt = editingId === NEW_PROMPT_ID;
@@ -283,7 +324,7 @@ export default function PromptPanel({
 
   const handleModelChange = async (modelId: string) => {
     setSelectedModel(modelId);
-    localStorage.setItem('selectedModel', modelId);
+    storeSelectedModel(modelId);
     await onRestartChat();
     onShowStatus?.('✅ 模型已切換');
   };
@@ -510,12 +551,19 @@ export default function PromptPanel({
                       className="input-base"
                       value={selectedModel}
                       onChange={(e) => handleModelChange(e.target.value)}
+                      disabled={modelsLoading}
                     >
-                      <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite</option>
-                      <option value="gemini-2.0-flash">gemini-2.0-flash</option>
-                      <option value="gemini-2.5-flash">gemini-2.5-flash</option>
-                      <option value="gemini-2.5-pro">gemini-2.5-pro</option>
-                      <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite</option>
+                      {modelsLoading ? (
+                        <option value={selectedModel}>載入中…</option>
+                      ) : availableModels.length > 0 ? (
+                        availableModels.map((m) => (
+                          <option key={m.name} value={m.name}>
+                            {m.display_name}
+                          </option>
+                        ))
+                      ) : (
+                        <option value={selectedModel}>{selectedModel}</option>
+                      )}
                     </select>
                   </div>
                 </div>

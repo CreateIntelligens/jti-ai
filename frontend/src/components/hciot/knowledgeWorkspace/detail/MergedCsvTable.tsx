@@ -53,6 +53,14 @@ interface MergedCsvTableProps {
 const VISIBILITY_HINT =
   '勾選：顯示為預設問題按鈕。取消：不顯示在按鈕列，但仍會進知識庫。';
 
+function getQuestionText(row: EditableMergedCsvRow): string {
+  return row.q.trim();
+}
+
+function getQuestionVisibilityLabel(questionText: string): string {
+  return questionText ? `顯示問題：${questionText}` : '顯示問題';
+}
+
 export default function MergedCsvTable({
   language,
   rows,
@@ -104,6 +112,18 @@ export default function MergedCsvTable({
     onUpdateRow(rowIndex, applyExistingRowImage(imageId));
   };
 
+  const questionTexts = Array.from(
+    new Set(rows.map(getQuestionText).filter((questionText) => questionText.length > 0)),
+  );
+  const questionIsVisible = (questionText: string) => !hiddenQuestions.has(questionText);
+  const allQuestionsVisible = questionTexts.length > 0 && questionTexts.every(questionIsVisible);
+  const someQuestionsVisible = questionTexts.some(questionIsVisible);
+  const isVisibilityIndeterminate = someQuestionsVisible && !allQuestionsVisible;
+
+  const handleToggleAllVisible = (visible: boolean) => {
+    questionTexts.forEach((questionText) => onToggleVisible(questionText, visible));
+  };
+
   return (
     <div className="hciot-merged-csv-container">
       <ExistingImagePicker
@@ -126,11 +146,31 @@ export default function MergedCsvTable({
           <thead>
             <tr>
               <th className="hciot-csv-col-num">編號</th>
-              {isEditing && (
-                <th className="hciot-csv-col-visible" title={VISIBILITY_HINT}>顯示</th>
-              )}
-              <th>問題 (Q)</th>
-              <th>回答 (A)</th>
+              <th className="hciot-csv-col-visible" title={VISIBILITY_HINT}>
+                {isEditing ? (
+                  <div className="hciot-csv-visible-header">
+                    <span>顯示</span>
+                    <label className="hciot-csv-select-all" title="全選顯示問題">
+                      <input
+                        type="checkbox"
+                        className="hciot-csv-visible-checkbox"
+                        aria-label="全選顯示問題"
+                        checked={allQuestionsVisible}
+                        disabled={questionTexts.length === 0}
+                        ref={(el) => {
+                          if (el) el.indeterminate = isVisibilityIndeterminate;
+                        }}
+                        onChange={(e) => handleToggleAllVisible(e.target.checked)}
+                      />
+                      <span>全選</span>
+                    </label>
+                  </div>
+                ) : (
+                  <span>顯示</span>
+                )}
+              </th>
+              <th className="hciot-csv-col-question">問題 (Q)</th>
+              <th className="hciot-csv-col-answer">回答 (A)</th>
               <th className="hciot-csv-col-wide">圖片 (IMG)</th>
               <th className="hciot-csv-col-wide">網址 (URL)</th>
               {isEditing && <th className="hciot-csv-col-action">-</th>}
@@ -144,26 +184,41 @@ export default function MergedCsvTable({
                 ? (row.pendingImageFile ? pendingUrls.get(row.pendingImageFile) || '' : '')
                 : getHciotImageUrl(row.img);
               const imageLabel = row.pendingImageName || normalizeImageId(row.img) || row.img;
-              const questionText = row.q.trim();
+              const questionText = getQuestionText(row);
               const hasQuestionText = questionText.length > 0;
+              const isQuestionVisible = hasQuestionText && questionIsVisible(questionText);
+              const visibilityLabel = getQuestionVisibilityLabel(questionText);
               return (
                 <tr key={`${row.index}-${i}`}>
                   <td>{i + 1}</td>
-                  {isEditing && (
-                    <td className="hciot-csv-cell-center">
+                  <td className="hciot-csv-cell-center">
+                    {isEditing ? (
                       <input
                         type="checkbox"
                         className="hciot-csv-visible-checkbox"
-                        checked={hasQuestionText && !hiddenQuestions.has(questionText)}
+                        aria-label={visibilityLabel}
+                        checked={isQuestionVisible}
                         disabled={!hasQuestionText}
                         title={VISIBILITY_HINT}
                         onChange={(e) => onToggleVisible(questionText, e.target.checked)}
                       />
-                    </td>
-                  )}
+                    ) : (
+                      <input
+                        type="checkbox"
+                        className="hciot-csv-visible-checkbox readonly"
+                        aria-label={visibilityLabel}
+                        checked={isQuestionVisible}
+                        readOnly
+                        title={VISIBILITY_HINT}
+                      />
+                    )}
+                  </td>
                   <td>
                     {isEditing ? (
-                      <textarea className="hciot-file-textarea hciot-csv-textarea" value={row.q} onChange={(e) => onUpdateRow(i, { q: e.target.value })}
+                      <textarea
+                        className="hciot-file-textarea hciot-csv-textarea"
+                        value={row.q}
+                        onChange={(e) => onUpdateRow(i, { q: e.target.value })}
                       />
                     ) : (
                       row.q
@@ -171,7 +226,10 @@ export default function MergedCsvTable({
                   </td>
                   <td className="hciot-csv-cell-pre">
                     {isEditing ? (
-                      <textarea className="hciot-file-textarea hciot-csv-textarea" value={row.a} onChange={(e) => onUpdateRow(i, { a: e.target.value })}
+                      <textarea
+                        className="hciot-file-textarea hciot-csv-textarea"
+                        value={row.a}
+                        onChange={(e) => onUpdateRow(i, { a: e.target.value })}
                       />
                     ) : (
                       row.a
@@ -181,7 +239,7 @@ export default function MergedCsvTable({
                     {isEditing ? (
                       <div className="hciot-merged-csv-img-cell">
                         {hasImage ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <div className="hciot-merged-csv-img-stack">
                             <div className="hciot-merged-csv-img-wrapper edit-mode">
                               {imageUrl && (
                                 <ZoomableThumbnail
@@ -204,9 +262,13 @@ export default function MergedCsvTable({
                               </button>
                               <span className="hciot-merged-csv-img-text" title={row.imgError || imageLabel}>{imageLabel}</span>
                             </div>
-                            <div style={{ display: 'flex', gap: 6 }}>
+                            <div className="hciot-merged-csv-img-actions">
                               <label className={`hciot-merged-csv-upload-btn${row.imgStatus === 'uploading' ? ' is-uploading' : ''}`}>
-                                <input className="file-input-hidden"type="file" accept="image/*" onChange={(e) => handleFileChange(i, e.target.files?.[0] || null)}
+                                <input
+                                  className="file-input-hidden"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => handleFileChange(i, e.target.files?.[0] || null)}
                                   disabled={row.imgStatus === 'uploading'}
                                 />
                                 <Upload size={14} />
@@ -221,9 +283,13 @@ export default function MergedCsvTable({
                             </div>
                           </div>
                         ) : (
-                          <div style={{ display: 'flex', gap: 6 }}>
+                          <div className="hciot-merged-csv-img-actions">
                             <label className={`hciot-merged-csv-upload-btn${row.imgStatus === 'uploading' ? ' is-uploading' : ''}`}>
-                              <input className="file-input-hidden"type="file" accept="image/*" onChange={(e) => handleFileChange(i, e.target.files?.[0] || null)}
+                              <input
+                                className="file-input-hidden"
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => handleFileChange(i, e.target.files?.[0] || null)}
                                 disabled={row.imgStatus === 'uploading'}
                               />
                               <Upload size={14} />
@@ -262,7 +328,10 @@ export default function MergedCsvTable({
                   </td>
                   <td className="hciot-csv-cell-break">
                     {isEditing ? (
-                      <textarea className="hciot-file-textarea hciot-csv-textarea" value={row.url || ''} onChange={(e) => onUpdateRow(i, { url: e.target.value })}
+                      <textarea
+                        className="hciot-file-textarea hciot-csv-textarea"
+                        value={row.url || ''}
+                        onChange={(e) => onUpdateRow(i, { url: e.target.value })}
                       />
                     ) : row.url ? (
                       <a href={row.url} target="_blank" rel="noopener noreferrer">{row.url}</a>

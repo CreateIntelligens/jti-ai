@@ -139,6 +139,25 @@ export async function deleteManagedKnowledgeFile(appTarget: AppTarget, fileName:
   return handleResponse<any>(response);
 }
 
+// ========== Models ==========
+
+export interface ModelInfo {
+  name: string;
+  display_name: string;
+  input_token_limit: number;
+  output_token_limit: number;
+}
+
+export interface ModelsResponse {
+  models: ModelInfo[];
+  default_model: string;
+}
+
+export async function fetchModels(): Promise<ModelsResponse> {
+  const response = await fetchWithUserGeminiKey(`${API_BASE}/models`);
+  return handleResponse<ModelsResponse>(response);
+}
+
 // ========== Chat ==========
 
 function getSelectedModel(): string {

@@ -63,6 +63,15 @@ def _category_order(cat: dict) -> int:
     return min((t.get("order", 0) for t in cat.get("topics", [])), default=0)
 
 
+def _topic_has_public_questions(topic: dict, language: Lang) -> bool:
+    questions = _localized_questions(topic.get("questions"), language)
+    if not questions:
+        return True
+
+    hidden_questions = set(_localized_questions(topic.get("hidden_questions"), language))
+    return any(question not in hidden_questions for question in questions)
+
+
 def _build_categories(language: Lang, filter_hidden: bool = True) -> list[dict]:
     """Build the single-language category tree consumed by the public endpoint.
 
@@ -71,15 +80,23 @@ def _build_categories(language: Lang, filter_hidden: bool = True) -> list[dict]:
     in the admin UI is what writes those values.
     """
     store = get_hciot_topic_store(language)
-    categories = [
-        {
+    categories: list[dict] = []
+    for cat in store.list_categories():
+        raw_topics = cat.get("topics", [])
+        if filter_hidden:
+            raw_topics = [topic for topic in raw_topics if _topic_has_public_questions(topic, language)]
+
+        topics = [_localize_topic(topic, language, filter_hidden) for topic in raw_topics]
+
+        if filter_hidden and not topics:
+            continue
+
+        categories.append({
             "id": cat.get("id", ""),
             "label": _localized_text(cat.get("labels"), language, cat.get("id", "")),
             "order": _category_order(cat),
-            "topics": [_localize_topic(t, language, filter_hidden) for t in cat.get("topics", [])],
-        }
-        for cat in store.list_categories()
-    ]
+            "topics": topics,
+        })
     return sorted(categories, key=lambda category: category["order"])
 
 
