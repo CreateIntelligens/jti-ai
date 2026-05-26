@@ -37,7 +37,7 @@ def test_localize_citations_uses_display_name(monkeypatch):
 
 def test_hciot_agent_uses_flash_lite_for_chat():
     agent = MainAgent()
-    assert agent.model_name == "gemini-3.1-flash-lite-preview"
+    assert agent.model_name == "gemini-3.1-flash-lite"
 
 
 def test_extract_image_id_returns_top_citation_id():

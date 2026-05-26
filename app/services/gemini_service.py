@@ -36,6 +36,37 @@ async def run_sync(fn: Callable[..., T], *args) -> T:
     return await asyncio.to_thread(fn, *args)
 
 
+def _is_model_gone(err: Exception) -> bool:
+    """Detect 'model no longer available / not found' errors worth falling back on."""
+    error_text = str(err).lower()
+    if "404" not in error_text and "not_found" not in error_text:
+        return False
+    return "no longer available" in error_text or "not found" in error_text
+
+
+def gemini_with_fallback(call_fn: Callable[[str], T], models: tuple[str, ...]) -> T:
+    """Try each model in order; on 'model gone' 404, advance to the next.
+
+    call_fn receives the model name and must perform one full call (including retry).
+    Non-fallback errors propagate immediately from the first attempt that raises them.
+    """
+    if not models:
+        raise RuntimeError("gemini_with_fallback: empty model list")
+
+    for model_index, model in enumerate(models):
+        try:
+            return call_fn(model)
+        except Exception as e:
+            if not _is_model_gone(e) or model_index == len(models) - 1:
+                raise
+            next_model = models[model_index + 1]
+            logger.warning(
+                "[Gemini] model %s unavailable (%s); falling back to %s",
+                model, type(e).__name__, next_model,
+            )
+    raise RuntimeError("gemini_with_fallback: unexpected exit")
+
+
 def gemini_with_retry(fn: Callable[[], T], retries: int = 3, base_delay: float = 2.0) -> T:
     """
     呼叫 Gemini API 並在 503 UNAVAILABLE 時自動重試。

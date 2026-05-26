@@ -208,7 +208,7 @@ class OpenAIChatMessage(BaseModel):
     role: str
     content: str
 
-from app.models_config import DEFAULT_MODEL, SUPPORTED_MODELS  # noqa: E402
+from app.models_config import DEFAULT_MODEL, SUPPORTED_MODELS, fallback_chain  # noqa: E402
 
 class OpenAIChatRequest(BaseModel):
     model: str = DEFAULT_MODEL
@@ -259,7 +259,7 @@ def _get_system_prompt(api_key_info, store_name: str, messages: list) -> Optiona
 async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Request, auth: dict = Depends(verify_auth)):
     """OpenAI-compatible Chat Completions API with knowledge-base-bound API keys."""
     from app.services.rag.service import get_rag_pipeline
-    from app.services.gemini_service import client as gemini_client
+    from app.services.gemini_service import client as gemini_client, gemini_with_fallback
 
     if not gemini_client:
         raise HTTPException(status_code=500, detail="Gemini API key not configured")
@@ -308,13 +308,16 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
         if system_prompt:
             config_kwargs["system_instruction"] = system_prompt
 
-        response = gemini_client.models.generate_content(
-            model=model_name,
-            contents=contents,
-            config=types.GenerateContentConfig(
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
-                **config_kwargs,
+        response = gemini_with_fallback(
+            lambda m: gemini_client.models.generate_content(
+                model=m,
+                contents=contents,
+                config=types.GenerateContentConfig(
+                    thinking_config=types.ThinkingConfig(thinking_budget=0),
+                    **config_kwargs,
+                ),
             ),
+            fallback_chain(model_name),
         )
 
         answer_text = strip_citations(response.text)

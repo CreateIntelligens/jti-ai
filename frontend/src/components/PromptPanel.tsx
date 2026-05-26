@@ -515,7 +515,7 @@ export default function PromptPanel({
                       <option value="gemini-2.0-flash">gemini-2.0-flash</option>
                       <option value="gemini-2.5-flash">gemini-2.5-flash</option>
                       <option value="gemini-2.5-pro">gemini-2.5-pro</option>
-                      <option value="gemini-3.1-flash-lite-preview">gemini-3.1-flash-lite (preview)</option>
+                      <option value="gemini-3.1-flash-lite">gemini-3.1-flash-lite</option>
                     </select>
                   </div>
                 </div>

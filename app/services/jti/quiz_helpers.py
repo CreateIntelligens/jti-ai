@@ -8,12 +8,13 @@ import logging
 from typing import Any
 
 import app.deps as deps
+from app.models_config import QUIZ_HELPER_MODEL, fallback_chain
 from app.services.jti.response_assembly import (
     build_jti_response_fields,
     format_option_texts,
 )
 from app.services.jti.main_agent import main_agent
-from app.services.gemini_service import gemini_with_retry, run_sync
+from app.services.gemini_service import gemini_with_fallback, gemini_with_retry, run_sync
 from app.services.gemini_clients import get_default_client
 
 logger = logging.getLogger(__name__)
@@ -216,12 +217,13 @@ async def _judge_user_choice(user_message: str, question: dict) -> str | None:
 
 只回覆：A 至 E、PAUSE 或 X"""
 
-        from app.models_config import QUIZ_HELPER_MODEL
-        model_name = QUIZ_HELPER_MODEL
-        response = await run_sync(gemini_with_retry, lambda: client.models.generate_content(
-            model=model_name,
-            contents=prompt
-        ))
+        response = await run_sync(
+            gemini_with_fallback,
+            lambda m: gemini_with_retry(
+                lambda: client.models.generate_content(model=m, contents=prompt)
+            ),
+            fallback_chain(QUIZ_HELPER_MODEL),
+        )
 
         result = response.text.strip().upper()
 

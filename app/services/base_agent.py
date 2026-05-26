@@ -293,13 +293,59 @@ class BaseAgent:
     _MAX_TOOL_ROUNDS = 2
     _RAG_MAX_CITATIONS = 5
 
+    async def _send_enriched_with_model_fallback(
+        self,
+        chat_session,
+        enriched: str,
+        force_config,
+        session: Session,
+    ):
+        """Send the initial forced-tool message.
+
+        Rebuild the chat session if its bound model is gone.
+        """
+        from app.models_config import fallback_chain
+        from app.services.gemini_service import _is_model_gone, gemini_with_retry, run_sync
+
+        model_chain = fallback_chain(self.model_name)
+        for model_index, model_name in enumerate(model_chain):
+            try:
+                response = await run_sync(
+                    gemini_with_retry,
+                    lambda current_chat_session=chat_session: current_chat_session.send_message(
+                        enriched,
+                        config=force_config,
+                    ),
+                )
+                return chat_session, response
+            except Exception as e:
+                if not _is_model_gone(e) or model_index == len(model_chain) - 1:
+                    raise
+
+                next_model = model_chain[model_index + 1]
+                logger.warning(
+                    "[Gemini] chat model %s unavailable; rebuilding session on %s",
+                    model_name,
+                    next_model,
+                )
+                self.model_name = next_model
+                self._chat_sessions.pop(session.session_id, None)
+                chat_session = self._get_or_create_chat_session(session)
+
+        raise RuntimeError("model fallback send exited unexpectedly")
+
     async def _run_tool_loop(self, chat_session, enriched: str, session: Session, user_message: str):
         """Send enriched message with forced tool call, handle function calling loop.
         Returns (response, citations)."""
         from app.services.gemini_service import gemini_with_retry, run_sync
 
         force_config = self._get_force_tool_config(session)
-        response = await run_sync(gemini_with_retry, lambda: chat_session.send_message(enriched, config=force_config))
+        chat_session, response = await self._send_enriched_with_model_fallback(
+            chat_session,
+            enriched,
+            force_config,
+            session,
+        )
 
         citations: list[dict] | None = None
         for _ in range(self._MAX_TOOL_ROUNDS):
