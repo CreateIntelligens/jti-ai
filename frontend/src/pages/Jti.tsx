@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { History, RotateCcw, Sun, Moon, Settings } from 'lucide-react';
 import ConversationHistoryModal from '../components/ConversationHistoryModal';
 import JtiSettingsModal from '../components/JtiSettingsModal';
@@ -47,6 +46,38 @@ interface WelcomeContent {
 
 type TtsState = 'pending' | 'ready' | 'error';
 
+const JTI_UI_TEXT = {
+  appTitle: 'JTI 智慧助手',
+  statusReady: '準備中...',
+  statusConnected: '已連線',
+  statusFailed: '連線失敗',
+  statusChatting: '對話中',
+  statusQuiz: '測驗中',
+  restartConfirm: '確定要重新開始對話嗎？所有記錄將清除。',
+  networkError: '網路錯誤，請稍後再試',
+  settingsTitle: '設定',
+  restartTitle: '重新開始',
+  historyTitle: '查看對話歷史',
+  themeTitle: '切換主題',
+};
+
+const JTI_QUICK_ACTIONS = {
+  zh: [
+    { text: '開始測驗', msg: '開始測驗', primary: true },
+    { text: '什麼是加熱菸?', msg: '什麼是加熱菸?', primary: false },
+    { icon: '👋', text: '你好', msg: '你好', primary: false },
+  ],
+  en: [
+    { text: 'Start Quiz', msg: 'Start Quiz', primary: true },
+    { text: 'What is Heated Tobacco?', msg: 'What is Heated Tobacco?', primary: false },
+    { icon: '👋', text: 'Say Hello', msg: 'Say Hello', primary: false },
+  ],
+};
+
+function getJtiQuickActions(language: string) {
+  return language === 'en' ? JTI_QUICK_ACTIONS.en : JTI_QUICK_ACTIONS.zh;
+}
+
 function getQuizTotalQuestions(session: SessionData): number {
   return session.selected_questions?.length || 4;
 }
@@ -56,12 +87,11 @@ function sleep(ms: number): Promise<void> {
 }
 
 export default function Jti() {
-  const { t } = useTranslation();
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [statusText, setStatusText] = useState(t('status_ready'));
+  const [statusText, setStatusText] = useState(JTI_UI_TEXT.statusReady);
   const [sessionInfo, setSessionInfo] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState(localStorage.getItem('language') || 'zh');
@@ -275,29 +305,29 @@ export default function Jti() {
       : [];
     setMessages(opening);
     clearTtsState();
-    setStatusText(t('status_connected'));
+    setStatusText(JTI_UI_TEXT.statusConnected);
     setSessionInfo(`#${data.session_id.substring(0, 8)}`);
     return data;
-  }, [sessionId, t, clearTtsState]);
+  }, [sessionId, clearTtsState]);
 
   const restartConversation = useCallback(async () => {
-    if (messages.some(m => m.type === 'user') && !window.confirm(t('restart_confirm'))) {
+    if (messages.some(m => m.type === 'user') && !window.confirm(JTI_UI_TEXT.restartConfirm)) {
       return;
     }
     try {
       await startNewSession(currentLanguage);
       setTimeout(() => inputRef.current?.focus(), 100);
     } catch {
-      setStatusText(t('status_failed'));
+      setStatusText(JTI_UI_TEXT.statusFailed);
     }
-  }, [currentLanguage, messages, t, startNewSession]);
+  }, [currentLanguage, messages, startNewSession]);
 
   const silentRestart = useCallback(async () => {
     try {
       await startNewSession(currentLanguage);
       setTimeout(() => inputRef.current?.focus(), 100);
     } catch {
-      setStatusText(t('status_failed'));
+      setStatusText(JTI_UI_TEXT.statusFailed);
     }
   }, [currentLanguage, startNewSession]);
 
@@ -315,15 +345,14 @@ export default function Jti() {
     try {
       await startNewSession(newLang);
     } catch {
-      setStatusText(t('status_failed'));
+      setStatusText(JTI_UI_TEXT.statusFailed);
     }
-  }, [currentLanguage, messages, t, startNewSession]);
+  }, [currentLanguage, messages, startNewSession]);
 
-  const refreshWelcomeContent = useCallback(async (lang?: string) => {
-    const targetLang = (lang || currentLanguage) === 'en' ? 'en' : 'zh';
+  const refreshWelcomeContent = useCallback(async () => {
     try {
-      const data = await getJtiRuntimeSettings(undefined, targetLang);
-      const welcome = data.settings?.welcome?.[targetLang];
+      const data = await getJtiRuntimeSettings(undefined, 'zh');
+      const welcome = data.settings?.welcome?.zh;
       if (welcome?.title && welcome?.description) {
         setWelcomeContent({
           title: welcome.title,
@@ -335,7 +364,7 @@ export default function Jti() {
     } catch {
       setWelcomeContent(null);
     }
-  }, [currentLanguage]);
+  }, []);
 
   const sessionStarted = useRef(false);
 
@@ -346,7 +375,7 @@ export default function Jti() {
     const lang = localStorage.getItem('language') || 'zh';
     startNewSession(lang)
       .then(() => setTimeout(() => inputRef.current?.focus(), 100))
-      .catch(() => setStatusText(t('status_failed')));
+      .catch(() => setStatusText(JTI_UI_TEXT.statusFailed));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -404,7 +433,7 @@ export default function Jti() {
           activeSessionId = restartData.session_id;
           setSessionId(activeSessionId);
           setSessionInfo(`#${activeSessionId.substring(0, 8)}`);
-          setStatusText(t('status_connected'));
+          setStatusText(JTI_UI_TEXT.statusConnected);
           clearTtsState();
 
           res = await postChatMessage(activeSessionId);
@@ -465,16 +494,16 @@ export default function Jti() {
         const count = Object.keys(s.answers || {}).length;
         const totalQuestions = getQuizTotalQuestions(s);
         const colorName = s.quiz_result?.color_name || s.quiz_result_id || '';
-        const status = s.step === 'QUIZ' ? `${t('status_quiz')} · ${count}/${totalQuestions}`
-          : colorName || t('status_chatting');
+        const status = s.step === 'QUIZ' ? `${JTI_UI_TEXT.statusQuiz} · ${count}/${totalQuestions}`
+          : colorName || JTI_UI_TEXT.statusChatting;
         setStatusText(status);
       }
 
     } catch (error) {
       setIsTyping(false);
-      const errorMessage = error instanceof Error ? error.message : t('error_network');
+      const errorMessage = error instanceof Error ? error.message : JTI_UI_TEXT.networkError;
       setMessages(prev => [...prev, {
-        text: `⚠️ ${errorMessage || t('error_network')}`,
+        text: `⚠️ ${errorMessage || JTI_UI_TEXT.networkError}`,
         type: 'system',
         timestamp: Date.now()
       }]);
@@ -482,7 +511,7 @@ export default function Jti() {
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [sessionId, warmupTtsAudio, currentLanguage, t, clearTtsState]);
+  }, [sessionId, warmupTtsAudio, currentLanguage, clearTtsState]);
 
   const handleRegenerate = async (turnNumber: number) => {
     if (!sessionId || loading) return;
@@ -549,11 +578,7 @@ export default function Jti() {
     handleEnterSubmit(e);
   };
 
-  const quickActions = [
-    { text: t('quick_action_quiz'), msg: t('quick_action_quiz'), primary: true },
-    { text: t('quick_action_htp'), msg: t('quick_action_htp'), primary: false },
-    { icon: '👋', text: t('quick_action_greeting'), msg: t('quick_action_greeting'), primary: false },
-  ];
+  const quickActions = useMemo(() => getJtiQuickActions(currentLanguage), [currentLanguage]);
 
   return (
     <div className="jti-container">
@@ -565,30 +590,30 @@ export default function Jti() {
       <header className="jti-header">
         <div className="header-content">
           <div className="logo-section">
-            <h1 className="logo-text">{t('app_title')}</h1>
+            <h1 className="logo-text">{JTI_UI_TEXT.appTitle}</h1>
           </div>
           <div className="status-section">
             <button
               className="icon-btn"
               onClick={() => setShowSettingsModal(true)}
-              title={t('settings') || '設定'}
-              aria-label="Settings"
+              title={JTI_UI_TEXT.settingsTitle}
+              aria-label={JTI_UI_TEXT.settingsTitle}
             >
               <Settings size={18} />
             </button>
             <button
               className="icon-btn"
               onClick={restartConversation}
-              title={t('button_restart')}
-              aria-label="Restart Conversation"
+              title={JTI_UI_TEXT.restartTitle}
+              aria-label={JTI_UI_TEXT.restartTitle}
             >
               <RotateCcw size={18} />
             </button>
             <button
               className="icon-btn"
               onClick={() => setShowHistoryModal(true)}
-              title={t('view_conversation_history') || 'View Conversation History'}
-              aria-label="Conversation History"
+              title={JTI_UI_TEXT.historyTitle}
+              aria-label={JTI_UI_TEXT.historyTitle}
             >
               <History size={18} />
             </button>
@@ -603,8 +628,8 @@ export default function Jti() {
             <button
               className="icon-btn"
               onClick={toggleTheme}
-              title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
-              aria-label="Toggle Theme"
+              title={JTI_UI_TEXT.themeTitle}
+              aria-label={JTI_UI_TEXT.themeTitle}
             >
               {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
@@ -633,7 +658,6 @@ export default function Jti() {
           welcomeDescription={welcomeContent?.description}
           onPlayTts={playAssistantTts}
           getTtsState={getAssistantTtsState}
-          t={t}
         />
         {messages.length === 1 && messages[0].type === 'assistant' && (
           <div className="quick-reply-chips">
@@ -660,7 +684,6 @@ export default function Jti() {
           handleSubmit={handleSubmit}
           handleKeyDown={handleKeyDown}
           inputRef={inputRef}
-          t={t}
         />
       </main>
 

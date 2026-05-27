@@ -16,14 +16,10 @@ it('renders a second-level question list for the selected topic', () => {
   const html = renderToStaticMarkup(
     <HciotTopicGrid
       topics={topics}
-      language="zh"
       disabled={false}
       onSelect={() => {}}
       onSelectQuestion={() => {}}
       selectedTopicId="prp"
-      heading="常用衛教主題"
-      subheading="先選主題，再選問題"
-      questionHeading="PRP 常見問題"
     />,
   );
 

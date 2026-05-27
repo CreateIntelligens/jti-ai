@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject, type SetStateAction } from 'react';
-import { useTranslation } from 'react-i18next';
 import { ExternalLink, FileText, HeartPulse, History, Moon, RotateCcw, Settings, Sun } from 'lucide-react';
 import { fetchWithApiKey } from '../services/api';
 
@@ -42,6 +41,25 @@ const WORKSPACE_STORAGE_KEY = 'hciot:workspace';
 const HCIOT_EXTERNAL_LINK_URL =
   (import.meta.env.VITE_HCIOT_EXTERNAL_LINK_URL as string | undefined)?.trim() || '';
 const HCIOT_EXTERNAL_LINK_LABEL = '語音管理';
+const HCIOT_UI_TEXT = {
+  appTitle: 'HCIoT 衛教助理',
+  brandKicker: 'Hospital Education Interface',
+  statusReady: '準備中...',
+  statusConnected: '已連線',
+  statusFailed: '連線失敗',
+  statusChatting: '對話中',
+  loading: '載入中...',
+  restartConfirm: '確定要重新開始對話嗎？所有記錄將清除。',
+  languageConfirm: '切換語言會重新開始對話，確定要繼續嗎？',
+  networkError: '網路錯誤，請稍後再試',
+  inputPlaceholder: '請輸入想詢問的症狀、照護方式、回診時機或飲食建議...',
+  settingsTitle: '人物設定',
+  restartTitle: '重新開始',
+  historyTitle: '查看對話歷史',
+  languageTitle: '切換語言',
+  themeTitle: '切換主題',
+  topicsLoadError: '無法載入題目分類，請稍後再試。',
+};
 type WorkspaceMode = 'chat' | 'files';
 interface TopicSelection {
   categoryId: string | null;
@@ -151,6 +169,18 @@ function buildOpeningMessages(openingMessage?: string): HciotMessage[] {
   return [{ text: openingMessage, type: 'assistant', timestamp: Date.now() }];
 }
 
+function getTopicDisabledMessage(storeMissing: boolean, topicsError: boolean): string | null {
+  if (storeMissing) {
+    return `找不到知識庫 ${HCIOT_DEFAULT_STORE_NAME}，請先建立 store 並匯入衛教文件。`;
+  }
+
+  if (topicsError) {
+    return HCIOT_UI_TEXT.topicsLoadError;
+  }
+
+  return null;
+}
+
 function findUserMessageIndexByTurn(messages: HciotMessage[], turnNumber: number): number {
   return messages.findIndex(
     (message) => message.type === 'user' && message.turnNumber === turnNumber,
@@ -183,7 +213,6 @@ function updateLastUserTurnNumber(
 }
 
 export default function Hciot() {
-  const { t } = useTranslation();
   const { theme, toggleTheme } = useTheme();
 
   const [storeName, setStoreName] = useState<string | null>(null);
@@ -193,7 +222,7 @@ export default function Hciot() {
   const [messages, setMessages] = useState<HciotMessage[]>([]);
   const [userInput, setUserInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [statusText, setStatusText] = useState(t('status_ready'));
+  const [statusText, setStatusText] = useState(HCIOT_UI_TEXT.statusReady);
   const [sessionInfo, setSessionInfo] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState(() =>
@@ -409,7 +438,7 @@ export default function Hciot() {
     const result = await api.hciotStartChat(lang, previousSessionId);
     setSessionId(result.session_id || null);
     setSessionInfo(buildSessionInfo(result.session_id));
-    setStatusText(t('status_connected'));
+    setStatusText(HCIOT_UI_TEXT.statusConnected);
     setStoreMissing(false);
     setMessages(buildOpeningMessages(result.opening_message));
     if (lang !== currentLanguage) {
@@ -417,7 +446,7 @@ export default function Hciot() {
     }
     focusSoon(inputRef);
     return result.session_id || null;
-  }, [currentLanguage, t]);
+  }, [currentLanguage]);
 
   const bootstrapped = useRef(false);
 
@@ -429,7 +458,7 @@ export default function Hciot() {
       .catch((error) => {
         console.error('Failed to initialize HCIoT session:', error);
         setStoreMissing(true);
-        setStatusText(t('status_failed'));
+        setStatusText(HCIOT_UI_TEXT.statusFailed);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -461,12 +490,12 @@ export default function Hciot() {
 
   const restartConversation = useCallback(async () => {
     if (!storeName) return;
-    if (messages.some((m) => m.type === 'user') && !window.confirm(t('restart_confirm'))) {
+    if (messages.some((m) => m.type === 'user') && !window.confirm(HCIOT_UI_TEXT.restartConfirm)) {
       return;
     }
     resetConversationState();
     await startSession(sessionId);
-  }, [messages, resetConversationState, sessionId, startSession, storeName, t]);
+  }, [messages, resetConversationState, sessionId, startSession, storeName]);
 
   const silentRestartConversation = useCallback(async () => {
     if (!storeName) return;
@@ -476,7 +505,7 @@ export default function Hciot() {
 
   const toggleLanguage = useCallback(async () => {
     if (messages.some((m) => m.type === 'user')) {
-      if (!window.confirm(t('hciot_language_confirm_zh'))) {
+      if (!window.confirm(HCIOT_UI_TEXT.languageConfirm)) {
         return;
       }
     }
@@ -488,7 +517,7 @@ export default function Hciot() {
     if (storeName) {
       await startSession(sessionId, nextLanguage);
     }
-  }, [currentLanguage, messages, sessionId, startSession, storeName, t]);
+  }, [currentLanguage, messages, sessionId, startSession, storeName]);
 
   const sendMessage = useCallback(async (message: string, turnNumber?: number) => {
     if (!message) return;
@@ -537,19 +566,19 @@ export default function Hciot() {
         return [...updateLastUserTurnNumber(prev, data.turn_number), nextMessage];
       });
 
-      setStatusText(t('status_chatting'));
+      setStatusText(HCIOT_UI_TEXT.statusChatting);
     } catch (error) {
       console.error('HCIoT sendMessage failed:', error);
       setIsTyping(false);
       setMessages((prev) => [
         ...prev,
-        { text: `⚠️ ${t('error_network')}`, type: 'system', timestamp: Date.now() },
+        { text: `⚠️ ${HCIOT_UI_TEXT.networkError}`, type: 'system', timestamp: Date.now() },
       ]);
     } finally {
       setLoading(false);
       focusSoon(inputRef);
     }
-  }, [selectedTtsCharacter, sessionId, startSession, t]);
+  }, [selectedTtsCharacter, sessionId, startSession]);
 
   const handleRegenerate = async (turnNumber: number) => {
     if (!sessionId || loading) return;
@@ -626,15 +655,12 @@ export default function Hciot() {
   };
 
   const allTopics = useMemo(() => categories.flatMap((cat) => cat.topics), [categories]);
-  const selectedTopic = useMemo(
-    () => allTopics.find((topic) => topic.id === selectedTopicId) || null,
-    [allTopics, selectedTopicId],
-  );
   const selectedCategory = useMemo(
     () => categories.find((cat) => cat.id === selectedCategoryId) || null,
     [categories, selectedCategoryId],
   );
   const visibleTopics = selectedCategory ? selectedCategory.topics : allTopics;
+  const topicDisabledMessage = getTopicDisabledMessage(storeMissing, topicsError);
 
   return (
     <div className="hciot-shell">
@@ -644,8 +670,8 @@ export default function Hciot() {
         <div className="hciot-brand">
           <div className="hciot-brand-mark"><HeartPulse size={24} /></div>
           <div>
-            <p className="hciot-brand-kicker">{t('hciot_brand_kicker')}</p>
-            <h1 className="hciot-brand-title">{t('hciot_app_title')}</h1>
+            <p className="hciot-brand-kicker">{HCIOT_UI_TEXT.brandKicker}</p>
+            <h1 className="hciot-brand-title">{HCIOT_UI_TEXT.appTitle}</h1>
           </div>
         </div>
 
@@ -695,19 +721,19 @@ export default function Hciot() {
               />
             </label>
           )}
-          <button className="hciot-icon-button" onClick={() => setShowSettingsModal(true)} title={t('hciot_settings')}>
+          <button className="hciot-icon-button" onClick={() => setShowSettingsModal(true)} title={HCIOT_UI_TEXT.settingsTitle}>
             <Settings size={18} />
           </button>
-          <button className="hciot-icon-button" onClick={() => void restartConversation()} title={t('button_restart')}>
+          <button className="hciot-icon-button" onClick={() => void restartConversation()} title={HCIOT_UI_TEXT.restartTitle}>
             <RotateCcw size={18} />
           </button>
-          <button className="hciot-icon-button" onClick={() => setShowHistoryModal(true)} title={t('view_conversation_history')}>
+          <button className="hciot-icon-button" onClick={() => setShowHistoryModal(true)} title={HCIOT_UI_TEXT.historyTitle}>
             <History size={18} />
           </button>
-          <button className="hciot-icon-button text" onClick={() => void toggleLanguage()} title={t('hciot_toggle_language')}>
+          <button className="hciot-icon-button text" onClick={() => void toggleLanguage()} title={HCIOT_UI_TEXT.languageTitle}>
             {currentLanguage === 'zh' ? 'EN' : '中'}
           </button>
-          <button className="hciot-icon-button" onClick={toggleTheme} title={t('hciot_toggle_theme')}>
+          <button className="hciot-icon-button" onClick={toggleTheme} title={HCIOT_UI_TEXT.themeTitle}>
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
         </div>
@@ -720,7 +746,6 @@ export default function Hciot() {
               <HciotTopicGrid
                 topics={visibleTopics}
                 categories={categories}
-                language={currentLanguage}
                 disabled={loading || !sessionId}
                 onSelect={handleSelectTopic}
                 onSelectQuestion={handleSelectQuestion}
@@ -734,20 +759,7 @@ export default function Hciot() {
                     topicId: firstTopic?.id || null,
                   });
                 }}
-                heading={t('hciot_topic_heading')}
-                subheading={t('hciot_topic_subheading')}
-                questionHeading={
-                  selectedTopic
-                    ? t('hciot_topic_question_heading', { topic: selectedTopic.label })
-                    : undefined
-                }
-                disabledMessage={
-                  storeMissing
-                    ? t('hciot_store_missing_notice', { store: HCIOT_DEFAULT_STORE_NAME })
-                    : topicsError
-                      ? '無法載入題目分類，請稍後再試。'
-                      : null
-                }
+                disabledMessage={topicDisabledMessage}
               />
             </div>
           </aside>
@@ -775,7 +787,7 @@ export default function Hciot() {
               sessionId={sessionId}
               statusText={statusText}
               sessionInfo={sessionInfo}
-              placeholder={loading ? t('loading') : t('hciot_input_placeholder')}
+              placeholder={loading ? HCIOT_UI_TEXT.loading : HCIOT_UI_TEXT.inputPlaceholder}
               setUserInput={setUserInput}
               handleSubmit={handleSubmit}
               handleKeyDown={handleKeyDown}
@@ -817,7 +829,7 @@ export default function Hciot() {
             })),
           );
           setSessionInfo(buildSessionInfo(sid));
-          setStatusText(t('status_connected'));
+          setStatusText(HCIOT_UI_TEXT.statusConnected);
         }}
       />
     </div>

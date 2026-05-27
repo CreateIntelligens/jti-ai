@@ -11,10 +11,7 @@ const apiMocks = vi.hoisted(() => ({
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, vars?: Record<string, string>) => {
-      if (key === 'hciot_topic_question_heading') return `${vars?.topic} 常見問題`;
-      return key;
-    },
+    t: (key: string) => key,
   }),
 }));
 

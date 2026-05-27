@@ -1,5 +1,7 @@
 import React from 'react';
-import { TFunction } from 'i18next';
+
+const INPUT_LOADING_PLACEHOLDER = '準備中...';
+const INPUT_PLACEHOLDER = '輸入訊息... (Enter 傳送, Shift+Enter 換行)';
 
 interface JtiInputAreaProps {
   userInput: string;
@@ -11,7 +13,6 @@ interface JtiInputAreaProps {
   handleSubmit: (e: React.FormEvent) => void;
   handleKeyDown: (e: React.KeyboardEvent) => void;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
-  t: TFunction;
 }
 
 export default function JtiInputArea({
@@ -24,7 +25,6 @@ export default function JtiInputArea({
   handleSubmit,
   handleKeyDown,
   inputRef,
-  t,
 }: JtiInputAreaProps) {
   return (
     <div className="input-area">
@@ -37,7 +37,7 @@ export default function JtiInputArea({
               value={userInput}
               onChange={(e) => setUserInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={loading ? t('status_ready') : t('input_placeholder')}
+              placeholder={loading ? INPUT_LOADING_PLACEHOLDER : INPUT_PLACEHOLDER}
               disabled={!sessionId}
               autoComplete="off"
               spellCheck={false}

@@ -1,7 +1,10 @@
 import React from 'react';
-import type { TFunction } from 'i18next';
 
 import CitationsList from '../CitationsList';
+
+const FALLBACK_WELCOME_TITLE = '歡迎使用 JTI 智慧助手';
+const FALLBACK_WELCOME_DESCRIPTION = '透過 AI 驅動的對話系統，帶你完成尋找命定前蓋，找到最適合你的測驗結果。';
+const QUICK_START_LABEL = '快速開始';
 
 function getTtsButtonTitle(ttsState: 'pending' | 'ready' | 'error' | undefined): string {
   if (ttsState === 'pending') return '語音準備中';
@@ -47,7 +50,6 @@ interface JtiMessageListProps {
   quickActions: QuickAction[];
   welcomeTitle?: string;
   welcomeDescription?: string;
-  t: TFunction;
 }
 
 export default function JtiMessageList({
@@ -70,7 +72,6 @@ export default function JtiMessageList({
   quickActions,
   welcomeTitle,
   welcomeDescription,
-  t,
 }: JtiMessageListProps) {
   return (
     <div className="messages-area custom-scrollbar">
@@ -81,14 +82,14 @@ export default function JtiMessageList({
               <span className="hero-icon"></span>
               <div className="icon-glow"></div>
             </div>
-            <h2 className="hero-title">{welcomeTitle || t('welcome_title')}</h2>
+            <h2 className="hero-title">{welcomeTitle || FALLBACK_WELCOME_TITLE}</h2>
             <p className="hero-description">
-              {welcomeDescription || t('welcome_description')}
+              {welcomeDescription || FALLBACK_WELCOME_DESCRIPTION}
             </p>
           </div>
 
           <div className="quick-start">
-            <p className="quick-start-label">{t('quick_start')}</p>
+            <p className="quick-start-label">{QUICK_START_LABEL}</p>
             <div className="quick-actions">
               {quickActions.map((action, i) => (
                 <button

@@ -1,44 +1,38 @@
-import { useTranslation } from 'react-i18next';
 import HciotSelect from './HciotSelect';
-import type { HciotCategory, HciotLanguage, HciotTopic } from '../../config/hciotTopics';
+import type { HciotCategory, HciotTopic } from '../../config/hciotTopics';
+
+const ALL_CATEGORIES_VALUE = '__all__';
+const TOPIC_PANEL_SUBHEADING = '先選主題，再選問題';
+const TOPIC_PANEL_HEADING = '常用衛教主題';
+const ALL_CATEGORIES_LABEL = '全部科別';
 
 interface HciotTopicGridProps {
   topics: HciotTopic[];
   categories?: HciotCategory[];
-  language: HciotLanguage;
   disabled?: boolean;
   onSelect: (topic: HciotTopic) => void;
   onSelectQuestion: (question: string) => void;
   onSelectCategory?: (categoryId: string | null) => void;
   selectedTopicId?: string | null;
   selectedCategoryId?: string | null;
-  heading: string;
-  subheading: string;
-  questionHeading?: string;
   disabledMessage?: string | null;
 }
 
 export default function HciotTopicGrid({
   topics,
   categories = [],
-  language,
   disabled = false,
   onSelect,
   onSelectQuestion,
   onSelectCategory,
   selectedTopicId = null,
   selectedCategoryId = null,
-  heading,
-  subheading,
-  questionHeading,
   disabledMessage,
 }: HciotTopicGridProps) {
-  const { t } = useTranslation();
   const selectedTopic = selectedTopicId ? topics.find((t) => t.id === selectedTopicId) ?? null : null;
-  const categorySelectPlaceholder = language === 'en' ? 'All categories' : '全部科別';
 
   const handleCategoryChange = (value: string) => {
-    onSelectCategory?.(value === '__all__' ? null : value);
+    onSelectCategory?.(value === ALL_CATEGORIES_VALUE ? null : value);
   };
 
   const handleTopicChange = (value: string) => {
@@ -51,8 +45,8 @@ export default function HciotTopicGrid({
   return (
     <section className="hciot-topic-section">
       <div className="hciot-topic-panel-head">
-        <p className="hciot-topic-kicker">{subheading}</p>
-        <h3 className="hciot-topic-heading">{heading}</h3>
+        <p className="hciot-topic-kicker">{TOPIC_PANEL_SUBHEADING}</p>
+        <h3 className="hciot-topic-heading">{TOPIC_PANEL_HEADING}</h3>
         {disabledMessage ? (
           <div className="hciot-topic-disabled">{disabledMessage}</div>
         ) : null}
@@ -61,11 +55,11 @@ export default function HciotTopicGrid({
       {categories.length > 1 ? (
         <HciotSelect
           className="hciot-topic-select"
-          value={selectedCategoryId || '__all__'}
+          value={selectedCategoryId || ALL_CATEGORIES_VALUE}
           onChange={handleCategoryChange}
           disabled={disabled}
           options={[
-            { value: '__all__', label: categorySelectPlaceholder },
+            { value: ALL_CATEGORIES_VALUE, label: ALL_CATEGORIES_LABEL },
             ...categories.map((cat) => ({ value: cat.id, label: cat.label })),
           ]}
         />
@@ -84,7 +78,7 @@ export default function HciotTopicGrid({
       {selectedTopic ? (
         <div className="hciot-topic-question-panel">
           <p className="hciot-q-section-head">
-            {questionHeading || t('hciot_topic_question_heading', { topic: selectedTopic.label })}
+            {selectedTopic.label} 常見問題
           </p>
           <div className="hciot-topic-question-list custom-scrollbar">
             {selectedTopic.questions.map((question, index) => {
