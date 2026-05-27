@@ -29,10 +29,14 @@ function LabelNameInput({ placeholder, value, onChange }: LabelNameInputProps) {
 }
 
 export default function UploadTopicSelector({ topic }: UploadTopicSelectorProps) {
+  const isNewCategory = topic.categoryId === NEW_VALUE;
+  const isNewTopic = topic.topicId === NEW_VALUE;
+  const showNewFields = isNewCategory || isNewTopic;
+
   return (
     <div className="hciot-qa-topic-section">
       <label className="hciot-qa-topic-label">
-        指定科別 / 主題（可選）
+        指定科別 / 主題
       </label>
       <div className="hciot-qa-selectors">
         <HciotSelect
@@ -54,23 +58,22 @@ export default function UploadTopicSelector({ topic }: UploadTopicSelectorProps)
         />
       </div>
 
-      {topic.categoryId === NEW_VALUE && (
-        <div className="hciot-qa-new-fields">
-          <LabelNameInput
-            placeholder="新科別名稱"
-            value={topic.newCategoryLabel}
-            onChange={topic.setNewCategoryLabel}
-          />
-        </div>
-      )}
-
-      {topic.topicId === NEW_VALUE && (
-        <div className="hciot-qa-new-fields">
-          <LabelNameInput
-            placeholder="新主題名稱"
-            value={topic.newTopicLabel}
-            onChange={topic.setNewTopicLabel}
-          />
+      {showNewFields && (
+        <div className="hciot-qa-new-fields hciot-qa-new-fields-row">
+          {isNewCategory && (
+            <LabelNameInput
+              placeholder="新科別名稱"
+              value={topic.newCategoryLabel}
+              onChange={topic.setNewCategoryLabel}
+            />
+          )}
+          {isNewTopic && (
+            <LabelNameInput
+              placeholder="新主題名稱"
+              value={topic.newTopicLabel}
+              onChange={topic.setNewTopicLabel}
+            />
+          )}
         </div>
       )}
     </div>

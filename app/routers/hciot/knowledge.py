@@ -2,6 +2,8 @@
 HCIoT knowledge management API.
 """
 
+import csv
+import io
 import json
 import logging
 import mimetypes
@@ -62,15 +64,11 @@ def _schedule_rag_delete(
     background_tasks.add_task(delete_from_rag, SOURCE_TYPE, language, filename)
 
 
-def _normalized_label(value: str | None, fallback: str) -> str:
-    return (value or "").strip() or fallback
-
-
 def _build_merged_topic_id(category_id: str | None, topic_id: str | None) -> str | None:
-    if category_id and topic_id:
-        return f"{category_id.strip()}/{topic_id.strip()}"
     if topic_id and "/" in topic_id:
         return topic_id.strip()
+    if category_id and topic_id:
+        return f"{category_id.strip()}/{topic_id.strip()}"
     if category_id:
         return category_id.strip()
     return None
@@ -91,6 +89,159 @@ def _prepare_csv_bytes(file_bytes: bytes) -> bytes:
     except UnsupportedQaCsvError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return normalize_qa_csv_rows(file_bytes) or file_bytes
+
+
+def _existing_topic_questions(language: str, topic_id: str | None) -> set[str]:
+    if not topic_id:
+        return set()
+    store = get_hciot_knowledge_store()
+    docs = store.get_topic_csv_files(language, topic_id)
+    seen: set[str] = set()
+    for doc in docs:
+        seen.update(
+            question.strip()
+            for question in extract_questions_from_csv(doc.get("data") or b"") or []
+            if question.strip()
+        )
+    return seen
+
+
+def _skipped_duplicate_upload_response(
+    *,
+    filename: str,
+    topic_id: str | None,
+    category_label: str | None,
+    topic_label: str | None,
+) -> dict:
+    return {
+        "name": "",
+        "display_name": filename,
+        "size": 0,
+        "synced": False,
+        "topic_synced": False,
+        "topic_id": topic_id,
+        "category_label": category_label,
+        "topic_label": topic_label,
+        "uploaded_count": 0,
+        "uploaded_files": [],
+        "imported_count": 0,
+        "skipped_all_duplicates": True,
+    }
+
+
+def _uploaded_csv_response(
+    *,
+    saved_files: list[dict],
+    topic_synced: bool,
+    imported_count: int,
+) -> dict:
+    primary = saved_files[0]
+    return {
+        "name": primary["name"],
+        "display_name": primary["display_name"],
+        "size": primary["size"],
+        "synced": False,
+        "topic_synced": topic_synced,
+        "topic_id": primary.get("topic_id"),
+        "category_label": primary.get("category_label"),
+        "topic_label": primary.get("topic_label"),
+        "uploaded_count": len(saved_files),
+        "uploaded_files": [item["name"] for item in saved_files],
+        "imported_count": imported_count,
+    }
+
+
+def _filter_csv_rows_by_existing_questions(file_bytes: bytes, existing: set[str]) -> bytes | None:
+    """Drop rows whose question already exists. Returns None if every row is a duplicate."""
+    if not existing:
+        return file_bytes
+    try:
+        text = file_bytes.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return file_bytes
+    reader = csv.DictReader(io.StringIO(text))
+    if reader.fieldnames is None or "q" not in reader.fieldnames:
+        return file_bytes
+    kept_rows: list[dict[str, str]] = []
+    for row in reader:
+        q = (row.get("q") or "").strip()
+        if not q or q in existing:
+            continue
+        kept_rows.append(row)
+    if not kept_rows:
+        return None
+    out = io.StringIO()
+    writer = csv.DictWriter(out, fieldnames=list(reader.fieldnames), lineterminator="\n")
+    writer.writeheader()
+    for row in kept_rows:
+        writer.writerow(row)
+    return out.getvalue().encode("utf-8")
+
+
+def save_qa_csv_to_topic(
+    *,
+    background_tasks: BackgroundTasks,
+    language: str,
+    csv_bytes: bytes,
+    filename: str,
+    content_type: str,
+    editable: bool,
+    topic_id: str | None,
+    category_label: str | None,
+    topic_label: str | None,
+    hidden_questions: list[str] | None,
+) -> dict:
+    """Shared write path for any QA-CSV ingestion (file upload, paste, AI extraction).
+
+    Handles dedup against existing topic questions, splits image-bearing rows, writes
+    to the store + schedules RAG sync, and syncs the topic question list. Returns a
+    response dict matching the /upload/ shape (or a `skipped_all_duplicates` payload).
+    """
+    if topic_id:
+        existing = _existing_topic_questions(language, topic_id)
+        filtered = _filter_csv_rows_by_existing_questions(csv_bytes, existing)
+        if filtered is None:
+            return _skipped_duplicate_upload_response(
+                filename=filename,
+                topic_id=topic_id,
+                category_label=category_label,
+                topic_label=topic_label,
+            )
+        csv_bytes = filtered
+
+    imported_count = len(extract_questions_from_csv(csv_bytes) or [])
+
+    uploads = split_qa_csv_by_image(csv_bytes, filename) or [(filename, csv_bytes)]
+
+    saved_files = []
+    for upload_name, upload_bytes in uploads:
+        saved = _insert_uploaded_file(
+            language=language,
+            filename=upload_name,
+            file_bytes=upload_bytes,
+            content_type=content_type,
+            editable=editable,
+            topic_id=topic_id,
+            category_label=category_label,
+            topic_label=topic_label,
+        )
+        saved_files.append(saved)
+        _schedule_rag_sync(background_tasks, language, saved["name"], upload_bytes)
+
+    topic_synced = _sync_topic_questions_from_store(
+        language=language,
+        topic_id=topic_id,
+        topic_label=topic_label,
+        category_label=category_label,
+        hidden_questions=hidden_questions,
+    )
+
+    invalidate_hciot_file_map(language)
+    return _uploaded_csv_response(
+        saved_files=saved_files,
+        topic_synced=topic_synced,
+        imported_count=imported_count,
+    )
 
 
 def _fallback_upload_error_response(detail: object) -> JSONResponse:
@@ -216,7 +367,6 @@ def _sync_topic_questions_from_store(
         existing_hidden = _get_topic_hidden_questions(existing_topic, language)
         return [q for q in existing_hidden if q in current_questions]
 
-
     existing = topic_store.get_topic(topic_id)
     if existing:
         if not questions and not store.has_non_csv_files(language, topic_id):
@@ -234,8 +384,10 @@ def _sync_topic_questions_from_store(
         return False
 
     other_lang = get_other_language(language)
-    topic_label_resolved = _normalized_label(topic_label, suffix)
-    category_label_resolved = _normalized_label(category_label, prefix)
+    # Label fallback: explicit user input wins, otherwise reuse the slug part of
+    # the topic_id ("prefix/suffix") so the topic still has a readable display name.
+    topic_label_resolved = (topic_label or "").strip() or suffix
+    category_label_resolved = (category_label or "").strip() or prefix
     topic_store.upsert_topic(
         topic_id,
         {
@@ -518,45 +670,43 @@ async def upload_knowledge_file(
     merged_topic_id = _build_merged_topic_id(category_id, topic_id)
     parsed_hidden = _parse_hidden_questions(hidden_questions)
 
-    uploads = split_qa_csv_by_image(file_bytes, safe_name) or [(safe_name, file_bytes)]
-
-    saved_files = []
-    for upload_name, upload_bytes in uploads:
-        saved = _insert_uploaded_file(
+    if ext == ".csv":
+        return save_qa_csv_to_topic(
+            background_tasks=background_tasks,
             language=language,
-            filename=upload_name,
-            file_bytes=upload_bytes,
+            csv_bytes=file_bytes,
+            filename=safe_name,
             content_type=content_type,
             editable=editable,
             topic_id=merged_topic_id,
             category_label=category_label,
             topic_label=topic_label,
+            hidden_questions=parsed_hidden,
         )
-        saved_files.append(saved)
-        _schedule_rag_sync(background_tasks, language, saved["name"], upload_bytes)
 
-    topic_synced = _sync_topic_questions_from_store(
+    saved = _insert_uploaded_file(
         language=language,
+        filename=safe_name,
+        file_bytes=file_bytes,
+        content_type=content_type,
+        editable=editable,
         topic_id=merged_topic_id,
-        topic_label=topic_label,
         category_label=category_label,
-        hidden_questions=parsed_hidden,
+        topic_label=topic_label,
     )
-
-    primary = saved_files[0]
+    _schedule_rag_sync(background_tasks, language, saved["name"], file_bytes)
     invalidate_hciot_file_map(language)
-
     return {
-        "name": primary["name"],
-        "display_name": primary["display_name"],
-        "size": primary["size"],
+        "name": saved["name"],
+        "display_name": saved["display_name"],
+        "size": saved["size"],
         "synced": False,
-        "topic_synced": topic_synced,
-        "topic_id": primary.get("topic_id"),
-        "category_label": primary.get("category_label"),
-        "topic_label": primary.get("topic_label"),
-        "uploaded_count": len(saved_files),
-        "uploaded_files": [item["name"] for item in saved_files],
+        "topic_synced": False,
+        "topic_id": saved.get("topic_id"),
+        "category_label": saved.get("category_label"),
+        "topic_label": saved.get("topic_label"),
+        "uploaded_count": 1,
+        "uploaded_files": [saved["name"]],
     }
 
 

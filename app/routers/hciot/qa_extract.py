@@ -13,66 +13,14 @@ from pydantic import BaseModel
 from app.auth import verify_admin
 from app.routers.hciot.knowledge import (
     _build_merged_topic_id,
-    _get_topic_hidden_questions,
-    _insert_uploaded_file,
-    _schedule_rag_sync,
-    _sync_topic_questions_from_store,
+    save_qa_csv_to_topic,
 )
 from app.routers.knowledge_utils import extract_docx_text, safe_filename, xlsx_to_csv_bytes
-from app.services.hciot.main_agent import invalidate_hciot_file_map
+from app.services.hciot.agent_prompts import get_active_persona_and_role_scope
 from app.services.hciot.qa_extract_jobs import create_job, delete_job, get_job, update_job
 from app.services.hciot.qa_extractor import extract_qa_from_document
-from app.services.hciot.topic_store import get_hciot_topic_store
 
 logger = logging.getLogger(__name__)
-
-
-def _get_active_prompt_context(language: str) -> tuple[str, str]:
-    """Fetch active persona and role_scope dynamically from PromptManager, falling back to default PERSONA/rules."""
-    from app.services.hciot.agent_prompts import PERSONA, DEFAULT_RESPONSE_RULE_SECTIONS
-    fallback_persona = PERSONA.get(language, PERSONA["zh"])
-    fallback_sections = DEFAULT_RESPONSE_RULE_SECTIONS.get(language, DEFAULT_RESPONSE_RULE_SECTIONS["zh"])
-    fallback_role_scope = fallback_sections.get("role_scope", "")
-
-    try:
-        from app import deps
-        if not deps.prompt_manager:
-            return fallback_persona, fallback_role_scope
-
-        store_name = "__hciot__en" if language == "en" else "__hciot__"
-        store_prompts = deps.prompt_manager.get_store_prompts(store_name)
-        active_id = getattr(store_prompts, "hciot_active_prompt_id", None)
-        if not active_id:
-            return fallback_persona, fallback_role_scope
-
-        persona = fallback_persona
-        persona_map = getattr(store_prompts, "hciot_persona_by_prompt", None)
-        if isinstance(persona_map, dict):
-            raw_persona = persona_map.get(active_id)
-            if isinstance(raw_persona, dict):
-                inner_persona = raw_persona.get("persona")
-                persona_pair = inner_persona if isinstance(inner_persona, dict) else raw_persona
-                value = persona_pair.get(language)
-                if isinstance(value, str) and value.strip():
-                    persona = value
-
-        role_scope = fallback_role_scope
-        runtime_map = getattr(store_prompts, "hciot_runtime_settings_by_prompt", None)
-        if isinstance(runtime_map, dict):
-            settings = runtime_map.get(active_id)
-            if isinstance(settings, dict):
-                sections = settings.get("response_rule_sections")
-                if isinstance(sections, dict):
-                    lang_sections = sections.get(language)
-                    if isinstance(lang_sections, dict):
-                        val = lang_sections.get("role_scope")
-                        if isinstance(val, str) and val.strip():
-                            role_scope = val
-    except Exception as e:
-        logger.warning("[QA Extract Router] Failed to load active prompt context, using fallback: %s", e)
-
-    return persona, role_scope
-
 
 router = APIRouter(tags=["HCIoT Knowledge"], dependencies=[Depends(verify_admin)])
 
@@ -88,6 +36,7 @@ class QaPairImport(BaseModel):
 
 class ImportQaRequest(BaseModel):
     qa_pairs: list[QaPairImport]
+    hidden_questions: list[str] | None = None
 
 
 def _extract_text_from_upload(file_bytes: bytes, filename: str) -> str:
@@ -110,7 +59,7 @@ def _extract_text_from_upload(file_bytes: bytes, filename: str) -> str:
 async def _run_extract_job_from_text(job_id: str, text: str, language: str) -> None:
     try:
         update_job(job_id, status="running")
-        persona_text, role_scope_text = _get_active_prompt_context(language)
+        persona_text, role_scope_text = get_active_persona_and_role_scope(language)
         qa_pairs = await extract_qa_from_document(
             text=text,
             language=language,
@@ -157,19 +106,10 @@ def _qa_pairs_to_csv_bytes(qa_pairs: list[QaPairImport]) -> bytes:
     return output.getvalue().encode("utf-8")
 
 
-def _combined_hidden_questions(
-    *,
-    language: str,
-    topic_id: str | None,
-    qa_pairs: list[QaPairImport],
-) -> list[str]:
-    new_questions = [pair.q.strip() for pair in qa_pairs if pair.q.strip()]
-    if not topic_id:
-        return new_questions
-    topic_store = get_hciot_topic_store(language)
-    existing_topic = topic_store.get_topic(topic_id)
-    existing_hidden = _get_topic_hidden_questions(existing_topic, language)
-    return list(dict.fromkeys(existing_hidden + new_questions))
+def _hidden_questions_for_import(req: ImportQaRequest) -> list[str]:
+    if req.hidden_questions is not None:
+        return req.hidden_questions
+    return [pair.q.strip() for pair in req.qa_pairs if pair.q.strip()]
 
 
 @router.post("/qa-extract")
@@ -251,35 +191,24 @@ async def import_extracted_qa(
 
     csv_bytes = _qa_pairs_to_csv_bytes(req.qa_pairs)
     filename = f"extracted-{int(time.time())}.csv"
-    saved = _insert_uploaded_file(
+    result = save_qa_csv_to_topic(
+        background_tasks=background_tasks,
         language=language,
+        csv_bytes=csv_bytes,
         filename=filename,
-        file_bytes=csv_bytes,
         content_type="text/csv",
         editable=True,
         topic_id=job.topic_id,
         category_label=job.category_label,
         topic_label=job.topic_label,
-    )
-    _schedule_rag_sync(background_tasks, language, saved["name"], csv_bytes)
-
-    topic_synced = _sync_topic_questions_from_store(
-        language=language,
-        topic_id=job.topic_id,
-        topic_label=job.topic_label,
-        category_label=job.category_label,
-        hidden_questions=_combined_hidden_questions(
-            language=language,
-            topic_id=job.topic_id,
-            qa_pairs=req.qa_pairs,
-        ),
+        hidden_questions=_hidden_questions_for_import(req),
     )
 
-    invalidate_hciot_file_map(language)
     delete_job(job_id)
 
     return {
-        "imported_count": len(req.qa_pairs),
-        "filename": filename,
-        "topic_synced": topic_synced,
+        "imported_count": result.get("imported_count", 0),
+        "filename": result["name"],
+        "topic_synced": result["topic_synced"],
+        "skipped_all_duplicates": result.get("skipped_all_duplicates", False),
     }

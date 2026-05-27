@@ -441,6 +441,7 @@ export interface QaImportResponse {
   imported_count: number;
   filename: string;
   topic_synced: boolean;
+  skipped_all_duplicates?: boolean;
 }
 
 export async function createQaExtractJob(
@@ -477,13 +478,17 @@ export async function importQaExtractJob(
   jobId: string,
   language: string,
   qaPairs: HciotQaPair[],
+  hiddenQuestions?: string[],
 ): Promise<QaImportResponse> {
   return fetchAdminJson<QaImportResponse>(
     `/knowledge/qa-extract/${encodeURIComponent(jobId)}/import`,
     {
       method: 'POST',
       headers: JSON_HEADERS,
-      body: JSON.stringify({ qa_pairs: qaPairs }),
+      body: JSON.stringify({
+        qa_pairs: qaPairs,
+        ...(hiddenQuestions !== undefined ? { hidden_questions: hiddenQuestions } : {}),
+      }),
     },
     { language: normLang(language) },
   );

@@ -4,6 +4,7 @@ import type { HciotLanguage } from '../../../../config/hciotTopics';
 import { toErrorMessage } from '../../../../utils/errors';
 import * as api from '../../../../services/api';
 import type { HciotQaPair } from '../../../../services/api';
+import { createEmptyRow, type QARow } from './types';
 import type { ResolvedUploadTopic } from './types';
 import type { TopicLabels } from '../topicUtils';
 import DocumentToQaPreview from './DocumentToQaPreview';
@@ -31,9 +32,13 @@ interface DocumentToQaTabProps {
     file: File,
     topicId: string | null,
     labels: TopicLabels | null,
-  ) => Promise<{ name: string }>;
+    hiddenQuestions?: string[],
+  ) => Promise<UploadFileResult>;
   onUploadComplete: (firstUploadedFileName: string | null, count: number) => Promise<void>;
 }
+
+type PendingAiSource = { kind: 'file'; file: File } | { kind: 'text'; text: string };
+type UploadFileResult = { name: string };
 
 function fileExtension(file: File): string | undefined {
   return file.name.split('.').pop()?.toLowerCase();
@@ -82,6 +87,30 @@ function parseQaPairsFromCsvText(raw: string): HciotQaPair[] | null {
   return pairs.length > 0 ? pairs : null;
 }
 
+function toHiddenPreviewRows(pairs: HciotQaPair[]): QARow[] {
+  return pairs.map((pair) => ({ ...createEmptyRow(), q: pair.q, a: pair.a, visible: false }));
+}
+
+function getHiddenQuestions(rows: QARow[]): string[] {
+  const hiddenQuestions = rows
+    .filter((row) => !row.visible)
+    .map((row) => row.q.trim())
+    .filter(Boolean);
+  return Array.from(new Set(hiddenQuestions));
+}
+
+function toPlainQaPairs(rows: QARow[]): HciotQaPair[] {
+  return rows.map(({ q, a }) => ({ q, a }));
+}
+
+function escapeCsvCell(value: string): string {
+  return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+function buildQaCsv(rows: QARow[]): string {
+  return ['q,a', ...rows.map((row) => `${escapeCsvCell(row.q)},${escapeCsvCell(row.a)}`)].join('\n');
+}
+
 function isUnrecognizedFormatError(error: unknown): boolean {
   try {
     const parsed = JSON.parse(toErrorMessage(error)) as {
@@ -113,13 +142,16 @@ export default function DocumentToQaTab({
   const [dragOver, setDragOver] = useState(false);
   const [status, setStatus] = useState<DocumentToQaStatus>('idle');
   const [jobId, setJobId] = useState<string | null>(null);
-  const [qaPairs, setQaPairs] = useState<HciotQaPair[]>([]);
+  const [qaPairs, setQaPairs] = useState<QARow[]>([]);
   const [error, setError] = useState<string | null>(null);
-  type PendingAiSource = { kind: 'file'; file: File } | { kind: 'text'; text: string };
 
   const pollingTimerRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
-const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const completeSingleFileUpload = async (result: UploadFileResult) => {
+    await onUploadComplete(result.name || null, result.name ? 1 : 0);
+  };
 
   useEffect(() => {
     if (open) {
@@ -185,7 +217,7 @@ const fileInputRef = useRef<HTMLInputElement>(null);
         const res = await api.getQaExtractJob(id);
         if (res.status === 'done' && res.qa_pairs) {
           stopPolling();
-          setQaPairs(res.qa_pairs);
+          setQaPairs(toHiddenPreviewRows(res.qa_pairs));
           setStatus('preview');
         } else if (res.status === 'failed') {
           stopPolling();
@@ -227,7 +259,7 @@ const fileInputRef = useRef<HTMLInputElement>(null);
             resolvedTopic.labels,
           );
           setStatus('success');
-          await onUploadComplete(res.name, 1);
+          await completeSingleFileUpload(res);
           window.setTimeout(() => onClose(), 1200);
         } catch (err: unknown) {
           if (isUnrecognizedFormatError(err)) {
@@ -254,7 +286,7 @@ const fileInputRef = useRef<HTMLInputElement>(null);
     const parsedPairs = parseQaPairsFromCsvText(trimmed);
     if (parsedPairs) {
       setJobId(null);
-      setQaPairs(parsedPairs);
+      setQaPairs(toHiddenPreviewRows(parsedPairs));
       setStatus('preview');
       return;
     }
@@ -297,9 +329,11 @@ const fileInputRef = useRef<HTMLInputElement>(null);
     }
     setError(null);
     setStatus('importing');
+    const hiddenQuestions = getHiddenQuestions(qaPairs);
+    const plainPairs = toPlainQaPairs(qaPairs);
     try {
       if (jobId) {
-        const res = await api.importQaExtractJob(jobId, language, qaPairs);
+        const res = await api.importQaExtractJob(jobId, language, plainPairs, hiddenQuestions);
         setStatus('success');
         await onUploadComplete(res.filename, res.imported_count);
       } else {
@@ -308,12 +342,11 @@ const fileInputRef = useRef<HTMLInputElement>(null);
           setStatus('preview');
           return;
         }
-        const escape = (v: string) => /[",\n\r]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
-        const csv = ['q,a', ...qaPairs.map((p) => `${escape(p.q)},${escape(p.a)}`)].join('\n');
+        const csv = buildQaCsv(qaPairs);
         const csvFile = new File([csv], `pasted-${Date.now()}.csv`, { type: 'text/csv' });
-        const res = await onUploadFile(csvFile, resolvedTopic.fullTopicId, resolvedTopic.labels);
+        const res = await onUploadFile(csvFile, resolvedTopic.fullTopicId, resolvedTopic.labels, hiddenQuestions);
         setStatus('success');
-        await onUploadComplete(res.name, 1);
+        await completeSingleFileUpload(res);
       }
       window.setTimeout(() => onClose(), 1200);
     } catch (err) {
@@ -350,8 +383,6 @@ const fileInputRef = useRef<HTMLInputElement>(null);
   if (status === 'preview') {
     return (
       <DocumentToQaPreview
-        language={language}
-        isEn={isEn}
         qaPairs={qaPairs}
         error={error}
         onChange={setQaPairs}

@@ -4,7 +4,6 @@ import type { HciotTopicCategory } from '../../../../services/api/hciot';
 import { NEW_VALUE, normalizeLabel, slugify, sortByLabel } from '../topicUtils';
 import type { ResolvedUploadTopic } from './types';
 
-const DEFAULT_CATEGORY = 'other';
 const LS_CATEGORY_KEY = 'hciot_upload_category';
 const LS_TOPIC_KEY = 'hciot_upload_topic';
 
@@ -21,12 +20,18 @@ export function readSavedTopicSelection(categories: HciotTopicCategory[]): Saved
   }
 
   const savedCategory = localStorage.getItem(LS_CATEGORY_KEY);
-  const category = categories.find((item) => item.id === savedCategory) ?? categories[0];
-  const categoryId = category?.id ?? DEFAULT_CATEGORY;
+  const category = (savedCategory
+    ? categories.find((item) => item.id === savedCategory)
+    : undefined) ?? categories[0];
+  const categoryId = category.id;
+
   const savedTopic = localStorage.getItem(LS_TOPIC_KEY);
-  const topicId = savedTopic && category?.topics.some((topic) => topic.id === savedTopic)
-    ? savedTopic
-    : '';
+  const matchedSavedTopic = savedTopic
+    ? category.topics.find((topic) => topic.id === savedTopic)
+    : undefined;
+  const topicId = matchedSavedTopic?.id
+    ?? category.topics[0]?.id
+    ?? NEW_VALUE;
 
   return { categoryId, topicId };
 }
@@ -40,10 +45,13 @@ export function buildUploadTopicOptions(
   sortedTopics: HciotTopicCategory['topics'],
 ): UploadTopicOption[] {
   return [
-    { value: '', label: '— 不指定 —' },
     ...sortedTopics.map((topic) => ({ value: topic.id, label: topic.label })),
     ...(categoryId ? [{ value: NEW_VALUE, label: '＋ 新增主題' }] : []),
   ];
+}
+
+function firstTopicId(category: HciotTopicCategory | undefined): string {
+  return category?.topics[0]?.id ?? NEW_VALUE;
 }
 
 function resolveTopicInfo(
@@ -145,14 +153,21 @@ export function useUploadTopicSelection(categories: HciotTopicCategory[], open: 
     sortedTopics,
     handleCategoryChange: (value: string) => {
       setCategoryId(value);
-      setTopicId(value === NEW_VALUE ? NEW_VALUE : '');
       setNewTopicLabel('');
-      if (value !== NEW_VALUE) {
-        setNewCategoryLabel('');
-        localStorage.setItem(LS_CATEGORY_KEY, value);
-        localStorage.removeItem(LS_TOPIC_KEY);
-      } else {
+      if (value === NEW_VALUE) {
+        setTopicId(NEW_VALUE);
         localStorage.removeItem(LS_CATEGORY_KEY);
+        localStorage.removeItem(LS_TOPIC_KEY);
+        return;
+      }
+
+      const nextTopicId = firstTopicId(categories.find((item) => item.id === value));
+      setTopicId(nextTopicId);
+      setNewCategoryLabel('');
+      localStorage.setItem(LS_CATEGORY_KEY, value);
+      if (nextTopicId !== NEW_VALUE) {
+        localStorage.setItem(LS_TOPIC_KEY, nextTopicId);
+      } else {
         localStorage.removeItem(LS_TOPIC_KEY);
       }
     },
