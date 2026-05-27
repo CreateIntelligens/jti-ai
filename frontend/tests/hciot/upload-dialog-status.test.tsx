@@ -4,7 +4,7 @@ import UploadDialog from '../../src/components/hciot/knowledgeWorkspace/upload/U
 import React from 'react';
 
 describe('UploadDialog', () => {
-  it('detects duplicate files and adds warning', async () => {
+  it('keeps one selected knowledge file in the unified upload tab', async () => {
     render(
       <UploadDialog 
         open={true}
@@ -22,15 +22,15 @@ describe('UploadDialog', () => {
     );
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    const file1 = new File([''], 'test.csv', { type: 'text/csv' });
+    const firstFile = new File([''], 'first.csv', { type: 'text/csv' });
+    const secondFile = new File([''], 'second.csv', { type: 'text/csv' });
     
-    // Add once
-    fireEvent.change(input, { target: { files: [file1] } });
-    
-    // Add again (duplicate)
-    fireEvent.change(input, { target: { files: [file1] } });
-    
-    const duplicateWarnings = await screen.findAllByText('(重複)');
-    expect(duplicateWarnings.length).toBeGreaterThan(0);
+    fireEvent.change(input, { target: { files: [firstFile] } });
+    expect(await screen.findByText('first.csv')).toBeTruthy();
+
+    fireEvent.change(input, { target: { files: [secondFile] } });
+
+    expect(await screen.findByText('second.csv')).toBeTruthy();
+    expect(screen.queryByText('first.csv')).toBeNull();
   });
 });

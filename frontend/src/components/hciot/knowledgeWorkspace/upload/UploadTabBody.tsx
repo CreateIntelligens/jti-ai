@@ -11,6 +11,7 @@ interface UploadTabBodyProps<T> {
   onSelect: (fileList: FileList | null) => void;
   inputRef: RefObject<HTMLInputElement | null>;
   accept?: string;
+  multiple?: boolean;
   items: T[];
   renderItem: (item: T, index: number) => ReactNode;
   isUploading: boolean;
@@ -25,6 +26,8 @@ interface UploadTabBodyProps<T> {
   countEn: string;
   fileListClassName?: string;
   hint?: ReactNode;
+  uploadLabel?: string;
+  extraFooterActions?: ReactNode;
 }
 
 export default function UploadTabBody<T>({
@@ -35,6 +38,7 @@ export default function UploadTabBody<T>({
   onSelect,
   inputRef,
   accept,
+  multiple = true,
   items,
   renderItem,
   isUploading,
@@ -49,6 +53,8 @@ export default function UploadTabBody<T>({
   countEn: _countEn,
   fileListClassName,
   hint,
+  uploadLabel,
+  extraFooterActions,
 }: UploadTabBodyProps<T>) {
   const fileListClasses = [
     'hciot-upload-file-list',
@@ -76,7 +82,7 @@ export default function UploadTabBody<T>({
         ref={inputRef}
         type="file"
         hidden
-        multiple
+        multiple={multiple}
         accept={accept}
         onChange={(event) => onSelect(event.target.files)}
       />
@@ -97,6 +103,7 @@ export default function UploadTabBody<T>({
           <button type="button" className="hciot-file-action-button" onClick={onClose}>
             取消
           </button>
+          {extraFooterActions}
           <button
             type="button"
             className="hciot-file-action-button primary"
@@ -104,7 +111,7 @@ export default function UploadTabBody<T>({
             onClick={onUpload}
           >
             <Upload size={14} />
-            {isUploading ? '上傳中...' : '上傳'}
+            {isUploading ? '上傳中...' : (uploadLabel || '上傳')}
           </button>
         </div>
       </div>

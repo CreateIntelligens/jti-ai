@@ -214,21 +214,6 @@ export async function updateHciotKnowledgeFileContent(
   );
 }
 
-export async function uploadHciotKnowledgeFile(
-  language: string,
-  file: File,
-): Promise<HciotKnowledgeFile & { synced: boolean; topic_synced: boolean; uploaded_count?: number; uploaded_files?: string[] }> {
-  const formData = new FormData();
-  formData.append('file', file);
-  return fetchAdminJson<HciotKnowledgeFile & { synced: boolean; topic_synced: boolean; uploaded_count?: number; uploaded_files?: string[] }>(
-    '/knowledge/upload/',
-    {
-      method: 'POST',
-      body: formData,
-    },
-    { language: normLang(language) },
-  );
-}
 
 export async function deleteHciotKnowledgeFile(fileName: string, language: string = 'zh'): Promise<void> {
   await fetchAdminJson<void>(`/knowledge/files/${encodeURIComponent(fileName)}`, {
@@ -350,7 +335,6 @@ export interface UploadWithTopicOptions {
   // for the doc's language partition.
   categoryLabel?: string;
   topicLabel?: string;
-  skipTopic?: boolean;
   // Question texts the admin un-checked while typing the Q&A. Sent as a JSON
   // string Form field; the backend writes them to hidden_questions atomically
   // with the extracted questions.
@@ -367,9 +351,6 @@ export async function uploadHciotKnowledgeFileWithTopic(
   appendOptionalFormValue(formData, 'topic_id', opts.topicId);
   appendOptionalFormValue(formData, 'category_label', opts.categoryLabel);
   appendOptionalFormValue(formData, 'topic_label', opts.topicLabel);
-  if (opts.skipTopic !== undefined) {
-    formData.append('skip_topic', String(opts.skipTopic));
-  }
   if (opts.hiddenQuestions !== undefined) {
     formData.append('hidden_questions', JSON.stringify(opts.hiddenQuestions));
   }
@@ -440,4 +421,70 @@ export async function getHciotTopicMergedCsv(topicId: string, language: HciotLan
     topic_id: topicId,
     language: normLang(language),
   });
+}
+
+// ========== Document to Q&A Extraction API ==========
+
+export interface HciotQaPair {
+  q: string;
+  a: string;
+}
+
+export interface QaExtractJobResponse {
+  job_id: string;
+  status: 'pending' | 'running' | 'done' | 'failed';
+  qa_pairs?: HciotQaPair[];
+  error?: string;
+}
+
+export interface QaImportResponse {
+  imported_count: number;
+  filename: string;
+  topic_synced: boolean;
+}
+
+export async function createQaExtractJob(
+  language: string,
+  source: { file: File } | { text: string },
+  categoryId: string,
+  topicId: string,
+  categoryLabel: string,
+  topicLabel: string,
+): Promise<{ job_id: string; status: string }> {
+  const formData = new FormData();
+  if ('file' in source) {
+    formData.append('file', source.file);
+  } else {
+    formData.append('text_input', source.text);
+  }
+  formData.append('category_id', categoryId);
+  formData.append('topic_id', topicId);
+  formData.append('category_label', categoryLabel);
+  formData.append('topic_label', topicLabel);
+  formData.append('language', normLang(language));
+
+  return fetchAdminJson<{ job_id: string; status: string }>('/knowledge/qa-extract', {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export async function getQaExtractJob(jobId: string): Promise<QaExtractJobResponse> {
+  return fetchAdminJson<QaExtractJobResponse>(`/knowledge/qa-extract/${encodeURIComponent(jobId)}`);
+}
+
+export async function importQaExtractJob(
+  jobId: string,
+  language: string,
+  qaPairs: HciotQaPair[],
+): Promise<QaImportResponse> {
+  return fetchAdminJson<QaImportResponse>(
+    `/knowledge/qa-extract/${encodeURIComponent(jobId)}/import`,
+    {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({ qa_pairs: qaPairs }),
+    },
+    { language: normLang(language) },
+  );
 }

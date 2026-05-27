@@ -768,10 +768,6 @@ export default function Hciot() {
               handleEditKeyDown={handleEditKeyDown}
               onPlayTts={playAssistantTts}
               getTtsState={getAssistantTtsState}
-              heroEyebrow={t('hciot_hero_eyebrow')}
-              heroTitle={t('hciot_hero_title')}
-              heroDescription={t('hciot_hero_description')}
-              heroNote={t('hciot_hero_note')}
             />
 
             <HciotInputArea

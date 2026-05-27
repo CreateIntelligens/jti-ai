@@ -5,6 +5,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 PROJECT_ROOT = str(Path(__file__).resolve().parents[2])
+_TEST_LOG_DIR = "/tmp/jtai-test-logs"
 _TEST_TTS_CACHE_DIR = "/tmp/jtai-test-tts-cache"
 _MODULES_TO_RESET = (
     "app.deps",
@@ -19,6 +20,7 @@ _MODULES_TO_RESET = (
     "app.routers.hciot.chat",
     "app.routers.general.stores",
     "app.routers.general.chat",
+    "app.routers.hciot.qa_extract",
     "app.main",
 )
 
@@ -43,6 +45,7 @@ def _reset_modules() -> None:
 
 def install_app_import_mocks() -> None:
     _ensure_project_root_on_path()
+    os.environ.setdefault("LOG_DIR", _TEST_LOG_DIR)
     os.environ.setdefault("TTS_CACHE_DIR", _TEST_TTS_CACHE_DIR)
 
     mock_db = MagicMock()

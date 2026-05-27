@@ -414,7 +414,7 @@ def get_store_file_content(
     if resolve_managed_store(store_name) is not None:
         raise HTTPException(
             status_code=400,
-            detail="Managed stores use /api/knowledge/files for content access",
+            detail="Managed stores expose content via their app-specific routes (e.g. /api/hciot/knowledge or /api/jti/knowledge)",
         )
 
     normalized = normalize_store_name(store_name)
@@ -471,7 +471,7 @@ async def update_store_file_content(
     if resolve_managed_store(store_name) is not None:
         raise HTTPException(
             status_code=400,
-            detail="Managed stores use /api/knowledge/files for content access",
+            detail="Managed stores expose content via their app-specific routes (e.g. /api/hciot/knowledge or /api/jti/knowledge)",
         )
 
     normalized = normalize_store_name(store_name)

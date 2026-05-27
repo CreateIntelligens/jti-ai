@@ -379,18 +379,10 @@ export default function HciotKnowledgeWorkspace({
     file: File,
     topicId: string | null,
     labels: TopicLabels | null,
-    skipTopic?: boolean,
     hiddenQuestions?: string[],
   ) => {
-    if (skipTopic) {
-      return api.uploadHciotKnowledgeFileWithTopic({
-        language,
-        file,
-        skipTopic: true,
-      });
-    }
     if (!topicId) {
-      return api.uploadHciotKnowledgeFile(language, file);
+      throw new Error("Topic ID is required.");
     }
     const { categoryId, topicSlug } = splitTopicId(topicId);
     return api.uploadHciotKnowledgeFileWithTopic({
@@ -427,7 +419,7 @@ export default function HciotKnowledgeWorkspace({
     try {
       // hidden_questions is written atomically with the extracted questions in
       // a single backend call — QaUploadTab then calls onUploadComplete itself.
-      const response = await uploadFileWithTopic(file, topicId, labels, false, hiddenQuestions);
+      const response = await uploadFileWithTopic(file, topicId, labels, hiddenQuestions);
       return { name: response.name, uploaded_count: response.uploaded_count ?? 1 };
     } finally {
       setUploading(false);

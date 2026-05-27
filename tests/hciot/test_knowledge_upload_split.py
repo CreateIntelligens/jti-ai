@@ -109,7 +109,8 @@ def _post_upload(client: TestClient, fake_store: FakeKnowledgeStore, fake_topic_
             "/api/hciot-admin/knowledge/upload/?language=zh",
             files={"file": ("prp.csv", csv_bytes, "text/csv")},
             data={
-                "topic_id": "ortho/prp",
+                "category_id": "ortho",
+                "topic_id": "prp",
                 "category_label": "骨科",
                 "topic_label": "PRP",
             },

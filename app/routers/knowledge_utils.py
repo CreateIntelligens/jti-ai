@@ -99,3 +99,24 @@ def sync_to_rag(source_type: str, language: str, filename: str, file_bytes: byte
 def delete_from_rag(source_type: str, language: str, filename: str) -> None:
     """Remove a file from the local RAG store."""
     get_backfill_service().delete_from_rag(source_type, filename, language=language)
+
+
+def xlsx_to_csv_bytes(xlsx_bytes: bytes) -> bytes:
+    """Convert all sheets of an xlsx file into a single CSV (sheets separated by a blank row)."""
+    import csv
+    import io
+    import openpyxl
+
+    workbook = openpyxl.load_workbook(io.BytesIO(xlsx_bytes), read_only=True, data_only=True)
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+
+    try:
+        for worksheet in workbook.worksheets:
+            for row in worksheet.iter_rows(values_only=True):
+                writer.writerow(["" if value is None else value for value in row])
+            writer.writerow([])  # blank row between sheets
+    finally:
+        workbook.close()
+
+    return buffer.getvalue().encode("utf-8")

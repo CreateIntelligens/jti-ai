@@ -7,11 +7,11 @@ import logging
 import mimetypes
 import uuid
 from pathlib import Path
+from urllib.parse import quote
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
-from urllib.parse import quote
 
 from app.auth import verify_admin
 from app.routers.knowledge_utils import (
@@ -22,9 +22,11 @@ from app.routers.knowledge_utils import (
     safe_filename,
     sync_to_rag,
     write_docx_text,
+    xlsx_to_csv_bytes,
 )
 from app.services.hciot.csv_utils import (
     UnsupportedQaCsvError,
+    _parse_csv_rows,
     extract_questions_from_csv,
     merge_csv_files,
     normalize_qa_csv_rows,
@@ -34,7 +36,6 @@ from app.services.hciot.csv_utils import (
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.hciot.main_agent import invalidate_hciot_file_map
 from app.services.hciot.topic_store import get_hciot_topic_store
-from app.services.rag.document_service import get_document_rag_service
 from app.utils import get_other_language
 
 logger = logging.getLogger(__name__)
@@ -59,34 +60,6 @@ def _schedule_rag_delete(
     filename: str,
 ) -> None:
     background_tasks.add_task(delete_from_rag, SOURCE_TYPE, language, filename)
-
-
-def _schedule_document_rag_sync(
-    background_tasks: BackgroundTasks,
-    language: str,
-    filename: str,
-    file_bytes: bytes,
-) -> None:
-    background_tasks.add_task(
-        get_document_rag_service().sync_document,
-        SOURCE_TYPE,
-        language,
-        filename,
-        file_bytes,
-    )
-
-
-def _schedule_document_rag_delete(
-    background_tasks: BackgroundTasks,
-    language: str,
-    filename: str,
-) -> None:
-    background_tasks.add_task(
-        get_document_rag_service().delete_document,
-        SOURCE_TYPE,
-        language,
-        filename,
-    )
 
 
 def _normalized_label(value: str | None, fallback: str) -> str:
@@ -118,6 +91,17 @@ def _prepare_csv_bytes(file_bytes: bytes) -> bytes:
     except UnsupportedQaCsvError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     return normalize_qa_csv_rows(file_bytes) or file_bytes
+
+
+def _fallback_upload_error_response(detail: object) -> JSONResponse:
+    return JSONResponse(
+        status_code=400,
+        content={
+            "detail": detail,
+            "error_code": "unrecognized_format",
+            "can_fallback_to_ai": True,
+        },
+    )
 
 
 def _insert_uploaded_file(
@@ -229,13 +213,9 @@ def _sync_topic_questions_from_store(
         """Intersect the desired hidden list with questions that actually exist."""
         if hidden_questions is not None:
             return [q for q in hidden_questions if q in current_questions]
-        hidden_by_language = (existing_topic or {}).get("hidden_questions") or {}
-        if not isinstance(hidden_by_language, dict):
-            return []
-        lang_hidden = hidden_by_language.get(language) or []
-        if not isinstance(lang_hidden, list):
-            return []
-        return [q for q in lang_hidden if q in current_questions]
+        existing_hidden = _get_topic_hidden_questions(existing_topic, language)
+        return [q for q in existing_hidden if q in current_questions]
+
 
     existing = topic_store.get_topic(topic_id)
     if existing:
@@ -421,9 +401,7 @@ async def update_file_content(
         if not updated:
             raise HTTPException(status_code=404, detail="檔案不存在")
 
-        if is_document:
-            _schedule_document_rag_sync(background_tasks, language, safe_name, new_bytes)
-        else:
+        if not is_document:
             _schedule_rag_sync(background_tasks, language, safe_name, new_bytes)
 
     topic_synced = _sync_topic_questions_for_doc(language, doc) if not is_document else False
@@ -457,26 +435,18 @@ async def update_file_metadata(
     }
 
 
-def _xlsx_to_csv_bytes(xlsx_bytes: bytes) -> bytes:
-    """Convert all sheets of an xlsx file into a single CSV (sheets separated by a blank row)."""
-    import csv
-    import io
+def _get_topic_hidden_questions(topic: dict | None, language: str) -> list[str]:
+    """Retrieve the list of hidden questions for a specific language from a topic dictionary."""
+    if not topic:
+        return []
+    hidden_by_language = topic.get("hidden_questions")
+    if not isinstance(hidden_by_language, dict):
+        return []
+    lang_hidden = hidden_by_language.get(language)
+    if not isinstance(lang_hidden, list):
+        return []
+    return [item for item in lang_hidden if isinstance(item, str)]
 
-    import openpyxl
-
-    workbook = openpyxl.load_workbook(io.BytesIO(xlsx_bytes), read_only=True, data_only=True)
-    buffer = io.StringIO()
-    writer = csv.writer(buffer)
-
-    try:
-        for worksheet in workbook.worksheets:
-            for row in worksheet.iter_rows(values_only=True):
-                writer.writerow(["" if value is None else value for value in row])
-            writer.writerow([])  # blank row between sheets
-    finally:
-        workbook.close()
-
-    return buffer.getvalue().encode("utf-8")
 
 
 def _parse_hidden_questions(raw: str | None) -> list[str] | None:
@@ -516,7 +486,7 @@ async def upload_knowledge_file(
     topic_id: str | None = Form(None),
     category_label: str | None = Form(None),
     topic_label: str | None = Form(None),
-    skip_topic: bool = Form(False),
+    skip_topic: bool = Form(False),  # noqa: ARG001 — kept for backward-compat with older clients; ignored
     hidden_questions: str | None = Form(None),
 ):
     display_name = file.filename or f"file_{uuid.uuid4().hex[:8]}"
@@ -525,24 +495,30 @@ async def upload_knowledge_file(
 
     ext = Path(safe_name).suffix.lower()
     if ext == ".xlsx":
-        file_bytes = _xlsx_to_csv_bytes(file_bytes)
+        try:
+            file_bytes = xlsx_to_csv_bytes(file_bytes)
+        except Exception as error:
+            return _fallback_upload_error_response(f"XLSX 轉檔失敗: {error}")
         safe_name = Path(safe_name).with_suffix(".csv").name
         ext = ".csv"
     editable = ext in EDITABLE_EXTENSIONS
     content_type = file.content_type or mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
-    if ext == ".csv" and not skip_topic:
-        file_bytes = _prepare_csv_bytes(file_bytes)
+    if ext == ".csv":
+        try:
+            parsed = _parse_csv_rows(file_bytes)
+            if not parsed:
+                raise HTTPException(status_code=400, detail="CSV 解析失敗")
+            fieldnames, _ = parsed
+            if "q" not in fieldnames or "a" not in fieldnames:
+                raise HTTPException(status_code=400, detail="CSV 格式無法識別 q/a 欄位")
+            file_bytes = _prepare_csv_bytes(file_bytes)
+        except HTTPException as error:
+            return _fallback_upload_error_response(getattr(error, "detail", str(error)))
 
-    merged_topic_id = None if skip_topic else _build_merged_topic_id(category_id, topic_id)
-    category_label_val = None if skip_topic else category_label
-    topic_label_val = None if skip_topic else topic_label
-    hidden_questions_val = None if skip_topic else _parse_hidden_questions(hidden_questions)
+    merged_topic_id = _build_merged_topic_id(category_id, topic_id)
+    parsed_hidden = _parse_hidden_questions(hidden_questions)
 
-    uploads = (
-        [(safe_name, file_bytes)]
-        if skip_topic
-        else split_qa_csv_by_image(file_bytes, safe_name) or [(safe_name, file_bytes)]
-    )
+    uploads = split_qa_csv_by_image(file_bytes, safe_name) or [(safe_name, file_bytes)]
 
     saved_files = []
     for upload_name, upload_bytes in uploads:
@@ -553,24 +529,19 @@ async def upload_knowledge_file(
             content_type=content_type,
             editable=editable,
             topic_id=merged_topic_id,
-            category_label=category_label_val,
-            topic_label=topic_label_val,
+            category_label=category_label,
+            topic_label=topic_label,
         )
         saved_files.append(saved)
-        if skip_topic:
-            _schedule_document_rag_sync(background_tasks, language, saved["name"], upload_bytes)
-        else:
-            _schedule_rag_sync(background_tasks, language, saved["name"], upload_bytes)
+        _schedule_rag_sync(background_tasks, language, saved["name"], upload_bytes)
 
-    topic_synced = False
-    if not skip_topic:
-        topic_synced = _sync_topic_questions_from_store(
-            language=language,
-            topic_id=merged_topic_id,
-            topic_label=topic_label_val,
-            category_label=category_label_val,
-            hidden_questions=hidden_questions_val,
-        )
+    topic_synced = _sync_topic_questions_from_store(
+        language=language,
+        topic_id=merged_topic_id,
+        topic_label=topic_label,
+        category_label=category_label,
+        hidden_questions=parsed_hidden,
+    )
 
     primary = saved_files[0]
     invalidate_hciot_file_map(language)
@@ -602,8 +573,6 @@ async def delete_knowledge_file(
     has_topic = bool(existing.get("topic_id"))
     if has_topic:
         _schedule_rag_delete(background_tasks, language, safe_name)
-    else:
-        _schedule_document_rag_delete(background_tasks, language, safe_name)
 
     topic_synced = _sync_topic_questions_for_doc(language, existing) if has_topic else False
     invalidate_hciot_file_map(language)
