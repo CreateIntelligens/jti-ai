@@ -57,15 +57,15 @@ export default function UploadTabBody<T>({
   extraFooterActions,
 }: UploadTabBodyProps<T>) {
   const fileListClasses = [
-    'hciot-upload-file-list',
+    'qa-workspace-upload-file-list',
     'custom-scrollbar',
     fileListClassName,
   ].filter(Boolean).join(' ');
 
   return (
-    <div className="hciot-upload-file-body">
+    <div className="qa-workspace-upload-file-body">
       <div
-        className={`hciot-upload-dropzone${dragOver ? ' is-drag-over' : ''}`}
+        className={`qa-workspace-upload-dropzone${dragOver ? ' is-drag-over' : ''}`}
         onClick={() => inputRef.current?.click()}
         onDragOver={(event) => {
           event.preventDefault();
@@ -95,18 +95,18 @@ export default function UploadTabBody<T>({
         </div>
       )}
 
-      <div className="hciot-qa-footer">
-        <span className="hciot-qa-count">
+      <div className="qa-workspace-qa-footer">
+        <span className="qa-workspace-qa-count">
           {items.length} {countZh}
         </span>
-        <div className="hciot-qa-footer-actions">
-          <button type="button" className="hciot-file-action-button" onClick={onClose}>
+        <div className="qa-workspace-qa-footer-actions">
+          <button type="button" className="qa-workspace-file-action-button" onClick={onClose}>
             取消
           </button>
           {extraFooterActions}
           <button
             type="button"
-            className="hciot-file-action-button primary"
+            className="qa-workspace-file-action-button primary"
             disabled={disabled}
             onClick={onUpload}
           >

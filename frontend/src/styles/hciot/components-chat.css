@@ -3,6 +3,9 @@
   grid-template-columns: minmax(0, 1fr);
   gap: 1.5rem;
   min-height: 0;
+  max-width: 52rem;
+  width: 100%;
+  margin: 0 auto;
 }
 
 .hciot-message-thread {
@@ -19,6 +22,10 @@
   display: grid;
   gap: 0.5rem;
   animation: fadeIn 0.3s ease both;
+  width: 100%;
+  max-width: 52rem;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .hciot-message.user {
@@ -26,7 +33,7 @@
 }
 
 .hciot-message-bubble {
-  max-width: 85%;
+  max-width: clamp(20rem, 85%, 48rem);
   padding: 1rem 1.25rem;
   border: 0.0625rem solid var(--hciot-border);
   border-radius: 1rem;
@@ -358,6 +365,14 @@
   background: var(--hciot-bg);
   border: 0.0625rem solid var(--hciot-border);
   font-family: monospace;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+
+.hciot-inline-status:hover .hciot-session-chip {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .hciot-send-button {
@@ -397,4 +412,57 @@
   border: 0.125rem solid rgba(255, 255, 255, 0.3);
   border-top-color: #fff;
   animation: spin 0.8s linear infinite;
+}
+
+.hciot-input-form {
+  max-width: 52rem;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.hciot-audio-playing-waveform {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 0.125rem;
+  width: 1rem;
+  height: 1rem;
+  color: inherit;
+}
+
+.hciot-audio-playing-waveform span {
+  display: block;
+  width: 0.125rem;
+  height: 0.25rem;
+  background: currentColor;
+  border-radius: 0.0625rem;
+  animation: bounceWave 0.8s ease-in-out infinite alternate;
+}
+
+.hciot-audio-playing-waveform span:nth-child(1) {
+  animation-duration: 0.6s;
+  animation-delay: 0.1s;
+}
+
+.hciot-audio-playing-waveform span:nth-child(2) {
+  animation-duration: 0.75s;
+  animation-delay: 0.25s;
+}
+
+.hciot-audio-playing-waveform span:nth-child(3) {
+  animation-duration: 0.5s;
+  animation-delay: 0.05s;
+}
+
+.hciot-audio-playing-waveform span:nth-child(4) {
+  animation-duration: 0.65s;
+  animation-delay: 0.15s;
+}
+
+@keyframes bounceWave {
+  from {
+    height: 0.2rem;
+  }
+  to {
+    height: 0.95rem;
+  }
 }

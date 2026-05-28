@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject, type SetStateAction } from 'react';
-import { ExternalLink, FileText, HeartPulse, History, Moon, RotateCcw, Settings, Sun } from 'lucide-react';
+import { ExternalLink, FileText, HeartPulse, History, Moon, RotateCcw, Settings, Sun, Menu, Volume2, Loader } from 'lucide-react';
 import { fetchWithApiKey } from '../services/api';
 
 import HciotSelect from '../components/hciot/HciotSelect';
@@ -240,6 +240,9 @@ export default function Hciot() {
   const [selectedTtsCharacter, setSelectedTtsCharacter] = useState<string>(
     () => readStoredTtsCharacter(),
   );
+  const [activeTtsMessageId, setActiveTtsMessageId] = useState<string | null>(null);
+  const [previewingVoice, setPreviewingVoice] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const selectedCategoryId = topicSelection.categoryId;
   const selectedTopicId = topicSelection.topicId;
@@ -354,6 +357,14 @@ export default function Hciot() {
 
   const playAssistantTts = useCallback(async (msg: HciotMessage) => {
     let ttsMessageId = normalizeTtsMessageId(msg.ttsMessageId);
+    if (ttsMessageId && activeTtsMessageId === ttsMessageId) {
+      currentAudioRef.current?.pause();
+      setActiveTtsMessageId(null);
+      return;
+    }
+
+    setPreviewingVoice(false);
+
     if (!ttsMessageId) {
       const sourceText = (msg.ttsText || msg.text || '').trim();
       if (!sourceText) return;
@@ -372,18 +383,105 @@ export default function Hciot() {
       if (!ttsMessageId) return;
       setMessages((prev) => attachTtsMessageId(prev, msg, ttsMessageId));
     }
+
+    if (activeTtsMessageId === ttsMessageId) {
+      currentAudioRef.current?.pause();
+      setActiveTtsMessageId(null);
+      return;
+    }
+
     const audioUrl = ttsAudioUrlMapRef.current.get(ttsMessageId);
     if (!audioUrl) {
       warmupTtsAudio(ttsMessageId, true);
       return;
     }
+
     currentAudioRef.current?.pause();
     const audio = new Audio(audioUrl);
     currentAudioRef.current = audio;
-    void audio.play().catch(() => {
-      setTtsState(ttsMessageId, 'error');
-    });
-  }, [currentLanguage, selectedTtsCharacter, setTtsState, warmupTtsAudio]);
+
+    const idToTrack = ttsMessageId;
+    setActiveTtsMessageId(idToTrack);
+
+    const cleanup = () => {
+      setActiveTtsMessageId((curr) => curr === idToTrack ? null : curr);
+    };
+    audio.onended = cleanup;
+    audio.onpause = cleanup;
+    audio.onerror = cleanup;
+
+    void audio.play()
+      .then(() => {
+        setActiveTtsMessageId(idToTrack);
+      })
+      .catch(() => {
+        setTtsState(idToTrack, 'error');
+        setActiveTtsMessageId((curr) => curr === idToTrack ? null : curr);
+      });
+  }, [currentLanguage, selectedTtsCharacter, setTtsState, warmupTtsAudio, activeTtsMessageId]);
+
+  const playVoicePreview = useCallback(async () => {
+    if (previewingVoice) {
+      currentAudioRef.current?.pause();
+      currentAudioRef.current = null;
+      setPreviewingVoice(false);
+      return;
+    }
+
+    setPreviewingVoice(true);
+    currentAudioRef.current?.pause();
+    setActiveTtsMessageId(null);
+
+    try {
+      const testText = currentLanguage === 'zh' ? '您好，我是您的語音助手。' : 'Hello, I am your voice assistant.';
+      const res = await fetchWithApiKey('/api/hciot/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text: testText,
+          language: currentLanguage,
+          character: selectedTtsCharacter || undefined,
+        }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const data = await res.json();
+      const id = normalizeTtsMessageId(data?.tts_message_id);
+      if (!id) throw new Error('Invalid TTS message ID');
+
+      let audioBlob: Blob | null = null;
+      for (let attempt = 0; attempt < 16; attempt += 1) {
+        if (isUnmountedRef.current) return;
+        const getRes = await fetchWithApiKey(`/api/hciot/tts/${encodeURIComponent(id)}`);
+        if (getRes.status === 202) {
+          await sleep(Math.min(300 + attempt * 50, 1000));
+          continue;
+        }
+        if (!getRes.ok) throw new Error(await getRes.text());
+        audioBlob = await getRes.blob();
+        break;
+      }
+
+      if (!audioBlob) throw new Error('TTS preview timeout');
+
+      const audioUrl = URL.createObjectURL(audioBlob);
+      const audio = new Audio(audioUrl);
+      currentAudioRef.current = audio;
+
+      const cleanup = () => {
+        setPreviewingVoice(false);
+        URL.revokeObjectURL(audioUrl);
+      };
+      audio.onended = cleanup;
+      audio.onpause = cleanup;
+      audio.onerror = cleanup;
+
+      await audio.play();
+    } catch (error) {
+      console.error('Failed to play voice preview:', error);
+      alert('語音播放失敗，請重試');
+      setPreviewingVoice(false);
+    }
+  }, [currentLanguage, selectedTtsCharacter, previewingVoice]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -428,6 +526,8 @@ export default function Hciot() {
     ttsPendingSinceRef.current.clear();
     currentAudioRef.current?.pause();
     currentAudioRef.current = null;
+    setActiveTtsMessageId(null);
+    setPreviewingVoice(false);
     ttsAudioUrlMapRef.current.forEach(url => URL.revokeObjectURL(url));
     ttsAudioUrlMapRef.current.clear();
     setTtsStateMap({});
@@ -647,11 +747,13 @@ export default function Hciot() {
   const handleSelectTopic = (topic: HciotTopic) => {
     if (!sessionId || loading) return;
     setSelectedTopicId((prev) => (prev === topic.id ? null : topic.id));
+    setIsSidebarOpen(false);
   };
 
   const handleSelectQuestion = (question: string) => {
     if (!sessionId || loading) return;
     void sendMessage(question);
+    setIsSidebarOpen(false);
   };
 
   const allTopics = useMemo(() => categories.flatMap((cat) => cat.topics), [categories]);
@@ -668,6 +770,18 @@ export default function Hciot() {
 
       <header className="hciot-header">
         <div className="hciot-brand">
+          {workspace === 'chat' && (
+            <button
+              type="button"
+              className="hciot-sidebar-toggle hciot-icon-button"
+              onClick={() => setIsSidebarOpen((prev) => !prev)}
+              title="科別主題"
+              aria-label="科別主題"
+              style={{ display: 'none', marginRight: '0.55rem' }}
+            >
+              <Menu size={20} />
+            </button>
+          )}
           <div className="hciot-brand-mark"><HeartPulse size={24} /></div>
           <div>
             <p className="hciot-brand-kicker">{HCIOT_UI_TEXT.brandKicker}</p>
@@ -709,17 +823,41 @@ export default function Hciot() {
           )}
           <span className="hciot-header-divider" aria-hidden="true" />
           {ttsCharacters.length > 0 && (
-            <label className="hciot-voice-select-wrap">
-              <span className="hciot-voice-select-label">
-                聲音
-              </span>
-              <HciotSelect
-                className="hciot-voice-select"
-                value={selectedTtsCharacter}
-                onChange={setSelectedTtsCharacter}
-                options={ttsCharacters.map((character) => ({ value: character, label: character }))}
-              />
-            </label>
+            <div className="hciot-voice-select-container" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+              <label className="hciot-voice-select-wrap">
+                <span className="hciot-voice-select-label">
+                  聲音
+                </span>
+                <HciotSelect
+                  className="hciot-voice-select"
+                  value={selectedTtsCharacter}
+                  onChange={setSelectedTtsCharacter}
+                  options={ttsCharacters.map((character) => ({ value: character, label: character }))}
+                />
+              </label>
+              <button
+                type="button"
+                className={`hciot-voice-preview-btn hciot-icon-button${previewingVoice ? ' is-playing' : ''}`}
+                onClick={playVoicePreview}
+                title="試聽選定聲音"
+                aria-label="試聽選定聲音"
+                style={{
+                  height: '2.5rem',
+                  width: '2.5rem',
+                  borderRadius: '0.8rem',
+                  border: '0.0625rem solid var(--hciot-border)',
+                  background: previewingVoice ? 'color-mix(in srgb, var(--hciot-accent) 15%, transparent)' : 'rgba(148, 163, 184, 0.08)',
+                  color: previewingVoice ? 'var(--hciot-accent)' : 'var(--hciot-ink-soft)',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                {previewingVoice ? <Loader size={14} className="animate-spin" /> : <Volume2 size={14} />}
+              </button>
+            </div>
           )}
           <button className="hciot-icon-button" onClick={() => setShowSettingsModal(true)} title={HCIOT_UI_TEXT.settingsTitle}>
             <Settings size={18} />
@@ -741,7 +879,11 @@ export default function Hciot() {
 
       <main className="hciot-main">
         <section className={`hciot-chat-workspace${workspace === 'chat' ? ' is-active' : ''}`}>
-          <aside className="hciot-sidebar custom-scrollbar">
+          <div
+            className={`hciot-sidebar-overlay${isSidebarOpen ? ' is-visible' : ''}`}
+            onClick={() => setIsSidebarOpen(false)}
+          />
+          <aside className={`hciot-sidebar custom-scrollbar${isSidebarOpen ? ' is-open' : ''}`}>
             <div className="hciot-topic-inline-panel">
               <HciotTopicGrid
                 topics={visibleTopics}
@@ -780,6 +922,7 @@ export default function Hciot() {
               handleEditKeyDown={handleEditKeyDown}
               onPlayTts={playAssistantTts}
               getTtsState={getAssistantTtsState}
+              activeTtsMessageId={activeTtsMessageId}
             />
 
             <HciotInputArea
@@ -808,6 +951,7 @@ export default function Hciot() {
         onClose={() => setShowSettingsModal(false)}
         onPromptChange={silentRestartConversation}
         language={currentLanguage}
+        sessionId={sessionId}
       />
 
       <ConversationHistoryModal

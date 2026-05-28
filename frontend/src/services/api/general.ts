@@ -373,4 +373,19 @@ async function reindexRag(sourceType: RagSourceType): Promise<ReindexRagResponse
   });
   return handleResponse<ReindexRagResponse>(response);
 }
+
+export interface ReindexStatusResponse {
+  source_type: string;
+  reindexing: boolean;
+}
+
+export async function getReindexStatus(sourceType: RagSourceType): Promise<ReindexStatusResponse> {
+  const query = new URLSearchParams({ source_type: sourceType });
+  const response = await fetchAsAdmin(API_BASE + '/admin/rag/status?' + query.toString(), {
+    method: 'GET',
+  });
+  return handleResponse<ReindexStatusResponse>(response);
+}
+
 export default reindexRag;
+

@@ -11,6 +11,7 @@ import type { TopicLabels } from '../topicUtils';
 import type { DeleteImageHandler, UploadedImageResult } from '../imageUpload';
 import UploadTopicSelector from './UploadTopicSelector';
 import { useUploadTopicSelection } from './uploadTopicSelection';
+import type { QaWorkspaceApiClient } from '../QaKnowledgeWorkspace';
 
 export {
   buildUploadTopicOptions,
@@ -45,6 +46,7 @@ interface UploadDialogProps {
     labels: TopicLabels,
     hiddenQuestions: string[],
   ) => Promise<{ name: string; uploaded_count: number }>;
+  api: QaWorkspaceApiClient;
   onUploadImage: (file: File, imageId?: string) => Promise<UploadedImageResult>;
   onDeleteImage?: DeleteImageHandler;
   onUploadImageComplete: (count: number) => Promise<void>;
@@ -60,6 +62,7 @@ export default function UploadDialog({
   onUploadFile,
   onUploadComplete,
   onSubmitQA,
+  api,
   onUploadImage,
   onDeleteImage,
   onUploadImageComplete,
@@ -79,22 +82,22 @@ export default function UploadDialog({
   if (!open) return null;
 
   return (
-    <div className="hciot-qa-overlay" onClick={onClose}>
-      <div className="hciot-qa-dialog" onClick={(e) => e.stopPropagation()}>
-        <div className="hciot-qa-header">
+    <div className="qa-workspace-qa-overlay" onClick={onClose}>
+      <div className="qa-workspace-qa-dialog" onClick={(e) => e.stopPropagation()}>
+        <div className="qa-workspace-qa-header">
           <h3>新增內容</h3>
-          <button type="button" className="hciot-qa-close" onClick={onClose}>
+          <button type="button" className="qa-workspace-qa-close" onClick={onClose}>
             <X size={18} />
           </button>
         </div>
 
-        <div className="hciot-upload-tabs" role="tablist">
+        <div className="qa-workspace-upload-tabs" role="tablist">
           {TABS.map((item) => (
             <button
               key={item.id}
               type="button"
               role="tab"
-              className={`hciot-upload-tab${tab === item.id ? ' is-active' : ''}`}
+              className={`qa-workspace-upload-tab${tab === item.id ? ' is-active' : ''}`}
               onClick={() => {
                 setTab(item.id);
               }}
@@ -120,6 +123,7 @@ export default function UploadDialog({
             onClose={onClose}
             onUploadFile={onUploadFile}
             onUploadComplete={onUploadComplete}
+            api={api}
           />
         )}
 

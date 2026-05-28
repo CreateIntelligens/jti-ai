@@ -158,12 +158,12 @@ export default function ExplorerSidebar({
 
   return (
     <aside
-      className={`hciot-explorer${sidebarCollapsed ? ' is-collapsed' : ''}`}
+      className={`qa-workspace-explorer${sidebarCollapsed ? ' is-collapsed' : ''}`}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <div className="hciot-explorer-toolbar">
-        <div className="hciot-explorer-search">
+      <div className="qa-workspace-explorer-toolbar">
+        <div className="qa-workspace-explorer-search">
           <Search size={15} />
           <input
             type="search"
@@ -173,10 +173,10 @@ export default function ExplorerSidebar({
           />
         </div>
 
-        <div className="hciot-explorer-actions">
+        <div className="qa-workspace-explorer-actions">
           <button
             type="button"
-            className="hciot-explorer-icon-button"
+            className="qa-workspace-explorer-icon-button"
             onClick={onOpenUploadDialog}
             title="新增內容"
             aria-label="新增內容"
@@ -187,7 +187,7 @@ export default function ExplorerSidebar({
           {onReindex && (
             <button
               type="button"
-              className={`hciot-explorer-icon-button reindex${reindexing ? ' is-loading' : ''}`}
+              className={`qa-workspace-explorer-icon-button reindex${reindexing ? ' is-loading' : ''}`}
               onClick={onReindex}
               disabled={reindexing}
               title="重新索引 RAG (暫停約 1 分鐘)"
@@ -200,13 +200,13 @@ export default function ExplorerSidebar({
         </div>
       </div>
 
-      <div className="hciot-explorer-body">
+      <div className="qa-workspace-explorer-body">
         {loadingWorkspace ? (
-          <div className="hciot-explorer-empty">載入中...</div>
+          <div className="qa-workspace-explorer-empty">載入中...</div>
         ) : visibleRows.length > 0 ? (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
             <SortableContext items={sortableKeys} strategy={verticalListSortingStrategy}>
-              <div className="hciot-explorer-tree" role="tree">
+              <div className="qa-workspace-explorer-tree" role="tree">
                 {visibleRows.map(({ node, depth }) => {
                   const isExpanded = isFolderNode(node) && (
                     Boolean(deferredSearchQuery) || visibleExpandedKeys.has(node.key)
@@ -217,7 +217,7 @@ export default function ExplorerSidebar({
                     return (
                       <div
                         key={node.key}
-                        className="hciot-explorer-row-wrap is-renaming"
+                        className="qa-workspace-explorer-row-wrap is-renaming"
                         style={{ '--row-depth': depth } as CSSProperties}
                       >
                         <RenameRow
@@ -254,7 +254,7 @@ export default function ExplorerSidebar({
             </SortableContext>
           </DndContext>
         ) : (
-          <div className="hciot-explorer-empty">
+          <div className="qa-workspace-explorer-empty">
             {searchQuery ? '找不到符合的節點' : '目前沒有知識檔案'}
           </div>
         )}
@@ -308,7 +308,7 @@ function ExplorerRowItem({
 
   const deletableTopicId = getDeletableTopicId(node);
   const nodeIconTone = getNodeIconTone(node);
-  const rowClassName = `hciot-explorer-row-wrap${isSelected ? ' is-selected' : ''}${sortable.isDragging ? ' is-dragging' : ''}`;
+  const rowClassName = `qa-workspace-explorer-row-wrap${isSelected ? ' is-selected' : ''}${sortable.isDragging ? ' is-dragging' : ''}`;
 
   const style: CSSProperties = {
     '--row-depth': depth,
@@ -328,6 +328,23 @@ function ExplorerRowItem({
     }
   };
 
+  const getTooltip = () => {
+    if (node.kind === 'file') {
+      const { category_label, topic_label, name } = node.file;
+      const path = [category_label, topic_label, node.label].filter(Boolean).join(' / ');
+      return `${path}\n路徑: ${name}`;
+    }
+    if (node.kind === 'image') {
+      const { image_id, size_bytes, reference_count = 0 } = node.image;
+      const sizeStr = size_bytes ? `${(size_bytes / 1024).toFixed(1)} KB` : '未知';
+      return `圖片 ID: ${image_id}\n大小: ${sizeStr}\n引用數: ${reference_count}`;
+    }
+    if (node.kind === 'merged-csv') {
+      return `整合的 Q&A 表格 (主題: ${node.label})`;
+    }
+    return node.label;
+  };
+
   return (
     <div
       ref={sortable.setNodeRef}
@@ -337,7 +354,7 @@ function ExplorerRowItem({
       {nodeKey && (
         <button
           type="button"
-          className="hciot-explorer-row-grip"
+          className="qa-workspace-explorer-row-grip"
           title="拖曳排序"
           aria-label="拖曳排序"
           {...sortable.attributes}
@@ -348,26 +365,27 @@ function ExplorerRowItem({
       )}
       <button
         type="button"
-        className={`hciot-explorer-row${isSelected ? ' is-selected' : ''}`}
+        className={`qa-workspace-explorer-row${isSelected ? ' is-selected' : ''}`}
         onClick={handleSelect}
         role="treeitem"
         aria-expanded={isFolderNode(node) ? isExpanded : undefined}
+        title={getTooltip()}
       >
-        <span className="hciot-explorer-row-indent" />
-        <span className="hciot-explorer-row-caret">
+        <span className="qa-workspace-explorer-row-indent" />
+        <span className="qa-workspace-explorer-row-caret">
           {isFolderNode(node) ? (
             isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />
           ) : null}
         </span>
-        <span className={`hciot-explorer-row-icon tone-${nodeIconTone}`}>
+        <span className={`qa-workspace-explorer-row-icon tone-${nodeIconTone}`}>
           {renderNodeIcon(node, isExpanded)}
         </span>
-        <span className="hciot-explorer-row-label">{node.label}</span>
+        <span className="qa-workspace-explorer-row-label">{node.label}</span>
       </button>
       {nodeKey && !renaming && (
         <button
           type="button"
-          className="hciot-explorer-row-rename"
+          className="qa-workspace-explorer-row-rename"
           title="重新命名"
           onClick={(event) => {
             event.stopPropagation();
@@ -380,7 +398,7 @@ function ExplorerRowItem({
       {deletableTopicId && onDeleteTopic && (
         <button
           type="button"
-          className="hciot-explorer-row-delete"
+          className="qa-workspace-explorer-row-delete"
           title="刪除整個主題"
           onClick={(event) => {
             event.stopPropagation();
@@ -418,10 +436,10 @@ function RenameRow({ initialLabel, saving, onCommit, onCancel }: RenameRowProps)
   };
 
   return (
-    <div className="hciot-explorer-rename">
+    <div className="qa-workspace-explorer-rename">
       <input
         type="text"
-        className="hciot-explorer-rename-input"
+        className="qa-workspace-explorer-rename-input"
         value={value}
         autoFocus
         disabled={saving}
@@ -438,7 +456,7 @@ function RenameRow({ initialLabel, saving, onCommit, onCancel }: RenameRowProps)
       />
       <button
         type="button"
-        className="hciot-explorer-rename-confirm"
+        className="qa-workspace-explorer-rename-confirm"
         title="儲存"
         disabled={saving}
         onClick={commit}
@@ -447,7 +465,7 @@ function RenameRow({ initialLabel, saving, onCommit, onCancel }: RenameRowProps)
       </button>
       <button
         type="button"
-        className="hciot-explorer-rename-cancel"
+        className="qa-workspace-explorer-rename-cancel"
         title="取消"
         disabled={saving}
         onClick={onCancel}

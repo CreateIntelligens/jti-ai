@@ -29,7 +29,7 @@ export default function DocumentToQaStatusView({
 }: DocumentToQaStatusViewProps) {
   if (status === 'success') {
     return (
-      <div className="hciot-upload-file-body">
+      <div className="qa-workspace-upload-file-body">
         <div className="hciot-doc-success-step">
           <div className="hciot-success-badge">✓</div>
           <h4 className="hciot-success-title">匯入成功！</h4>
@@ -41,13 +41,13 @@ export default function DocumentToQaStatusView({
 
   if (status === 'error') {
     return (
-      <div className="hciot-upload-file-body">
+      <div className="qa-workspace-upload-file-body">
         <div className="hciot-doc-error-step">
           <AlertCircle size={36} className="hciot-error-icon" />
           <h4 className="hciot-error-title">處理時發生錯誤</h4>
           <p className="hciot-error-subtitle">{error}</p>
-          <div className="hciot-qa-footer-actions">
-            <button type="button" className="hciot-file-action-button" onClick={onReset}>
+          <div className="qa-workspace-qa-footer-actions">
+            <button type="button" className="qa-workspace-file-action-button" onClick={onReset}>
               重新開始
             </button>
           </div>
@@ -57,7 +57,7 @@ export default function DocumentToQaStatusView({
   }
 
   return (
-    <div className="hciot-upload-file-body">
+    <div className="qa-workspace-upload-file-body">
       <div className="hciot-doc-progress-step">
         <Loader2 size={36} className="hciot-spinner" />
         <h4 className="hciot-progress-title">

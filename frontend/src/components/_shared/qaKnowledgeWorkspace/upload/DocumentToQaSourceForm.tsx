@@ -101,7 +101,7 @@ export default function DocumentToQaSourceForm({
           countEn="document"
           uploadLabel={uploadLabel}
           hint={error ? (
-            <div className="hciot-upload-error-banner">
+            <div className="qa-workspace-upload-error-banner">
               <AlertCircle size={16} />
               <span>{error}</span>
             </div>
@@ -117,14 +117,14 @@ export default function DocumentToQaSourceForm({
           onUpload={onStartExtraction}
           onClose={onClose}
           renderItem={(item, index) => (
-            <div key={`${item.file.name}-${index}`} className="hciot-upload-file-item">
+            <div key={`${item.file.name}-${index}`} className="qa-workspace-upload-file-item">
               <FileText size={16} className="hciot-icon-dark-blue" />
-              <span className="hciot-upload-file-name">{item.file.name}</span>
-              <span className="hciot-upload-file-size">{formatFileSize(item.file.size)}</span>
-              <div className="hciot-file-actions">
+              <span className="qa-workspace-upload-file-name">{item.file.name}</span>
+              <span className="qa-workspace-upload-file-size">{formatFileSize(item.file.size)}</span>
+              <div className="qa-workspace-file-actions">
                 <button
                   type="button"
-                  className="hciot-qa-row-delete"
+                  className="qa-workspace-qa-row-delete"
                   onClick={onRemoveFile}
                   title="移除"
                 >
@@ -137,7 +137,7 @@ export default function DocumentToQaSourceForm({
       )}
 
       {mode === 'text' && (
-        <div className="hciot-upload-file-body">
+        <div className="qa-workspace-upload-file-body">
           <textarea
             className="hciot-doc-text-input custom-scrollbar"
             placeholder="在此貼上文章內容，AI 會自動分析並擷取問答對。"
@@ -150,22 +150,22 @@ export default function DocumentToQaSourceForm({
             </span>
           </div>
           {error && (
-            <div className="hciot-upload-error-banner">
+            <div className="qa-workspace-upload-error-banner">
               <AlertCircle size={16} />
               <span>{error}</span>
             </div>
           )}
-          <div className="hciot-qa-footer">
-            <span className="hciot-qa-count">
+          <div className="qa-workspace-qa-footer">
+            <span className="qa-workspace-qa-count">
               {text.trim().length > 0 ? '1 段文字' : '0 段文字'}
             </span>
-            <div className="hciot-qa-footer-actions">
-              <button type="button" className="hciot-file-action-button" onClick={onClose}>
+            <div className="qa-workspace-qa-footer-actions">
+              <button type="button" className="qa-workspace-file-action-button" onClick={onClose}>
                 取消
               </button>
               <button
                 type="button"
-                className="hciot-file-action-button primary"
+                className="qa-workspace-file-action-button primary"
                 disabled={!canSubmit}
                 onClick={onStartExtraction}
               >

@@ -3,7 +3,7 @@ import { Upload, FileText, Trash2, Download, Pencil, X } from 'lucide-react';
 import HciotSelect from './HciotSelect';
 import ConfirmDialog from '../ConfirmDialog';
 import HciotTopicEditor from './HciotTopicEditor';
-import { missingLabelMessage, NEW_VALUE, normalizeLabel, slugify } from './knowledgeWorkspace/topicUtils';
+import { missingLabelMessage, NEW_VALUE, normalizeLabel, slugify } from '../_shared/qaKnowledgeWorkspace/topicUtils';
 import * as api from '../../services/api';
 
 interface KBFile {

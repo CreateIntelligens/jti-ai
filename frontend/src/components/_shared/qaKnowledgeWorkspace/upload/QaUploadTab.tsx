@@ -201,8 +201,8 @@ export default function QaUploadTab({
         onClose={() => setPreviewImageUrl(null)}
       />
 
-      <div className="hciot-upload-qa-body">
-        <div className="hciot-qa-rows custom-scrollbar">
+      <div className="qa-workspace-upload-qa-body">
+        <div className="qa-workspace-qa-rows custom-scrollbar">
           {rows.map((row, index) => {
             const previewUrl = row.pendingImageFile
               ? pendingUrls.get(row.pendingImageFile) || ''
@@ -239,24 +239,24 @@ export default function QaUploadTab({
 
         <button
           type="button"
-          className="hciot-qa-add-row"
+          className="qa-workspace-qa-add-row"
           onClick={() => setRows((prev) => [...prev, createEmptyRow()])}
         >
           <Plus size={14} />
           新增一題
         </button>
 
-        <div className="hciot-qa-footer">
-          <span className="hciot-qa-count">
+        <div className="qa-workspace-qa-footer">
+          <span className="qa-workspace-qa-count">
             {validRows.length} 題有效
           </span>
-          <div className="hciot-qa-footer-actions">
-            <button type="button" className="hciot-file-action-button" onClick={onClose}>
+          <div className="qa-workspace-qa-footer-actions">
+            <button type="button" className="qa-workspace-file-action-button" onClick={onClose}>
               取消
             </button>
             <button
               type="button"
-              className="hciot-file-action-button primary"
+              className="qa-workspace-file-action-button primary"
               disabled={!canSubmitQA}
               onClick={() => { void handleSubmit(); }}
             >

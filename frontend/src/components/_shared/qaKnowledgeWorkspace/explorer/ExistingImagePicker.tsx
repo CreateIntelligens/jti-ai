@@ -69,9 +69,9 @@ export default function ExistingImagePicker({
     }
 
     return (
-      <section className="hciot-image-picker-section">
-        <h4 className="hciot-image-picker-section-title">{title}</h4>
-        <div className="hciot-image-picker-grid">
+      <section className="qa-workspace-image-picker-section">
+        <h4 className="qa-workspace-image-picker-section-title">{title}</h4>
+        <div className="qa-workspace-image-picker-grid">
           {sectionImages.map((image) => {
             const isSelected = selectedImageId === image.image_id;
             const isUnused = (image.reference_count ?? 0) === 0;
@@ -79,22 +79,22 @@ export default function ExistingImagePicker({
               <button
                 key={image.image_id}
                 type="button"
-                className={`hciot-image-picker-card${isSelected ? ' is-selected' : ''}`}
+                className={`qa-workspace-image-picker-card${isSelected ? ' is-selected' : ''}`}
                 onClick={() => onSelect(image.image_id)}
               >
-                <div className="hciot-image-picker-thumb-wrapper">
+                <div className="qa-workspace-image-picker-thumb-wrapper">
                   <img
                     src={image.url}
                     alt={image.image_id}
-                    className="hciot-image-picker-thumb"
+                    className="qa-workspace-image-picker-thumb"
                   />
                 </div>
-                <div className="hciot-image-picker-info">
-                  <div className="hciot-image-picker-id">{image.image_id}</div>
-                  <div className={`hciot-image-picker-ref${isUnused ? ' is-unused' : ''}`}>
+                <div className="qa-workspace-image-picker-info">
+                  <div className="qa-workspace-image-picker-id">{image.image_id}</div>
+                  <div className={`qa-workspace-image-picker-ref${isUnused ? ' is-unused' : ''}`}>
                     {imageReferenceLabel(language, image)}
                   </div>
-                  <div className="hciot-image-picker-size">
+                  <div className="qa-workspace-image-picker-size">
                     {image.size_bytes ? `${Math.max(1, Math.round(image.size_bytes / 1024))} KB` : '0 KB'}
                   </div>
                 </div>
@@ -110,42 +110,42 @@ export default function ExistingImagePicker({
     <div
       role="dialog"
       aria-modal="true"
-      className="hciot-image-picker-overlay"
+      className="qa-workspace-image-picker-overlay"
       onClick={onClose}
     >
       <div
-        className="hciot-image-picker-dialog"
+        className="qa-workspace-image-picker-dialog"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="hciot-image-picker-header">
+        <div className="qa-workspace-image-picker-header">
           <div>
-            <div className="hciot-image-picker-title">
+            <div className="qa-workspace-image-picker-title">
               選擇既有圖片
             </div>
-            <div className="hciot-image-picker-subtitle">
+            <div className="qa-workspace-image-picker-subtitle">
               未引用圖片會優先顯示在上方
             </div>
           </div>
-          <button type="button" className="hciot-explorer-icon-button" onClick={onClose}>
+          <button type="button" className="qa-workspace-explorer-icon-button" onClick={onClose}>
             <X size={16} />
           </button>
         </div>
 
-        <div className="hciot-image-picker-search">
-          <label className="hciot-image-picker-search-label">
+        <div className="qa-workspace-image-picker-search">
+          <label className="qa-workspace-image-picker-search-label">
             <Search size={16} />
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="搜尋 image id"
-              className="hciot-image-picker-search-input"
+              className="qa-workspace-image-picker-search-input"
             />
           </label>
         </div>
 
-        <div className="hciot-image-picker-body custom-scrollbar">
+        <div className="qa-workspace-image-picker-body custom-scrollbar">
           {filteredImages.length === 0 ? (
-            <div className="hciot-image-picker-empty">
+            <div className="qa-workspace-image-picker-empty">
               <ImageIcon size={24} />
               <div>找不到符合條件的圖片</div>
             </div>

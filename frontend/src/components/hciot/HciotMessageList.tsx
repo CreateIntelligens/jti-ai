@@ -1,4 +1,5 @@
 import React from 'react';
+import { Volume2, VolumeX, Loader } from 'lucide-react';
 import type { TtsState } from '../../types';
 
 import CitationsList from '../CitationsList';
@@ -30,6 +31,7 @@ interface HciotMessageListProps {
   handleEditKeyDown: (e: React.KeyboardEvent, turnNumber: number) => void;
   onPlayTts: (msg: HciotMessage) => void;
   getTtsState: (ttsMessageId?: string) => TtsState | undefined;
+  activeTtsMessageId?: string | null;
 }
 
 function getMessageRoleLabel(type: HciotMessage['type']): string {
@@ -38,7 +40,8 @@ function getMessageRoleLabel(type: HciotMessage['type']): string {
   return 'System';
 }
 
-function getAudioButtonTitle(ttsState?: TtsState): string {
+function getAudioButtonTitle(ttsState?: TtsState, isPlaying?: boolean): string {
+  if (isPlaying) return '停止播放';
   if (ttsState === 'pending') return '語音準備中';
   if (ttsState === 'error') return '語音產生失敗，點擊重試';
   return '播放語音';
@@ -59,6 +62,7 @@ export default function HciotMessageList({
   handleEditKeyDown,
   onPlayTts,
   getTtsState,
+  activeTtsMessageId = null,
 }: HciotMessageListProps) {
   return (
     <div className="hciot-messages-area">
@@ -70,7 +74,28 @@ export default function HciotMessageList({
           const canPlayTts =
             msg.type === 'assistant' && idx > 0 && Boolean(msg.ttsMessageId || msg.ttsText || msg.text);
           const ttsState = canPlayTts ? getTtsState(msg.ttsMessageId) : undefined;
-          const audioButtonClassName = `hciot-audio-btn${ttsState ? ` ${ttsState}` : ''}`;
+          const isPlaying = Boolean(canPlayTts && msg.ttsMessageId && activeTtsMessageId === msg.ttsMessageId);
+          const audioButtonClassName = `hciot-audio-btn${ttsState ? ` ${ttsState}` : ''}${isPlaying ? ' playing' : ''}`;
+
+          const renderAudioIcon = () => {
+            if (isPlaying) {
+              return (
+                <span className="hciot-audio-playing-waveform" aria-hidden="true">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </span>
+              );
+            }
+            if (ttsState === 'pending') {
+              return <Loader size={14} className="animate-spin" />;
+            }
+            if (ttsState === 'error') {
+              return <VolumeX size={14} />;
+            }
+            return <Volume2 size={14} />;
+          };
 
           return (
             <div
@@ -155,10 +180,10 @@ export default function HciotMessageList({
                   <button
                     className={audioButtonClassName}
                     onClick={() => onPlayTts(msg)}
-                    title={getAudioButtonTitle(ttsState)}
+                    title={getAudioButtonTitle(ttsState, isPlaying)}
                     aria-label="播放語音"
                   >
-                    <span className="hciot-audio-icon">🔊</span>
+                    {renderAudioIcon()}
                   </button>
                 ) : null}
               </div>

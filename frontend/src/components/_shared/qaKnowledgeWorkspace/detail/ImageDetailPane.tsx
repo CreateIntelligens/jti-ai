@@ -23,8 +23,8 @@ export default function ImageDetailPane({
 }: ImageDetailPaneProps) {
   if (!selectedImage) {
     return (
-      <div className="hciot-file-editor">
-        <div className="hciot-file-empty">
+      <div className="qa-workspace-file-editor">
+        <div className="qa-workspace-file-empty">
           <ImageIcon size={28} />
           <div>
             <h3>從左側檔案樹選擇圖片</h3>
@@ -43,18 +43,18 @@ export default function ImageDetailPane({
   const referenceColor = isReferenced ? '#166534' : '#b45309';
 
   return (
-    <div className="hciot-file-editor hciot-image-detail-pane">
-      <div className="hciot-file-header">
+    <div className="qa-workspace-file-editor qa-workspace-image-detail-pane">
+      <div className="qa-workspace-file-header">
         <div>
-          <p className="hciot-file-kicker">知識庫</p>
-          <h2 className="hciot-file-title">{selectedImage.image_id}</h2>
-          <p className="hciot-file-path">圖片目錄</p>
+          <p className="qa-workspace-file-kicker">知識庫</p>
+          <h2 className="qa-workspace-file-title">{selectedImage.image_id}</h2>
+          <p className="qa-workspace-file-path">圖片目錄</p>
         </div>
 
-        <div className="hciot-file-actions">
+        <div className="qa-workspace-file-actions">
           <button
             type="button"
-            className="hciot-file-action-button"
+            className="qa-workspace-file-action-button"
             onClick={onCleanupUnused}
             disabled={cleaningUnused || unusedImageCount === 0}
           >
@@ -66,7 +66,7 @@ export default function ImageDetailPane({
           </button>
           <button
             type="button"
-            className="hciot-file-action-button danger"
+            className="qa-workspace-file-action-button danger"
             onClick={onDelete}
             disabled={deleting}
           >
@@ -76,14 +76,14 @@ export default function ImageDetailPane({
         </div>
       </div>
 
-      <section className="hciot-file-editor-panel hciot-image-preview-panel">
-        <div className="hciot-file-editor-meta hciot-image-preview-meta-full">
+      <section className="qa-workspace-file-editor-panel qa-workspace-image-preview-panel">
+        <div className="qa-workspace-file-editor-meta qa-workspace-image-preview-meta-full">
           <span>ID: {selectedImage.image_id}</span>
           <span>{selectedImage.size_bytes ? `${Math.max(1, Math.round(selectedImage.size_bytes / 1024))} KB` : '0 KB'}</span>
           <span style={{ color: referenceColor, fontWeight: 600 }}>{referenceLabel}</span>
         </div>
-        <div className="hciot-image-preview-container">
-          <img className="hciot-image-preview-img" src={selectedImage.url} alt={selectedImage.image_id} />
+        <div className="qa-workspace-image-preview-container">
+          <img className="qa-workspace-image-preview-img" src={selectedImage.url} alt={selectedImage.image_id} />
         </div>
       </section>
     </div>

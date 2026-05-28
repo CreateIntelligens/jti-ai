@@ -34,17 +34,17 @@ export default function DocumentToQaPreview({
   };
 
   return (
-    <div className="hciot-upload-qa-body">
-      <div className="hciot-qa-preview-header">
-        <h4 className="hciot-qa-preview-title">
+    <div className="qa-workspace-upload-qa-body">
+      <div className="qa-workspace-qa-preview-header">
+        <h4 className="qa-workspace-qa-preview-title">
           擷取到 {qaPairs.length} 組問答對
         </h4>
-        <p className="hciot-qa-preview-subtitle">
+        <p className="qa-workspace-qa-preview-subtitle">
           匯入後預設不顯示為快速問答按鈕（仍可透過 RAG 檢索）。若要設為預設問題請逐條勾選。
         </p>
       </div>
 
-      <div className="hciot-qa-rows custom-scrollbar">
+      <div className="qa-workspace-qa-rows custom-scrollbar">
         {qaPairs.map((row, index) => (
           <QaRowItem
             key={index}
@@ -62,27 +62,27 @@ export default function DocumentToQaPreview({
         ))}
       </div>
 
-      <button type="button" className="hciot-qa-add-row" onClick={addRow}>
+      <button type="button" className="qa-workspace-qa-add-row" onClick={addRow}>
         <Plus size={14} />
         新增一題
       </button>
 
       {error && (
-        <div className="hciot-upload-error-banner hciot-qa-preview-error">
+        <div className="qa-workspace-upload-error-banner qa-workspace-qa-preview-error">
           <AlertCircle size={16} />
           <span>{error}</span>
         </div>
       )}
 
-      <div className="hciot-qa-footer">
-        <span className="hciot-qa-count">{qaPairs.length} 組</span>
-        <div className="hciot-qa-footer-actions">
-          <button type="button" className="hciot-file-action-button" onClick={onReset}>
+      <div className="qa-workspace-qa-footer">
+        <span className="qa-workspace-qa-count">{qaPairs.length} 組</span>
+        <div className="qa-workspace-qa-footer-actions">
+          <button type="button" className="qa-workspace-file-action-button" onClick={onReset}>
             放棄重新上傳
           </button>
           <button
             type="button"
-            className="hciot-file-action-button primary"
+            className="qa-workspace-file-action-button primary"
             onClick={onImport}
             disabled={qaPairs.length === 0}
           >

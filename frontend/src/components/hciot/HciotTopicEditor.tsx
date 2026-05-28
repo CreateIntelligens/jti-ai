@@ -8,7 +8,7 @@ import {
   getErrorMessage,
   missingLabelMessage,
   slugify,
-} from './knowledgeWorkspace/topicUtils';
+} from '../_shared/qaKnowledgeWorkspace/topicUtils';
 
 interface Props {
   language: 'zh' | 'en';

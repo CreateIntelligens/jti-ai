@@ -24,6 +24,7 @@ interface HciotSettingsModalProps {
   onClose: () => void;
   onPromptChange: () => void;
   language?: string;
+  sessionId?: string | null;
 }
 
 const MAX_CUSTOM = 3;
@@ -34,6 +35,7 @@ export default function HciotSettingsModal({
   onClose,
   onPromptChange,
   language = 'zh',
+  sessionId = null,
 }: HciotSettingsModalProps) {
   const normalizedLanguage = normalizeHciotLanguage(language);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
@@ -271,7 +273,14 @@ export default function HciotSettingsModal({
     <div className="jti-settings-overlay" onClick={onClose}>
       <div className="jti-settings-modal" onClick={(event) => event.stopPropagation()}>
         <div className="jti-settings-header">
-          <h2 className="jti-settings-title">HCIoT 設定</h2>
+          <div>
+            <h2 className="jti-settings-title">HCIoT 設定</h2>
+            {sessionId && (
+              <span style={{ fontSize: '0.75rem', color: 'var(--hciot-ink-soft)', fontFamily: 'monospace', marginTop: '0.25rem', display: 'block' }}>
+                Session ID: {sessionId}
+              </span>
+            )}
+          </div>
           <button className="jti-settings-close" onClick={onClose} aria-label="關閉">
             <X size={20} />
           </button>

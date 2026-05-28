@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { HciotLanguage } from '../../../../config/hciotTopics';
 import { toErrorMessage } from '../../../../utils/errors';
-import * as api from '../../../../services/api';
-import type { HciotQaPair } from '../../../../services/api';
+import type { HciotQaPair } from '../../../../services/api/hciot';
 import { createEmptyRow, type QARow } from './types';
 import type { ResolvedUploadTopic } from './types';
 import type { TopicLabels } from '../topicUtils';
 import DocumentToQaPreview from './DocumentToQaPreview';
 import DocumentToQaSourceForm from './DocumentToQaSourceForm';
 import DocumentToQaStatusView from './DocumentToQaStatusView';
+import type { QaWorkspaceApiClient } from '../QaKnowledgeWorkspace';
 import {
   MAX_FILE_SIZE_BYTES,
   MAX_TEXT_LENGTH,
@@ -35,6 +35,7 @@ interface DocumentToQaTabProps {
     hiddenQuestions?: string[],
   ) => Promise<UploadFileResult>;
   onUploadComplete: (firstUploadedFileName: string | null, count: number) => Promise<void>;
+  api: QaWorkspaceApiClient;
 }
 
 type PendingAiSource = { kind: 'file'; file: File } | { kind: 'text'; text: string };
@@ -69,7 +70,7 @@ function splitCsvLine(line: string): string[] {
 }
 
 function parseQaPairsFromCsvText(raw: string): HciotQaPair[] | null {
-  const cleaned = raw.replace(/^﻿/, '').trim();
+  const cleaned = raw.replace(/^\uFEFF/, '').trim();
   if (!cleaned) return null;
   const lines = cleaned.split(/\r?\n/).filter((line) => line.trim().length > 0);
   if (lines.length < 2) return null;
@@ -133,6 +134,7 @@ export default function DocumentToQaTab({
   onClose,
   onUploadFile,
   onUploadComplete,
+  api,
 }: DocumentToQaTabProps) {
   const isEn = language === 'en';
 

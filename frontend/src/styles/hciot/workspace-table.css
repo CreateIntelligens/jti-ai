@@ -1,7 +1,7 @@
 /* ==========================================================================
    Merged CSV and Tabs
    ========================================================================== */
-.hciot-file-tabs {
+.qa-workspace-file-tabs {
   display: flex;
   gap: 0.5rem;
   padding: 0 1rem;
@@ -9,7 +9,7 @@
   margin-bottom: 1rem;
 }
 
-.hciot-file-tab {
+.qa-workspace-file-tab {
   display: flex;
   align-items: center;
   gap: 0.375rem;
@@ -24,16 +24,16 @@
   transition: all 0.2s;
 }
 
-.hciot-file-tab:hover {
+.qa-workspace-file-tab:hover {
   color: var(--hciot-ink);
 }
 
-.hciot-file-tab.active {
+.qa-workspace-file-tab.active {
   color: var(--hciot-accent);
   border-bottom-color: var(--hciot-accent);
 }
 
-.hciot-merged-panel {
+.qa-workspace-merged-panel {
   padding: 0 1rem;
   flex: 1;
   overflow: hidden;
@@ -41,26 +41,26 @@
   flex-direction: column;
 }
 
-.hciot-merged-csv-container {
+.qa-workspace-merged-csv-container {
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
-.hciot-merged-csv-meta {
+.qa-workspace-merged-csv-meta {
   font-size: 0.82rem;
   color: var(--hciot-ink-soft);
   margin-bottom: 0.75rem;
 }
 
-.hciot-merged-csv-table-wrapper {
+.qa-workspace-merged-csv-table-wrapper {
   flex: 1;
   overflow: auto;
   border: 0.0625rem solid var(--hciot-border);
   border-radius: 0.5rem;
 }
 
-.hciot-merged-csv-table {
+.qa-workspace-merged-csv-table {
   width: 100%;
   min-width: 88rem;
   border-collapse: collapse;
@@ -68,8 +68,8 @@
   table-layout: fixed;
 }
 
-.hciot-merged-csv-table th,
-.hciot-merged-csv-table td {
+.qa-workspace-merged-csv-table th,
+.qa-workspace-merged-csv-table td {
   padding: 0.625rem 0.75rem;
   border-bottom: 0.0625rem solid var(--hciot-border);
   text-align: left;
@@ -77,18 +77,18 @@
   color: var(--hciot-ink);
 }
 
-.hciot-merged-csv-table td a {
+.qa-workspace-merged-csv-table td a {
   color: var(--primary-color, #8ab4f8);
   text-decoration: none;
   transition: color 0.15s, filter 0.15s;
 }
 
-.hciot-merged-csv-table td a:hover {
+.qa-workspace-merged-csv-table td a:hover {
   text-decoration: underline;
   filter: brightness(1.2);
 }
 
-.hciot-merged-csv-table th {
+.qa-workspace-merged-csv-table th {
   background-color: var(--hciot-panel-strong);
   font-weight: 600;
   position: sticky;
@@ -96,7 +96,7 @@
   z-index: 1;
 }
 
-.hciot-merged-csv-img-wrapper {
+.qa-workspace-merged-csv-img-wrapper {
   position: relative;
   width: 5rem;
   height: 5rem;
@@ -108,45 +108,45 @@
   justify-content: center;
 }
 
-.hciot-merged-csv-thumbnail {
+.qa-workspace-merged-csv-thumbnail {
   max-width: 100%;
   max-height: 100%;
   object-fit: cover;
 }
 
-.hciot-merged-csv-img-text {
+.qa-workspace-merged-csv-img-text {
   font-size: 0.75rem;
   color: var(--hciot-ink-soft);
   word-break: break-all;
 }
 
-.hciot-merged-csv-img-text.hidden {
+.qa-workspace-merged-csv-img-text.hidden {
   display: none;
 }
 
-.hciot-merged-csv-img-cell {
+.qa-workspace-merged-csv-img-cell {
   position: relative;
   min-width: 6.25rem;
 }
 
-.hciot-merged-csv-img-stack {
+.qa-workspace-merged-csv-img-stack {
   display: flex;
   flex-direction: column;
   gap: 0.375rem;
 }
 
-.hciot-merged-csv-img-wrapper.edit-mode {
+.qa-workspace-merged-csv-img-wrapper.edit-mode {
   border: 0.0625rem dashed var(--hciot-border-strong);
   background: rgba(148, 163, 184, 0.05);
   cursor: default;
 }
 
-.hciot-merged-csv-img-actions {
+.qa-workspace-merged-csv-img-actions {
   display: flex;
   gap: 0.375rem;
 }
 
-.hciot-merged-csv-remove-img {
+.qa-workspace-merged-csv-remove-img {
   position: absolute;
   top: 0.125rem;
   right: 0.125rem;
@@ -164,12 +164,12 @@
   transition: transform 0.15s ease, background 0.15s ease;
 }
 
-.hciot-merged-csv-remove-img:hover {
+.qa-workspace-merged-csv-remove-img:hover {
   transform: scale(1.1);
   background: rgb(185, 28, 28);
 }
 
-.hciot-merged-csv-upload-btn {
+.qa-workspace-merged-csv-upload-btn {
   display: flex;
   flex: 1;
   align-items: center;
@@ -188,7 +188,7 @@
   box-shadow: 0 0.0625rem 0.125rem rgba(0,0,0,0.05);
 }
 
-.hciot-merged-csv-upload-btn:hover {
+.qa-workspace-merged-csv-upload-btn:hover {
   background: var(--hciot-hover);
   border-color: var(--hciot-accent);
   color: var(--hciot-accent);
@@ -196,24 +196,24 @@
   box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.08);
 }
 
-.hciot-merged-csv-upload-btn.is-uploading {
+.qa-workspace-merged-csv-upload-btn.is-uploading {
   cursor: wait;
 }
 
 /* Merged CSV table cells */
-.hciot-csv-col-num    { width: 4.25rem; }
-.hciot-csv-col-visible { width: 5.75rem; text-align: center; }
-.hciot-csv-col-question { width: 24rem; }
-.hciot-csv-col-answer { width: 28rem; }
-.hciot-csv-col-wide   { width: 11.25rem; }
-.hciot-csv-col-action { width: 3.75rem; text-align: center; }
-.hciot-csv-visible-header {
+.qa-workspace-csv-col-num    { width: 4.25rem; }
+.qa-workspace-csv-col-visible { width: 5.75rem; text-align: center; }
+.qa-workspace-csv-col-question { width: 24rem; }
+.qa-workspace-csv-col-answer { width: 28rem; }
+.qa-workspace-csv-col-wide   { width: 11.25rem; }
+.qa-workspace-csv-col-action { width: 3.75rem; text-align: center; }
+.qa-workspace-csv-visible-header {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.35rem;
 }
-.hciot-csv-select-all {
+.qa-workspace-csv-select-all {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -223,16 +223,16 @@
   font-weight: 500;
   cursor: pointer;
 }
-.hciot-csv-visible-checkbox {
+.qa-workspace-csv-visible-checkbox {
   width: 0.9rem;
   height: 0.9rem;
   cursor: pointer;
   accent-color: var(--hciot-accent, #6366f1);
 }
-.hciot-csv-visible-checkbox.readonly { cursor: default; }
-.hciot-csv-visible-checkbox:disabled { cursor: not-allowed; opacity: 0.4; }
-.hciot-csv-textarea   { min-height: 3.75rem; padding: 0.25rem; }
-.hciot-csv-cell-pre   { white-space: pre-wrap; }
-.hciot-csv-cell-break { word-break: break-all; }
-.hciot-csv-cell-center { text-align: center; }
-.hciot-csv-footer     { margin-top: 1rem; text-align: center; }
+.qa-workspace-csv-visible-checkbox.readonly { cursor: default; }
+.qa-workspace-csv-visible-checkbox:disabled { cursor: not-allowed; opacity: 0.4; }
+.qa-workspace-csv-textarea   { min-height: 3.75rem; padding: 0.25rem; }
+.qa-workspace-csv-cell-pre   { white-space: pre-wrap; }
+.qa-workspace-csv-cell-break { word-break: break-all; }
+.qa-workspace-csv-cell-center { text-align: center; }
+.qa-workspace-csv-footer     { margin-top: 1rem; text-align: center; }

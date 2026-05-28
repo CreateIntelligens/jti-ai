@@ -122,14 +122,14 @@ export default function ImageUploadTab({
         const previewUrl = selectedImageUrls.get(item.file) || '';
 
         return (
-          <div key={`${item.file.name}-${index}`} className="hciot-upload-file-item image-item">
+          <div key={`${item.file.name}-${index}`} className="qa-workspace-upload-file-item image-item">
             {previewUrl ? (
-              <img src={previewUrl} alt={item.imageId.trim() || item.file.name} className="hciot-upload-image-thumb" />
+              <img src={previewUrl} alt={item.imageId.trim() || item.file.name} className="qa-workspace-upload-image-thumb" />
             ) : (
               <ImageIcon size={16} className="hciot-icon-green" />
             )}
-            <div className="hciot-upload-image-info">
-              <span className="hciot-upload-file-name">{item.file.name}</span>
+            <div className="qa-workspace-upload-image-info">
+              <span className="qa-workspace-upload-file-name">{item.file.name}</span>
               <input
                 type="text"
                 placeholder="自訂 IMG ID (選填)"
@@ -138,18 +138,18 @@ export default function ImageUploadTab({
                   imageIndex === index ? { ...image, imageId: event.target.value } : image
                 )))}
                 disabled={item.status === 'uploading' || item.status === 'done'}
-                className="hciot-file-input hciot-upload-image-id-input"
+                className="qa-workspace-file-input qa-workspace-upload-image-id-input"
               />
             </div>
-            <span className="hciot-upload-file-size">
+            <span className="qa-workspace-upload-file-size">
               {item.file.size > 1024 ? `${(item.file.size / 1024).toFixed(1)} KB` : `${item.file.size} B`}
             </span>
-            <div className="hciot-file-actions">
+            <div className="qa-workspace-file-actions">
               <UploadStatusIcon status={item.status} error={item.error} />
               {item.status !== 'uploading' && item.status !== 'done' && (
                 <button
                   type="button"
-                  className="hciot-qa-row-delete"
+                  className="qa-workspace-qa-row-delete"
                   onClick={() => setSelectedImages((previous) => previous.filter((_, imageIndex) => imageIndex !== index))}
                   title="移除"
                 >

@@ -13,17 +13,17 @@ export default function ImageLightbox({ url, alt = '', onClose }: ImageLightboxP
   if (!url) return null;
 
   return (
-    <div className="hciot-image-lightbox" onClick={onClose}>
-      <div className="hciot-image-lightbox-frame" onClick={(e) => e.stopPropagation()}>
+    <div className="qa-workspace-image-lightbox" onClick={onClose}>
+      <div className="qa-workspace-image-lightbox-frame" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
-          className="hciot-image-lightbox-close"
+          className="qa-workspace-image-lightbox-close"
           aria-label="關閉"
           onClick={onClose}
         >
           <X size={24} />
         </button>
-        <img src={url} alt={alt} className="hciot-image-lightbox-img" />
+        <img src={url} alt={alt} className="qa-workspace-image-lightbox-img" />
       </div>
     </div>
   );

@@ -255,14 +255,14 @@
   height: 2.5rem;
   padding: 0 0.85rem;
   margin-left: 0.25rem;
-  border: 0.0625rem solid var(--hciot-border);
+  border: 0.0625rem solid color-mix(in srgb, var(--hciot-accent) 25%, transparent);
   border-radius: 0.8rem;
-  background: rgba(148, 163, 184, 0.08);
-  color: var(--hciot-ink-soft);
+  background: color-mix(in srgb, var(--hciot-accent) 8%, transparent);
+  color: var(--hciot-accent);
   font-size: 0.88rem;
   font-weight: 600;
   text-decoration: none;
-  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease;
+  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
   box-sizing: border-box;
 }
 
@@ -273,7 +273,8 @@
 .hciot-external-pill:hover {
   border-color: var(--hciot-accent);
   color: var(--hciot-accent-strong);
-  background: rgba(2, 132, 199, 0.1);
+  background: color-mix(in srgb, var(--hciot-accent) 15%, transparent);
+  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--hciot-accent) 12%, transparent);
 }
 
 .hciot-external-pill:hover svg {
@@ -321,6 +322,63 @@
   min-height: 0;
 }
 
+@media (max-width: 64rem) {
+  .hciot-sidebar-toggle {
+    display: inline-flex !important;
+  }
+
+  .hciot-chat-workspace {
+    grid-template-columns: 1fr;
+    position: relative;
+  }
+
+  .hciot-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 18.5rem;
+    max-width: 85vw;
+    background: var(--hciot-panel-strong);
+    border-right: 0.0625rem solid var(--hciot-border);
+    z-index: 1000;
+    padding: 1.5rem 1rem;
+    transform: translateX(-100%);
+    transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0.25rem 0 1.5rem rgba(0, 0, 0, 0.15);
+  }
+
+  .hciot-sidebar.is-open {
+    transform: translateX(0);
+  }
+
+  .hciot-sidebar-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.3);
+    backdrop-filter: blur(0.125rem);
+    z-index: 999;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+  }
+
+  .hciot-sidebar-overlay.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (min-width: 64.0625rem) {
+  .hciot-sidebar-toggle {
+    display: none !important;
+  }
+  .hciot-sidebar-overlay {
+    display: none !important;
+  }
+}
+
 @media (max-width: 56.25rem) {
   .hciot-header {
     flex-direction: column;
@@ -354,9 +412,9 @@
    touching JSX. Keep this selector list in sync with the `overflow: auto`
    containers across the hciot stylesheets. */
 .hciot-shell :is(
-  .hciot-explorer-body,
-  .hciot-merged-csv-table-wrapper,
-  .hciot-image-picker-body,
+  .qa-workspace-explorer-body,
+  .qa-workspace-merged-csv-table-wrapper,
+  .qa-workspace-image-picker-body,
   .hciot-topic-question-list,
   .hciot-te-qs-list,
   .hciot-messages-area
@@ -366,9 +424,9 @@
 }
 
 .hciot-shell :is(
-  .hciot-explorer-body,
-  .hciot-merged-csv-table-wrapper,
-  .hciot-image-picker-body,
+  .qa-workspace-explorer-body,
+  .qa-workspace-merged-csv-table-wrapper,
+  .qa-workspace-image-picker-body,
   .hciot-topic-question-list,
   .hciot-te-qs-list,
   .hciot-messages-area
@@ -378,9 +436,9 @@
 }
 
 .hciot-shell :is(
-  .hciot-explorer-body,
-  .hciot-merged-csv-table-wrapper,
-  .hciot-image-picker-body,
+  .qa-workspace-explorer-body,
+  .qa-workspace-merged-csv-table-wrapper,
+  .qa-workspace-image-picker-body,
   .hciot-topic-question-list,
   .hciot-te-qs-list,
   .hciot-messages-area
@@ -389,9 +447,9 @@
 }
 
 .hciot-shell :is(
-  .hciot-explorer-body,
-  .hciot-merged-csv-table-wrapper,
-  .hciot-image-picker-body,
+  .qa-workspace-explorer-body,
+  .qa-workspace-merged-csv-table-wrapper,
+  .qa-workspace-image-picker-body,
   .hciot-topic-question-list,
   .hciot-te-qs-list,
   .hciot-messages-area
@@ -401,9 +459,9 @@
 }
 
 .hciot-shell :is(
-  .hciot-explorer-body,
-  .hciot-merged-csv-table-wrapper,
-  .hciot-image-picker-body,
+  .qa-workspace-explorer-body,
+  .qa-workspace-merged-csv-table-wrapper,
+  .qa-workspace-image-picker-body,
   .hciot-topic-question-list,
   .hciot-te-qs-list,
   .hciot-messages-area

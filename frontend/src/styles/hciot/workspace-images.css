@@ -1,7 +1,7 @@
 /* ==========================================================================
    Image Management
    ========================================================================== */
-.hciot-image-detail-pane .hciot-file-editor-meta {
+.qa-workspace-image-detail-pane .qa-workspace-file-editor-meta {
   display: flex;
   gap: 1rem;
   font-size: 0.88rem;
@@ -11,19 +11,19 @@
   border-bottom: 0.0625rem solid var(--hciot-border);
 }
 
-.hciot-image-upload-dialog {
+.qa-workspace-image-upload-dialog {
   max-width: 37.5rem;
   width: 90vw;
 }
 
-.hciot-explorer-row-icon.tone-image {
+.qa-workspace-explorer-row-icon.tone-image {
   color: #22c55e;
 }
 
 /* ==========================================================================
    Existing Image Picker Dialog
    ========================================================================== */
-.hciot-image-picker-overlay {
+.qa-workspace-image-picker-overlay {
   position: fixed;
   inset: 0;
   z-index: 1000;
@@ -35,7 +35,7 @@
   padding: 1.5rem;
 }
 
-.hciot-image-picker-dialog {
+.qa-workspace-image-picker-dialog {
   width: min(55rem, 100%);
   max-height: min(80vh, 53.75rem);
   overflow: hidden;
@@ -47,7 +47,7 @@
   flex-direction: column;
 }
 
-.hciot-image-picker-header {
+.qa-workspace-image-picker-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -55,24 +55,24 @@
   border-bottom: 0.0625rem solid var(--hciot-border);
 }
 
-.hciot-image-picker-title {
+.qa-workspace-image-picker-title {
   font-size: 1.1rem;
   font-weight: 700;
   color: var(--hciot-ink);
 }
 
-.hciot-image-picker-subtitle {
+.qa-workspace-image-picker-subtitle {
   margin-top: 0.25rem;
   font-size: 0.8rem;
   color: var(--hciot-ink-soft);
 }
 
-.hciot-image-picker-search {
+.qa-workspace-image-picker-search {
   padding: 1rem;
   border-bottom: 0.0625rem solid var(--hciot-border);
 }
 
-.hciot-image-picker-search-label {
+.qa-workspace-image-picker-search-label {
   display: flex;
   align-items: center;
   gap: 0.625rem;
@@ -83,7 +83,7 @@
   color: var(--hciot-ink-soft);
 }
 
-.hciot-image-picker-search-input {
+.qa-workspace-image-picker-search-input {
   border: 0;
   outline: none;
   background: transparent;
@@ -93,19 +93,19 @@
   font-family: inherit;
 }
 
-.hciot-image-picker-search-input::placeholder {
+.qa-workspace-image-picker-search-input::placeholder {
   color: var(--hciot-ink-soft);
   opacity: 0.6;
 }
 
-.hciot-image-picker-body {
+.qa-workspace-image-picker-body {
   padding: 1rem;
   overflow-y: auto;
   display: grid;
   gap: 1.125rem;
 }
 
-.hciot-image-picker-empty {
+.qa-workspace-image-picker-empty {
   min-height: 13.75rem;
   display: flex;
   flex-direction: column;
@@ -115,13 +115,13 @@
   color: var(--hciot-ink-soft);
 }
 
-.hciot-image-picker-section {
+.qa-workspace-image-picker-section {
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
 }
 
-.hciot-image-picker-section-title {
+.qa-workspace-image-picker-section-title {
   margin: 0;
   font-size: 0.8rem;
   font-weight: 700;
@@ -130,12 +130,12 @@
   letter-spacing: 0.03em;
 }
 
-.hciot-image-picker-grid {
+.qa-workspace-image-picker-grid {
   display: grid;
   gap: 0.625rem;
 }
 
-.hciot-image-picker-card {
+.qa-workspace-image-picker-card {
   display: grid;
   grid-template-columns: 4.5rem 1fr;
   gap: 0.75rem;
@@ -149,16 +149,16 @@
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.hciot-image-picker-card:hover {
+.qa-workspace-image-picker-card:hover {
   border-color: var(--hciot-accent);
 }
 
-.hciot-image-picker-card.is-selected {
+.qa-workspace-image-picker-card.is-selected {
   border: 0.125rem solid var(--hciot-accent);
   box-shadow: 0 0 0 0.125rem rgba(2, 132, 199, 0.08);
 }
 
-.hciot-image-picker-thumb-wrapper {
+.qa-workspace-image-picker-thumb-wrapper {
   width: 4.5rem;
   height: 4.5rem;
   border-radius: 0.5rem;
@@ -170,50 +170,50 @@
   border: 0.0625rem solid var(--hciot-border);
 }
 
-.hciot-image-picker-thumb {
+.qa-workspace-image-picker-thumb {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.hciot-image-picker-info {
+.qa-workspace-image-picker-info {
   min-width: 0;
 }
 
-.hciot-image-picker-id {
+.qa-workspace-image-picker-id {
   font-weight: 600;
   color: var(--hciot-ink);
   word-break: break-word;
 }
 
-.hciot-image-picker-ref {
+.qa-workspace-image-picker-ref {
   margin-top: 0.25rem;
   font-size: 0.75rem;
   color: #166534;
 }
 
-.hciot-image-picker-ref.is-unused {
+.qa-workspace-image-picker-ref.is-unused {
   color: #b45309;
 }
 
-.hciot-image-picker-size {
+.qa-workspace-image-picker-size {
   margin-top: 0.25rem;
   font-size: 0.75rem;
   color: var(--hciot-ink-soft);
 }
 
 /* Image preview detail layout */
-.hciot-image-preview-panel {
+.qa-workspace-image-preview-panel {
   display: flex;
   flex-direction: column;
   gap: 1rem;
   align-items: center;
   justify-content: center;
 }
-.hciot-image-preview-meta-full {
+.qa-workspace-image-preview-meta-full {
   width: 100%;
 }
-.hciot-image-preview-container {
+.qa-workspace-image-preview-container {
   flex: 1;
   display: flex;
   align-items: center;
@@ -224,17 +224,17 @@
   width: 100%;
   min-height: 18.75rem;
 }
-.hciot-image-preview-img {
+.qa-workspace-image-preview-img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
 }
-.hciot-csv-icon {
+.qa-workspace-csv-icon {
   vertical-align: -0.1875rem;
   margin-right: 0.4rem;
 }
 
-.hciot-image-lightbox {
+.qa-workspace-image-lightbox {
   position: fixed;
   inset: 0;
   z-index: var(--hciot-z-lightbox, 1000);
@@ -243,19 +243,19 @@
   justify-content: center;
   background-color: rgba(0, 0, 0, 0.85);
 }
-.hciot-image-lightbox-frame {
+.qa-workspace-image-lightbox-frame {
   position: relative;
   max-width: 90vw;
   max-height: 90vh;
 }
-.hciot-image-lightbox-img {
+.qa-workspace-image-lightbox-img {
   max-width: 100%;
   max-height: 90vh;
   object-fit: contain;
   border-radius: 0.5rem;
   box-shadow: 0 0.25rem 1.5rem rgba(0, 0, 0, 0.5);
 }
-.hciot-image-lightbox-close {
+.qa-workspace-image-lightbox-close {
   position: absolute;
   top: -2.5rem;
   right: -2.5rem;
@@ -270,6 +270,6 @@
   background: rgba(255, 255, 255, 0.2);
   cursor: pointer;
 }
-.hciot-image-lightbox-close:hover {
+.qa-workspace-image-lightbox-close:hover {
   background: rgba(255, 255, 255, 0.35);
 }

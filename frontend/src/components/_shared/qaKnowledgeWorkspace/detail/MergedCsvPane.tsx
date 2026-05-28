@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Table as TableIcon, Download, Edit, Save, Trash2, X } from 'lucide-react';
 
 import type { HciotLanguage } from '../../../../config/hciotTopics';
-import { getHciotTopicMergedCsv, deleteHciotKnowledgeFile, updateHciotKnowledgeFileContent, updateHciotTopic, type HciotImage, type HciotMergedCsvRow } from '../../../../services/api/hciot';
+import type { HciotImage, HciotMergedCsvRow } from '../../../../services/api/hciot';
 import { buildCsvString } from '../../../../utils/csv';
 import { downloadBlob } from '../../../../utils/download';
 import { extractUploadedImageId, rollbackUploadedImages, type DeleteImageHandler, type UploadedImageResult } from '../imageUpload';
@@ -10,6 +10,7 @@ import { getErrorMessage } from '../topicUtils';
 import MergedCsvTable, { type EditableMergedCsvRow } from './MergedCsvTable';
 import { useEscapeKey } from '../../../../hooks/useEscapeKey';
 import { confirmDiscard } from '../../../../utils/confirmDiscard';
+import type { QaWorkspaceApiClient } from '../QaKnowledgeWorkspace';
 
 interface MergedCsvPaneProps {
   topicId: string;
@@ -17,6 +18,7 @@ interface MergedCsvPaneProps {
   language: HciotLanguage;
   availableImages: HciotImage[];
   statusMessage: string | null;
+  api: QaWorkspaceApiClient;
   // Question texts currently hidden from this topic's preset-question chips.
   // Seeds the per-row visibility checkboxes; defaults to all-visible when absent.
   hiddenQuestions?: string[];
@@ -57,6 +59,7 @@ export default function MergedCsvPane({
   language,
   availableImages,
   statusMessage,
+  api,
   hiddenQuestions,
   onRefreshWorkspace,
   onUploadImage,
@@ -93,14 +96,14 @@ export default function MergedCsvPane({
   const fetchCsv = useCallback(async () => {
     setLoading(true);
     try {
-      const response = await getHciotTopicMergedCsv(topicId, language);
+      const response = await api.getTopicMergedCsv(topicId, language);
       applyMergedCsvResponse(response);
     } catch (err) {
       setError(getErrorMessage(err));
     } finally {
       setLoading(false);
     }
-  }, [applyMergedCsvResponse, language, topicId]);
+  }, [api, applyMergedCsvResponse, language, topicId]);
 
   const handleCancelEdit = useCallback(() => {
     if (dirty && !confirmDiscard('cancel')) {
@@ -115,7 +118,7 @@ export default function MergedCsvPane({
     setIsEditing(false);
     let active = true;
     setLoading(true);
-    getHciotTopicMergedCsv(topicId, language)
+    api.getTopicMergedCsv(topicId, language)
       .then((response) => {
         if (!active) return;
         applyMergedCsvResponse(response);
@@ -129,7 +132,7 @@ export default function MergedCsvPane({
       });
 
     return () => { active = false; };
-  }, [applyMergedCsvResponse, topicId, language]);
+  }, [api, applyMergedCsvResponse, topicId, language]);
 
   useEscapeKey(handleCancelEdit, isEditing);
 
@@ -191,10 +194,10 @@ export default function MergedCsvPane({
 
       await Promise.all([
         ...Array.from(grouped).map(([file, fileRows]) =>
-          updateHciotKnowledgeFileContent(file, toCsvString(fileRows), language)
+          api.updateKnowledgeFileContent(file, toCsvString(fileRows), language)
         ),
         ...sourceFiles.filter(file => !grouped.has(file)).map(file =>
-          deleteHciotKnowledgeFile(file, language)
+          api.deleteKnowledgeFile(file, language)
         )
       ]);
 
@@ -205,7 +208,7 @@ export default function MergedCsvPane({
         savedRows.map(row => row.q.trim()).filter(text => text.length > 0),
       );
       const nextHidden = Array.from(hiddenSet).filter(text => survivingQuestions.has(text));
-      await updateHciotTopic(topicId, { hidden_questions: nextHidden }, language);
+      await api.updateTopic(topicId, { hidden_questions: nextHidden }, language);
 
       setIsEditing(false);
       if (onRefreshWorkspace) {
@@ -266,22 +269,22 @@ export default function MergedCsvPane({
   };
 
   return (
-    <div className="hciot-file-editor">
-      <div className="hciot-file-header">
+    <div className="qa-workspace-file-editor">
+      <div className="qa-workspace-file-header">
         <div>
-          <p className="hciot-file-kicker">知識庫</p>
-          <h2 className="hciot-file-title">
-            <TableIcon className="hciot-csv-icon" size={20} />
+          <p className="qa-workspace-file-kicker">知識庫</p>
+          <h2 className="qa-workspace-file-title">
+            <TableIcon className="qa-workspace-csv-icon" size={20} />
             {topicLabel || topicSlug}
           </h2>
         </div>
 
-        <div className="hciot-file-actions">
+        <div className="qa-workspace-file-actions">
           {isEditing ? (
             <>
               <button
                 type="button"
-                className="hciot-file-action-button"
+                className="qa-workspace-file-action-button"
                 onClick={handleCancelEdit}
                 disabled={saving}
               >
@@ -290,7 +293,7 @@ export default function MergedCsvPane({
               </button>
               <button
                 type="button"
-                className="hciot-file-action-button primary"
+                className="qa-workspace-file-action-button primary"
                 onClick={handleSave}
                 disabled={saving}
               >
@@ -302,7 +305,7 @@ export default function MergedCsvPane({
             <>
               <button
                 type="button"
-                className="hciot-file-action-button"
+                className="qa-workspace-file-action-button"
                 onClick={handleDownload}
                 disabled={loading || error !== null || rows.length === 0}
               >
@@ -312,7 +315,7 @@ export default function MergedCsvPane({
               {onDeleteTopic && (
                 <button
                   type="button"
-                  className="hciot-file-action-button danger"
+                  className="qa-workspace-file-action-button danger"
                   onClick={() => onDeleteTopic(topicId, topicLabel || topicSlug || topicId)}
                   disabled={loading}
                 >
@@ -322,7 +325,7 @@ export default function MergedCsvPane({
               )}
               <button
                 type="button"
-                className="hciot-file-action-button primary"
+                className="qa-workspace-file-action-button primary"
                 onClick={() => setIsEditing(true)}
                 disabled={loading || error !== null || rows.length === 0}
               >
@@ -335,10 +338,10 @@ export default function MergedCsvPane({
       </div>
 
       {statusMessage ? (
-        <div className="hciot-file-status-banner">{statusMessage}</div>
+        <div className="qa-workspace-file-status-banner">{statusMessage}</div>
       ) : null}
 
-      <section className="hciot-file-editor-panel hciot-merged-panel">
+      <section className="qa-workspace-file-editor-panel qa-workspace-merged-panel">
         <MergedCsvTable
           language={language}
           rows={rows}

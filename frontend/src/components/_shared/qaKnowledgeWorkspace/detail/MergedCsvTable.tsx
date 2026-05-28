@@ -80,15 +80,15 @@ export default function MergedCsvTable({
   const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
 
   if (loading) {
-    return <div className="hciot-merged-csv-loading">載入整合資料中...</div>;
+    return <div className="qa-workspace-merged-csv-loading">載入整合資料中...</div>;
   }
 
   if (error) {
-    return <div className="hciot-merged-csv-error">{error}</div>;
+    return <div className="qa-workspace-merged-csv-error">{error}</div>;
   }
 
   if (rows.length === 0 && !isEditing) {
-    return <div className="hciot-merged-csv-empty">此主題目前沒有 CSV 檔案。</div>;
+    return <div className="qa-workspace-merged-csv-empty">此主題目前沒有 CSV 檔案。</div>;
   }
 
   const handleFileChange = (index: number, file: File | null) => {
@@ -125,7 +125,7 @@ export default function MergedCsvTable({
   };
 
   return (
-    <div className="hciot-merged-csv-container">
+    <div className="qa-workspace-merged-csv-container">
       <ExistingImagePicker
         open={pickerIndex !== null}
         language={language}
@@ -138,22 +138,22 @@ export default function MergedCsvTable({
         url={previewImageUrl}
         onClose={() => setPreviewImageUrl(null)}
       />
-      <div className="hciot-merged-csv-meta">
+      <div className="qa-workspace-merged-csv-meta">
         {`已合併 ${sourceFiles.length} 個檔案`}
       </div>
-      <div className="hciot-merged-csv-table-wrapper">
-        <table className="hciot-merged-csv-table">
+      <div className="qa-workspace-merged-csv-table-wrapper">
+        <table className="qa-workspace-merged-csv-table">
           <thead>
             <tr>
-              <th className="hciot-csv-col-num">編號</th>
-              <th className="hciot-csv-col-visible" title={VISIBILITY_HINT}>
+              <th className="qa-workspace-csv-col-num">編號</th>
+              <th className="qa-workspace-csv-col-visible" title={VISIBILITY_HINT}>
                 {isEditing ? (
-                  <div className="hciot-csv-visible-header">
+                  <div className="qa-workspace-csv-visible-header">
                     <span>顯示</span>
-                    <label className="hciot-csv-select-all" title="全選顯示問題">
+                    <label className="qa-workspace-csv-select-all" title="全選顯示問題">
                       <input
                         type="checkbox"
-                        className="hciot-csv-visible-checkbox"
+                        className="qa-workspace-csv-visible-checkbox"
                         aria-label="全選顯示問題"
                         checked={allQuestionsVisible}
                         disabled={questionTexts.length === 0}
@@ -169,11 +169,11 @@ export default function MergedCsvTable({
                   <span>顯示</span>
                 )}
               </th>
-              <th className="hciot-csv-col-question">問題 (Q)</th>
-              <th className="hciot-csv-col-answer">回答 (A)</th>
-              <th className="hciot-csv-col-wide">圖片 (IMG)</th>
-              <th className="hciot-csv-col-wide">網址 (URL)</th>
-              {isEditing && <th className="hciot-csv-col-action">-</th>}
+              <th className="qa-workspace-csv-col-question">問題 (Q)</th>
+              <th className="qa-workspace-csv-col-answer">回答 (A)</th>
+              <th className="qa-workspace-csv-col-wide">圖片 (IMG)</th>
+              <th className="qa-workspace-csv-col-wide">網址 (URL)</th>
+              {isEditing && <th className="qa-workspace-csv-col-action">-</th>}
             </tr>
           </thead>
           <tbody>
@@ -191,11 +191,11 @@ export default function MergedCsvTable({
               return (
                 <tr key={`${row.index}-${i}`}>
                   <td>{i + 1}</td>
-                  <td className="hciot-csv-cell-center">
+                  <td className="qa-workspace-csv-cell-center">
                     {isEditing ? (
                       <input
                         type="checkbox"
-                        className="hciot-csv-visible-checkbox"
+                        className="qa-workspace-csv-visible-checkbox"
                         aria-label={visibilityLabel}
                         checked={isQuestionVisible}
                         disabled={!hasQuestionText}
@@ -205,7 +205,7 @@ export default function MergedCsvTable({
                     ) : (
                       <input
                         type="checkbox"
-                        className="hciot-csv-visible-checkbox readonly"
+                        className="qa-workspace-csv-visible-checkbox readonly"
                         aria-label={visibilityLabel}
                         checked={isQuestionVisible}
                         readOnly
@@ -216,7 +216,7 @@ export default function MergedCsvTable({
                   <td>
                     {isEditing ? (
                       <textarea
-                        className="hciot-file-textarea hciot-csv-textarea"
+                        className="qa-workspace-file-textarea qa-workspace-csv-textarea"
                         value={row.q}
                         onChange={(e) => onUpdateRow(i, { q: e.target.value })}
                       />
@@ -224,10 +224,10 @@ export default function MergedCsvTable({
                       row.q
                     )}
                   </td>
-                  <td className="hciot-csv-cell-pre">
+                  <td className="qa-workspace-csv-cell-pre">
                     {isEditing ? (
                       <textarea
-                        className="hciot-file-textarea hciot-csv-textarea"
+                        className="qa-workspace-file-textarea qa-workspace-csv-textarea"
                         value={row.a}
                         onChange={(e) => onUpdateRow(i, { a: e.target.value })}
                       />
@@ -237,15 +237,15 @@ export default function MergedCsvTable({
                   </td>
                   <td>
                     {isEditing ? (
-                      <div className="hciot-merged-csv-img-cell">
+                      <div className="qa-workspace-merged-csv-img-cell">
                         {hasImage ? (
-                          <div className="hciot-merged-csv-img-stack">
-                            <div className="hciot-merged-csv-img-wrapper edit-mode">
+                          <div className="qa-workspace-merged-csv-img-stack">
+                            <div className="qa-workspace-merged-csv-img-wrapper edit-mode">
                               {imageUrl && (
                                 <ZoomableThumbnail
                                   src={imageUrl}
                                   alt={row.img}
-                                  className="hciot-merged-csv-thumbnail"
+                                  className="qa-workspace-merged-csv-thumbnail"
                                   onZoom={setPreviewImageUrl}
                                 />
                               )}
@@ -254,16 +254,16 @@ export default function MergedCsvTable({
                               ) : null}
                               <button
                                 type="button"
-                                className="hciot-merged-csv-remove-img"
+                                className="qa-workspace-merged-csv-remove-img"
                                 onClick={() => onUpdateRow(i, clearRowImageState())}
                                 title="移除圖片"
                               >
                                 <X size={12} />
                               </button>
-                              <span className="hciot-merged-csv-img-text" title={row.imgError || imageLabel}>{imageLabel}</span>
+                              <span className="qa-workspace-merged-csv-img-text" title={row.imgError || imageLabel}>{imageLabel}</span>
                             </div>
-                            <div className="hciot-merged-csv-img-actions">
-                              <label className={`hciot-merged-csv-upload-btn${row.imgStatus === 'uploading' ? ' is-uploading' : ''}`}>
+                            <div className="qa-workspace-merged-csv-img-actions">
+                              <label className={`qa-workspace-merged-csv-upload-btn${row.imgStatus === 'uploading' ? ' is-uploading' : ''}`}>
                                 <input
                                   className="file-input-hidden"
                                   type="file"
@@ -275,7 +275,7 @@ export default function MergedCsvTable({
                               </label>
                               <button
                                 type="button"
-                                className="hciot-merged-csv-upload-btn"
+                                className="qa-workspace-merged-csv-upload-btn"
                                 onClick={() => setPickerIndex(i)}
                               >
                                 <ImageIcon size={14} />
@@ -283,8 +283,8 @@ export default function MergedCsvTable({
                             </div>
                           </div>
                         ) : (
-                          <div className="hciot-merged-csv-img-actions">
-                            <label className={`hciot-merged-csv-upload-btn${row.imgStatus === 'uploading' ? ' is-uploading' : ''}`}>
+                          <div className="qa-workspace-merged-csv-img-actions">
+                            <label className={`qa-workspace-merged-csv-upload-btn${row.imgStatus === 'uploading' ? ' is-uploading' : ''}`}>
                               <input
                                 className="file-input-hidden"
                                 type="file"
@@ -297,7 +297,7 @@ export default function MergedCsvTable({
                             </label>
                             <button
                               type="button"
-                              className="hciot-merged-csv-upload-btn"
+                              className="qa-workspace-merged-csv-upload-btn"
                               onClick={() => setPickerIndex(i)}
                             >
                               <ImageIcon size={14} />
@@ -307,12 +307,12 @@ export default function MergedCsvTable({
                         )}
                       </div>
                     ) : row.img ? (
-                      <div className="hciot-merged-csv-img-wrapper">
+                      <div className="qa-workspace-merged-csv-img-wrapper">
                         {imageUrl && (
                           <ZoomableThumbnail
                             src={imageUrl}
                             alt={row.img}
-                            className="hciot-merged-csv-thumbnail"
+                            className="qa-workspace-merged-csv-thumbnail"
                             title={row.img}
                             onZoom={setPreviewImageUrl}
                             onError={(e) => {
@@ -322,14 +322,14 @@ export default function MergedCsvTable({
                             }}
                           />
                         )}
-                        <span className="hciot-merged-csv-img-text hidden">{row.img}</span>
+                        <span className="qa-workspace-merged-csv-img-text hidden">{row.img}</span>
                       </div>
                     ) : null}
                   </td>
-                  <td className="hciot-csv-cell-break">
+                  <td className="qa-workspace-csv-cell-break">
                     {isEditing ? (
                       <textarea
-                        className="hciot-file-textarea hciot-csv-textarea"
+                        className="qa-workspace-file-textarea qa-workspace-csv-textarea"
                         value={row.url || ''}
                         onChange={(e) => onUpdateRow(i, { url: e.target.value })}
                       />
@@ -338,10 +338,10 @@ export default function MergedCsvTable({
                     ) : null}
                   </td>
                   {isEditing && (
-                    <td className="hciot-csv-cell-center">
+                    <td className="qa-workspace-csv-cell-center">
                       <button
                         type="button"
-                        className="hciot-explorer-icon-button danger"
+                        className="qa-workspace-explorer-icon-button danger"
                         onClick={() => onDeleteRow(i)}
                         title="刪除此列"
                       >
@@ -355,10 +355,10 @@ export default function MergedCsvTable({
           </tbody>
         </table>
         {isEditing && (
-          <div className="hciot-csv-footer">
+          <div className="qa-workspace-csv-footer">
             <button
               type="button"
-              className="hciot-file-action-button"
+              className="qa-workspace-file-action-button"
               onClick={onAddRow}
             >
               <Plus size={15} />

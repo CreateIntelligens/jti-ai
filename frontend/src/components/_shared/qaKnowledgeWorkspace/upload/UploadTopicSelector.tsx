@@ -1,4 +1,4 @@
-import HciotSelect from '../../HciotSelect';
+import HciotSelect from '../../../hciot/HciotSelect';
 
 import { NEW_VALUE } from '../topicUtils';
 import {
@@ -20,7 +20,7 @@ interface LabelNameInputProps {
 function LabelNameInput({ placeholder, value, onChange }: LabelNameInputProps) {
   return (
     <input
-      className="hciot-file-input"
+      className="qa-workspace-file-input"
       placeholder={placeholder}
       value={value}
       onChange={(event) => onChange(event.target.value)}
@@ -34,13 +34,13 @@ export default function UploadTopicSelector({ topic }: UploadTopicSelectorProps)
   const showNewFields = isNewCategory || isNewTopic;
 
   return (
-    <div className="hciot-qa-topic-section">
-      <label className="hciot-qa-topic-label">
+    <div className="qa-workspace-qa-topic-section">
+      <label className="qa-workspace-qa-topic-label">
         指定科別 / 主題
       </label>
-      <div className="hciot-qa-selectors">
+      <div className="qa-workspace-qa-selectors">
         <HciotSelect
-          className="hciot-file-select"
+          className="qa-workspace-file-select"
           value={topic.categoryId}
           onChange={topic.handleCategoryChange}
           options={[
@@ -48,9 +48,9 @@ export default function UploadTopicSelector({ topic }: UploadTopicSelectorProps)
             { value: NEW_VALUE, label: '＋ 新增科別' },
           ]}
         />
-        <span className="hciot-file-path-separator">/</span>
+        <span className="qa-workspace-file-path-separator">/</span>
         <HciotSelect
-          className="hciot-file-select"
+          className="qa-workspace-file-select"
           value={topic.topicId}
           onChange={topic.handleTopicChange}
           disabled={isUploadTopicSelectDisabled(topic.categoryId)}
@@ -59,7 +59,7 @@ export default function UploadTopicSelector({ topic }: UploadTopicSelectorProps)
       </div>
 
       {showNewFields && (
-        <div className="hciot-qa-new-fields hciot-qa-new-fields-row">
+        <div className="qa-workspace-qa-new-fields qa-workspace-qa-new-fields-row">
           {isNewCategory && (
             <LabelNameInput
               placeholder="新科別名稱"

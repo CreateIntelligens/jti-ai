@@ -32,43 +32,43 @@ export default function QaRowItem({
   const hasImage = Boolean(imageLabel);
 
   return (
-    <div className="hciot-qa-row">
-      <span className="hciot-qa-row-number">{index + 1}</span>
-      <label className="hciot-qa-row-visible" title={visibilityHint}>
+    <div className="qa-workspace-qa-row">
+      <span className="qa-workspace-qa-row-number">{index + 1}</span>
+      <label className="qa-workspace-qa-row-visible" title={visibilityHint}>
         <input
           type="checkbox"
-          className="hciot-qa-row-visible-checkbox"
+          className="qa-workspace-qa-row-visible-checkbox"
           checked={row.visible}
           onChange={(event) => onUpdate({ visible: event.target.checked })}
         />
       </label>
-      <div className="hciot-qa-row-fields">
+      <div className="qa-workspace-qa-row-fields">
         <input
-          className="hciot-qa-input"
+          className="qa-workspace-qa-input"
           placeholder="問題 (Q)"
           value={row.q}
           onChange={(event) => onUpdate({ q: event.target.value })}
         />
-        <div className="hciot-qa-row-fields-inner">
+        <div className="qa-workspace-qa-row-fields-inner">
           <textarea
-            className="hciot-qa-textarea hciot-qa-textarea-flexible"
+            className="qa-workspace-qa-textarea qa-workspace-qa-textarea-flexible"
             placeholder="回答 (A)"
             value={row.a}
             onChange={(event) => onUpdate({ a: event.target.value })}
             rows={2}
           />
-          <div className="hciot-qa-row-image">
+          <div className="qa-workspace-qa-row-image">
             {hasImage && (
-              <div className="hciot-qa-image-preview">
+              <div className="qa-workspace-qa-image-preview">
                 {previewUrl ? (
                   <ZoomableThumbnail
                     src={previewUrl}
                     alt={imageLabel}
-                    className="hciot-qa-image-thumb"
+                    className="qa-workspace-qa-image-thumb"
                     onZoom={onPreviewImage}
                   />
                 ) : (
-                  <span className="hciot-qa-image-name" title={imageLabel}>{imageLabel}</span>
+                  <span className="qa-workspace-qa-image-name" title={imageLabel}>{imageLabel}</span>
                 )}
                 {row.imgStatus === 'uploading' && (
                   <Loader2 size={14} className="animate-spin" />
@@ -76,15 +76,15 @@ export default function QaRowItem({
                 {row.imgStatus === 'error' && (
                   <span title={row.imgError}><XCircle size={14} className="text-red-500" /></span>
                 )}
-                <button type="button" className="hciot-qa-image-clear" onClick={onClearImage}>
+                <button type="button" className="qa-workspace-qa-image-clear" onClick={onClearImage}>
                   <X size={10} />
                 </button>
               </div>
             )}
-            <div className={`hciot-qa-image-actions${hasImage ? ' has-preview' : ''}`}>
+            <div className={`qa-workspace-qa-image-actions${hasImage ? ' has-preview' : ''}`}>
               <button
                 type="button"
-                className="hciot-qa-image-btn"
+                className="qa-workspace-qa-image-btn"
                 onClick={onUploadImage}
                 title="上傳圖片"
               >
@@ -93,7 +93,7 @@ export default function QaRowItem({
               </button>
               <button
                 type="button"
-                className="hciot-qa-image-btn"
+                className="qa-workspace-qa-image-btn"
                 onClick={onChooseExisting}
                 title="選擇既有圖片"
               >
@@ -106,7 +106,7 @@ export default function QaRowItem({
       </div>
       <button
         type="button"
-        className="hciot-qa-row-delete"
+        className="qa-workspace-qa-row-delete"
         onClick={onRemove}
         title="移除"
       >
