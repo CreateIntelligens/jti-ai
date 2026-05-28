@@ -367,6 +367,7 @@ export default function QaKnowledgeWorkspace({
           availableImages={workspaceData.images}
           statusMessage={workspaceData.statusMessage}
           hiddenQuestions={workspaceData.selectedMergedTopic?.hidden_questions}
+          refreshKey={workspaceData.topicRefreshKey}
           api={api}
           onRefreshWorkspace={() => workspaceData.refreshWorkspaceAfterTopicChange()}
           onUploadImage={api.uploadImage}

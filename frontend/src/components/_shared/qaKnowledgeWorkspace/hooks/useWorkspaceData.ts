@@ -31,6 +31,7 @@ export function useWorkspaceData({
   const [selectedMergedTopicId, setSelectedMergedTopicId] = useState<string | null>(null);
   const [loadingWorkspace, setLoadingWorkspace] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [topicRefreshKey, setTopicRefreshKey] = useState(0);
 
   const showStatus = (message: string) => {
     if (statusTimerRef.current !== null) {
@@ -107,6 +108,7 @@ export function useWorkspaceData({
   const refreshWorkspaceAfterTopicChange = async (preferredFileName?: string | null) => {
     await refreshWorkspace(preferredFileName);
     await onTopicsChanged?.();
+    setTopicRefreshKey((current) => current + 1);
   };
 
   const completeUpload = async (
@@ -148,6 +150,7 @@ export function useWorkspaceData({
     unusedImageCount,
     selectedMergedTopic,
     selectedMergedLabel,
+    topicRefreshKey,
     refreshWorkspace,
     refreshWorkspaceAfterTopicChange,
     completeUpload,
