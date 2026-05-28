@@ -89,6 +89,10 @@ class ImportQaRequest(BaseModel):
     hidden_questions: list[str] | None = None
 
 
+class ParseCsvTextRequest(BaseModel):
+    text: str
+
+
 def _required(value: Any, name: str) -> Any:
     if value is None:
         raise RuntimeError(f"QaKbRouterConfig.{name} is required for this route")
@@ -347,6 +351,39 @@ def _add_knowledge_routes(router: APIRouter, config: QaKbRouterConfig) -> None:
 
 
 def _add_extract_routes(router: APIRouter, config: QaKbRouterConfig) -> None:
+    @router.post("/qa-parse-csv")
+    def parse_csv_text(req: ParseCsvTextRequest):
+        """Parse pasted CSV text into Q&A pairs using the canonical header
+        aliases. Returns ``parsed=False`` when the text has no recognizable
+        question/answer columns, signalling the caller to fall back to AI
+        extraction. Does not run AI or write to storage."""
+        if len(req.text) > MAX_QA_EXTRACT_TEXT_LENGTH:
+            raise HTTPException(status_code=400, detail="text_too_long")
+        parsed = _parse_csv_rows(req.text.encode("utf-8"))
+        if parsed is None:
+            return {"parsed": False, "qa_pairs": []}
+
+        fieldnames, rows = parsed
+        if "q" not in fieldnames or "a" not in fieldnames:
+            return {"parsed": False, "qa_pairs": []}
+
+        qa_pairs = []
+        for row in rows:
+            q = (row.get("q") or "").strip()
+            a = (row.get("a") or "").strip()
+            if not q or not a:
+                continue
+            pair = {"q": q, "a": a}
+            img = (row.get("img") or "").strip()
+            if img:
+                pair["img"] = img
+            url = (row.get("url") or "").strip()
+            if url:
+                pair["url"] = url
+            qa_pairs.append(pair)
+
+        return {"parsed": bool(qa_pairs), "qa_pairs": qa_pairs}
+
     @router.post("/qa-extract")
     async def start_qa_extraction(
         background_tasks: BackgroundTasks,

@@ -36,6 +36,7 @@ const hciotQaWorkspaceApi: QaWorkspaceApiClient = {
   downloadKnowledgeFile: api.downloadHciotKnowledgeFile,
   getTopicMergedCsv: api.getHciotTopicMergedCsv,
   createQaExtractJob: api.createQaExtractJob,
+  parseQaCsvText: api.parseQaCsvText,
   getQaExtractJob: api.getQaExtractJob,
   importQaExtractJob: api.importQaExtractJob,
 };

@@ -390,6 +390,10 @@ export async function createQaExtractJob(
   );
 }
 
+export async function parseQaCsvText(text: string): Promise<{ parsed: boolean; qa_pairs: HciotQaPair[] }> {
+  return hciotQaKnowledgeApi.parseQaCsvText(text);
+}
+
 export async function getQaExtractJob(jobId: string): Promise<QaExtractJobResponse> {
   return hciotQaKnowledgeApi.getQaExtractJob(jobId);
 }

@@ -18,18 +18,17 @@ def extract_questions_from_csv(file_bytes: bytes) -> list[str] | None:
     Returns a de-duplicated list of non-empty ``q`` values, or ``None``
     when the CSV has no ``q`` header (meaning it's a regular knowledge file).
     """
-    try:
-        text = file_bytes.decode("utf-8-sig")
-    except UnicodeDecodeError:
+    parsed = _parse_csv_rows(file_bytes)
+    if parsed is None:
         return None
 
-    reader = csv.DictReader(io.StringIO(text))
-    if reader.fieldnames is None or "q" not in reader.fieldnames:
+    fieldnames, rows = parsed
+    if "q" not in fieldnames:
         return None
 
     seen: set[str] = set()
     questions: list[str] = []
-    for row in reader:
+    for row in rows:
         q = (row.get("q") or "").strip()
         if q and q not in seen:
             seen.add(q)
@@ -39,7 +38,7 @@ def extract_questions_from_csv(file_bytes: bytes) -> list[str] | None:
 
 
 _FIELD_ALIASES: dict[str, list[str]] = {
-    "q": ["q", "question", "問題", "问题", "題目", "题目"],
+    "q": ["q", "question", "問題", "问题", "題目", "题目", "項目", "项目"],
     "a": ["a", "answer", "答案", "回答", "回覆", "解答", "說明", "内容", "內容"],
     "img": ["img", "image", "圖片", "图片", "圖片 (image)", "image (圖片)"],
     "url": ["url", "link", "網址", "网址", "連結", "链接"],

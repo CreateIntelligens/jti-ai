@@ -91,6 +91,7 @@ export interface QaKnowledgeApi {
     categoryLabel: string,
     topicLabel: string,
   ): Promise<{ job_id: string; status: string }>;
+  parseQaCsvText(text: string): Promise<{ parsed: boolean; qa_pairs: QaPair[] }>;
   getQaExtractJob(jobId: string): Promise<QaExtractJobResponse>;
   importQaExtractJob(
     jobId: string,
@@ -214,6 +215,14 @@ export function createQaKnowledgeApi(basePath: string): QaKnowledgeApi {
       return fetchJson<{ job_id: string; status: string }>('/qa-extract', {
         method: 'POST',
         body: formData,
+      });
+    },
+
+    parseQaCsvText(text: string) {
+      return fetchJson<{ parsed: boolean; qa_pairs: QaPair[] }>('/qa-parse-csv', {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ text }),
       });
     },
 

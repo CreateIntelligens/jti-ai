@@ -49,80 +49,6 @@ function fileExtension(file: File): string | undefined {
   return file.name.split('.').pop()?.toLowerCase();
 }
 
-function splitCsvLine(line: string): string[] {
-  const cells: string[] = [];
-  let current = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (inQuotes) {
-      if (ch === '"') {
-        if (line[i + 1] === '"') { current += '"'; i++; }
-        else { inQuotes = false; }
-      } else { current += ch; }
-    } else if (ch === '"') {
-      inQuotes = true;
-    } else if (ch === ',') {
-      cells.push(current);
-      current = '';
-    } else {
-      current += ch;
-    }
-  }
-  cells.push(current);
-  return cells.map((c) => c.trim());
-}
-
-const FIELD_ALIASES: Record<string, string[]> = {
-  q: ['q', 'question', '\u554F\u984C', '\u95EE\u9898', '\u984C\u76EE', '\u9898\u76EE'],
-  a: ['a', 'answer', '\u7B54\u6848', '\u56DE\u7B54', '\u56DE\u8986', '\u89E3\u7B54', '\u8AAA\u660E', '\u5185\u5BB9', '\u5167\u5BB9'],
-  img: ['img', 'image', '\u5716\u7247', '\u56FE\u7247', '\u5716\u7247 (image)', 'image (\u5716\u7247)'],
-  url: ['url', 'link', '\u7DB2\u5740', '\u7F51\u5740', '\u9023\u7D50', '\u94FE\u63A5'],
-};
-
-function normalizeHeaderField(raw: string): string {
-  const key = raw.trim().toLowerCase();
-  for (const [canonical, aliases] of Object.entries(FIELD_ALIASES)) {
-    if (aliases.includes(key)) {
-      return canonical;
-    }
-  }
-  return key;
-}
-
-function parseQaPairsFromCsvText(raw: string): HciotQaPair[] | null {
-  const cleaned = raw.replace(/^\uFEFF/, '').trim();
-  if (!cleaned) return null;
-  const lines = cleaned.split(/\r?\n/).filter((line) => line.trim().length > 0);
-  if (lines.length < 2) return null;
-  const header = splitCsvLine(lines[0]).map(normalizeHeaderField);
-  const qIdx = header.indexOf('q');
-  const aIdx = header.indexOf('a');
-  if (qIdx < 0 || aIdx < 0) return null;
-  const imgIdx = header.indexOf('img');
-  const urlIdx = header.indexOf('url');
-
-  const pairs: HciotQaPair[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const cells = splitCsvLine(lines[i]);
-    const q = (cells[qIdx] || '').trim();
-    const a = (cells[aIdx] || '').trim();
-    if (q && a) {
-      const pair: HciotQaPair = { q, a };
-      if (imgIdx >= 0) {
-        const img = (cells[imgIdx] || '').trim();
-        if (img) pair.img = img;
-      }
-      if (urlIdx >= 0) {
-        const url = (cells[urlIdx] || '').trim();
-        if (url) pair.url = url;
-      }
-      pairs.push(pair);
-    }
-  }
-  return pairs.length > 0 ? pairs : null;
-}
-
 function toHiddenPreviewRows(pairs: HciotQaPair[]): QARow[] {
   return pairs.map((pair) => ({
     ...createEmptyRow(),
@@ -341,12 +267,17 @@ export default function DocumentToQaTab({
       return;
     }
 
-    const parsedPairs = parseQaPairsFromCsvText(trimmed);
-    if (parsedPairs) {
-      setJobId(null);
-      setQaPairs(toHiddenPreviewRows(parsedPairs));
-      setStatus('preview');
-      return;
+    setStatus('uploading');
+    try {
+      const { parsed, qa_pairs } = await api.parseQaCsvText(trimmed);
+      if (parsed && qa_pairs.length > 0) {
+        setJobId(null);
+        setQaPairs(toHiddenPreviewRows(qa_pairs));
+        setStatus('preview');
+        return;
+      }
+    } catch {
+      // Fall through to AI extraction when the parse probe fails.
     }
     await startAiExtraction({ kind: 'text', text: trimmed });
   };

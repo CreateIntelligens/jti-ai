@@ -236,7 +236,7 @@ def test_upload_rejects_qa_like_csv_without_question_column():
     client, fake_store, fake_topic_store = _make_upload_context()
     fake_topic_store.get_topic.return_value = None
 
-    csv_bytes = "項目,內容,圖片 (img),網址 (URL)\n股四頭肌是什麼？,大腿前側肌肉,IMG_1,\n".encode()
+    csv_bytes = "內容,圖片 (img),網址 (URL)\n大腿前側肌肉,IMG_1,\n".encode()
 
     response = _post_upload(client, fake_store, fake_topic_store, csv_bytes)
 
@@ -244,6 +244,20 @@ def test_upload_rejects_qa_like_csv_without_question_column():
     assert "q" in response.json()["detail"]
     assert fake_store.files == []
     fake_topic_store.upsert_topic.assert_not_called()
+
+
+def test_upload_accepts_qa_csv_with_alias_headers():
+    client, fake_store, fake_topic_store = _make_upload_context()
+    fake_topic_store.get_topic.return_value = None
+
+    csv_bytes = "項目,內容,圖片 (img),網址 (URL)\n股四頭肌是什麼？,大腿前側肌肉,,\n".encode()
+
+    response = _post_upload(client, fake_store, fake_topic_store, csv_bytes)
+
+    assert response.status_code == 200
+    saved = fake_store.get_file("zh", "prp.csv")
+    assert saved is not None
+    assert "q,a" in saved["data"].decode("utf-8-sig")
 
 
 def test_upload_rejects_qa_csv_without_answer_column():
@@ -388,7 +402,7 @@ def test_update_file_content_rejects_qa_like_csv_without_question_column():
          mock.patch("app.routers.hciot.knowledge.get_hciot_topic_store", return_value=fake_topic_store):
         response = client.put(
             "/api/hciot-admin/knowledge/files/legacy.csv/content?language=zh",
-            json={"content": "項目,內容,圖片 (img),網址 (URL)\n股四頭肌是什麼？,大腿前側肌肉,IMG_1,\n"},
+            json={"content": "內容,圖片 (img),網址 (URL)\n大腿前側肌肉,IMG_1,\n"},
         )
 
     assert response.status_code == 400

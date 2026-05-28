@@ -91,6 +91,7 @@ export interface QaWorkspaceApiClient {
     categoryLabel: string,
     topicLabel: string,
   ): Promise<{ job_id: string; status: string }>;
+  parseQaCsvText(text: string): Promise<{ parsed: boolean; qa_pairs: HciotQaPair[] }>;
   getQaExtractJob(jobId: string): Promise<QaExtractJobResponse>;
   importQaExtractJob(
     jobId: string,
