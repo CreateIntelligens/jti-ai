@@ -88,8 +88,8 @@ def test_sync_topic_questions_writes_explicit_hidden_questions():
     ]
 
     fake_topic_store = MagicMock()
-    # Topic already exists; its previous hidden_questions must be overridden by
-    # the explicit list, not merged.
+    # Topic already exists; its previous hidden_questions must be merged with
+    # the explicit list, not overridden.
     fake_topic_store.get_topic.return_value = {
         "topic_id": "ortho/prp",
         "labels": {"zh": "PRP", "en": ""},
@@ -106,7 +106,7 @@ def test_sync_topic_questions_writes_explicit_hidden_questions():
             topic_label="PRP",
             category_label="骨科",
             # "Q9" does not exist in the CSV and must be dropped by the
-            # intersection; "Q1" was previously hidden but is now visible.
+            # intersection; "Q1" was previously hidden and must remain hidden.
             hidden_questions=["Q2", "Q9"],
         )
 
@@ -115,7 +115,7 @@ def test_sync_topic_questions_writes_explicit_hidden_questions():
     args, _ = fake_topic_store.update_topic.call_args
     _, update_data = args
     assert update_data["questions.zh"] == ["Q1", "Q2", "Q3"]
-    assert update_data["hidden_questions.zh"] == ["Q2"]
+    assert update_data["hidden_questions.zh"] == ["Q1", "Q2"]
 
 
 def test_sync_topic_questions_creates_topic_with_explicit_hidden_questions():

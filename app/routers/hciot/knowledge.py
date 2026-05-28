@@ -7,8 +7,12 @@ from fastapi import BackgroundTasks
 from app.auth import verify_admin
 from app.routers._shared.qa_kb_router import (
     QaKbRouterConfig,
-    _sync_topic_questions_from_store as _shared_sync_topic_questions_from_store,
     build_qa_kb_router,
+)
+from app.routers._shared.qa_kb_sync import (
+    _sync_topic_questions_from_store as _shared_sync_topic_questions_from_store,
+)
+from app.routers._shared.qa_kb_upload import (
     save_qa_csv_to_topic as _shared_save_qa_csv_to_topic,
 )
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store

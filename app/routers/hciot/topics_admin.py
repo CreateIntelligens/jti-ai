@@ -107,7 +107,7 @@ def list_topics_slim(lang: Lang):
 
 
 @public_router.get("/topics/{lang}/all")
-def list_topics_admin(lang: Lang):
+def list_topics_all(lang: Lang):
     """Unfiltered topic listing — returns all questions plus hidden_questions."""
     return {"categories": _build_categories(lang, filter_hidden=False)}
 

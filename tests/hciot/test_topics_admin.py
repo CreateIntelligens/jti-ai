@@ -385,7 +385,7 @@ def test_list_topics_slim_removes_topics_and_categories_without_visible_question
     assert [topic["id"] for topic in result["categories"][0]["topics"]] == ["ortho/faq"]
 
 
-def test_list_topics_admin_retains_hidden_questions():
+def test_list_topics_all_retains_hidden_questions():
     store = FakeStore()
     store.categories = [
         {
@@ -406,7 +406,7 @@ def test_list_topics_admin_retains_hidden_questions():
     ]
 
     with patch_topic_store(store):
-        result = topics_admin.list_topics_admin("zh")
+        result = topics_admin.list_topics_all("zh")
 
     topic = result["categories"][0]["topics"][0]
     assert topic["questions"] == ["Q1", "Q2", "Q3"]
