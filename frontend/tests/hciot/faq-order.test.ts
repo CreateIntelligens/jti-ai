@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { sortByLabel } from '../../src/components/hciot/knowledgeWorkspace/topicUtils';
+import { sortByLabel } from '../../src/components/_shared/qaKnowledgeWorkspace/topicUtils';
 
 describe('sortByLabel', () => {
   it('places common questions first', () => {

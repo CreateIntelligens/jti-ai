@@ -19,6 +19,7 @@ interface MergedCsvPaneProps {
   availableImages: HciotImage[];
   statusMessage: string | null;
   api: QaWorkspaceApiClient;
+  refreshKey?: number;
   // Question texts currently hidden from this topic's preset-question chips.
   // Seeds the per-row visibility checkboxes; defaults to all-visible when absent.
   hiddenQuestions?: string[];
@@ -60,6 +61,7 @@ export default function MergedCsvPane({
   availableImages,
   statusMessage,
   api,
+  refreshKey = 0,
   hiddenQuestions,
   onRefreshWorkspace,
   onUploadImage,
@@ -132,7 +134,7 @@ export default function MergedCsvPane({
       });
 
     return () => { active = false; };
-  }, [api, applyMergedCsvResponse, topicId, language]);
+  }, [api, applyMergedCsvResponse, topicId, language, refreshKey]);
 
   useEscapeKey(handleCancelEdit, isEditing);
 

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import DocumentToQaTab from '../../src/components/hciot/knowledgeWorkspace/upload/DocumentToQaTab';
+import DocumentToQaTab from '../../src/components/_shared/qaKnowledgeWorkspace/upload/DocumentToQaTab';
 import * as api from '../../src/services/api';
 
 vi.mock('../../src/services/api', async (importOriginal) => ({
@@ -42,6 +42,7 @@ describe('DocumentToQaTab', () => {
         onClose={() => {}}
         onUploadFile={onUploadFile}
         onUploadComplete={async () => {}}
+        api={api}
       />,
     );
 

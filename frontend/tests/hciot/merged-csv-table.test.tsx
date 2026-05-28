@@ -1,9 +1,9 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import MergedCsvTable from '../../src/components/hciot/knowledgeWorkspace/detail/MergedCsvTable';
-import React from 'react';
+import MergedCsvTable from '../../src/components/_shared/qaKnowledgeWorkspace/detail/MergedCsvTable';
+import type { ComponentProps } from 'react';
 
-type MergedCsvTableProps = React.ComponentProps<typeof MergedCsvTable>;
+type MergedCsvTableProps = ComponentProps<typeof MergedCsvTable>;
 
 afterEach(() => {
   cleanup();
@@ -71,6 +71,20 @@ describe('MergedCsvTable', () => {
     expect(hiddenCheckbox.checked).toBe(false);
     expect(visibleCheckbox.readOnly).toBe(true);
     expect(hiddenCheckbox.readOnly).toBe(true);
+  });
+
+  it('does not link scheme-less URLs as relative app paths', () => {
+    renderMergedCsvTable({
+      rows: [
+        { index: '001', q: 'Q1', a: 'A1', img: '', url: 'example.com/page' },
+        { index: '002', q: 'Q2', a: 'A2', img: '', url: 'https://example.com/page' },
+      ],
+    });
+
+    expect(screen.getByText('example.com/page').closest('a')).toBeNull();
+    expect(screen.getByRole('link', { name: 'https://example.com/page' }).getAttribute('href')).toBe(
+      'https://example.com/page',
+    );
   });
 
   it('toggles all question visibility from the header checkbox', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { normalizeLabel } from '../../src/components/hciot/knowledgeWorkspace/topicUtils';
+import { normalizeLabel } from '../../src/components/_shared/qaKnowledgeWorkspace/topicUtils';
 
 describe('normalizeLabel', () => {
   it('returns null for empty or whitespace-only input', () => {

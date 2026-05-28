@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import UploadDialog from '../../src/components/hciot/knowledgeWorkspace/upload/UploadDialog';
-import React from 'react';
+import UploadDialog from '../../src/components/_shared/qaKnowledgeWorkspace/upload/UploadDialog';
 
 describe('UploadDialog', () => {
   it('keeps one selected knowledge file in the unified upload tab', async () => {

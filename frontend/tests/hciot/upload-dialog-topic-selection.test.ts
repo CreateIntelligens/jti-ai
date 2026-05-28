@@ -4,8 +4,8 @@ import {
   buildUploadTopicOptions,
   isUploadTopicSelectDisabled,
   readSavedTopicSelection,
-} from '../../src/components/hciot/knowledgeWorkspace/upload/UploadDialog';
-import { NEW_VALUE } from '../../src/components/hciot/knowledgeWorkspace/topicUtils';
+} from '../../src/components/_shared/qaKnowledgeWorkspace/upload/UploadDialog';
+import { NEW_VALUE } from '../../src/components/_shared/qaKnowledgeWorkspace/topicUtils';
 
 describe('UploadDialog topic selection', () => {
   afterEach(() => {

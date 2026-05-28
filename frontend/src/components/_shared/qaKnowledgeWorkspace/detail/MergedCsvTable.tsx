@@ -61,6 +61,20 @@ function getQuestionVisibilityLabel(questionText: string): string {
   return questionText ? `顯示問題：${questionText}` : '顯示問題';
 }
 
+function isHttpUrl(value: string): boolean {
+  return /^https?:\/\//i.test(value.trim());
+}
+
+function renderUrlValue(url?: string) {
+  if (!url) {
+    return null;
+  }
+  if (!isHttpUrl(url)) {
+    return url;
+  }
+  return <a href={url.trim()} target="_blank" rel="noopener noreferrer">{url}</a>;
+}
+
 export default function MergedCsvTable({
   language,
   rows,
@@ -333,9 +347,7 @@ export default function MergedCsvTable({
                         value={row.url || ''}
                         onChange={(e) => onUpdateRow(i, { url: e.target.value })}
                       />
-                    ) : row.url ? (
-                      <a href={row.url} target="_blank" rel="noopener noreferrer">{row.url}</a>
-                    ) : null}
+                    ) : renderUrlValue(row.url)}
                   </td>
                   {isEditing && (
                     <td className="qa-workspace-csv-cell-center">
