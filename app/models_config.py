@@ -27,7 +27,27 @@ FALLBACK_MODELS: tuple[str, ...] = (
 )
 
 
-def fallback_chain(primary: str) -> tuple[str, ...]:
-    """Return primary followed by configured fallback models, without duplicates."""
+from typing import Any
+
+def fallback_chain(primary: str, client: Any = None) -> tuple[str, ...]:
+    """Return primary followed by configured fallback models, without duplicates.
+
+    If client is provided, dynamically discover available models from API first.
+    """
+    if client is not None:
+        try:
+            from app.services.model_discovery import get_available_models
+            available = get_available_models(client)
+            if available:
+                chain = [primary]
+                for model in available:
+                    name = model.name
+                    if name != primary and name not in chain:
+                        chain.append(name)
+                return tuple(chain)
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning("Dynamic model discovery failed in fallback_chain: %s", e)
+
     fallbacks = tuple(model for model in FALLBACK_MODELS if model != primary)
     return (primary,) + fallbacks

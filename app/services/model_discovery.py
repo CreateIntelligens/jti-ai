@@ -62,7 +62,7 @@ def get_available_models(client: genai.Client) -> list[ModelInfo]:
     results: list[ModelInfo] = []
     for raw_model in raw_models:
         # 僅保留支援 generateContent 的模型
-        if "generateContent" not in (raw_model.supported_generation_methods or ()):
+        if "generateContent" not in (raw_model.supported_actions or ()):
             continue
 
         name = _model_name_without_prefix(raw_model.name)

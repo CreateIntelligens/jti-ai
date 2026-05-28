@@ -307,7 +307,9 @@ class BaseAgent:
         from app.models_config import fallback_chain
         from app.services.gemini_service import _is_model_gone, gemini_with_retry, run_sync
 
-        model_chain = fallback_chain(self.model_name)
+        store_name = self._get_store_name_for_session(session)
+        client = get_client_by_index(resolve_key_index_for_store(store_name))
+        model_chain = fallback_chain(self.model_name, client)
         for model_index, model_name in enumerate(model_chain):
             try:
                 response = await run_sync(

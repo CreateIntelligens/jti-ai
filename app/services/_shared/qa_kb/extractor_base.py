@@ -59,7 +59,7 @@ async def extract_qa_from_document(
     role_scope = role_scope_text or default_role_scope
     system_instruction = build_instruction(language, persona, role_scope)
     prompt = f"請從以下文件中擷取問答：\n\n```\n{cleaned_text}\n```"
-    model_names = list(models_to_try or fallback_chain(DEFAULT_MODEL))
+    model_names = list(models_to_try or fallback_chain(DEFAULT_MODEL, model_client))
 
     def _call_gemini(model_name: str):
         logger.info("%s Calling model=%s (length=%d)", log_prefix, model_name, len(cleaned_text))

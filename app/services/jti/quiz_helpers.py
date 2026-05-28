@@ -222,7 +222,7 @@ async def _judge_user_choice(user_message: str, question: dict) -> str | None:
             lambda m: gemini_with_retry(
                 lambda: client.models.generate_content(model=m, contents=prompt)
             ),
-            fallback_chain(QUIZ_HELPER_MODEL),
+            fallback_chain(QUIZ_HELPER_MODEL, client),
         )
 
         result = response.text.strip().upper()

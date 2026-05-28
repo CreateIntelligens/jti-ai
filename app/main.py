@@ -320,7 +320,7 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
                     **config_kwargs,
                 ),
             ),
-            fallback_chain(model_name),
+            fallback_chain(model_name, gemini_client),
         )
 
         answer_text = strip_citations(response.text or "")
