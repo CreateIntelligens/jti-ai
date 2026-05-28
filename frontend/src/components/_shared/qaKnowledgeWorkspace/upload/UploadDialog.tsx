@@ -39,7 +39,11 @@ interface UploadDialogProps {
     topicId: string | null,
     labels: TopicLabels | null,
   ) => Promise<{ name: string }>;
-  onUploadComplete: (firstUploadedFileName: string | null, count: number) => Promise<void>;
+  onUploadComplete: (
+    firstUploadedFileName: string | null,
+    count: number,
+    topicId?: string | null,
+  ) => Promise<void>;
   onSubmitQA: (
     file: File,
     topicId: string,

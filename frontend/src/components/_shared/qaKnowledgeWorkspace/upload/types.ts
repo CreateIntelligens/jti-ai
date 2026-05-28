@@ -11,6 +11,7 @@ export interface QARow {
   q: string;
   a: string;
   img?: string;
+  url?: string;
   pendingImageFile?: File | null;
   pendingImageName?: string;
   imgStatus?: FileStatus;
@@ -36,7 +37,7 @@ export interface ImageItem {
 }
 
 export function createEmptyRow(): QARow {
-  return { q: '', a: '', img: '', imgStatus: 'pending', visible: true };
+  return { q: '', a: '', img: '', url: '', imgStatus: 'pending', visible: true };
 }
 
 export function clearRowImageState(row: QARow): QARow {
@@ -59,12 +60,13 @@ export function applyExistingRowImage(row: QARow, imageId: string): QARow {
 }
 
 export function buildCsvBlob(rows: QARow[]): Blob {
-  const lines = ['q,a,img'];
+  const lines = ['q,a,img,url'];
   rows.forEach((row) => {
     const q = row.q.replace(/"/g, '""');
     const a = row.a.replace(/"/g, '""');
     const img = (row.img || '').replace(/"/g, '""');
-    lines.push(`"${q}","${a}","${img}"`);
+    const url = (row.url || '').replace(/"/g, '""');
+    lines.push(`"${q}","${a}","${img}","${url}"`);
   });
   return new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
 }

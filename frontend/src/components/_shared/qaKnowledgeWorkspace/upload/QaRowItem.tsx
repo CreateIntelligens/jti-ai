@@ -103,6 +103,12 @@ export default function QaRowItem({
             </div>
           </div>
         </div>
+        <input
+          className="qa-workspace-qa-input"
+          placeholder="網址 (URL)"
+          value={row.url || ''}
+          onChange={(event) => onUpdate({ url: event.target.value })}
+        />
       </div>
       <button
         type="button"

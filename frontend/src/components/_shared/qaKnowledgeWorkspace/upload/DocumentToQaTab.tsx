@@ -34,7 +34,11 @@ interface DocumentToQaTabProps {
     labels: TopicLabels | null,
     hiddenQuestions?: string[],
   ) => Promise<UploadFileResult>;
-  onUploadComplete: (firstUploadedFileName: string | null, count: number) => Promise<void>;
+  onUploadComplete: (
+    firstUploadedFileName: string | null,
+    count: number,
+    topicId?: string | null,
+  ) => Promise<void>;
   api: QaWorkspaceApiClient;
 }
 
@@ -69,27 +73,66 @@ function splitCsvLine(line: string): string[] {
   return cells.map((c) => c.trim());
 }
 
+const FIELD_ALIASES: Record<string, string[]> = {
+  q: ['q', 'question', '\u554F\u984C', '\u95EE\u9898', '\u984C\u76EE', '\u9898\u76EE'],
+  a: ['a', 'answer', '\u7B54\u6848', '\u56DE\u7B54', '\u56DE\u8986', '\u89E3\u7B54', '\u8AAA\u660E', '\u5185\u5BB9', '\u5167\u5BB9'],
+  img: ['img', 'image', '\u5716\u7247', '\u56FE\u7247', '\u5716\u7247 (image)', 'image (\u5716\u7247)'],
+  url: ['url', 'link', '\u7DB2\u5740', '\u7F51\u5740', '\u9023\u7D50', '\u94FE\u63A5'],
+};
+
+function normalizeHeaderField(raw: string): string {
+  const key = raw.trim().toLowerCase();
+  for (const [canonical, aliases] of Object.entries(FIELD_ALIASES)) {
+    if (aliases.includes(key)) {
+      return canonical;
+    }
+  }
+  return key;
+}
+
 function parseQaPairsFromCsvText(raw: string): HciotQaPair[] | null {
   const cleaned = raw.replace(/^\uFEFF/, '').trim();
   if (!cleaned) return null;
   const lines = cleaned.split(/\r?\n/).filter((line) => line.trim().length > 0);
   if (lines.length < 2) return null;
-  const header = splitCsvLine(lines[0]).map((h) => h.toLowerCase());
+  const header = splitCsvLine(lines[0]).map(normalizeHeaderField);
   const qIdx = header.indexOf('q');
   const aIdx = header.indexOf('a');
   if (qIdx < 0 || aIdx < 0) return null;
+  const imgIdx = header.indexOf('img');
+  const urlIdx = header.indexOf('url');
+
   const pairs: HciotQaPair[] = [];
   for (let i = 1; i < lines.length; i++) {
     const cells = splitCsvLine(lines[i]);
     const q = (cells[qIdx] || '').trim();
     const a = (cells[aIdx] || '').trim();
-    if (q && a) pairs.push({ q, a });
+    if (q && a) {
+      const pair: HciotQaPair = { q, a };
+      if (imgIdx >= 0) {
+        const img = (cells[imgIdx] || '').trim();
+        if (img) pair.img = img;
+      }
+      if (urlIdx >= 0) {
+        const url = (cells[urlIdx] || '').trim();
+        if (url) pair.url = url;
+      }
+      pairs.push(pair);
+    }
   }
   return pairs.length > 0 ? pairs : null;
 }
 
 function toHiddenPreviewRows(pairs: HciotQaPair[]): QARow[] {
-  return pairs.map((pair) => ({ ...createEmptyRow(), q: pair.q, a: pair.a, visible: false }));
+  return pairs.map((pair) => ({
+    ...createEmptyRow(),
+    q: pair.q,
+    a: pair.a,
+    img: pair.img || '',
+    url: pair.url || '',
+    imgStatus: pair.img ? 'done' : 'pending',
+    visible: false,
+  }));
 }
 
 function getHiddenQuestions(rows: QARow[]): string[] {
@@ -101,7 +144,12 @@ function getHiddenQuestions(rows: QARow[]): string[] {
 }
 
 function toPlainQaPairs(rows: QARow[]): HciotQaPair[] {
-  return rows.map(({ q, a }) => ({ q, a }));
+  return rows.map(({ q, a, img, url }) => {
+    const pair: HciotQaPair = { q, a };
+    if (img) pair.img = img;
+    if (url) pair.url = url;
+    return pair;
+  });
 }
 
 function escapeCsvCell(value: string): string {
@@ -109,7 +157,15 @@ function escapeCsvCell(value: string): string {
 }
 
 function buildQaCsv(rows: QARow[]): string {
-  return ['q,a', ...rows.map((row) => `${escapeCsvCell(row.q)},${escapeCsvCell(row.a)}`)].join('\n');
+  return [
+    'q,a,img,url',
+    ...rows.map(
+      (row) =>
+        `${escapeCsvCell(row.q)},${escapeCsvCell(row.a)},${escapeCsvCell(
+          row.img || '',
+        )},${escapeCsvCell(row.url || '')}`,
+    ),
+  ].join('\n');
 }
 
 function isUnrecognizedFormatError(error: unknown): boolean {
@@ -151,8 +207,8 @@ export default function DocumentToQaTab({
   const startTimeRef = useRef<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const completeSingleFileUpload = async (result: UploadFileResult) => {
-    await onUploadComplete(result.name || null, result.name ? 1 : 0);
+  const completeSingleFileUpload = async (result: UploadFileResult, topicId?: string | null) => {
+    await onUploadComplete(result.name || null, result.name ? 1 : 0, topicId);
   };
 
   useEffect(() => {
@@ -261,7 +317,7 @@ export default function DocumentToQaTab({
             resolvedTopic.labels,
           );
           setStatus('success');
-          await completeSingleFileUpload(res);
+          await completeSingleFileUpload(res, resolvedTopic.fullTopicId);
           window.setTimeout(() => onClose(), 1200);
         } catch (err: unknown) {
           if (isUnrecognizedFormatError(err)) {
@@ -337,7 +393,7 @@ export default function DocumentToQaTab({
       if (jobId) {
         const res = await api.importQaExtractJob(jobId, language, plainPairs, hiddenQuestions);
         setStatus('success');
-        await onUploadComplete(res.filename, res.imported_count);
+        await onUploadComplete(res.filename, res.imported_count, res.topic_id ?? resolvedTopic?.fullTopicId ?? null);
       } else {
         if (!resolvedTopic) {
           setError('請先選擇科別與主題。');
@@ -348,7 +404,7 @@ export default function DocumentToQaTab({
         const csvFile = new File([csv], `pasted-${Date.now()}.csv`, { type: 'text/csv' });
         const res = await onUploadFile(csvFile, resolvedTopic.fullTopicId, resolvedTopic.labels, hiddenQuestions);
         setStatus('success');
-        await completeSingleFileUpload(res);
+        await completeSingleFileUpload(res, resolvedTopic.fullTopicId);
       }
       window.setTimeout(() => onClose(), 1200);
     } catch (err) {

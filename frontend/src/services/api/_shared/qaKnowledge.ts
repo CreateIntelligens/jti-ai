@@ -47,6 +47,8 @@ export interface QaMergedCsvResponse {
 export interface QaPair {
   q: string;
   a: string;
+  img?: string;
+  url?: string;
 }
 
 export interface QaExtractJobResponse {
@@ -61,6 +63,7 @@ export interface QaImportResponse {
   filename: string;
   topic_synced: boolean;
   skipped_all_duplicates?: boolean;
+  topic_id?: string | null;
 }
 
 export interface QaKnowledgeApi {

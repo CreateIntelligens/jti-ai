@@ -136,13 +136,24 @@ export function getMetadataPayload(
   // Output uses the flattened single-label shape and only emits the label
   // for the file's own language partition.
   const isDraft = 'categoryId' in data;
-  const categoryId = isDraft
-    ? (data.categoryId && data.categoryId !== NEW_VALUE ? data.categoryId : null)
-    : (data.topic_id ? categoryPrefix(data.topic_id) : null);
+  let categoryId: string | null = null;
+  let topicId: string | null = null;
 
-  const topicId = isDraft
-    ? (categoryId && data.topicId && data.topicId !== NEW_VALUE ? data.topicId : null)
-    : data.topic_id;
+  if (isDraft) {
+    const draft = data as FileMetadataDraft;
+    if (draft.categoryId && draft.categoryId !== NEW_VALUE) {
+      categoryId = draft.categoryId;
+    }
+    if (categoryId && draft.topicId && draft.topicId !== NEW_VALUE) {
+      topicId = draft.topicId;
+    }
+  } else {
+    const file = data as HciotKnowledgeFile;
+    if (file.topic_id) {
+      categoryId = categoryPrefix(file.topic_id);
+      topicId = file.topic_id;
+    }
+  }
 
   if (isDraft) {
     return {
@@ -208,4 +219,39 @@ export function buildTopicOptions(
   }
 
   return buildGenericOptions(currentCategory.topics, draft.topicId, draft.topicLabel, { questions: [] });
+}
+
+export function createEmptyTopicDraft(): Pick<FileMetadataDraft, 'topicId' | 'topicLabel'> {
+  return {
+    topicId: '',
+    topicLabel: '',
+  };
+}
+
+export interface ParsedExplorerKey {
+  kind: string;
+  id: string;
+}
+
+export function parseExplorerKey(key: string): ParsedExplorerKey {
+  const separatorIndex = key.indexOf(':');
+  return separatorIndex === -1
+    ? { kind: key, id: '' }
+    : { kind: key.slice(0, separatorIndex), id: key.slice(separatorIndex + 1) };
+}
+
+export function splitTopicId(topicId: string): { categoryId: string; topicSlug: string } {
+  const [categoryId = '', ...topicParts] = topicId.split('/');
+  return { categoryId, topicSlug: topicParts.join('/') };
+}
+
+export function moveItem<T>(items: T[], from: number, to: number): T[] | null {
+  if (from === -1 || to === -1) {
+    return null;
+  }
+
+  const nextItems = [...items];
+  const [moved] = nextItems.splice(from, 1);
+  nextItems.splice(to, 0, moved);
+  return nextItems;
 }
