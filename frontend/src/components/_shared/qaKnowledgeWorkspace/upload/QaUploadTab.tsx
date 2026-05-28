@@ -167,6 +167,7 @@ export default function QaUploadTab({
       const file = new File([blob], `${prefix.toLowerCase()}_qa_${Date.now()}.csv`, { type: 'text/csv' });
       const result = await onSubmitQA(file, resolvedTopic.fullTopicId, resolvedTopic.labels, hiddenQuestions);
       await onUploadComplete(result.name, result.uploaded_count);
+      onClose();
     } catch (error) {
       if (submitStage === 'images') {
         await rollbackUploadedImages(uploadedImageIds, onDeleteImage);

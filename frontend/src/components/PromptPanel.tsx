@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ChevronDown, ChevronRight, X } from 'lucide-react';
 import * as api from '../services/api';
+import AppSelect from './AppSelect';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { toErrorMessage } from '../utils/errors';
 import { confirmDiscard } from '../utils/confirmDiscard';
@@ -546,24 +547,22 @@ export default function PromptPanel({
                 <div className="rp-stack-lg">
                   <div className="field">
                     <label>模型</label>
-                    <select
-                      className="input-base"
+                    <AppSelect
                       value={selectedModel}
-                      onChange={(e) => handleModelChange(e.target.value)}
+                      onChange={handleModelChange}
                       disabled={modelsLoading}
-                    >
-                      {modelsLoading ? (
-                        <option value={selectedModel}>載入中…</option>
-                      ) : availableModels.length > 0 ? (
-                        availableModels.map((m) => (
-                          <option key={m.name} value={m.name}>
-                            {m.display_name}
-                          </option>
-                        ))
-                      ) : (
-                        <option value={selectedModel}>{selectedModel}</option>
-                      )}
-                    </select>
+                      placeholder={modelsLoading ? '載入中…' : selectedModel}
+                      options={
+                        availableModels.length > 0
+                          ? availableModels.map((m) => ({
+                              value: m.name,
+                              label: m.display_name,
+                            }))
+                          : selectedModel
+                            ? [{ value: selectedModel, label: selectedModel }]
+                            : []
+                      }
+                    />
                   </div>
                 </div>
               )}

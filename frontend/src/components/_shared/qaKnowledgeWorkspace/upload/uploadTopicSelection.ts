@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import type { HciotTopicCategory } from '../../../../services/api/hciot';
-import { NEW_VALUE, normalizeLabel, slugify, sortByLabel } from '../topicUtils';
+import { NEW_VALUE, normalizeLabel, slugify } from '../topicUtils';
 import type { ResolvedUploadTopic } from './types';
 
 const LS_CATEGORY_KEY = 'hciot_upload_category';
@@ -117,20 +117,20 @@ export function useUploadTopicSelection(categories: HciotTopicCategory[], open: 
     setNewTopicLabel('');
   }, [open, categories]);
 
-  const sortedCategories = useMemo(
-    () => [...categories].sort((a, b) => sortByLabel(a.label, b.label)),
-    [categories],
-  );
+  // Preserve the backend ordering (by stored `order`) so the upload dropdown
+  // matches the quick-QA topic order. Both come from /topics/{lang}/all, which
+  // is already sorted by `order`.
+  const sortedCategories = categories;
 
   const currentCategory = useMemo(
     () => (categoryId && categoryId !== NEW_VALUE ? categories.find((c) => c.id === categoryId) : null),
     [categories, categoryId],
   );
 
-  const sortedTopics = useMemo(() => {
-    if (!currentCategory) return [];
-    return [...currentCategory.topics].sort((a, b) => sortByLabel(a.label, b.label));
-  }, [currentCategory]);
+  const sortedTopics = useMemo(
+    () => (currentCategory ? currentCategory.topics : []),
+    [currentCategory],
+  );
 
   const resolvedTopic = useMemo(
     () => resolveTopicInfo(categoryId, topicId, newCategoryLabel, newTopicLabel, currentCategory),
