@@ -84,6 +84,13 @@ fake_db = {"knowledge_files": fake_collection}
 install_app_import_mocks()
 sys.modules["app.services.mongo_client"].get_mongo_db.return_value = fake_db
 
+# Reload base FIRST — it owns the `from app.services.mongo_client import get_mongo_db`
+# reference, and without this reload it keeps a stale binding from earlier tests'
+# mongo_client mock, causing find_one() to return a truthy MagicMock and turning
+# `_resolve_filename`'s `while` loop into an unbounded string allocation. Then
+# reload the hciot subclass so its base lookup points at the freshly-bound module.
+base_module = importlib.import_module("app.services._shared.qa_kb.knowledge_store_base")
+importlib.reload(base_module)
 knowledge_store_module = importlib.import_module("app.services.hciot.knowledge_store")
 knowledge_store_module = importlib.reload(knowledge_store_module)
 HciotKnowledgeStore = knowledge_store_module.HciotKnowledgeStore

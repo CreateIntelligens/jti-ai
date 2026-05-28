@@ -1,8 +1,9 @@
 import logging
+import os
 from typing import Any, List, Optional, Union
 
 import numpy as np
-import torch
+
 from app.services.embedding.errors import (
     EmbeddingModelError,
     EmbeddingEncodingError,
@@ -10,6 +11,20 @@ from app.services.embedding.errors import (
 
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_device(explicit: Optional[str]) -> str:
+    if explicit:
+        return explicit
+    env_device = os.getenv("EMBEDDING_DEVICE")
+    if env_device:
+        return env_device
+    try:
+        import torch  # lazy: torch import alone costs ~500MB-1GB RSS; only pay it when actually deciding device
+        return "cuda" if torch.cuda.is_available() else "cpu"
+    except Exception:
+        return "cpu"
+
 
 class EmbeddingService:
     _instance: Optional['EmbeddingService'] = None
@@ -21,9 +36,8 @@ class EmbeddingService:
         device: Optional[str] = None,
         batch_size: Optional[int] = None
     ):
-        import os
         self.model_name = model_name or os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
-        self.device = device or os.getenv("EMBEDDING_DEVICE") or ("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = _resolve_device(device)
         self.batch_size = batch_size or int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
         logger.debug(f"EmbeddingService config: {self.model_name} on {self.device}")
 
@@ -60,7 +74,7 @@ class EmbeddingService:
         """Encode text(s) into embeddings."""
         if isinstance(texts, str):
             texts = [texts]
-        
+
         try:
             # BGE-M3's encode() handles both single and batch
             return self.model.encode(
