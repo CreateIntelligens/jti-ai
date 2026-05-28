@@ -12,6 +12,7 @@ import logging
 from typing import Dict, Optional
 
 from app.services._shared.agent_prompts_base import AgentPrompts
+from app.services._shared.qa_kb.prompts_loader import load_active_persona_and_role_scope
 
 logger = logging.getLogger(__name__)
 
@@ -120,40 +121,6 @@ prompts = _HciotAgentPrompts(
 )
 
 
-def _active_prompt_language_value(prompt_map: object, active_id: str, language: str) -> str | None:
-    if not isinstance(prompt_map, dict):
-        return None
-
-    raw_prompt = prompt_map.get(active_id)
-    if not isinstance(raw_prompt, dict):
-        return None
-
-    nested_persona = raw_prompt.get("persona")
-    language_values = nested_persona if isinstance(nested_persona, dict) else raw_prompt
-    value = language_values.get(language)
-    return value if isinstance(value, str) and value.strip() else None
-
-
-def _active_role_scope(runtime_map: object, active_id: str, language: str) -> str | None:
-    if not isinstance(runtime_map, dict):
-        return None
-
-    settings = runtime_map.get(active_id)
-    if not isinstance(settings, dict):
-        return None
-
-    sections = settings.get("response_rule_sections")
-    if not isinstance(sections, dict):
-        return None
-
-    language_sections = sections.get(language)
-    if not isinstance(language_sections, dict):
-        return None
-
-    value = language_sections.get("role_scope")
-    return value if isinstance(value, str) and value.strip() else None
-
-
 def get_active_persona_and_role_scope(language: str) -> tuple[str, str]:
     """Return (persona, role_scope) for the currently-active HCIoT prompt profile.
 
@@ -165,40 +132,16 @@ def get_active_persona_and_role_scope(language: str) -> tuple[str, str]:
     fallback_persona = PERSONA.get(language, PERSONA["zh"])
     fallback_sections = DEFAULT_RESPONSE_RULE_SECTIONS.get(language, DEFAULT_RESPONSE_RULE_SECTIONS["zh"])
     fallback_role_scope = fallback_sections.get("role_scope", "")
-
-    persona = fallback_persona
-    role_scope = fallback_role_scope
-
-    try:
-        from app import deps
-        if not deps.prompt_manager:
-            return persona, role_scope
-
-        store_name = "__hciot__en" if language == "en" else "__hciot__"
-        store_prompts = deps.prompt_manager.get_store_prompts(store_name)
-        active_id = getattr(store_prompts, "hciot_active_prompt_id", None)
-        if not active_id:
-            return persona, role_scope
-
-        active_persona = _active_prompt_language_value(
-            getattr(store_prompts, "hciot_persona_by_prompt", None),
-            active_id,
-            language,
-        )
-        if active_persona is not None:
-            persona = active_persona
-
-        active_role_scope = _active_role_scope(
-            getattr(store_prompts, "hciot_runtime_settings_by_prompt", None),
-            active_id,
-            language,
-        )
-        if active_role_scope is not None:
-            role_scope = active_role_scope
-    except Exception as e:
-        logger.warning("[HCIoT prompts] Failed to load active prompt context, using fallback: %s", e)
-
-    return persona, role_scope
+    return load_active_persona_and_role_scope(
+        language=language,
+        store_name_for_language=lambda lang: "__hciot__en" if lang == "en" else "__hciot__",
+        active_id_attr="hciot_active_prompt_id",
+        persona_map_attr="hciot_persona_by_prompt",
+        runtime_map_attr="hciot_runtime_settings_by_prompt",
+        fallback_persona=fallback_persona,
+        fallback_role_scope=fallback_role_scope,
+        log_label="HCIoT prompts",
+    )
 
 
 def build_system_instruction(

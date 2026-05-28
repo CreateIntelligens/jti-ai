@@ -1,0 +1,248 @@
+"""Generic QA-CSV knowledge store with namespace + collection isolation.
+
+A sub-app subclasses ``QaKbKnowledgeStoreBase``, sets ``DB_NAME``, ``COLLECTION_NAME``,
+and ``NAMESPACE``, and gets the full file CRUD + topic-aware helpers (csv listing,
+non-csv detection, image-aware filename resolution) for free.
+
+The store deliberately holds NO knowledge of the underlying sub-app; namespacing
+keeps multiple sub-apps in one Mongo cluster without leaking documents across
+boundaries.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from bson.binary import Binary
+from pymongo import ReturnDocument
+
+from app.services.mongo_client import get_mongo_db
+
+
+class QaKbKnowledgeStoreBase:
+    DB_NAME: str = ""
+    COLLECTION_NAME: str = ""
+    NAMESPACE: str = ""
+
+    def __init__(self):
+        if not self.DB_NAME:
+            raise NotImplementedError(f"{type(self).__name__} must set DB_NAME")
+        if not self.COLLECTION_NAME:
+            raise NotImplementedError(f"{type(self).__name__} must set COLLECTION_NAME")
+        if not self.NAMESPACE:
+            raise NotImplementedError(f"{type(self).__name__} must set NAMESPACE")
+        self.db = get_mongo_db(self.DB_NAME)
+        self.collection = self.db[self.COLLECTION_NAME]
+
+    @staticmethod
+    def _normalize_language(language: str) -> str:
+        return (language or "zh").strip().lower()
+
+    @staticmethod
+    def _safe_filename(filename: str) -> str:
+        return Path(filename).name
+
+    @staticmethod
+    def _to_bytes(data: Any) -> bytes:
+        if isinstance(data, Binary):
+            return bytes(data)
+        if isinstance(data, (bytes, bytearray)):
+            return bytes(data)
+        return b""
+
+    @staticmethod
+    def _normalize_optional_text(value: Any) -> str | None:
+        if not isinstance(value, str):
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    @classmethod
+    def _association_metadata(
+        cls,
+        *,
+        topic_id: str | None = None,
+        category_label: str | None = None,
+        topic_label: str | None = None,
+    ) -> dict[str, Any]:
+        tid = cls._normalize_optional_text(topic_id)
+        return {
+            "topic_id": tid,
+            "category_label": cls._normalize_optional_text(category_label) if tid else None,
+            "topic_label": cls._normalize_optional_text(topic_label) if tid else None,
+        }
+
+    @staticmethod
+    def _metadata_from_doc(doc: dict[str, Any]) -> dict[str, Any]:
+        filename = doc.get("filename", "")
+        return {
+            "name": filename,
+            "filename": filename,
+            "display_name": doc.get("display_name", filename),
+            "content_type": doc.get("content_type", "application/octet-stream"),
+            "size": int(doc.get("size", 0)),
+            "editable": bool(doc.get("editable", False)),
+            "topic_id": doc.get("topic_id"),
+            "category_label": doc.get("category_label"),
+            "topic_label": doc.get("topic_label"),
+            "created_at": doc.get("created_at"),
+        }
+
+    def _query(self, language: str, filename: str | None = None) -> dict[str, Any]:
+        query: dict[str, Any] = {
+            "namespace": self.NAMESPACE,
+            "language": self._normalize_language(language),
+        }
+        if filename is not None:
+            query["filename"] = self._safe_filename(filename)
+        return query
+
+    def has_non_csv_files(self, language: str, topic_id: str) -> bool:
+        query = self._query(language)
+        query["topic_id"] = topic_id
+        query["filename"] = {"$not": {"$regex": r"\.csv$", "$options": "i"}}
+        return self.collection.count_documents(query, limit=1) > 0
+
+    def iter_csv_files_with_data(self, language: str):
+        """Yield ``(filename, data_bytes)`` for every CSV in the language."""
+        query = self._query(language)
+        query["filename"] = {"$regex": r"\.csv$", "$options": "i"}
+        cursor = self.collection.find(query, {"filename": 1, "data": 1}).sort("filename", 1)
+        for doc in cursor:
+            yield doc.get("filename") or "", self._to_bytes(doc.get("data"))
+
+    def get_topic_csv_files(self, language: str, topic_id: str) -> list[dict[str, Any]]:
+        query = self._query(language)
+        query["topic_id"] = topic_id
+        query["filename"] = {"$regex": r"\.csv$", "$options": "i"}
+        cursor = self.collection.find(query, {"filename": 1, "data": 1}).sort("filename", 1)
+        return [
+            {"filename": doc.get("filename"), "data": self._to_bytes(doc.get("data"))}
+            for doc in cursor
+        ]
+
+    def list_files(self, language: str, **kwargs: Any) -> list[dict[str, Any]]:
+        cursor = self.collection.find(
+            self._query(language),
+            {
+                "_id": 0,
+                "filename": 1,
+                "display_name": 1,
+                "content_type": 1,
+                "size": 1,
+                "editable": 1,
+                "topic_id": 1,
+                "category_label": 1,
+                "topic_label": 1,
+                "created_at": 1,
+            },
+        ).sort("filename", 1)
+        return [self._metadata_from_doc(doc) for doc in cursor]
+
+    def get_file(self, language: str, filename: str) -> dict[str, Any] | None:
+        doc = self.collection.find_one(self._query(language, filename))
+        if not doc:
+            return None
+        doc.pop("_id", None)
+        doc["data"] = self._to_bytes(doc.get("data"))
+        return doc
+
+    def _resolve_filename(self, language: str, filename: str) -> str:
+        base_name = self._safe_filename(filename)
+        path = Path(base_name)
+        stem, suffix = path.stem, path.suffix
+        candidate = base_name
+        counter = 1
+        while self.collection.find_one(self._query(language, candidate), {"_id": 1}):
+            candidate = f"{stem}_{counter}{suffix}"
+            counter += 1
+        return candidate
+
+    def insert_file(
+        self,
+        language: str,
+        filename: str,
+        data: bytes,
+        display_name: str | None = None,
+        content_type: str = "application/octet-stream",
+        editable: bool = True,
+        topic_id: str | None = None,
+        category_label: str | None = None,
+        topic_label: str | None = None,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
+        candidate = self._resolve_filename(language, filename)
+        now = datetime.now(timezone.utc)
+        doc = {
+            "namespace": self.NAMESPACE,
+            "language": self._normalize_language(language),
+            "filename": candidate,
+            "display_name": display_name or candidate,
+            "content_type": content_type or "application/octet-stream",
+            "size": len(data),
+            "data": Binary(data),
+            "editable": bool(editable),
+            "created_at": now,
+            "updated_at": now,
+            **self._association_metadata(
+                topic_id=topic_id,
+                category_label=category_label,
+                topic_label=topic_label,
+            ),
+        }
+        self.collection.insert_one(doc)
+        return self._metadata_from_doc(doc)
+
+    def delete_file(self, language: str, filename: str, **kwargs: Any) -> bool:
+        result = self.collection.delete_one(self._query(language, filename))
+        return result.deleted_count > 0
+
+    def update_file_content(
+        self,
+        language: str,
+        filename: str,
+        new_data: bytes,
+    ) -> dict[str, Any] | None:
+        updated = self.collection.find_one_and_update(
+            self._query(language, filename),
+            {
+                "$set": {
+                    "data": Binary(new_data),
+                    "size": len(new_data),
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            },
+            return_document=ReturnDocument.AFTER,
+        )
+        if not updated:
+            return None
+        updated.pop("_id", None)
+        return self._metadata_from_doc(updated)
+
+    def update_file_metadata(
+        self,
+        language: str,
+        filename: str,
+        metadata: dict[str, Any],
+    ) -> dict[str, Any] | None:
+        payload = self._association_metadata(
+            topic_id=metadata.get("topic_id"),
+            category_label=metadata.get("category_label"),
+            topic_label=metadata.get("topic_label"),
+        )
+        updated = self.collection.find_one_and_update(
+            self._query(language, filename),
+            {
+                "$set": {
+                    **payload,
+                    "updated_at": datetime.now(timezone.utc),
+                }
+            },
+            return_document=ReturnDocument.AFTER,
+        )
+        if not updated:
+            return None
+        updated.pop("_id", None)
+        return self._metadata_from_doc(updated)

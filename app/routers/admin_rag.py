@@ -34,11 +34,17 @@ def _expand_source_types(source_type: str) -> list[str]:
     raise HTTPException(status_code=400, detail="source_type must be one of: hciot, jti, all")
 
 
+_running_reindexes = set()
+
+
 async def _run_rag_reindex(source_types: list[str], force: bool) -> None:
     """Run requested source/language RAG backfills without blocking the request."""
     backfill = get_backfill_service()
     loop = asyncio.get_running_loop()
     logger.info("[RAG] Reindex started for source_types=%s languages=%s force=%s", source_types, LANGUAGES, force)
+
+    active_keys = {(st, lang) for st in source_types for lang in LANGUAGES}
+    _running_reindexes.update(active_keys)
 
     try:
         tasks = [
@@ -50,6 +56,8 @@ async def _run_rag_reindex(source_types: list[str], force: bool) -> None:
         logger.info("[RAG] Reindex finished for source_types=%s languages=%s", source_types, LANGUAGES)
     except Exception as e:
         logger.error("[RAG] Reindex failed: %s", e)
+    finally:
+        _running_reindexes.difference_update(active_keys)
 
 
 @router.post("/reindex")
@@ -69,3 +77,14 @@ async def reindex_rag(
         "source_types": source_types,
         "languages": LANGUAGES,
     }
+
+
+@router.get("/status")
+async def reindex_status(source_type: str = "hciot"):
+    source_types = _expand_source_types(source_type)
+    is_running = any((st, lang) in _running_reindexes for st in source_types for lang in LANGUAGES)
+    return {
+        "source_type": source_type,
+        "reindexing": is_running,
+    }
+

@@ -1,25 +1,20 @@
 """HCIoT document to structured Q&A extractor using Gemini API."""
 
-import json
 import logging
 
-from google.genai import types
-from pydantic import BaseModel, Field
-
-from app.models_config import DEFAULT_MODEL, fallback_chain
+from app.services._shared.qa_kb.extractor_base import (
+    QaListSchema,
+    QaPair,
+    extract_qa_from_document as _extract_qa_from_document,
+)
 from app.services.gemini_clients import get_default_client
-from app.services.gemini_service import gemini_with_fallback, gemini_with_retry, run_sync
+from app.services.gemini_service import (
+    gemini_with_fallback,
+    gemini_with_retry,
+    run_sync,
+)
 
 logger = logging.getLogger(__name__)
-
-
-class QaPair(BaseModel):
-    q: str = Field(description="The voice-style oral question a user might ask.")
-    a: str = Field(description="The detailed, complete, professional yet warm answer answering the question.")
-
-
-class QaListSchema(BaseModel):
-    qa_pairs: list[QaPair]
 
 
 def _build_extraction_instruction(language: str, persona_text: str, role_scope_text: str) -> str:
@@ -79,60 +74,14 @@ async def extract_qa_from_document(
     Call Gemini API to extract Q&A pairs from the document text.
     Returns a list of dicts: [{"q": "...", "a": "..."}, ...]
     """
-    cleaned_text = (text or "").strip()
-    if not cleaned_text:
-        raise ValueError("Document text is empty")
-
-    if not persona_text:
-        persona_text = "你是一個智慧對話助理，任務是回答使用者的問題。"
-    if not role_scope_text:
-        role_scope_text = "回答使用者的各種問題，並提供清楚、白話、好懂的說明。"
-
-    system_instruction = _build_extraction_instruction(language, persona_text, role_scope_text)
-    prompt = f"請從以下文件中擷取問答：\n\n```\n{cleaned_text}\n```"
-
-    client = get_default_client()
-    models_to_try = fallback_chain(DEFAULT_MODEL)
-
-    def _call_gemini(model_name: str):
-        logger.info("[QA Extractor] Calling model=%s (length=%d)", model_name, len(cleaned_text))
-        config = types.GenerateContentConfig(
-            system_instruction=[types.Part.from_text(text=system_instruction)],
-            response_mime_type="application/json",
-            response_schema=QaListSchema,
-            temperature=0.2,
-        )
-        return client.models.generate_content(
-            model=model_name,
-            contents=prompt,
-            config=config,
-        )
-
-    try:
-        # Run in thread pool to avoid blocking async loop
-        response = await run_sync(
-            gemini_with_fallback,
-            lambda m: gemini_with_retry(lambda: _call_gemini(m)),
-            models_to_try,
-        )
-
-        raw_text = response.text
-        if not raw_text:
-            raise ValueError("Empty response received from LLM")
-
-        data = json.loads(raw_text)
-        qa_pairs = data.get("qa_pairs", [])
-
-        result: list[dict[str, str]] = []
-        for pair in qa_pairs:
-            q = (pair.get("q") or "").strip()
-            a = (pair.get("a") or "").strip()
-            if q and a:
-                result.append({"q": q, "a": a})
-
-        logger.info("[QA Extractor] Successfully extracted %d Q&A pairs", len(result))
-        return result
-
-    except Exception as e:
-        logger.error("[QA Extractor] Failed to extract Q&A from document: %s", e)
-        raise
+    return await _extract_qa_from_document(
+        text=text,
+        language=language,
+        persona_text=persona_text,
+        role_scope_text=role_scope_text,
+        build_instruction=_build_extraction_instruction,
+        model_client=get_default_client(),
+        gemini_with_fallback_func=gemini_with_fallback,
+        gemini_with_retry_func=gemini_with_retry,
+        run_sync_func=run_sync,
+    )
