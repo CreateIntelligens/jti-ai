@@ -62,7 +62,6 @@
 
 .qa-workspace-merged-csv-table {
   width: 100%;
-  min-width: 88rem;
   border-collapse: collapse;
   font-size: 0.88rem;
   table-layout: fixed;
@@ -201,10 +200,14 @@
 }
 
 /* Merged CSV table cells */
+/* Fixed-size columns keep rem. Question/answer are left unsized so
+   table-layout:fixed distributes the remaining container width between them,
+   fitting any container instead of forcing horizontal scroll. The 3:4 split
+   gives answers a bit more room than questions. */
 .qa-workspace-csv-col-num    { width: 4.25rem; }
 .qa-workspace-csv-col-visible { width: 5.75rem; text-align: center; }
-.qa-workspace-csv-col-question { width: 24rem; }
-.qa-workspace-csv-col-answer { width: 28rem; }
+.qa-workspace-csv-col-question { width: 30%; }
+.qa-workspace-csv-col-answer { width: 40%; }
 .qa-workspace-csv-col-wide   { width: 11.25rem; }
 .qa-workspace-csv-col-action { width: 3.75rem; text-align: center; }
 .qa-workspace-csv-visible-header {

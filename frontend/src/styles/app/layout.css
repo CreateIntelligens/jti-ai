@@ -116,7 +116,6 @@
 
 .app-container aside {
   width: 21.5rem;
-  min-width: 21.5rem;
   flex-shrink: 0;
   background: var(--glass-bg);
   border: 0.0625rem solid var(--glass-border);
@@ -364,7 +363,6 @@
 @media (max-width: 64rem) {
   .app-container aside {
     width: 20rem;
-    min-width: 20rem;
   }
 
   .message {
