@@ -60,12 +60,12 @@ export default function ChatArea({
   useFocusOnOpen(editTextareaRef, editingTurn !== null);
 
   const submitInput = useCallback(() => {
-    if (input.trim()) {
+    if (input.trim() && !loading) {
       onSendMessage(input.trim());
       setInput('');
       setShouldFocus(true);
     }
-  }, [input, onSendMessage]);
+  }, [input, onSendMessage, loading]);
 
   const handleSubmit = (e: { preventDefault(): void }) => {
     e.preventDefault();
@@ -290,7 +290,7 @@ export default function ChatArea({
                 ? `向「${currentStoreName}」提問...`
                 : '請先選擇知識庫...'
             }
-            disabled={disabled || loading}
+            disabled={disabled}
           />
           <button
             className="send-btn"

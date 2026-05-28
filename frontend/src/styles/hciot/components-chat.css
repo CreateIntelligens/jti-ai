@@ -3,7 +3,6 @@
   grid-template-columns: minmax(0, 1fr);
   gap: 1.5rem;
   min-height: 0;
-  max-width: 52rem;
   width: 100%;
   margin: 0 auto;
 }
@@ -23,7 +22,6 @@
   gap: 0.5rem;
   animation: fadeIn 0.3s ease both;
   width: 100%;
-  max-width: 52rem;
   margin-left: auto;
   margin-right: auto;
 }
@@ -415,7 +413,6 @@
 }
 
 .hciot-input-form {
-  max-width: 52rem;
   width: 100%;
   margin: 0 auto;
 }

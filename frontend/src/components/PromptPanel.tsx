@@ -325,7 +325,6 @@ export default function PromptPanel({
   const handleModelChange = async (modelId: string) => {
     setSelectedModel(modelId);
     storeSelectedModel(modelId);
-    await onRestartChat();
     onShowStatus?.('✅ 模型已切換');
   };
 

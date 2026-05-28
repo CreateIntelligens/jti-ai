@@ -630,6 +630,7 @@ export default function Hciot() {
     setUserInput('');
     setLoading(true);
     setIsTyping(true);
+    focusSoon(inputRef);
 
     try {
       let activeSessionId = sessionId;

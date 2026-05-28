@@ -90,12 +90,14 @@ export async function updateStoreFileContent(
 
 
 function knowledgeFileUrl(filename: string, suffix: string, appTarget: AppTarget, language: string): string {
-  const path = `${API_BASE}/knowledge/files/${encodeURIComponent(filename)}${suffix}`;
-  return buildUrl(path, { app: appTarget, language: normLang(language) });
+  const prefix = appTarget === 'jti' ? 'jti-admin' : 'hciot-admin';
+  const path = `${API_BASE}/${prefix}/knowledge/files/${encodeURIComponent(filename)}${suffix}`;
+  return buildUrl(path, { language: normLang(language) });
 }
 
 export async function listManagedKnowledgeFiles(appTarget: AppTarget, language: string = 'zh'): Promise<{ files: KnowledgeFile[] }> {
-  const url = buildUrl(`${API_BASE}/knowledge/files/`, { app: appTarget, language: normLang(language) });
+  const prefix = appTarget === 'jti' ? 'jti-admin' : 'hciot-admin';
+  const url = buildUrl(`${API_BASE}/${prefix}/knowledge/files/`, { language: normLang(language) });
   const response = await fetchAsAdmin(url);
   return handleResponse<{ files: KnowledgeFile[] }>(response);
 }
@@ -126,7 +128,8 @@ export async function updateManagedKnowledgeFileContent(
 export async function uploadManagedKnowledgeFile(appTarget: AppTarget, language: string, file: File): Promise<any> {
   const formData = new FormData();
   formData.append('file', file);
-  const url = buildUrl(`${API_BASE}/knowledge/upload/`, { app: appTarget, language: normLang(language) });
+  const prefix = appTarget === 'jti' ? 'jti-admin' : 'hciot-admin';
+  const url = buildUrl(`${API_BASE}/${prefix}/knowledge/upload/`, { language: normLang(language) });
   const response = await fetchAsAdmin(url, {
     method: 'POST',
     body: formData,
@@ -177,7 +180,7 @@ export async function sendMessage(text: string, sessionId?: string, turnNumber?:
   const response = await fetchWithUserGeminiKey(`${API_BASE}/chat/message`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message: text, session_id: sessionId, turn_number: turnNumber }),
+    body: JSON.stringify({ message: text, session_id: sessionId, turn_number: turnNumber, model: getSelectedModel() }),
   });
   return handleResponse<ChatResponse>(response);
 }

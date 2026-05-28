@@ -49,6 +49,7 @@ class ChatMessageRequest(BaseModel):
     message: str
     session_id: Optional[str] = None
     turn_number: Optional[int] = None
+    model: Optional[str] = None
 
 
 def _get_conversation_logger():
@@ -204,6 +205,7 @@ async def send_message(req: ChatMessageRequest, request: Request, auth: dict = D
     result = await main_agent.chat(
         session_id=session.session_id,
         user_message=req.message,
+        model=req.model,
     )
 
     answer = result.get("message", "")

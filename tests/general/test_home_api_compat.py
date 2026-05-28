@@ -256,7 +256,7 @@ def test_general_chat_uses_browser_gemini_key_for_general_store(monkeypatch):
         captured["owner_key_hash"] = owner_key_hash
         return ManagedStoreConfig("store_hotai", "和泰", "", "", key_index=None)
 
-    async def fake_agent_chat(session_id, user_message):
+    async def fake_agent_chat(session_id, user_message, *args, **kwargs):
         captured["chat_called"] = (session_id, user_message)
         return {
             "message": "和泰回答",
@@ -307,7 +307,7 @@ def test_home_can_start_and_send_general_chat(monkeypatch):
         def delete_turns_from(self, *_args):
             return 0
 
-    async def fake_agent_chat(session_id, user_message):
+    async def fake_agent_chat(session_id, user_message, *args, **kwargs):
         return {
             "message": f"回答：{user_message}",
             "citations": [{"title": "FAQ", "uri": "faq.csv", "text": "常見問題"}],

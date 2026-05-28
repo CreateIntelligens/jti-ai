@@ -311,15 +311,21 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
         if system_prompt:
             config_kwargs["system_instruction"] = system_prompt
 
-        response = gemini_with_fallback(
-            lambda m: gemini_client.models.generate_content(
+        def generate_with_model(m):
+            name_lower = m.lower()
+            is_thinking_model = "thinking" in name_lower or "gemini-3" in name_lower
+            thinking_config = None if is_thinking_model else types.ThinkingConfig(thinking_budget=0)
+            return gemini_client.models.generate_content(
                 model=m,
                 contents=contents,
                 config=types.GenerateContentConfig(
-                    thinking_config=types.ThinkingConfig(thinking_budget=0),
+                    thinking_config=thinking_config,
                     **config_kwargs,
                 ),
-            ),
+            )
+
+        response = gemini_with_fallback(
+            generate_with_model,
             fallback_chain(model_name, gemini_client),
         )
 

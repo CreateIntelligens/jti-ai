@@ -187,9 +187,14 @@ class BaseAgent:
 
     def _make_chat_config(self, session: Session) -> types.GenerateContentConfig:
         tool = self._rag_tool_declaration
+        model_name = session.metadata.get("model") or self.model_name
+        name_lower = model_name.lower()
+        is_thinking_model = "thinking" in name_lower or "gemini-3" in name_lower
+        thinking_config = None if is_thinking_model else types.ThinkingConfig(thinking_budget=0)
+
         return types.GenerateContentConfig(
             system_instruction=[types.Part.from_text(text=self._get_system_instruction(session))],
-            thinking_config=types.ThinkingConfig(thinking_budget=0),
+            thinking_config=thinking_config,
             tools=[tool] if tool else None,
             temperature=0.7,
         )
@@ -207,28 +212,41 @@ class BaseAgent:
             ),
         )
 
-    def _get_or_create_chat_session(self, session: Session):
+    def _get_or_create_chat_session(self, session: Session, model: str | None = None):
         """Get or create a persistent Gemini chat session."""
         sid = session.session_id
         cached_session = self._chat_sessions.get(sid)
+        model_to_use = model or session.metadata.get("model") or self.model_name
+
         if cached_session is not None:
-            self._chat_sessions.move_to_end(sid)
-            return cached_session
+            cached_model = getattr(cached_session, "_model", getattr(cached_session, "model", None))
+            if cached_model:
+                cached_model_clean = cached_model.removeprefix("models/").lower()
+                target_model_clean = model_to_use.removeprefix("models/").lower()
+                if cached_model_clean == target_model_clean:
+                    self._chat_sessions.move_to_end(sid)
+                    return cached_session
 
         history = []
         if session.chat_history:
             history = build_chat_history(session.chat_history)
         if history:
-            logger.info("恢復 chat session: %d 筆 (session=%s...)", len(history), sid[:8])
+            logger.info("恢復/重建 chat session (%s): %d 筆 (session=%s...)", model_to_use, len(history), sid[:8])
 
         config = self._make_chat_config(session)
 
         store_name = self._get_store_name_for_session(session)
         client = get_client_by_index(resolve_key_index_for_store(store_name))
+        
+        # Sync the model selection to DB metadata
+        if session.metadata.get("model") != model_to_use:
+            session.metadata["model"] = model_to_use
+            self._session_manager.update_session(session)
+
         # Cast: build_chat_history returns list[Content]; the SDK accepts
         # list[Content | dict] but list is invariant so Pyright can't narrow.
         chat_session = client.chats.create(
-            model=self.model_name,
+            model=model_to_use,
             config=config,
             history=cast(list[types.ContentOrDict], history) if history else None,
         )
@@ -309,7 +327,8 @@ class BaseAgent:
 
         store_name = self._get_store_name_for_session(session)
         client = get_client_by_index(resolve_key_index_for_store(store_name))
-        model_chain = fallback_chain(self.model_name, client)
+        model_to_use = session.metadata.get("model") or self.model_name
+        model_chain = fallback_chain(model_to_use, client)
         for model_index, model_name in enumerate(model_chain):
             try:
                 response = await run_sync(
@@ -330,7 +349,8 @@ class BaseAgent:
                     model_name,
                     next_model,
                 )
-                self.model_name = next_model
+                session.metadata["model"] = next_model
+                self._session_manager.update_session(session)
                 self._chat_sessions.pop(session.session_id, None)
                 chat_session = self._get_or_create_chat_session(session)
 
@@ -562,7 +582,7 @@ class BaseAgent:
         """回傳 chat 失敗時的預設訊息。"""
         return "AI目前發生錯誤，請稍後再試。"
 
-    async def chat(self, session_id: str, user_message: str) -> dict[str, Any]:
+    async def chat(self, session_id: str, user_message: str, model: str | None = None) -> dict[str, Any]:
         """
         統一的對話流程 (Function-calling / RAG 版本)：
         1. 取得 session 並建立 enriched message。
@@ -580,7 +600,7 @@ class BaseAgent:
             if not session:
                 return {"error": "Session not found", "message": "找不到對話記錄，請重新開始。"}
 
-            chat_session = self._get_or_create_chat_session(session)
+            chat_session = self._get_or_create_chat_session(session, model=model)
             
             # 組裝原始 enriched message (用於驅動 RAG 判斷)
             q_label = self._get_question_label(session.language)

@@ -99,7 +99,7 @@ async def test_hciot_chat_injects_session_state_into_prompt(monkeypatch):
         return mock_response, None
     monkeypatch.setattr(agent, "_run_tool_loop", fake_run_tool_loop)
     
-    monkeypatch.setattr(agent, "_get_or_create_chat_session", lambda s: FakeChatSession())
+    monkeypatch.setattr(agent, "_get_or_create_chat_session", lambda s, *a, **kw: FakeChatSession())
     monkeypatch.setattr(agent, "_sync_history_to_db_background", lambda *a, **kw: None)
 
     result = await agent.chat("sid-123", "PRP是什麼")

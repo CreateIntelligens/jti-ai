@@ -398,6 +398,7 @@ export default function Jti() {
     setUserInput('');
     setLoading(true);
     setIsTyping(true);
+    setTimeout(() => inputRef.current?.focus(), 10);
 
     try {
       const postChatMessage = async (activeSessionId: string) => {

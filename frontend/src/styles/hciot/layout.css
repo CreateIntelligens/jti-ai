@@ -292,8 +292,8 @@
 
 .hciot-chat-workspace {
   display: none;
-  grid-template-columns: clamp(15.5rem, 22vw, 19rem) minmax(0, 1fr);
-  gap: 2rem;
+  grid-template-columns: clamp(18rem, 24vw, 22rem) minmax(0, 1fr);
+  gap: 1.25rem;
   min-height: 0;
   height: 100%;
 }
