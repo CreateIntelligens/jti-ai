@@ -624,7 +624,7 @@ export default function Jti() {
               title={currentLanguage === 'zh' ? '切換至英文知識庫' : '切換至中文知識庫'}
               aria-label="Toggle Language"
             >
-              {currentLanguage === 'zh' ? 'EN' : '中'}
+              {currentLanguage === 'zh' ? '英文' : '中文'}
             </button>
             <button
               className="icon-btn"

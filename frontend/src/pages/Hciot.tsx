@@ -870,7 +870,7 @@ export default function Hciot() {
             <History size={18} />
           </button>
           <button className="hciot-icon-button text" onClick={() => void toggleLanguage()} title={HCIOT_UI_TEXT.languageTitle}>
-            {currentLanguage === 'zh' ? 'EN' : '中'}
+            {currentLanguage === 'zh' ? '英文' : '中文'}
           </button>
           <button className="hciot-icon-button" onClick={toggleTheme} title={HCIOT_UI_TEXT.themeTitle}>
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
