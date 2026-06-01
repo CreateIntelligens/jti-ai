@@ -9,8 +9,8 @@ afterEach(() => {
   cleanup();
 });
 
-function renderMergedCsvTable(props: Partial<MergedCsvTableProps> = {}) {
-  const defaultProps: MergedCsvTableProps = {
+function createMergedCsvTableProps(props: Partial<MergedCsvTableProps> = {}): MergedCsvTableProps {
+  return {
     language: 'zh',
     rows: [],
     sourceFiles: ['file1.csv'],
@@ -23,9 +23,13 @@ function renderMergedCsvTable(props: Partial<MergedCsvTableProps> = {}) {
     onDeleteRow: () => {},
     onAddRow: () => {},
     onToggleVisible: () => {},
+    onReorderRow: () => {},
+    ...props,
   };
+}
 
-  return render(<MergedCsvTable {...defaultProps} {...props} />);
+function renderMergedCsvTable(props: Partial<MergedCsvTableProps> = {}) {
+  return render(<MergedCsvTable {...createMergedCsvTableProps(props)} />);
 }
 
 describe('MergedCsvTable', () => {
@@ -85,6 +89,27 @@ describe('MergedCsvTable', () => {
     expect(screen.getByRole('link', { name: 'https://example.com/page' }).getAttribute('href')).toBe(
       'https://example.com/page',
     );
+  });
+
+  it('shows a keyboard-operable drag handle per row only while editing', () => {
+    const props = {
+      rows: [
+        { index: '001', q: 'Q1', a: 'A1', img: '' },
+        { index: '002', q: 'Q2', a: 'A2', img: '' },
+      ],
+    };
+
+    const { rerender } = renderMergedCsvTable(props);
+    // No grips in read-only mode.
+    expect(screen.queryByRole('button', { name: /拖曳第/ })).toBeNull();
+
+    rerender(<MergedCsvTable {...createMergedCsvTableProps({ ...props, isEditing: true })} />);
+
+    const grips = screen.getAllByRole('button', { name: /拖曳第/ });
+    expect(grips).toHaveLength(2);
+    // dnd-kit makes the handle focusable + announces it as draggable.
+    expect(grips[0].getAttribute('aria-roledescription')).toBe('sortable');
+    expect(grips[0].tabIndex).toBe(0);
   });
 
   it('toggles all question visibility from the header checkbox', () => {

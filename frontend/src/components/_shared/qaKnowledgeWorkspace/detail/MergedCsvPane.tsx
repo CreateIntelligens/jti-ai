@@ -30,7 +30,7 @@ interface MergedCsvPaneProps {
 }
 
 const SAVE_CSV_HEADER = ['index', 'q', 'a', 'img', 'url'];
-const DOWNLOAD_CSV_HEADER = ['q', 'a', 'img', 'url'];
+const DOWNLOAD_CSV_HEADER = ['index', 'q', 'a', 'img', 'url', 'display'];
 
 function toCsvString(rows: HciotMergedCsvRow[]): string {
   return buildCsvString(
@@ -39,10 +39,14 @@ function toCsvString(rows: HciotMergedCsvRow[]): string {
   );
 }
 
-function toDownloadCsvString(rows: HciotMergedCsvRow[]): string {
+function toDownloadCsvString(rows: HciotMergedCsvRow[], hiddenSet: Set<string>): string {
   return buildCsvString(
     DOWNLOAD_CSV_HEADER,
-    rows.map((row) => [row.q, row.a, row.img, row.url || '']),
+    rows.map((row, index) => {
+      const questionText = row.q.trim();
+      const display = questionText && hiddenSet.has(questionText) ? 'false' : 'true';
+      return [index + 1, row.q, row.a, row.img, row.url || '', display];
+    }),
   );
 }
 
@@ -256,6 +260,26 @@ export default function MergedCsvPane({
     setDirty(true);
   };
 
+  const handleReorderRow = (fromIndex: number, toIndex: number) => {
+    if (
+      fromIndex === toIndex ||
+      fromIndex < 0 ||
+      toIndex < 0 ||
+      fromIndex >= rows.length ||
+      toIndex >= rows.length
+    ) {
+      return;
+    }
+
+    setRows(prev => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+    setDirty(true);
+  };
+
   const handleAddRow = () => {
     setRows(prev => [
       ...prev,
@@ -266,7 +290,7 @@ export default function MergedCsvPane({
 
   const handleDownload = () => {
     const filename = `${topicLabel || topicSlug || 'topic'}.csv`;
-    const blob = new Blob([toDownloadCsvString(rows)], { type: 'text/csv;charset=utf-8' });
+    const blob = new Blob([toDownloadCsvString(rows, hiddenSet)], { type: 'text/csv;charset=utf-8' });
     downloadBlob(blob, filename);
   };
 
@@ -357,6 +381,7 @@ export default function MergedCsvPane({
           onDeleteRow={handleDeleteRow}
           onAddRow={handleAddRow}
           onToggleVisible={handleToggleVisible}
+          onReorderRow={handleReorderRow}
         />
       </section>
     </div>

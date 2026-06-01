@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { HciotLanguage } from '../../../../config/hciotTopics';
 import { toErrorMessage } from '../../../../utils/errors';
+import { parseCsvAsObjects } from '../../../../utils/csv';
 import type { HciotQaPair } from '../../../../services/api/hciot';
 import { createEmptyRow, type QARow } from './types';
 import type { ResolvedUploadTopic } from './types';
@@ -44,6 +45,7 @@ interface DocumentToQaTabProps {
 
 type PendingAiSource = { kind: 'file'; file: File } | { kind: 'text'; text: string };
 type UploadFileResult = { name: string };
+const HIDDEN_DISPLAY_VALUES = new Set(['false', '0', '否', 'n']);
 
 function fileExtension(file: File): string | undefined {
   return file.name.split('.').pop()?.toLowerCase();
@@ -59,6 +61,45 @@ function toHiddenPreviewRows(pairs: HciotQaPair[]): QARow[] {
     imgStatus: pair.img ? 'done' : 'pending',
     visible: false,
   }));
+}
+
+function parseDisplayValue(value: string | undefined): boolean {
+  return value === undefined || !HIDDEN_DISPLAY_VALUES.has(value.trim().toLowerCase());
+}
+
+/**
+ * Read a downloaded-then-edited QA CSV (one carrying a `display` column) into
+ * preview rows, seeding each row's `visible` flag from `display`. Returns
+ * `null` when the text is not such a CSV (no data rows, or missing the
+ * `display`/`q` columns) so callers can fall back to the AI extraction path.
+ */
+function parseCsvDisplayPreviewRows(text: string): QARow[] | null {
+  const parsed = parseCsvAsObjects(text);
+  if (!parsed) {
+    return null;
+  }
+
+  const { headers, rows: records } = parsed;
+  if (!headers.includes('display') || !headers.includes('q')) {
+    return null;
+  }
+
+  const rows = records
+    .map((record): QARow => {
+      const img = record.img ?? '';
+      return {
+        ...createEmptyRow(),
+        q: record.q ?? '',
+        a: record.a ?? '',
+        img,
+        url: record.url ?? '',
+        imgStatus: img ? 'done' : 'pending',
+        visible: parseDisplayValue(record.display),
+      };
+    })
+    .filter((row) => row.q.trim().length > 0);
+
+  return rows.length > 0 ? rows : null;
 }
 
 function getHiddenQuestions(rows: QARow[]): string[] {
@@ -186,6 +227,23 @@ export default function DocumentToQaTab({
     }
   };
 
+  const showPreviewRows = (rows: QARow[], options: { clearJobId?: boolean } = {}) => {
+    if (options.clearJobId) {
+      setJobId(null);
+    }
+    setQaPairs(rows);
+    setStatus('preview');
+  };
+
+  const showCsvDisplayPreview = (csvText: string): boolean => {
+    const previewRows = parseCsvDisplayPreviewRows(csvText);
+    if (!previewRows) {
+      return false;
+    }
+    showPreviewRows(previewRows, { clearJobId: true });
+    return true;
+  };
+
   const startPolling = (id: string) => {
     if (pollingTimerRef.current !== null) {
       window.clearInterval(pollingTimerRef.current);
@@ -201,8 +259,7 @@ export default function DocumentToQaTab({
         const res = await api.getQaExtractJob(id);
         if (res.status === 'done' && res.qa_pairs) {
           stopPolling();
-          setQaPairs(toHiddenPreviewRows(res.qa_pairs));
-          setStatus('preview');
+          showPreviewRows(toHiddenPreviewRows(res.qa_pairs));
         } else if (res.status === 'failed') {
           stopPolling();
           setError(res.error || '問答擷取失敗。');
@@ -235,6 +292,10 @@ export default function DocumentToQaTab({
       }
 
       if (ext === 'csv' || ext === 'xlsx') {
+        if (ext === 'csv' && showCsvDisplayPreview(await file.file.text())) {
+          return;
+        }
+
         setStatus('uploading');
         try {
           const res = await onUploadFile(
@@ -269,11 +330,13 @@ export default function DocumentToQaTab({
 
     setStatus('uploading');
     try {
+      if (showCsvDisplayPreview(trimmed)) {
+        return;
+      }
+
       const { parsed, qa_pairs } = await api.parseQaCsvText(trimmed);
       if (parsed && qa_pairs.length > 0) {
-        setJobId(null);
-        setQaPairs(toHiddenPreviewRows(qa_pairs));
-        setStatus('preview');
+        showPreviewRows(toHiddenPreviewRows(qa_pairs), { clearJobId: true });
         return;
       }
     } catch {
