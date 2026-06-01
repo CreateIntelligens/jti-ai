@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { listHciotTopics, listHciotTopicsAdmin } from '../../src/services/api/hciot';
+import {
+  listHciotTopics,
+  listHciotTopicsAdmin,
+  setHciotCategoryHidden,
+} from '../../src/services/api/hciot';
 
 describe('HCIoT topic API paths', () => {
   afterEach(() => {
@@ -33,5 +37,17 @@ describe('HCIoT topic API paths', () => {
     await listHciotTopicsAdmin('en');
 
     expect(fetchMock).toHaveBeenCalledWith('/api/hciot/topics/en/all', expect.any(Object));
+  });
+
+  it('updates category visibility through the admin category metadata endpoint', async () => {
+    const fetchMock = stubSuccessfulFetch();
+
+    await setHciotCategoryHidden('ortho', true, 'zh');
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/hciot-admin/topics/categories/zh/ortho/visibility', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ hidden: true }),
+    });
   });
 });

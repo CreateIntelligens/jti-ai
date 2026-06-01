@@ -15,6 +15,7 @@ import {
   Image as ImageIcon,
   Table as TableIcon,
   RefreshCw,
+  Settings,
 } from 'lucide-react';
 import {
   DndContext,
@@ -64,6 +65,7 @@ interface ExplorerSidebarProps {
   onSelectImage: (fileName: string) => void;
   onSelectMergedCsv: (topicId: string) => void;
   onOpenUploadDialog: () => void;
+  onOpenManageDialog: () => void;
   onDeleteTopic?: (topicId: string, topicLabel: string) => void;
   onReindex?: () => void;
   reindexing?: boolean;
@@ -131,6 +133,7 @@ export default function ExplorerSidebar({
   onSelectImage,
   onSelectMergedCsv,
   onOpenUploadDialog,
+  onOpenManageDialog,
   onDeleteTopic,
   onReindex,
   reindexing,
@@ -182,6 +185,16 @@ export default function ExplorerSidebar({
             aria-label="新增內容"
           >
             <Plus size={16} />
+          </button>
+
+          <button
+            type="button"
+            className="qa-workspace-explorer-icon-button manage"
+            onClick={onOpenManageDialog}
+            title="管理科別與主題"
+            aria-label="管理科別與主題"
+          >
+            <Settings size={16} />
           </button>
 
           {onReindex && (

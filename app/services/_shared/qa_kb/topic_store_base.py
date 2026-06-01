@@ -21,6 +21,7 @@ class QaKbTopicStoreBase:
 
     DB_NAME: str = ""
     COLLECTION_NAME: str = ""
+    CATEGORY_COLLECTION_NAME: str = ""
     NAMESPACE: str = ""
 
     def __init__(self, language: Language = "zh"):
@@ -33,6 +34,8 @@ class QaKbTopicStoreBase:
         self.language = language
         self.db = get_mongo_db(self.DB_NAME)
         self.collection = self.db[self.COLLECTION_NAME]
+        category_collection_name = self.CATEGORY_COLLECTION_NAME or f"{self.NAMESPACE}_categories"
+        self.category_collection = self.db[category_collection_name]
 
     def _language_query(self) -> dict[str, Any]:
         return {"language": self.language}
@@ -80,6 +83,8 @@ class QaKbTopicStoreBase:
         payload = self._prepare_payload(data, topic_id)
         query = self._topic_query(topic_id)
         set_on_insert = {"created_at": now, "language": self.language}
+        if "hidden" not in payload:
+            set_on_insert["hidden"] = False
 
         if "order" not in payload:
             updated = self.collection.find_one_and_update(
@@ -122,6 +127,34 @@ class QaKbTopicStoreBase:
             updated += result.matched_count
         return updated
 
+    def get_category_meta(self) -> dict[str, dict[str, Any]]:
+        """Return category metadata keyed by category id for the active language."""
+        docs = self.category_collection.find(self._language_query(), {"_id": 0})
+        return {
+            str(doc.get("category_id", "")): {key: value for key, value in doc.items() if key != "_id"}
+            for doc in docs
+            if doc.get("category_id")
+        }
+
+    def set_category_hidden(self, category_id: str, hidden: bool) -> bool:
+        """Persist presentation-only category visibility metadata."""
+        now = datetime.now(timezone.utc)
+        payload = {
+            "language": self.language,
+            "category_id": category_id,
+            "hidden": hidden,
+            "updated_at": now,
+        }
+        result = self.category_collection.update_one(
+            {"language": self.language, "category_id": category_id},
+            {
+                "$set": payload,
+                "$setOnInsert": {"created_at": now},
+            },
+            upsert=True,
+        )
+        return result.matched_count > 0 or result.upserted_id is not None
+
     def ensure_topic(self, topic_id: str, labels: dict, category_labels: dict) -> None:
         """Create topic if it doesn't exist yet."""
         if self.get_topic(topic_id) is None:
@@ -132,5 +165,6 @@ class QaKbTopicStoreBase:
                     "category_labels": category_labels,
                     "questions": {"zh": [], "en": []},
                     "hidden_questions": {"zh": [], "en": []},
+                    "hidden": False,
                 },
             )

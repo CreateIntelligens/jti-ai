@@ -11,6 +11,7 @@ import type {
   QaImportResponse,
 } from '../../../services/api/hciot';
 import ExplorerSidebar from './explorer/ExplorerSidebar';
+import VisibilityOrderModal from './explorer/VisibilityOrderModal';
 import FileDetailPane from './detail/FileDetailPane';
 import MergedCsvPane from './detail/MergedCsvPane';
 import UploadDialog from './upload/UploadDialog';
@@ -43,6 +44,7 @@ type TopicUpdatePayload = {
   category_labels?: string;
   questions?: string[];
   hidden_questions?: string[];
+  hidden?: boolean;
 };
 
 type KnowledgeMetadataPayload = {
@@ -75,6 +77,7 @@ export interface QaWorkspaceApiClient {
   deleteKnowledgeFile(filename: string, language: HciotLanguage): Promise<void>;
   updateTopic(topicId: string, data: TopicUpdatePayload, language: HciotLanguage): Promise<Record<string, unknown>>;
   reorderTopics(topicIds: string[], language: HciotLanguage): Promise<{ updated: number }>;
+  setCategoryHidden(categoryId: string, hidden: boolean, language: HciotLanguage): Promise<Record<string, unknown>>;
   uploadImage(file: File, imageId?: string): Promise<HciotImage>;
   deleteImage(imageId: string): Promise<void>;
   deleteUnusedImages(): Promise<{ deleted_count: number; deleted_image_ids: string[] }>;
@@ -125,7 +128,9 @@ export default function QaKnowledgeWorkspace({
   config,
 }: QaKnowledgeWorkspaceProps) {
   const [qaDialogOpen, setQaDialogOpen] = useState(false);
+  const [manageDialogOpen, setManageDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [savingManagement, setSavingManagement] = useState(false);
 
   const api = config.api;
   const text = (zh: string, en: string) => (config.text || getLocalizedText)(language, zh, en);
@@ -297,6 +302,33 @@ export default function QaKnowledgeWorkspace({
     }
   };
 
+  const handleSaveManagement = async (
+    nextCategories: HciotTopicCategory[],
+    changes: {
+      categoryHidden: Array<{ categoryId: string; hidden: boolean }>;
+      topicHidden: Array<{ topicId: string; hidden: boolean }>;
+    },
+  ) => {
+    setSavingManagement(true);
+    try {
+      const topicIds = nextCategories.flatMap((category) => category.topics.map((topic) => topic.id));
+      await Promise.all([
+        api.reorderTopics(topicIds, language),
+        ...changes.categoryHidden.map((item) =>
+          api.setCategoryHidden(item.categoryId, item.hidden, language)
+        ),
+        ...changes.topicHidden.map((item) =>
+          api.updateTopic(item.topicId, { hidden: item.hidden }, language)
+        ),
+      ]);
+      setManageDialogOpen(false);
+      await workspaceData.refreshWorkspaceAfterTopicChange();
+      workspaceData.showStatus(text('管理設定已更新', 'Management settings updated'));
+    } finally {
+      setSavingManagement(false);
+    }
+  };
+
   const hasSelection = !!(workspaceData.selectedFileName || workspaceData.selectedImageName || workspaceData.selectedMergedTopicId);
   useEscapeKey(() => { if (fileEditor.discardChanges()) fileEditor.selectWorkspaceItem({}); }, hasSelection);
 
@@ -323,6 +355,7 @@ export default function QaKnowledgeWorkspace({
         onSelectImage={handleSelectImage}
         onSelectMergedCsv={handleSelectMergedCsv}
         onOpenUploadDialog={() => setQaDialogOpen(true)}
+        onOpenManageDialog={() => setManageDialogOpen(true)}
         onDeleteTopic={topicMutations.handleDeleteTopic}
         onReindex={reindexData.handleReindex}
         reindexing={reindexData.reindexing}
@@ -332,6 +365,14 @@ export default function QaKnowledgeWorkspace({
         onCommitRename={topicMutations.handleCommitRename}
         onCancelRename={topicMutations.handleCancelRename}
         onReorder={topicMutations.handleReorder}
+      />
+
+      <VisibilityOrderModal
+        open={manageDialogOpen}
+        categories={workspaceData.categories}
+        saving={savingManagement}
+        onClose={() => setManageDialogOpen(false)}
+        onSave={handleSaveManagement}
       />
 
       <UploadDialog

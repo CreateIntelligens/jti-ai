@@ -38,6 +38,7 @@ def to_topic_language(language: str | None = None) -> Language:
 class HciotTopicStore(QaKbTopicStoreBase):
     DB_NAME = "hciot_app"
     COLLECTION_NAME = "hciot_topics"
+    CATEGORY_COLLECTION_NAME = "hciot_categories"
     COLLECTION = COLLECTION_NAME
     NAMESPACE = "hciot"
 

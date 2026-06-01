@@ -236,12 +236,14 @@ export interface HciotTopic {
   label: string;
   questions: string[];
   hidden_questions?: string[];
+  hidden?: boolean;
 }
 
 export interface HciotTopicCategory {
   id: string;
   order?: number;
   label: string;
+  hidden?: boolean;
   topics: HciotTopic[];
 }
 
@@ -262,13 +264,30 @@ function buildTopicAdminPath(language: HciotLanguage, topicId?: string): string 
 
 export async function updateHciotTopic(
   topicId: string,
-  data: { labels?: string; category_labels?: string; questions?: string[]; hidden_questions?: string[] },
+  data: {
+    labels?: string;
+    category_labels?: string;
+    questions?: string[];
+    hidden_questions?: string[];
+    hidden?: boolean;
+  },
   language: HciotLanguage = 'zh',
 ): Promise<Record<string, unknown>> {
   // topic_id contains "/" so we can't use encodeURIComponent — pass raw
   return fetchAdminJson<Record<string, unknown>>(
     buildTopicAdminPath(language, topicId),
     jsonRequest('PUT', data),
+  );
+}
+
+export async function setHciotCategoryHidden(
+  categoryId: string,
+  hidden: boolean,
+  language: HciotLanguage = 'zh',
+): Promise<{ category_id: string; hidden: boolean }> {
+  return fetchAdminJson<{ category_id: string; hidden: boolean }>(
+    `/topics/categories/${normLang(language)}/${encodeURIComponent(categoryId)}/visibility`,
+    jsonRequest('PUT', { hidden }),
   );
 }
 

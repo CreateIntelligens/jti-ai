@@ -54,6 +54,7 @@ def _localize_topic(topic: dict, lang: Lang, filter_hidden: bool = True) -> dict
         # the editing UI can render each question's checkbox state.
         payload["questions"] = questions
         payload["hidden_questions"] = hidden_questions
+        payload["hidden"] = bool(topic.get("hidden", False))
 
     return payload
 
@@ -80,23 +81,37 @@ def _build_categories(language: Lang, filter_hidden: bool = True) -> list[dict]:
     in the admin UI is what writes those values.
     """
     store = get_hciot_topic_store(language)
+    category_meta = store.get_category_meta()
     categories: list[dict] = []
     for cat in store.list_categories():
+        category_id = cat.get("id", "")
+        category_hidden = bool(category_meta.get(category_id, {}).get("hidden", False))
+        if filter_hidden and category_hidden:
+            continue
+
         raw_topics = cat.get("topics", [])
         if filter_hidden:
-            raw_topics = [topic for topic in raw_topics if _topic_has_public_questions(topic, language)]
+            raw_topics = [
+                topic
+                for topic in raw_topics
+                if not topic.get("hidden", False) and _topic_has_public_questions(topic, language)
+            ]
 
         topics = [_localize_topic(topic, language, filter_hidden) for topic in raw_topics]
 
         if filter_hidden and not topics:
             continue
 
-        categories.append({
-            "id": cat.get("id", ""),
+        category_payload = {
+            "id": category_id,
             "label": _localized_text(cat.get("labels"), language, cat.get("id", "")),
             "order": _category_order(cat),
             "topics": topics,
-        })
+        }
+        if not filter_hidden:
+            category_payload["hidden"] = category_hidden
+
+        categories.append(category_payload)
     return sorted(categories, key=lambda category: category["order"])
 
 
@@ -133,6 +148,11 @@ class UpdateTopicRequest(BaseModel):
     category_labels: str | None = None
     questions: list[str] | None = None
     hidden_questions: list[str] | None = None
+    hidden: bool | None = None
+
+
+class UpdateCategoryVisibilityRequest(BaseModel):
+    hidden: bool
 
 
 class ReorderTopicsRequest(BaseModel):
@@ -152,6 +172,7 @@ def create_topic(language: Lang, request: CreateTopicRequest):
         "category_labels": _partitioned_label(request.category_labels, language),
         "questions": _partitioned_questions(request.questions or [], language),
         "hidden_questions": {"zh": [], "en": []},
+        "hidden": False,
     }
     store.upsert_topic(request.topic_id, data)
     return store.get_topic(request.topic_id)
@@ -169,6 +190,15 @@ def reorder_topics(language: Lang, request: ReorderTopicsRequest):
     return {"updated": updated}
 
 
+@router.put("/categories/{language}/{category_id}/visibility")
+def update_category_visibility(language: Lang, category_id: str, request: UpdateCategoryVisibilityRequest):
+    store = get_hciot_topic_store(language)
+    success = store.set_category_hidden(category_id, request.hidden)
+    if not success:
+        raise HTTPException(status_code=404, detail=f"Category '{category_id}' not found")
+    return {"category_id": category_id, "hidden": request.hidden}
+
+
 @router.put("/{language}/{topic_id:path}")
 def update_topic(language: Lang, topic_id: str, request: UpdateTopicRequest):
     store = get_hciot_topic_store(language)
@@ -181,6 +211,8 @@ def update_topic(language: Lang, topic_id: str, request: UpdateTopicRequest):
         update_data["questions"] = _partitioned_questions(request.questions, language)
     if request.hidden_questions is not None:
         update_data["hidden_questions"] = _partitioned_questions(request.hidden_questions, language)
+    if request.hidden is not None:
+        update_data["hidden"] = request.hidden
     if not update_data:
         raise HTTPException(status_code=400, detail="No fields to update")
     success = store.update_topic(topic_id, update_data)

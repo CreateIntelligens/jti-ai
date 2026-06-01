@@ -27,6 +27,7 @@ const hciotQaWorkspaceApi: QaWorkspaceApiClient = {
   deleteKnowledgeFile: api.deleteHciotKnowledgeFile,
   updateTopic: api.updateHciotTopic,
   reorderTopics: api.reorderHciotTopics,
+  setCategoryHidden: api.setHciotCategoryHidden,
   uploadImage: api.uploadHciotImage,
   deleteImage: api.deleteHciotImage,
   deleteUnusedImages: api.deleteUnusedHciotImages,

@@ -17,6 +17,7 @@ class FakeStore:
         self.topics: dict[tuple[str, str], dict] = {}
         self.categories: list[dict] = []
         self.categories_by_language: dict[str, list[dict]] = {}
+        self.category_meta_by_language: dict[str, dict[str, dict]] = {}
         self.calls: list[tuple] = []
 
     def bind(self, language: str = "zh"):
@@ -51,6 +52,20 @@ class FakeStore:
             {**cat, "topics": sorted(cat.get("topics", []), key=lambda t: t.get("order", 0))}
             for cat in categories
         ]
+
+    def get_category_meta(self):
+        root = self._root
+        root.calls.append(("get_category_meta", self.language))
+        return {
+            category_id: dict(meta)
+            for category_id, meta in root.category_meta_by_language.get(self.language, {}).items()
+        }
+
+    def set_category_hidden(self, category_id: str, hidden: bool) -> bool:
+        root = self._root
+        root.calls.append(("set_category_hidden", category_id, hidden, self.language))
+        root.category_meta_by_language.setdefault(self.language, {}).setdefault(category_id, {})["hidden"] = hidden
+        return True
 
 
 def patch_topic_store(store: FakeStore):
@@ -411,3 +426,125 @@ def test_list_topics_all_retains_hidden_questions():
     topic = result["categories"][0]["topics"][0]
     assert topic["questions"] == ["Q1", "Q2", "Q3"]
     assert topic["hidden_questions"] == ["Q2"]
+
+
+def test_update_topic_saves_topic_hidden_flag():
+    store = FakeStore()
+    store.bind("zh").upsert_topic(
+        "ortho/prp",
+        {
+            "labels": {"zh": "PRP 治療", "en": ""},
+            "category_labels": {"zh": "骨科", "en": ""},
+            "questions": {"zh": ["Q1"], "en": []},
+            "hidden_questions": {"zh": [], "en": []},
+            "hidden": False,
+        },
+    )
+    request = topics_admin.UpdateTopicRequest(hidden=True)
+
+    with patch_topic_store(store):
+        result = topics_admin.update_topic("zh", "ortho/prp", request)
+
+    assert result["hidden"] is True
+
+
+def test_public_topics_filter_topic_hidden_flag_but_admin_retains_it():
+    store = FakeStore()
+    store.categories = [
+        {
+            "id": "ortho",
+            "labels": {"zh": "骨科", "en": "Orthopedics"},
+            "topics": [
+                {
+                    "id": "ortho/prp",
+                    "topic_id": "ortho/prp",
+                    "labels": {"zh": "PRP 治療", "en": "PRP Therapy"},
+                    "category_labels": {"zh": "骨科", "en": "Orthopedics"},
+                    "order": 1,
+                    "questions": {"zh": ["Q1"], "en": []},
+                    "hidden_questions": {"zh": [], "en": []},
+                    "hidden": True,
+                },
+                {
+                    "id": "ortho/faq",
+                    "topic_id": "ortho/faq",
+                    "labels": {"zh": "常見問題", "en": "FAQ"},
+                    "category_labels": {"zh": "骨科", "en": "Orthopedics"},
+                    "order": 2,
+                    "questions": {"zh": ["Q2"], "en": []},
+                    "hidden_questions": {"zh": [], "en": []},
+                },
+            ],
+        },
+    ]
+
+    with patch_topic_store(store):
+        public_result = topics_admin.list_topics_slim("zh")
+        admin_result = topics_admin.list_topics_all("zh")
+
+    assert [topic["id"] for topic in public_result["categories"][0]["topics"]] == ["ortho/faq"]
+    admin_topics = admin_result["categories"][0]["topics"]
+    assert [topic["id"] for topic in admin_topics] == ["ortho/prp", "ortho/faq"]
+    assert admin_topics[0]["hidden"] is True
+    assert admin_topics[1]["hidden"] is False
+
+
+def test_public_topics_filter_category_meta_hidden_but_admin_retains_it():
+    store = FakeStore()
+    store.category_meta_by_language = {
+        "zh": {
+            "ortho": {"hidden": True},
+        },
+    }
+    store.categories = [
+        {
+            "id": "ortho",
+            "labels": {"zh": "骨科", "en": "Orthopedics"},
+            "topics": [
+                {
+                    "id": "ortho/prp",
+                    "topic_id": "ortho/prp",
+                    "labels": {"zh": "PRP 治療", "en": "PRP Therapy"},
+                    "category_labels": {"zh": "骨科", "en": "Orthopedics"},
+                    "order": 1,
+                    "questions": {"zh": ["Q1"], "en": []},
+                    "hidden_questions": {"zh": [], "en": []},
+                },
+            ],
+        },
+        {
+            "id": "faq",
+            "labels": {"zh": "常見問題", "en": "FAQ"},
+            "topics": [
+                {
+                    "id": "faq/general",
+                    "topic_id": "faq/general",
+                    "labels": {"zh": "一般", "en": "General"},
+                    "category_labels": {"zh": "常見問題", "en": "FAQ"},
+                    "order": 2,
+                    "questions": {"zh": ["Q2"], "en": []},
+                    "hidden_questions": {"zh": [], "en": []},
+                },
+            ],
+        },
+    ]
+
+    with patch_topic_store(store):
+        public_result = topics_admin.list_topics_slim("zh")
+        admin_result = topics_admin.list_topics_all("zh")
+
+    assert [category["id"] for category in public_result["categories"]] == ["faq"]
+    assert [category["id"] for category in admin_result["categories"]] == ["ortho", "faq"]
+    assert admin_result["categories"][0]["hidden"] is True
+    assert admin_result["categories"][1]["hidden"] is False
+
+
+def test_update_category_visibility_writes_category_meta():
+    store = FakeStore()
+    request = topics_admin.UpdateCategoryVisibilityRequest(hidden=True)
+
+    with patch_topic_store(store):
+        result = topics_admin.update_category_visibility("zh", "ortho", request)
+
+    assert result == {"category_id": "ortho", "hidden": True}
+    assert ("set_category_hidden", "ortho", True, "zh") in store.calls
