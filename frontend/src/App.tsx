@@ -16,7 +16,7 @@ import Login from './pages/Login';
 import { useAppChat } from './hooks/useAppChat';
 import { useCurrentUserProfile } from './hooks/useCurrentUserProfile';
 import { PROJECT_COLORS, getStoreIcon } from './utils/storeDisplay';
-import { getProfileRedirectPath } from './utils/authRouting';
+import { getProfileRedirectPath, isAdminRole, isGeneralUserScope } from './utils/authRouting';
 import type { FileItem } from './types';
 import './styles/shared/index.css';
 import './styles/app/layout.css';
@@ -37,9 +37,10 @@ interface AuthGuardProps {
   children: ReactNode;
   allowedRoles?: string[];
   allowedApp?: string;
+  allowGeneralUser?: boolean;
 }
 
-function AuthGuard({ children, allowedRoles, allowedApp }: AuthGuardProps) {
+function AuthGuard({ children, allowedRoles, allowedApp, allowGeneralUser = false }: AuthGuardProps) {
   const { profile, loading, error } = useCurrentUserProfile();
 
   if (loading) {
@@ -55,7 +56,11 @@ function AuthGuard({ children, allowedRoles, allowedApp }: AuthGuardProps) {
     return <Navigate to="/login" replace />;
   }
 
-  if (allowedRoles && !allowedRoles.includes(profile.role)) {
+  if (
+    allowedRoles
+    && !allowedRoles.includes(profile.role)
+    && !(allowGeneralUser && isGeneralUserScope(profile))
+  ) {
     return <Navigate to={getProfileRedirectPath(profile)} replace />;
   }
 
@@ -110,7 +115,7 @@ export default function App() {
           path="/"
           element={
             canShow('home') ? (
-              <AuthGuard allowedRoles={['admin', 'super_admin']}>
+              <AuthGuard allowedRoles={['admin', 'super_admin']} allowGeneralUser>
                 <HomeShell />
               </AuthGuard>
             ) : (
@@ -149,6 +154,7 @@ function HomeShell() {
 
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
   const { profile, setProfile } = useCurrentUserProfile();
+  const isAdmin = isAdminRole(profile?.role);
 
   // Derive store display info for chat area
   const activeStore = currentTarget?.kind === 'store'
@@ -196,6 +202,7 @@ function HomeShell() {
             onDeleteFile={handleDeleteFile}
             onCreateStore={handleCreateStore}
             onOpenFile={(f) => setPreviewFile(f)}
+            canManageKnowledge={isAdmin}
           />
           <ChatArea
             messages={messages}
@@ -208,9 +215,9 @@ function HomeShell() {
             currentStoreIcon={currentStoreIcon}
             currentProjectName={currentProjectName}
             currentProjectColor={currentProjectColor}
-            onOpenPromptPanel={() => openPanel('prompt')}
+            onOpenPromptPanel={isAdmin ? () => openPanel('prompt') : undefined}
             onRestartChat={handleRestartChat}
-            onCreateStore={() => openPanel('admin')}
+            onCreateStore={isAdmin ? () => openPanel('admin') : undefined}
           />
         </div>
       </div>

@@ -9,6 +9,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import unquote
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel
@@ -41,6 +42,7 @@ class ManagedStoreConfig:
     managed_app: str
     managed_language: str
     key_index: int | None = None
+    key_name: str | None = None
 
 
 class CreateStoreRequest(BaseModel):
@@ -81,6 +83,7 @@ class StoreRegistry:
             "created_at": doc.get("created_at"),
             "owner_key_hash": doc.get("owner_key_hash"),
             "managed_app": doc.get("managed_app") or "general",
+            "key_name": doc.get("key_name"),
         }
 
     @staticmethod
@@ -144,12 +147,18 @@ class StoreRegistry:
         key_index: int = 0,
         owner_key_hash: str | None = None,
         managed_app: str | None = None,
+        key_name: str | None = None,
     ) -> dict[str, Any]:
         now = datetime.now(timezone.utc)
+        key_names = gemini_clients.get_key_names()
+        if key_name is None and not owner_key_hash and 0 <= int(key_index) < len(key_names):
+            key_name = key_names[int(key_index)]
         if managed_app is not None:
             resolved_app = managed_app
         elif owner_key_hash:
             resolved_app = "general"
+        elif key_name:
+            resolved_app = app_key_map.resolve_app_for_key_name(key_name)
         else:
             resolved_app = app_key_map.resolve_app_for_key_index(int(key_index))
         resolved_app = resolved_app.strip().lower() or "general"
@@ -157,6 +166,7 @@ class StoreRegistry:
             "name": self._new_store_name(),
             "display_name": display_name.strip(),
             "key_index": None if owner_key_hash else int(key_index),
+            "key_name": None if owner_key_hash else key_name,
             "owner_key_hash": owner_key_hash,
             "managed_app": resolved_app,
             "created_at": now,
@@ -234,6 +244,7 @@ def resolve_store_config(store_name: str | None, owner_key_hash: str | None = No
         managed_app=dynamic.get("managed_app", "general"),
         managed_language="",
         key_index=dynamic.get("key_index"),
+        key_name=dynamic.get("key_name"),
     )
 
 
@@ -252,6 +263,10 @@ def resolve_key_index_for_store(store_name: str) -> int:
             return 0
         return idx
     dynamic = get_store_registry().get_store(normalize_store_name(store_name))
+    if dynamic and dynamic.get("key_name"):
+        idx = gemini_clients.resolve_key_index_by_name(str(dynamic["key_name"]))
+        if idx >= 0:
+            return idx
     if dynamic and isinstance(dynamic.get("key_index"), int):
         return int(dynamic["key_index"])
     return 0
@@ -319,8 +334,34 @@ def _managed_store_payload(config: ManagedStoreConfig) -> dict[str, Any]:
     }
 
 
+def _normalize_key_name(name: str | None) -> str:
+    return (name or "").strip().lower()
+
+
+def _key_name_for_store(store: dict[str, Any]) -> str | None:
+    key_name = store.get("key_name")
+    if isinstance(key_name, str) and key_name.strip():
+        return key_name.strip()
+    key_index = store.get("key_index")
+    if isinstance(key_index, int):
+        key_names = gemini_clients.get_key_names()
+        if 0 <= key_index < len(key_names):
+            return key_names[key_index]
+    return None
+
+
+def _key_index_for_store_payload(store: dict[str, Any], key_name: str | None) -> int | None:
+    if key_name:
+        resolved = gemini_clients.resolve_key_index_by_name(key_name)
+        if resolved >= 0:
+            return resolved
+    key_index = store.get("key_index")
+    return key_index if isinstance(key_index, int) else None
+
+
 def _dynamic_store_payload(store: dict[str, Any]) -> dict[str, Any]:
     store_name = store["name"]
+    key_name = _key_name_for_store(store)
     return {
         "name": store_name,
         "display_name": store.get("display_name") or store_name,
@@ -328,13 +369,61 @@ def _dynamic_store_payload(store: dict[str, Any]) -> dict[str, Any]:
         "created_at": store.get("created_at"),
         "managed_app": store.get("managed_app") or "general",
         "managed_language": None,
-        "key_index": store.get("key_index"),
+        "key_index": _key_index_for_store_payload(store, key_name),
+        "key_name": key_name,
     }
 
 
 def _normalize_app_filter(app: str | None) -> str | None:
     normalized = (app or "").strip().lower()
     return normalized or None
+
+
+def _key_name_from_scope(scope: str | None) -> str | None:
+    normalized = _normalize_app_filter(scope)
+    if normalized is None:
+        return None
+    if normalized.startswith("key:"):
+        raise HTTPException(status_code=400, detail="Key scopes must use key_name:<name>")
+    if not normalized.startswith("key_name:"):
+        return None
+    raw_name = normalized.removeprefix("key_name:")
+    key_name = unquote(raw_name).strip()
+    if not key_name:
+        raise HTTPException(status_code=400, detail="Invalid key scope")
+    return key_name
+
+
+def _dynamic_store_matches_scope(store: dict[str, Any], scope: str | None) -> bool:
+    normalized = _normalize_app_filter(scope)
+    if normalized is None:
+        return True
+    key_name = _key_name_from_scope(normalized)
+    if key_name is not None:
+        return _normalize_key_name(_key_name_for_store(store)) == _normalize_key_name(key_name)
+    return (store.get("managed_app") or "general").strip().lower() == normalized
+
+
+def store_config_matches_scope(config: ManagedStoreConfig, scope: str | None) -> bool:
+    """Return whether a resolved store belongs to an app or registered-key scope."""
+    normalized = _normalize_app_filter(scope)
+    if normalized is None:
+        return True
+    key_name = _key_name_from_scope(normalized)
+    if key_name is not None:
+        return _normalize_key_name(config.key_name) == _normalize_key_name(key_name)
+    return bool(config.managed_app) and config.managed_app.lower() == normalized
+
+
+def _list_key_name_scoped_store_payloads(
+    owner_key_hash: str | None,
+    key_name: str,
+) -> list[dict[str, Any]]:
+    return [
+        _dynamic_store_payload(store)
+        for store in get_store_registry().list_stores(owner_key_hash)
+        if _dynamic_store_matches_scope(store, f"key_name:{key_name}")
+    ]
 
 
 def _list_app_scoped_store_payloads(owner_key_hash: str | None, app: str) -> list[dict[str, Any]]:
@@ -350,6 +439,26 @@ def _list_app_scoped_store_payloads(owner_key_hash: str | None, app: str) -> lis
     return managed + dynamic
 
 
+def _list_scope_scoped_store_payloads(
+    owner_key_hash: str | None,
+    scope: str,
+) -> list[dict[str, Any]]:
+    key_name = _key_name_from_scope(scope)
+    if key_name is not None:
+        return _list_key_name_scoped_store_payloads(owner_key_hash, key_name)
+    return _list_app_scoped_store_payloads(owner_key_hash, scope)
+
+
+def _scope_values_equal(left: str | None, right: str | None) -> bool:
+    normalized_left = _normalize_app_filter(left)
+    normalized_right = _normalize_app_filter(right)
+    left_key_name = _key_name_from_scope(normalized_left)
+    right_key_name = _key_name_from_scope(normalized_right)
+    if left_key_name is not None or right_key_name is not None:
+        return _normalize_key_name(left_key_name) == _normalize_key_name(right_key_name)
+    return normalized_left == normalized_right
+
+
 def _list_assigned_store_payloads(
     store_name: str,
     owner_key_hash: str | None,
@@ -359,9 +468,9 @@ def _list_assigned_store_payloads(
     expected_app = _normalize_app_filter(auth_app)
     managed = resolve_managed_store(store_name)
     if managed is not None:
-        if expected_app is not None and managed.managed_app != expected_app:
+        if expected_app is not None and not store_config_matches_scope(managed, expected_app):
             raise HTTPException(status_code=403, detail="Access denied")
-        if app_filter is not None and managed.managed_app != app_filter:
+        if app_filter is not None and not store_config_matches_scope(managed, app_filter):
             raise HTTPException(status_code=403, detail="Access denied")
         return [_managed_store_payload(managed)]
 
@@ -370,10 +479,9 @@ def _list_assigned_store_payloads(
     if dynamic is None:
         raise HTTPException(status_code=404, detail="Knowledge store not found")
 
-    dynamic_app = (dynamic.get("managed_app") or "general").strip().lower()
-    if expected_app is not None and dynamic_app != expected_app:
+    if expected_app is not None and not _dynamic_store_matches_scope(dynamic, expected_app):
         raise HTTPException(status_code=403, detail="Access denied")
-    if app_filter is not None and dynamic_app != app_filter:
+    if app_filter is not None and not _dynamic_store_matches_scope(dynamic, app_filter):
         raise HTTPException(status_code=403, detail="Access denied")
     return [_dynamic_store_payload(dynamic)]
 
@@ -395,9 +503,9 @@ def _list_user_scoped_stores(
     auth_app = (auth.get("app") or "").strip().lower()
     if not auth_app:
         raise HTTPException(status_code=403, detail="Access denied")
-    if app_filter is not None and app_filter != auth_app:
+    if app_filter is not None and not _scope_values_equal(app_filter, auth_app):
         raise HTTPException(status_code=403, detail="Access denied")
-    return _list_app_scoped_store_payloads(owner_key_hash, auth_app)
+    return _list_scope_scoped_store_payloads(owner_key_hash, auth_app)
 
 
 @router.get("/stores")
@@ -414,7 +522,7 @@ def list_stores(
 
     require_admin(auth)
     if app_filter is not None:
-        return _list_app_scoped_store_payloads(owner_hash, app_filter)
+        return _list_scope_scoped_store_payloads(owner_hash, app_filter)
     managed = [_managed_store_payload(config) for config in MANAGED_STORES]
     dynamic = [_dynamic_store_payload(store) for store in get_store_registry().list_stores(owner_hash)]
     return managed + dynamic
@@ -437,10 +545,13 @@ def create_store(request_data: CreateStoreRequest, request: Request, auth: dict 
     display_name = _validate_store_name(request_data.display_name)
     owner_hash = _owner_key_hash(request)
     key_index = _validate_key_index(request_data.key_index, owner_hash)
+    key_names = gemini_clients.get_key_names()
+    key_name = key_names[key_index] if not owner_hash and 0 <= key_index < len(key_names) else None
     store = get_store_registry().create_store(
         display_name=display_name,
         key_index=key_index,
         owner_key_hash=owner_hash,
+        key_name=key_name,
     )
     return _dynamic_store_payload(store)
 

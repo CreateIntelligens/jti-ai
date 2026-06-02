@@ -149,48 +149,52 @@ export default function Header({
         >
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
-        <button
-          className="icon-btn icon-btn-pill"
-          onClick={() => openPanel(onOpenExtKeysPanel)}
-          title="對外 API Keys"
-        >
-          <Link2 size={16} /> 對外 Keys
-        </button>
-        <div
-          className="dd-wrap"
-          ref={wrapRef}
-          onClick={(e) => e.stopPropagation()}
-        >
-          <button
-            className="icon-btn"
-            onClick={() => setSettingsOpen((o) => !o)}
-            title="設定"
-          >
-            <Settings size={16} />
-          </button>
-          {settingsOpen && (
-            <div className="dd-menu">
-              <button className="dd-item" onClick={() => openPanel(onOpenAdminPanel)}>
-                <Database size={16} /> 知識庫管理
-              </button>
-              <button className="dd-item" onClick={() => openPanel(onOpenApiKeysPanel)}>
-                <KeyRound size={16} /> API Key 設定
-              </button>
-              <button className="dd-item" onClick={() => openPanel(onOpenPromptPanel)}>
-                <MessageSquare size={16} /> Prompt 設定
-              </button>
-              <div className="dd-sep" />
+        {isAdmin && (
+          <>
+            <button
+              className="icon-btn icon-btn-pill"
+              onClick={() => openPanel(onOpenExtKeysPanel)}
+              title="對外 API Keys"
+            >
+              <Link2 size={16} /> 對外 Keys
+            </button>
+            <div
+              className="dd-wrap"
+              ref={wrapRef}
+              onClick={(e) => e.stopPropagation()}
+            >
               <button
-                className="dd-item"
-                onClick={handleReindexRag}
-                disabled={isReindexing}
+                className="icon-btn"
+                onClick={() => setSettingsOpen((o) => !o)}
+                title="設定"
               >
-                {isReindexing ? <Loader2 size={16} /> : <RefreshCw size={16} />}
-                重新索引 RAG
+                <Settings size={16} />
               </button>
+              {settingsOpen && (
+                <div className="dd-menu">
+                  <button className="dd-item" onClick={() => openPanel(onOpenAdminPanel)}>
+                    <Database size={16} /> 知識庫管理
+                  </button>
+                  <button className="dd-item" onClick={() => openPanel(onOpenApiKeysPanel)}>
+                    <KeyRound size={16} /> API Key 設定
+                  </button>
+                  <button className="dd-item" onClick={() => openPanel(onOpenPromptPanel)}>
+                    <MessageSquare size={16} /> Prompt 設定
+                  </button>
+                  <div className="dd-sep" />
+                  <button
+                    className="dd-item"
+                    onClick={handleReindexRag}
+                    disabled={isReindexing}
+                  >
+                    {isReindexing ? <Loader2 size={16} /> : <RefreshCw size={16} />}
+                    重新索引 RAG
+                  </button>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
         {userProfile && (
           <>
             <span className="profile-badge">

@@ -79,6 +79,36 @@ def test_admin_creates_user_role_ok(client):
     deps.user_manager.create_user.assert_called_once()
 
 
+def test_admin_creates_store_only_user_ok(client):
+    deps.user_manager = MagicMock()
+    deps.user_manager.create_user.return_value = _make_user(
+        id="user_store",
+        username="hotai-user",
+        app=None,
+        store_name="store_hotai",
+    )
+    _override_auth({"role": "admin", "app": None, "store_name": None, "user_id": "admin_1"})
+
+    resp = client.post("/api/users", json={
+        "username": "hotai-user",
+        "password": "pw",
+        "role": "user",
+        "store_name": "store_hotai",
+    })
+
+    assert resp.status_code in (200, 201)
+    assert resp.json()["app"] is None
+    assert resp.json()["store_name"] == "store_hotai"
+    deps.user_manager.create_user.assert_called_once_with(
+        username="hotai-user",
+        password="pw",
+        role="user",
+        app=None,
+        store_name="store_hotai",
+        created_by="admin_1",
+    )
+
+
 def test_admin_creating_admin_role_forbidden(client):
     deps.user_manager = MagicMock()
     _override_auth({"role": "admin", "app": None, "store_name": None, "user_id": "admin_1"})
@@ -114,9 +144,9 @@ def test_create_duplicate_username_conflict(client):
     assert resp.status_code == 409
 
 
-def test_create_user_without_app_bad_request(client):
+def test_create_user_without_scope_bad_request(client):
     deps.user_manager = MagicMock()
-    deps.user_manager.create_user.side_effect = ValueError("role=user 必須指定非空的 app")
+    deps.user_manager.create_user.side_effect = ValueError("role=user 必須指定 app 或 store_name")
     _override_auth({"role": "super_admin", "app": None, "store_name": None, "user_id": "su_1"})
 
     resp = client.post("/api/users", json={
@@ -124,6 +154,7 @@ def test_create_user_without_app_bad_request(client):
     })
     assert resp.status_code == 400
     assert "app" in resp.json()["detail"]
+    assert "store_name" in resp.json()["detail"]
 
 
 # --- PATCH /users/{id}/disabled ---

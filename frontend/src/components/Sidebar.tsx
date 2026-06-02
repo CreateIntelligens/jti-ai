@@ -16,6 +16,7 @@ interface SidebarProps {
   onDeleteFile: (fileName: string) => void;
   onCreateStore: (name: string, keyIndex: number) => Promise<void>;
   onOpenFile?: (file: FileItem) => void;
+  canManageKnowledge?: boolean;
 }
 
 interface ProjectGroup {
@@ -60,6 +61,7 @@ export default function Sidebar({
   onDeleteFile,
   onCreateStore,
   onOpenFile,
+  canManageKnowledge = true,
 }: SidebarProps) {
   const [collapsedProjects, setCollapsedProjects] = useState<Record<string, boolean>>({});
   const [creatingForKey, setCreatingForKey] = useState<number | null>(null);
@@ -139,16 +141,18 @@ export default function Sidebar({
               >
                 <div className="project-dot" style={{ background: group.color }} />
                 <span className="project-name">{group.name}</span>
-                <button
-                  className="project-add"
-                  title={`在 ${group.name} 建立知識庫`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    beginCreate(group.index);
-                  }}
-                >
-                  <Plus size={12} />
-                </button>
+                {canManageKnowledge && (
+                  <button
+                    className="project-add"
+                    title={`在 ${group.name} 建立知識庫`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      beginCreate(group.index);
+                    }}
+                  >
+                    <Plus size={12} />
+                  </button>
+                )}
                 <span className={`project-chevron${isOpen ? ' open' : ''}`}>
                   <ChevronRight size={13} />
                 </span>
@@ -158,7 +162,7 @@ export default function Sidebar({
                   {group.stores.length === 0 && creatingForKey !== group.index && (
                     <li className="store-empty">尚無知識庫</li>
                   )}
-                  {creatingForKey === group.index && (
+                  {canManageKnowledge && creatingForKey === group.index && (
                     <li className="store-create-row">
                       <input
                         className="store-create-input"
@@ -224,13 +228,15 @@ export default function Sidebar({
         <div className="file-panel">
           <div className="fp-header">
             <span className="fp-title">文件</span>
-            <button
-              className="icon-btn icon-btn-sm"
-              title="上傳"
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <Plus size={14} />
-            </button>
+            {canManageKnowledge && (
+              <button
+                className="icon-btn icon-btn-sm"
+                title="上傳"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Plus size={14} />
+              </button>
+            )}
           </div>
           <ul className="file-list-inner">
             {filesLoading ? (
@@ -254,7 +260,7 @@ export default function Sidebar({
                       {f.display_name || f.name}
                     </span>
                   </button>
-                  {!isManagedKnowledgeStore(activeStore) && (
+                  {canManageKnowledge && !isManagedKnowledgeStore(activeStore) && (
                     <button
                       className="file-del"
                       onClick={(e) => {
@@ -270,7 +276,7 @@ export default function Sidebar({
               ))
             )}
           </ul>
-          {!isManagedKnowledgeStore(activeStore) && (
+          {canManageKnowledge && !isManagedKnowledgeStore(activeStore) && (
             <div
               className="drop-zone"
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -282,7 +288,9 @@ export default function Sidebar({
               {uploading ? '上傳中...' : (<>拖曳或<span>選擇</span>上傳</>)}
             </div>
           )}
-          <input className="file-input-hidden" ref={fileInputRef} type="file" onChange={handleFileSelect} aria-label="選擇文件" />
+          {canManageKnowledge && (
+            <input className="file-input-hidden" ref={fileInputRef} type="file" onChange={handleFileSelect} aria-label="選擇文件" />
+          )}
         </div>
       )}
 

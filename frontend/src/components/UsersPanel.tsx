@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { X, UserPlus, Power, Trash2 } from 'lucide-react';
 import * as api from '../services/api';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { formatKeyScope, parseKeyScope, storeMatchesKeyName } from '../utils/scope';
 
 interface UsersPanelProps {
   isOpen: boolean;
@@ -11,7 +12,11 @@ interface UsersPanelProps {
 }
 
 const DEFAULT_ROLE = 'user';
-const DEFAULT_APP = 'hciot';
+const DEFAULT_SCOPE = '';
+const APP_SCOPE_OPTIONS = [
+  { value: 'hciot', label: 'HCIoT' },
+  { value: 'jti', label: 'JTI' },
+];
 
 function errorMessage(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
@@ -21,6 +26,33 @@ function roleBadgeClass(role: string): string {
   if (role === 'super_admin') return 'role-super-admin';
   if (role === 'admin') return 'role-admin';
   return 'role-user';
+}
+
+function normalizeKeyLabels(keyNames: unknown): string[] {
+  if (!Array.isArray(keyNames)) return [];
+  return keyNames.map((keyName, index) => {
+    if (typeof keyName === 'string' && keyName.trim()) {
+      return keyName.trim();
+    }
+    return `Key #${index + 1}`;
+  });
+}
+
+function storeMatchesScope(store: api.Store, scope: string, keyNames: string[]): boolean {
+  if (!scope) return true;
+  const keyName = parseKeyScope(scope);
+  if (keyName !== null) {
+    return storeMatchesKeyName(store, keyName, keyNames);
+  }
+  return (store.managed_app || 'general') === scope;
+}
+
+function scopeLabel(scope: string | null): string {
+  if (!scope) return '未綁定範圍';
+  const keyName = parseKeyScope(scope);
+  if (keyName !== null) return keyName;
+  const appOption = APP_SCOPE_OPTIONS.find((option) => option.value === scope);
+  return appOption?.label || scope;
 }
 
 function canModifyAccount(
@@ -36,10 +68,11 @@ function canModifyAccount(
 export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin', currentUserId }: UsersPanelProps) {
   const [users, setUsers] = useState<api.UserAccount[]>([]);
   const [stores, setStores] = useState<api.Store[]>([]);
+  const [keyNames, setKeyNames] = useState<string[]>([]);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState(DEFAULT_ROLE);
-  const [app, setApp] = useState(DEFAULT_APP);
+  const [scope, setScope] = useState(DEFAULT_SCOPE);
   const [storeName, setStoreName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,7 +83,7 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
     setUsername('');
     setPassword('');
     setRole(DEFAULT_ROLE);
-    setApp(DEFAULT_APP);
+    setScope(DEFAULT_SCOPE);
     setStoreName('');
     setError(null);
   }, []);
@@ -66,8 +99,12 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
 
   const loadStores = useCallback(async () => {
     try {
-      const data = await api.fetchStores();
+      const [data, keyInfo] = await Promise.all([
+        api.fetchStores(),
+        api.getKeyInfos().catch(() => ({ count: 0, names: [] })),
+      ]);
       setStores(data);
+      setKeyNames(normalizeKeyLabels(keyInfo.names));
     } catch (err: unknown) {
       console.error('無法獲取知識庫列表', err);
     }
@@ -87,7 +124,12 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
     e.preventDefault();
     const trimmedUsername = username.trim();
     const trimmedStoreName = storeName.trim();
+    const trimmedScope = scope.trim();
     if (!trimmedUsername || !password.trim()) return;
+    if (role === 'user' && !trimmedScope && !trimmedStoreName) {
+      setError('一般用戶需選擇帳號範圍，或綁定單一知識庫');
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -96,7 +138,7 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
       username: trimmedUsername,
       password,
       role,
-      app: role === 'user' ? app : null,
+      app: role === 'user' && trimmedScope ? trimmedScope : null,
       store_name: role === 'user' && trimmedStoreName ? trimmedStoreName : null,
     };
 
@@ -135,6 +177,12 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
   };
 
   const isSuperAdmin = currentUserRole === 'super_admin';
+  const filteredStores = stores.filter((store) => storeMatchesScope(store, scope, keyNames));
+  const canSubmit = Boolean(
+    username.trim()
+      && password.trim()
+      && (role !== 'user' || scope.trim() || storeName.trim()),
+  );
 
   return (
     <div className="rp-overlay" onClick={onClose}>
@@ -184,7 +232,10 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
                 <select
                   className="select-reset input-base"
                   value={role}
-                  onChange={(e) => setRole(e.target.value)}
+                  onChange={(e) => {
+                    setRole(e.target.value);
+                    setStoreName('');
+                  }}
                   disabled={loading || !isSuperAdmin}
                 >
                   <option value="user">一般用戶 (user)</option>
@@ -200,19 +251,33 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
               {role === 'user' && (
                 <>
                   <div className="field">
-                    <label>綁定應用程式 (App)</label>
+                    <label>帳號範圍</label>
                     <select
                       className="select-reset input-base"
-                      value={app}
+                      value={scope}
                       onChange={(e) => {
-                        const newApp = e.target.value;
-                        setApp(newApp);
+                        setScope(e.target.value);
                         setStoreName('');
                       }}
                       disabled={loading}
                     >
-                      <option value="hciot">hciot</option>
-                      <option value="jti">jti</option>
+                      <option value="">不綁定範圍（只選特定知識庫）</option>
+                      <optgroup label="應用程式">
+                        {APP_SCOPE_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </optgroup>
+                      {keyNames.length > 0 && (
+                        <optgroup label="註冊 Key">
+                          {keyNames.map((name, index) => (
+                            <option key={index} value={formatKeyScope(name)}>
+                              {name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      )}
                     </select>
                   </div>
 
@@ -224,14 +289,14 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
                       onChange={(e) => setStoreName(e.target.value)}
                       disabled={loading}
                     >
-                      <option value="">不選（此 App 下所有知識庫）</option>
-                      {stores
-                        .filter((s) => (s.managed_app || 'general') === app)
-                        .map((s) => (
-                          <option key={s.name} value={s.name}>
-                            {s.display_name || s.name}
-                          </option>
-                        ))}
+                      <option value="">
+                        {scope ? '不選（此範圍下所有知識庫）' : '請選擇特定知識庫'}
+                      </option>
+                      {filteredStores.map((s) => (
+                        <option key={s.name} value={s.name}>
+                          {s.display_name || s.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </>
@@ -240,7 +305,7 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
               <button
                 type="submit"
                 className="btn btn-primary btn-sm"
-                disabled={loading || !username.trim() || !password.trim()}
+                disabled={loading || !canSubmit}
               >
                 <UserPlus size={14} />
                 {loading ? '建立中...' : '建立帳號'}
@@ -282,7 +347,7 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
                           </span>
                           {u.app && (
                             <span className="kc-badge system">
-                              {u.app}
+                              {scopeLabel(u.app)}
                             </span>
                           )}
                           {isSelf && (

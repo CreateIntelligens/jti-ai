@@ -16,6 +16,7 @@ from app.auth import extract_user_gemini_api_key, verify_auth
 from app.routers.general.stores import (
     hash_user_gemini_api_key,
     resolve_store_config,
+    store_config_matches_scope,
 )
 from app.schemas.chat import (
     DeleteConversationRequest,
@@ -79,7 +80,7 @@ def _resolve_request_store(
         if assigned_store:
             config = resolve_or_404(assigned_store)
             auth_app = auth.get("app")
-            if auth_app and config.managed_app and config.managed_app.lower() != auth_app.lower():
+            if auth_app and not store_config_matches_scope(config, auth_app):
                 raise HTTPException(status_code=403, detail="Access denied")
             return config.name
 
@@ -87,7 +88,7 @@ def _resolve_request_store(
         if not auth_app:
             raise HTTPException(status_code=403, detail="Access denied")
         config = resolve_or_404(req.store_name)
-        if not config.managed_app or config.managed_app.lower() != auth_app.lower():
+        if not store_config_matches_scope(config, auth_app):
             raise HTTPException(status_code=403, detail="Access denied")
         return config.name
 

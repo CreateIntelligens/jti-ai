@@ -57,6 +57,17 @@ def resolve_app_for_key_index(key_index: int) -> str:
     return "general"
 
 
+def resolve_app_for_key_name(name: str) -> str:
+    """Resolve a Gemini key display name to a managed app name, defaulting to general."""
+    target = (name or "").strip().lower()
+    if not target:
+        return "general"
+    for app, key_name in load_app_key_map().items():
+        if key_name.strip().lower() == target:
+            return app
+    return "general"
+
+
 def validate_app_key_map() -> list[tuple[str, str]]:
     """Log APP_KEY_MAP entries that do not resolve to a configured Gemini key."""
     missing: list[tuple[str, str]] = []

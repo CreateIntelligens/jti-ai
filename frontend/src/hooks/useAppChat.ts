@@ -3,6 +3,7 @@ import { useTheme } from './useTheme';
 import { useTransientStatus } from './useTransientStatus';
 import * as api from '../services/api';
 import { toErrorMessage } from '../utils/errors';
+import { formatKeyScope, parseKeyScope, storeMatchesKeyName } from '../utils/scope';
 import type {
   Store,
   FileItem,
@@ -63,28 +64,23 @@ function getManagedKnowledgeContext(target: KnowledgeTarget | null): {
   };
 }
 
-function hasProjectKeyIndex(store: Store): store is Store & { key_index: number } {
-  return typeof store.key_index === 'number' && Number.isInteger(store.key_index);
-}
-
 export function getProjectFilterOptions(keyNames: string[], storeList: Store[]): Array<{ value: string; label: string }> {
   void storeList;
   if (keyNames.length <= 1) return [];
   return [
     { value: 'all', label: '全部專案' },
     ...keyNames.map((name, i) => ({
-      value: `key:${i}`,
+      value: formatKeyScope(name || `Key #${i + 1}`),
       label: name || `Key #${i + 1}`,
     })),
   ];
 }
 
-export function filterStoresByProject(storeList: Store[], projectFilter: string): Store[] {
+export function filterStoresByProject(storeList: Store[], projectFilter: string, keyNames: string[] = []): Store[] {
   if (projectFilter === 'all') return storeList;
-  const [, keyIndexText] = projectFilter.split(':');
-  const keyIndex = Number(keyIndexText);
-  if (Number.isNaN(keyIndex)) return storeList;
-  return storeList.filter((store) => hasProjectKeyIndex(store) && store.key_index === keyIndex);
+  const keyName = parseKeyScope(projectFilter);
+  if (keyName === null) return storeList;
+  return storeList.filter((store) => storeMatchesKeyName(store, keyName, keyNames));
 }
 
 async function fetchFilesForTarget(target: KnowledgeTarget): Promise<FileItem[]> {

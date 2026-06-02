@@ -17,29 +17,36 @@ requires_bcrypt = pytest.mark.skipif(not HAS_BCRYPT, reason="bcrypt 未安裝")
 
 # --- 純邏輯: 角色 / app 驗證 (不需 Mongo) ---
 
-class TestValidateRoleApp:
+class TestValidateRoleScope:
     def test_allowed_roles_set(self):
         assert ALLOWED_ROLES == {"super_admin", "admin", "user"}
 
     def test_invalid_role_raises(self):
         with pytest.raises(ValueError):
-            UserManager._validate_role_app("root", app="jti")
+            UserManager._validate_role_scope("root", app="jti")
 
     @pytest.mark.parametrize("role", ["super_admin", "admin"])
     def test_admin_roles_allow_none_app(self, role):
         # 不丟例外
-        UserManager._validate_role_app(role, app=None)
+        UserManager._validate_role_scope(role, app=None, store_name=None)
 
-    def test_user_role_requires_app(self):
-        with pytest.raises(ValueError):
-            UserManager._validate_role_app("user", app=None)
+    def test_user_role_requires_app_or_store(self):
+        with pytest.raises(ValueError, match="app.*store_name|store_name.*app"):
+            UserManager._validate_role_scope("user", app=None, store_name=None)
 
-    def test_user_role_rejects_empty_app(self):
-        with pytest.raises(ValueError):
-            UserManager._validate_role_app("user", app="")
+    def test_user_role_rejects_empty_scope(self):
+        with pytest.raises(ValueError, match="app.*store_name|store_name.*app"):
+            UserManager._validate_role_scope("user", app="", store_name="")
 
     def test_user_role_with_app_ok(self):
-        UserManager._validate_role_app("user", app="hciot")
+        UserManager._validate_role_scope("user", app="hciot", store_name=None)
+
+    def test_user_role_rejects_legacy_key_index_scope(self):
+        with pytest.raises(ValueError, match="key_name"):
+            UserManager._validate_role_scope("user", app="key:1", store_name=None)
+
+    def test_user_role_with_store_only_ok(self):
+        UserManager._validate_role_scope("user", app=None, store_name="store_hotai")
 
 
 # --- 純邏輯: User 模型 ---
@@ -76,7 +83,7 @@ class TestUserManagerMongo:
             mgr.create_user("bob", "pw", role="root")
         mgr.collection.insert_one.assert_not_called()
 
-    def test_create_user_user_role_without_app_raises_before_db(self):
+    def test_create_user_user_role_without_scope_raises_before_db(self):
         mgr = _manager_with_mock_collection()
         with pytest.raises(ValueError):
             mgr.create_user("bob", "pw", role="user")
@@ -94,6 +101,22 @@ class TestUserManagerMongo:
         doc = mgr.collection.insert_one.call_args[0][0]
         assert doc["password_hash"] != "pw123"
         assert "_id" not in doc
+
+    @requires_bcrypt
+    def test_create_user_store_only_user_inserts(self):
+        mgr = _manager_with_mock_collection()
+        user = mgr.create_user(
+            "hotai-user",
+            "pw123",
+            role="user",
+            app=None,
+            store_name="store_hotai",
+        )
+        assert user.app is None
+        assert user.store_name == "store_hotai"
+        doc = mgr.collection.insert_one.call_args[0][0]
+        assert doc["app"] is None
+        assert doc["store_name"] == "store_hotai"
 
     @requires_bcrypt
     def test_verify_credentials_success(self):
