@@ -163,7 +163,7 @@ function HomeShell() {
   const currentProjectColor = PROJECT_COLORS[currentProjectIdx % PROJECT_COLORS.length];
 
   return (
-    <>
+    <div className="app-container">
       <div className="app-shell">
         <Header
           sidebarOpen={sidebarOpen}
@@ -281,6 +281,6 @@ function HomeShell() {
           // General 模式目前不處理語言切換（沒有多語言支援）
         }}
       />
-    </>
+    </div>
   );
 }

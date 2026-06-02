@@ -32,7 +32,10 @@ export default function Login() {
       const profile = await api.login(username.trim(), password);
       navigate(getLoginRedirectPath(profile));
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Invalid username or password');
+      const raw = err instanceof Error ? err.message : '';
+      // 帳密錯誤統一顯示友善訊息,不透出後端原字串;其餘錯誤才顯示細節。
+      const isAuthFailure = /invalid credentials/i.test(raw) || raw === '';
+      setError(isAuthFailure ? '帳號或密碼錯誤' : raw);
     } finally {
       setLoading(false);
     }
@@ -42,8 +45,7 @@ export default function Login() {
     <div className="login-page">
       <div className="login-card">
         <div className="login-header">
-          <div className="login-logo">JTAI</div>
-          <p className="login-subtitle">RBAC & Authentication Gateway</p>
+          <div className="login-logo">ai360 Knowledge Base</div>
         </div>
 
         <form className="login-form" onSubmit={handleSubmit}>

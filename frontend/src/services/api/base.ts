@@ -21,10 +21,34 @@ export function getUserGeminiApiKey(): string | null {
 
 export async function handleResponse<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const error = await response.text();
-    throw new Error(error || response.statusText);
+    throw new Error(await extractErrorMessage(response));
   }
   return response.json();
+}
+
+/**
+ * 從錯誤 response 取出可讀訊息。
+ * 優先解析 FastAPI 的 { detail: ... } 結構,避免把原始 JSON 字串直接丟給使用者。
+ */
+async function extractErrorMessage(response: Response): Promise<string> {
+  const raw = await response.text();
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      const detail = parsed?.detail;
+      if (typeof detail === 'string') return detail;
+      // FastAPI 驗證錯誤: detail 是陣列
+      if (Array.isArray(detail) && detail.length > 0) {
+        const first = detail[0];
+        if (typeof first?.msg === 'string') return first.msg;
+      }
+      if (typeof parsed?.message === 'string') return parsed.message;
+    } catch {
+      // 非 JSON,退回原始文字
+      return raw;
+    }
+  }
+  return response.statusText || '發生未知錯誤';
 }
 
 export async function fetchWithApiKey(url: string, options: RequestInit = {}): Promise<Response> {

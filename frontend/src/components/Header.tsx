@@ -110,20 +110,19 @@ export default function Header({
       <div className="header-right">
         {isAdmin && (
           <>
-            <button
-              className="icon-btn icon-btn-pill"
-              onClick={() => navigate('/hciot')}
-              title="前往 HCIoT 衛教助理"
+            <select
+              className="select-reset header-app-nav"
+              value=""
+              title="前往應用"
+              aria-label="前往應用"
+              onChange={(e) => {
+                if (e.target.value) navigate(e.target.value);
+              }}
             >
-              前往 HCIOT
-            </button>
-            <button
-              className="icon-btn icon-btn-pill"
-              onClick={() => navigate('/jti')}
-              title="前往 JTI 智慧助手"
-            >
-              前往 JTI
-            </button>
+              <option value="" disabled hidden>前往應用</option>
+              <option value="/hciot">HCIoT 衛教助手</option>
+              <option value="/jti">JTI 智慧助手</option>
+            </select>
             {onOpenUsersPanel && (
               <button
                 className="icon-btn"

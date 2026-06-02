@@ -14,7 +14,7 @@
 .app-header .sidebar-toggle { width: 2rem; height: 2rem; border: none; background: transparent; color: var(--text-2); border-radius: var(--r-sm); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background var(--trans), color var(--trans); }
 .app-header .sidebar-toggle:hover { background: var(--border); color: var(--text); }
 
-.app-header .app-logo { font-size: 1rem; font-weight: 700; color: var(--primary); letter-spacing: -.02em; white-space: nowrap; }
+.app-header .app-logo { font-size: 1rem; font-weight: 700; color: var(--primary); letter-spacing: 0; white-space: nowrap; }
 .app-header .app-logo span { color: var(--text-2); font-weight: 400; }
 
 .app-header .status-badge { font-size: .75rem; padding: .1875rem .625rem; background: var(--accent-lt); color: var(--accent); border-radius: var(--radius-pill); font-weight: 500; border: 0.0625rem solid rgba(217,119,6,.2); white-space: nowrap; animation: badgeFade .25s ease; }
@@ -34,6 +34,24 @@
 .rp-overlay .icon-btn-pill { width: auto; padding: 0 .625rem; font-size: .8125rem; font-weight: 500; gap: .375rem; white-space: nowrap; border: 0.0625rem solid var(--border); border-radius: var(--r-md); display: inline-flex; align-items: center; }
 .app-shell .icon-btn-pill:hover,
 .rp-overlay .icon-btn-pill:hover { background: var(--border); }
+/* Header「前往應用」下拉:只管主題/尺寸;appearance + 箭頭由 .select-reset 提供。 */
+.app-header .header-app-nav {
+  width: auto;
+  height: 2rem;
+  padding: 0 1.75rem 0 .625rem;
+  font-size: .8125rem;
+  font-weight: 500;
+  color: var(--text);
+  border: 0.0625rem solid var(--border-md);
+  border-radius: var(--r-md);
+  background-color: transparent;
+}
+.app-header .header-app-nav option {
+  background-color: var(--surface);
+  color: var(--text);
+}
+.app-header .header-app-nav:hover { background-color: var(--border); }
+.app-header .header-app-nav:focus { outline: none; border-color: var(--primary); }
 .app-shell .icon-btn-sm,
 .rp-overlay .icon-btn-sm,
 .overlay .icon-btn-sm { width: 1.5rem; height: 1.5rem; }
