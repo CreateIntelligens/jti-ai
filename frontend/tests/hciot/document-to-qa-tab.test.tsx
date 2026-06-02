@@ -9,6 +9,7 @@ vi.mock('../../src/services/api', async (importOriginal) => ({
   createQaExtractJob: vi.fn(),
   getQaExtractJob: vi.fn(),
   importQaExtractJob: vi.fn(),
+  parseQaCsvText: vi.fn(),
 }));
 
 describe('DocumentToQaTab', () => {
@@ -68,6 +69,24 @@ describe('DocumentToQaTab', () => {
 
   it('opens CSV files with display values in preview before importing', async () => {
     const onUploadFile = vi.fn().mockResolvedValue({ name: 'questions.csv' });
+    const csvText = [
+      'index,q,a,img,url,display',
+      '1,顯示題,顯示答,,https://example.test,true',
+      '2,隱藏題,隱藏答,,,false',
+    ].join('\n');
+    const expectedUploadedCsv = [
+      'index,q,a,img,url',
+      ',顯示題,顯示答,,https://example.test',
+      ',隱藏題,隱藏答,,',
+    ].join('\n');
+
+    vi.mocked(api.parseQaCsvText).mockResolvedValue({
+      parsed: true,
+      qa_pairs: [
+        { q: '顯示題', a: '顯示答', img: '', url: 'https://example.test', display: 'true' },
+        { q: '隱藏題', a: '隱藏答', img: '', url: '', display: 'false' },
+      ],
+    });
 
     render(
       <DocumentToQaTab
@@ -84,13 +103,7 @@ describe('DocumentToQaTab', () => {
     );
 
     const input = document.querySelector('input[type="file"]') as HTMLInputElement;
-    const file = new File([
-      [
-        'index,q,a,img,url,display',
-        '1,顯示題,顯示答,,https://example.test,true',
-        '2,隱藏題,隱藏答,,,false',
-      ].join('\n'),
-    ], 'questions.csv', { type: 'text/csv' });
+    const file = new File([csvText], 'questions.csv', { type: 'text/csv' });
 
     fireEvent.change(input, { target: { files: [file] } });
     fireEvent.click(screen.getByRole('button', { name: /開始上傳/ }));
@@ -112,10 +125,6 @@ describe('DocumentToQaTab', () => {
     expect(topicId).toBe('cat-1/topic-1');
     expect(labels).toEqual(resolvedTopic.labels);
     expect(hiddenQuestions).toEqual(['隱藏題']);
-    await expect((uploadedFile as File).text()).resolves.toBe([
-      'q,a,img,url',
-      '顯示題,顯示答,,https://example.test',
-      '隱藏題,隱藏答,,',
-    ].join('\n'));
+    await expect((uploadedFile as File).text()).resolves.toBe(expectedUploadedCsv);
   });
 });

@@ -70,7 +70,7 @@ describe('MergedCsvTable', () => {
     const visibleCheckbox = screen.getByRole('checkbox', { name: '顯示問題：Q1' }) as HTMLInputElement;
     const hiddenCheckbox = screen.getByRole('checkbox', { name: '顯示問題：Q2' }) as HTMLInputElement;
 
-    expect(screen.getByRole('columnheader', { name: '顯示' })).toBeTruthy();
+    expect(screen.getByRole('columnheader', { name: '顯示 (D)' })).toBeTruthy();
     expect(visibleCheckbox.checked).toBe(true);
     expect(hiddenCheckbox.checked).toBe(false);
     expect(visibleCheckbox.readOnly).toBe(true);

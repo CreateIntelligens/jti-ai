@@ -41,6 +41,7 @@ export default function QaRowItem({
           checked={row.visible}
           onChange={(event) => onUpdate({ visible: event.target.checked })}
         />
+        <span className="qa-workspace-qa-row-visible-label">顯示</span>
       </label>
       <div className="qa-workspace-qa-row-fields">
         <input

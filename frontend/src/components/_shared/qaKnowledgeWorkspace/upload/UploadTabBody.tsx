@@ -26,6 +26,7 @@ interface UploadTabBodyProps<T> {
   countEn: string;
   fileListClassName?: string;
   hint?: ReactNode;
+  afterContent?: ReactNode;
   uploadLabel?: string;
   extraFooterActions?: ReactNode;
 }
@@ -53,6 +54,7 @@ export default function UploadTabBody<T>({
   countEn: _countEn,
   fileListClassName,
   hint,
+  afterContent,
   uploadLabel,
   extraFooterActions,
 }: UploadTabBodyProps<T>) {
@@ -94,6 +96,8 @@ export default function UploadTabBody<T>({
           {items.map((item, index) => renderItem(item, index))}
         </div>
       )}
+
+      {afterContent}
 
       <div className="qa-workspace-qa-footer">
         <span className="qa-workspace-qa-count">

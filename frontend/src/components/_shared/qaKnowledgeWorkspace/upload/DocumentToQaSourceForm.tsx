@@ -1,7 +1,8 @@
 import type { RefObject } from 'react';
-import { AlertCircle, FileText, Type, X } from 'lucide-react';
+import { AlertCircle, Download, FileText, Table, Type, X } from 'lucide-react';
 
 import type { HciotLanguage } from '../../../../config/hciotTopics';
+import { downloadBlob } from '../../../../utils/download';
 import UploadTabBody from './UploadTabBody';
 import {
   MAX_TEXT_LENGTH,
@@ -35,6 +36,65 @@ function formatFileSize(size: number): string {
 
 function getFileExtension(file: File | undefined): string | undefined {
   return file?.name.split('.').pop()?.toLowerCase();
+}
+
+const CSV_EXAMPLE_HEADERS = ['index', 'q', 'a', 'img', 'url', 'display'] as const;
+
+const CSV_EXAMPLE_ROWS = [
+  ['1', 'PRP術後多久可以碰水？', '24小時內避免碰水並依醫囑照護', 'IMG_PRP_001', 'https://example.com/prp', 'true'],
+  ['2', '療程前需要注意什麼？', '請先告知用藥與過敏史', '', 'https://example.com/checklist', 'false'],
+] as const;
+
+const CSV_EXAMPLE_TEXT = [CSV_EXAMPLE_HEADERS, ...CSV_EXAMPLE_ROWS]
+  .map((row) => row.join(','))
+  .join('\n');
+
+function downloadCsvExample() {
+  downloadBlob(
+    new Blob([`\uFEFF${CSV_EXAMPLE_TEXT}`], { type: 'text/csv;charset=utf-8' }),
+    'qa-upload-example.csv',
+  );
+}
+
+function CsvFormatExample() {
+  return (
+    <section className="qa-workspace-csv-example" aria-labelledby="qa-csv-example-title">
+      <div className="qa-workspace-csv-example-header">
+        <div className="qa-workspace-csv-example-title">
+          <Table size={15} />
+          <h4 id="qa-csv-example-title">CSV 格式範例</h4>
+        </div>
+        <button
+          type="button"
+          className="qa-workspace-csv-example-download"
+          onClick={downloadCsvExample}
+        >
+          <Download size={14} />
+          <span>下載 CSV 範例</span>
+        </button>
+      </div>
+      <div className="qa-workspace-csv-example-table-wrap">
+        <table className="qa-workspace-csv-example-table">
+          <thead>
+            <tr>
+              {CSV_EXAMPLE_HEADERS.map((header) => (
+                <th key={header}>{header}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {CSV_EXAMPLE_ROWS.map((row) => (
+              <tr key={row[0]}>
+                {row.map((cell, index) => (
+                  <td key={`${row[0]}-${index}`}>{cell}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
 }
 
 export default function DocumentToQaSourceForm({
@@ -139,6 +199,7 @@ export default function DocumentToQaSourceForm({
               </div>
             </div>
           )}
+          afterContent={<CsvFormatExample />}
         />
       )}
 
