@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useEscapeKey } from '../../../../hooks/useEscapeKey';
 import { Image as ImageIcon, Plus, Upload, X } from 'lucide-react';
 
@@ -74,6 +74,7 @@ export default function UploadDialog({
   onUploadImageComplete,
 }: UploadDialogProps) {
   const [tab, setTab] = useState<Tab>('file');
+  const overlayPressStartedRef = useRef(false);
   const topic = useUploadTopicSelection(categories, open);
   const resolvedTopic = topic.resolvedTopic;
 
@@ -87,9 +88,26 @@ export default function UploadDialog({
 
   if (!open) return null;
 
+  const handleOverlayMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+    overlayPressStartedRef.current = event.target === event.currentTarget;
+  };
+
+  const handleOverlayMouseUp = (event: MouseEvent<HTMLDivElement>) => {
+    const shouldClose = overlayPressStartedRef.current && event.target === event.currentTarget;
+    overlayPressStartedRef.current = false;
+
+    if (shouldClose) {
+      onClose();
+    }
+  };
+
   return (
-    <div className="qa-workspace-qa-overlay" onClick={onClose}>
-      <div className="qa-workspace-qa-dialog" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="qa-workspace-qa-overlay"
+      onMouseDown={handleOverlayMouseDown}
+      onMouseUp={handleOverlayMouseUp}
+    >
+      <div className="qa-workspace-qa-dialog">
         <div className="qa-workspace-qa-header">
           <h3>新增內容</h3>
           <button type="button" className="qa-workspace-qa-close" onClick={onClose}>
