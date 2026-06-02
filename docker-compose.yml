@@ -8,6 +8,7 @@ services:
     volumes:
       - ./app:/app/app
       - ./tests:/app/tests
+      - ./scripts:/app/scripts
       - ./.env:/app/.env
       - ./data:/app/data
       - ./logs:/app/logs
