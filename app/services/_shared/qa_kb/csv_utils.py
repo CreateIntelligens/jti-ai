@@ -42,7 +42,8 @@ _FIELD_ALIASES: dict[str, list[str]] = {
     "a": ["a", "answer", "答案", "回答", "回覆", "解答", "說明", "内容", "內容"],
     "img": ["img", "image", "圖片", "图片", "圖片 (image)", "image (圖片)"],
     "url": ["url", "link", "網址", "网址", "連結", "链接"],
-    "index": ["index"],
+    "index": ["index", "i", "順序"],
+    "display": ["display", "d", "顯示"],
 }
 _QA_CONTENT_FIELDS = ("q", "a", "img", "url")
 
@@ -141,8 +142,22 @@ def _image_filename_fragment(raw: str, fallback_index: int) -> str:
     return f"{value}{suffix}"
 
 
+def _index_sort_value(raw: str) -> float:
+    """Return numeric index, pushing blank/non-numeric values to the end."""
+    try:
+        return float((raw or "").strip())
+    except (TypeError, ValueError):
+        return float("inf")
+
+
+def _sort_and_renumber_by_index(rows: list[dict]) -> None:
+    rows.sort(key=lambda row: _index_sort_value(row.get("index", "")))
+    for position, row in enumerate(rows, start=1):
+        row["index"] = str(position)
+
+
 def normalize_qa_csv_rows(file_bytes: bytes) -> bytes | None:
-    """Remove fully blank QA rows and backfill missing index values."""
+    """Drop blank QA rows, sort by user index, and renumber 1..N."""
     parsed = _parse_csv_rows(file_bytes)
     if parsed is None:
         return None
@@ -154,15 +169,8 @@ def normalize_qa_csv_rows(file_bytes: bytes) -> bytes | None:
     if "index" not in fieldnames:
         fieldnames = ["index", *fieldnames]
 
-    meaningful_rows = []
-    i = 1
-    for row in rows:
-        if not _has_meaningful_qa_content(row):
-            continue
-        if not row.get("index"):
-            row["index"] = str(i)
-        meaningful_rows.append(row)
-        i += 1
+    meaningful_rows = [row for row in rows if _has_meaningful_qa_content(row)]
+    _sort_and_renumber_by_index(meaningful_rows)
 
     return _rows_to_csv_bytes(fieldnames, meaningful_rows)
 
@@ -262,12 +270,5 @@ def merge_csv_files(csv_contents: list[bytes], source_filenames: list[str] | Non
             if any(merged_row[k] for k in _QA_CONTENT_FIELDS):
                 rows.append(merged_row)
 
-    def sort_key(item):
-        raw = item["index"]
-        try:
-            return float(raw)
-        except ValueError:
-            return float("inf")
-
-    rows.sort(key=sort_key)
+    _sort_and_renumber_by_index(rows)
     return rows

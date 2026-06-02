@@ -8,6 +8,7 @@ export interface ResolvedUploadTopic {
 }
 
 export interface QARow {
+  index?: string;
   q: string;
   a: string;
   img?: string;

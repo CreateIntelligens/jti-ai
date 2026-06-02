@@ -19,6 +19,7 @@ interface DocumentToQaSourceFormProps {
   dragOver: boolean;
   fileInputRef: RefObject<HTMLInputElement | null>;
   canSubmit: boolean;
+  disableAiQaExtraction?: boolean;
   onModeChange: (mode: DocumentSourceMode) => void;
   onTextChange: (text: string) => void;
   onDragOverChange: (dragOver: boolean) => void;
@@ -45,6 +46,7 @@ export default function DocumentToQaSourceForm({
   dragOver,
   fileInputRef,
   canSubmit,
+  disableAiQaExtraction = false,
   onModeChange,
   onTextChange,
   onDragOverChange,
@@ -57,7 +59,11 @@ export default function DocumentToQaSourceForm({
   const ext = getFileExtension(selectedFile);
   const isCsvOrXlsx = ext === 'csv' || ext === 'xlsx';
 
-  const uploadLabel = isCsvOrXlsx ? '開始上傳' : '開始 AI 擷取';
+  const extractionLabel = disableAiQaExtraction ? '開始上傳' : '開始 AI 擷取';
+  const uploadLabel = isCsvOrXlsx ? '開始上傳' : extractionLabel;
+  const textPlaceholder = disableAiQaExtraction
+    ? '在此貼上文字內容，將直接儲存並建立索引。'
+    : '在此貼上文章內容，AI 會自動分析並擷取問答對。';
 
   return (
     <div className="hciot-doc-source-tab">
@@ -140,7 +146,7 @@ export default function DocumentToQaSourceForm({
         <div className="qa-workspace-upload-file-body">
           <textarea
             className="hciot-doc-text-input custom-scrollbar"
-            placeholder="在此貼上文章內容，AI 會自動分析並擷取問答對。"
+            placeholder={textPlaceholder}
             value={text}
             onChange={(event) => onTextChange(event.target.value)}
           />
@@ -169,7 +175,7 @@ export default function DocumentToQaSourceForm({
                 disabled={!canSubmit}
                 onClick={onStartExtraction}
               >
-                開始 AI 擷取
+                {extractionLabel}
               </button>
             </div>
           </div>

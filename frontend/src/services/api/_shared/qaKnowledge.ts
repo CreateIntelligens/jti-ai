@@ -45,10 +45,12 @@ export interface QaMergedCsvResponse {
 }
 
 export interface QaPair {
+  index?: string;
   q: string;
   a: string;
   img?: string;
   url?: string;
+  display?: string;
 }
 
 export interface QaExtractJobResponse {

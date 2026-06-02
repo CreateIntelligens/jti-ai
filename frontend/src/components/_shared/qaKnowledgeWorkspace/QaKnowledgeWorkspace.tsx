@@ -108,6 +108,9 @@ export interface QaWorkspaceConfig {
   sourceType: QaWorkspaceSourceType;
   api: QaWorkspaceApiClient;
   text?: (language: HciotLanguage, zh: string, en: string) => string;
+  /** When true, pasted text and uploaded docs are saved directly (and chunked
+   * by the RAG backfill) instead of going through AI Q&A extraction. */
+  disableAiQaExtraction?: boolean;
 }
 
 interface QaKnowledgeWorkspaceProps {
@@ -386,6 +389,7 @@ export default function QaKnowledgeWorkspace({
         onUploadComplete={handleUploadComplete}
         onSubmitQA={handleQASubmit}
         api={api}
+        disableAiQaExtraction={config.disableAiQaExtraction}
         onUploadImage={api.uploadImage}
         onDeleteImage={api.deleteImage}
         onUploadImageComplete={imageManagement.handleUploadImageComplete}

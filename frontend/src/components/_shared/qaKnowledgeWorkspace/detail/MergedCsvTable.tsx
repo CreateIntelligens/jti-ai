@@ -94,7 +94,7 @@ function renderUrlValue(url?: string) {
 
 interface SortableRowProps {
   id: string;
-  displayNumber: number;
+  displayNumber: string | number;
   isEditing: boolean;
   children: ReactNode;
 }
@@ -245,11 +245,11 @@ export default function MergedCsvTable({
           <table className="qa-workspace-merged-csv-table">
             <thead>
               <tr>
-                <th className="qa-workspace-csv-col-num">#</th>
+                <th className="qa-workspace-csv-col-num">順序 (I)</th>
                 <th className="qa-workspace-csv-col-visible" title={VISIBILITY_HINT}>
                   {isEditing ? (
                     <div className="qa-workspace-csv-visible-header">
-                      <span>顯示</span>
+                      <span>顯示 (D)</span>
                       <label className="qa-workspace-csv-select-all" title="全選顯示問題">
                         <input
                           type="checkbox"
@@ -266,7 +266,7 @@ export default function MergedCsvTable({
                       </label>
                     </div>
                   ) : (
-                    <span>顯示</span>
+                    <span>顯示 (D)</span>
                   )}
                 </th>
                 <th className="qa-workspace-csv-col-question">問題 (Q)</th>
@@ -293,7 +293,7 @@ export default function MergedCsvTable({
                     <SortableRow
                       key={sortableIds[i]}
                       id={sortableIds[i]}
-                      displayNumber={i + 1}
+                      displayNumber={row.index?.trim() || i + 1}
                       isEditing={isEditing}
                     >
                       <td className="qa-workspace-csv-cell-center">

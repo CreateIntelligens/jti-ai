@@ -374,12 +374,18 @@ def _add_extract_routes(router: APIRouter, config: QaKbRouterConfig) -> None:
             if not q or not a:
                 continue
             pair = {"q": q, "a": a}
+            index = (row.get("index") or "").strip()
+            if index:
+                pair["index"] = index
             img = (row.get("img") or "").strip()
             if img:
                 pair["img"] = img
             url = (row.get("url") or "").strip()
             if url:
                 pair["url"] = url
+            display = (row.get("display") or "").strip()
+            if display:
+                pair["display"] = display
             qa_pairs.append(pair)
 
         return {"parsed": bool(qa_pairs), "qa_pairs": qa_pairs}

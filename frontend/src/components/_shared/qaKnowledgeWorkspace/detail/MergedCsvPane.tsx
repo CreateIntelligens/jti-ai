@@ -32,6 +32,9 @@ interface MergedCsvPaneProps {
 const SAVE_CSV_HEADER = ['index', 'q', 'a', 'img', 'url'];
 const DOWNLOAD_CSV_HEADER = ['index', 'q', 'a', 'img', 'url', 'display'];
 
+// The sequence value persisted in the `index` column follows the row's
+// position in the (drag-ordered) list, so reordering rewrites a clean 1..N
+// sequence while preserving the user's chosen order.
 function toCsvString(rows: HciotMergedCsvRow[]): string {
   return buildCsvString(
     SAVE_CSV_HEADER,
@@ -275,7 +278,9 @@ export default function MergedCsvPane({
       const next = [...prev];
       const [moved] = next.splice(fromIndex, 1);
       next.splice(toIndex, 0, moved);
-      return next;
+      // Renumber the sequence (`index`) to the new positions so the displayed
+      // 順序 (I) column matches what gets persisted.
+      return next.map((row, i) => ({ ...row, index: String(i + 1) }));
     });
     setDirty(true);
   };

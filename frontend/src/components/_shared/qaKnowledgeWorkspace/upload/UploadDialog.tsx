@@ -51,6 +51,7 @@ interface UploadDialogProps {
     hiddenQuestions: string[],
   ) => Promise<{ name: string; uploaded_count: number }>;
   api: QaWorkspaceApiClient;
+  disableAiQaExtraction?: boolean;
   onUploadImage: (file: File, imageId?: string) => Promise<UploadedImageResult>;
   onDeleteImage?: DeleteImageHandler;
   onUploadImageComplete: (count: number) => Promise<void>;
@@ -67,6 +68,7 @@ export default function UploadDialog({
   onUploadComplete,
   onSubmitQA,
   api,
+  disableAiQaExtraction,
   onUploadImage,
   onDeleteImage,
   onUploadImageComplete,
@@ -128,6 +130,7 @@ export default function UploadDialog({
             onUploadFile={onUploadFile}
             onUploadComplete={onUploadComplete}
             api={api}
+            disableAiQaExtraction={disableAiQaExtraction}
           />
         )}
 

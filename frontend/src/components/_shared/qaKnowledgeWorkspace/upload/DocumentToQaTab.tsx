@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { HciotLanguage } from '../../../../config/hciotTopics';
 import { toErrorMessage } from '../../../../utils/errors';
-import { parseCsvAsObjects } from '../../../../utils/csv';
 import type { HciotQaPair } from '../../../../services/api/hciot';
 import { createEmptyRow, type QARow } from './types';
 import type { ResolvedUploadTopic } from './types';
@@ -41,10 +40,14 @@ interface DocumentToQaTabProps {
     topicId?: string | null,
   ) => Promise<void>;
   api: QaWorkspaceApiClient;
+  /** When true, pasted text and uploaded docs are saved directly (chunked by
+   * the RAG backfill) instead of going through AI Q&A extraction. */
+  disableAiQaExtraction?: boolean;
 }
 
 type PendingAiSource = { kind: 'file'; file: File } | { kind: 'text'; text: string };
 type UploadFileResult = { name: string };
+const CLOSE_AFTER_SUCCESS_MS = 1200;
 const HIDDEN_DISPLAY_VALUES = new Set(['false', '0', '否', 'n']);
 
 function fileExtension(file: File): string | undefined {
@@ -52,54 +55,33 @@ function fileExtension(file: File): string | undefined {
 }
 
 function toHiddenPreviewRows(pairs: HciotQaPair[]): QARow[] {
-  return pairs.map((pair) => ({
+  // `display` may be absent (AI-extracted pairs) — default to hidden in that
+  // case, matching the previous behavior; honor it when the CSV provided one.
+  const rows = pairs.map((pair): QARow => ({
     ...createEmptyRow(),
+    index: pair.index || '',
     q: pair.q,
     a: pair.a,
     img: pair.img || '',
     url: pair.url || '',
     imgStatus: pair.img ? 'done' : 'pending',
-    visible: false,
+    visible: pair.display === undefined ? false : parseDisplayValue(pair.display),
   }));
+  // Order the preview by the user-supplied index (blank/non-numeric last,
+  // ties keep original order) so it matches the final stored order.
+  const indexValue = (row: QARow): number => {
+    const raw = (row.index ?? '').trim();
+    const n = Number(raw);
+    return raw !== '' && Number.isFinite(n) ? n : Infinity;
+  };
+  return rows
+    .map((row, i) => ({ row, i }))
+    .sort((a, b) => indexValue(a.row) - indexValue(b.row) || a.i - b.i)
+    .map(({ row }) => row);
 }
 
 function parseDisplayValue(value: string | undefined): boolean {
   return value === undefined || !HIDDEN_DISPLAY_VALUES.has(value.trim().toLowerCase());
-}
-
-/**
- * Read a downloaded-then-edited QA CSV (one carrying a `display` column) into
- * preview rows, seeding each row's `visible` flag from `display`. Returns
- * `null` when the text is not such a CSV (no data rows, or missing the
- * `display`/`q` columns) so callers can fall back to the AI extraction path.
- */
-function parseCsvDisplayPreviewRows(text: string): QARow[] | null {
-  const parsed = parseCsvAsObjects(text);
-  if (!parsed) {
-    return null;
-  }
-
-  const { headers, rows: records } = parsed;
-  if (!headers.includes('display') || !headers.includes('q')) {
-    return null;
-  }
-
-  const rows = records
-    .map((record): QARow => {
-      const img = record.img ?? '';
-      return {
-        ...createEmptyRow(),
-        q: record.q ?? '',
-        a: record.a ?? '',
-        img,
-        url: record.url ?? '',
-        imgStatus: img ? 'done' : 'pending',
-        visible: parseDisplayValue(record.display),
-      };
-    })
-    .filter((row) => row.q.trim().length > 0);
-
-  return rows.length > 0 ? rows : null;
 }
 
 function getHiddenQuestions(rows: QARow[]): string[] {
@@ -111,8 +93,9 @@ function getHiddenQuestions(rows: QARow[]): string[] {
 }
 
 function toPlainQaPairs(rows: QARow[]): HciotQaPair[] {
-  return rows.map(({ q, a, img, url }) => {
+  return rows.map(({ index, q, a, img, url }) => {
     const pair: HciotQaPair = { q, a };
+    if (index) pair.index = index;
     if (img) pair.img = img;
     if (url) pair.url = url;
     return pair;
@@ -125,12 +108,12 @@ function escapeCsvCell(value: string): string {
 
 function buildQaCsv(rows: QARow[]): string {
   return [
-    'q,a,img,url',
+    'index,q,a,img,url',
     ...rows.map(
       (row) =>
-        `${escapeCsvCell(row.q)},${escapeCsvCell(row.a)},${escapeCsvCell(
-          row.img || '',
-        )},${escapeCsvCell(row.url || '')}`,
+        `${escapeCsvCell(row.index || '')},${escapeCsvCell(row.q)},${escapeCsvCell(
+          row.a,
+        )},${escapeCsvCell(row.img || '')},${escapeCsvCell(row.url || '')}`,
     ),
   ].join('\n');
 }
@@ -158,6 +141,7 @@ export default function DocumentToQaTab({
   onUploadFile,
   onUploadComplete,
   api,
+  disableAiQaExtraction = false,
 }: DocumentToQaTabProps) {
   const isEn = language === 'en';
 
@@ -176,6 +160,28 @@ export default function DocumentToQaTab({
 
   const completeSingleFileUpload = async (result: UploadFileResult, topicId?: string | null) => {
     await onUploadComplete(result.name || null, result.name ? 1 : 0, topicId);
+  };
+
+  const closeAfterSuccess = () => {
+    window.setTimeout(() => onClose(), CLOSE_AFTER_SUCCESS_MS);
+  };
+
+  const saveFileDirect = async (fileToSave: File) => {
+    if (!resolvedTopic) return;
+    setStatus('uploading');
+    try {
+      const res = await onUploadFile(
+        fileToSave,
+        resolvedTopic.fullTopicId,
+        resolvedTopic.labels,
+      );
+      setStatus('success');
+      await completeSingleFileUpload(res, resolvedTopic.fullTopicId);
+      closeAfterSuccess();
+    } catch (err: unknown) {
+      setError(toErrorMessage(err));
+      setStatus('error');
+    }
   };
 
   useEffect(() => {
@@ -235,13 +241,17 @@ export default function DocumentToQaTab({
     setStatus('preview');
   };
 
-  const showCsvDisplayPreview = (csvText: string): boolean => {
-    const previewRows = parseCsvDisplayPreviewRows(csvText);
-    if (!previewRows) {
+  const showParsedCsvPreview = async (csvText: string): Promise<boolean> => {
+    try {
+      const { parsed, qa_pairs: parsedPairs } = await api.parseQaCsvText(csvText);
+      if (!parsed || parsedPairs.length === 0) {
+        return false;
+      }
+      showPreviewRows(toHiddenPreviewRows(parsedPairs), { clearJobId: true });
+      return true;
+    } catch {
       return false;
     }
-    showPreviewRows(previewRows, { clearJobId: true });
-    return true;
   };
 
   const startPolling = (id: string) => {
@@ -287,12 +297,16 @@ export default function DocumentToQaTab({
 
       const ext = fileExtension(file.file);
       if (ext === 'docx' || ext === 'txt' || ext === 'md') {
-        await startAiExtraction({ kind: 'file', file: file.file });
+        if (disableAiQaExtraction) {
+          await saveFileDirect(file.file);
+        } else {
+          await startAiExtraction({ kind: 'file', file: file.file });
+        }
         return;
       }
 
       if (ext === 'csv' || ext === 'xlsx') {
-        if (ext === 'csv' && showCsvDisplayPreview(await file.file.text())) {
+        if (ext === 'csv' && await showParsedCsvPreview(await file.file.text())) {
           return;
         }
 
@@ -305,7 +319,7 @@ export default function DocumentToQaTab({
           );
           setStatus('success');
           await completeSingleFileUpload(res, resolvedTopic.fullTopicId);
-          window.setTimeout(() => onClose(), 1200);
+          closeAfterSuccess();
         } catch (err: unknown) {
           if (isUnrecognizedFormatError(err)) {
             await startAiExtraction({ kind: 'file', file: file.file });
@@ -329,18 +343,14 @@ export default function DocumentToQaTab({
     }
 
     setStatus('uploading');
-    try {
-      if (showCsvDisplayPreview(trimmed)) {
-        return;
-      }
+    if (await showParsedCsvPreview(trimmed)) {
+      return;
+    }
 
-      const { parsed, qa_pairs } = await api.parseQaCsvText(trimmed);
-      if (parsed && qa_pairs.length > 0) {
-        showPreviewRows(toHiddenPreviewRows(qa_pairs), { clearJobId: true });
-        return;
-      }
-    } catch {
-      // Fall through to AI extraction when the parse probe fails.
+    if (disableAiQaExtraction) {
+      const mdFile = new File([trimmed], `pasted-${Date.now()}.md`, { type: 'text/markdown' });
+      await saveFileDirect(mdFile);
+      return;
     }
     await startAiExtraction({ kind: 'text', text: trimmed });
   };
@@ -400,7 +410,7 @@ export default function DocumentToQaTab({
         setStatus('success');
         await completeSingleFileUpload(res, resolvedTopic.fullTopicId);
       }
-      window.setTimeout(() => onClose(), 1200);
+      closeAfterSuccess();
     } catch (err) {
       setError(toErrorMessage(err));
       setStatus('preview');
@@ -427,6 +437,7 @@ export default function DocumentToQaTab({
         isEn={isEn}
         error={error}
         qaPairCount={qaPairs.length}
+        directSave={disableAiQaExtraction}
         onReset={handleReset}
       />
     );
@@ -460,6 +471,7 @@ export default function DocumentToQaTab({
       dragOver={dragOver}
       fileInputRef={fileInputRef}
       canSubmit={canSubmit}
+      disableAiQaExtraction={disableAiQaExtraction}
       onModeChange={(nextMode) => {
         setMode(nextMode);
         setError(null);
