@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
-from tests.support.app_test_support import get_test_app
+from tests.support.app_test_support import get_test_app, override_admin_auth
 
 
 app = get_test_app()
@@ -11,7 +11,11 @@ app = get_test_app()
 
 class TestHciotApiRoutes(unittest.TestCase):
     def setUp(self):
+        self.cleanup_auth = override_admin_auth(app)
         self.client = TestClient(app)
+
+    def tearDown(self):
+        self.cleanup_auth()
 
     def test_hciot_tts_characters_route_returns_character_list(self):
         response = self.client.get(

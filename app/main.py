@@ -115,10 +115,11 @@ from .auth import verify_auth, _extract_bearer_token
 from .services.agent_utils import strip_citations
 from .services.model_discovery import get_available_models
 from .routers.jti import chat as jti_chat, quiz as jti_quiz, prompts as jti_prompts, knowledge as jti_knowledge, quiz_bank as jti_quiz_bank
-from .routers.general import chat, prompts, stores, api_keys, models
+from .routers.general import chat, prompts, stores, api_keys, models, users
 from .routers.hciot import chat as hciot_chat, prompts as hciot_prompts, knowledge as hciot_knowledge, qa_extract as hciot_qa_extract, images as hciot_images
 from .routers.hciot import topics_admin as hciot_topics_admin
 from .routers.admin_rag import router as admin_rag_router
+from .routers.auth_routes import router as auth_router
 from .services.mongo_client import get_mongo_client
 import app.deps as deps
 
@@ -267,7 +268,7 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
 
     # Resolve store_name and api_key_info
     api_key_info = None
-    if auth["role"] == "admin":
+    if auth["role"] in ("admin", "super_admin"):
         store_name = os.getenv("JTI_STORE_ID_ZH", "")
         if not store_name:
             raise HTTPException(status_code=400, detail="Knowledge store not configured (JTI_STORE_ID_ZH)")
@@ -407,6 +408,7 @@ def index():
 
 # ========== Include Routers ==========
 app.include_router(admin_rag_router)
+app.include_router(auth_router)
 app.include_router(jti_chat.runtime_router)
 app.include_router(jti_chat.compat_history_router)
 app.include_router(jti_chat.admin_history_router)
@@ -435,3 +437,4 @@ app.include_router(prompts.router)  # before stores (more specific path patterns
 app.include_router(stores.router)
 app.include_router(api_keys.router)
 app.include_router(models.router)
+app.include_router(users.router)

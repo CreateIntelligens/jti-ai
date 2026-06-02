@@ -1,12 +1,19 @@
 import hashlib
 from types import SimpleNamespace
 
+import pytest
 from fastapi.testclient import TestClient
 
-from tests.support.app_test_support import get_test_app
-
+from tests.support.app_test_support import get_test_app, override_admin_auth
 
 app = get_test_app()
+
+
+@pytest.fixture(autouse=True)
+def override_auth_for_compat():
+    cleanup = override_admin_auth(app)
+    yield
+    cleanup()
 
 
 class FakeStoreRegistry:

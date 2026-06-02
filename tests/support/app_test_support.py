@@ -62,3 +62,18 @@ def get_test_app():
     from app.main import app
 
     return app
+
+
+def override_admin_auth(test_app, auth: dict | None = None):
+    """Install admin auth dependency overrides and return a cleanup callback."""
+    from app.auth import verify_auth, verify_admin
+
+    auth_info = auth or {"role": "admin", "store_name": None}
+    test_app.dependency_overrides[verify_auth] = lambda: auth_info
+    test_app.dependency_overrides[verify_admin] = lambda: auth_info
+
+    def cleanup() -> None:
+        test_app.dependency_overrides.pop(verify_auth, None)
+        test_app.dependency_overrides.pop(verify_admin, None)
+
+    return cleanup

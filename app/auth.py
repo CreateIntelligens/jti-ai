@@ -2,19 +2,17 @@
 API 認證模組
 
 認證優先順序：
-1. Authorization: Bearer <token> 或 API-Token: <token>
-2. token = ADMIN_API_KEY → admin
+1. session JWT（Authorization / API-Token / query / cookie）
+2. token = ADMIN_API_KEY → super_admin
 3. token = sk-xxx（MongoDB api_keys）→ 一般用戶，綁定 store
-4. 無 token → 401
+4. 無 token 或 token 無效 → 401
 """
 
 import os
-from urllib.parse import urlparse, urlsplit
+
 from fastapi import HTTPException, Request
 
-
-# 允許的內部 host（前端同 origin 判定用）
-_INTERNAL_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0"}
+from app.security.tokens import decode_session_token
 
 
 def _extract_bearer_token(request: Request) -> str | None:
@@ -34,83 +32,97 @@ def _extract_api_token(request: Request) -> str | None:
     return token
 
 
-def _hostname_from_host_header(value: str | None) -> str:
-    host = (value or "").split(",", 1)[0].strip()
-    if not host:
-        return ""
-    return urlsplit(f"//{host}").hostname or ""
-
-
-def _request_hostnames(request: Request) -> set[str]:
-    hosts = {
-        _hostname_from_host_header(request.headers.get("host")),
-        _hostname_from_host_header(request.headers.get("x-forwarded-host")),
-    }
-    return {host for host in hosts if host}
-
-
-def _is_allowed_frontend_host(hostname: str, request_hosts: set[str]) -> bool:
-    return hostname in request_hosts or hostname in _INTERNAL_HOSTS
-
-
 def extract_user_gemini_api_key(request: Request) -> str | None:
     """從獨立 header 提取使用者自己的 Gemini API key。"""
     api_key = (request.headers.get("x-gemini-api-key") or "").strip()
     return api_key or None
 
 
-def _is_same_origin(request: Request) -> bool:
+def _extract_session_cookie(request: Request) -> str | None:
+    cookies = getattr(request, "cookies", None)
+    if not cookies:
+        return None
+    return cookies.get("session")
+
+
+def _resolve_session_jwt(token: str) -> dict | None:
+    """若 token 是有效的 session JWT,回傳該使用者的 auth dict;否則回 None。
+
+    優先序最高 (在 ADMIN_API_KEY / sk-xxx 之前嘗試)。流程:
+    1. decode_session_token 失敗 (None) → 回 None,讓後續分支處理。
+    2. 解出 claims 後,若 deps.user_manager 可用則查使用者:
+       - 不存在 → 401 (token 指向已刪除帳號)。
+       - disabled → 401。
+       - 否則以 user 的 role/app/store_name 為準 (DB 為單一事實來源)。
+    3. user_manager 不可用 (測試環境 / 尚未初始化) → 直接信任 claims。
+
+    回傳的 dict 比既有 sk-xxx 分支多帶 app / user_id 等欄位。
     """
-    判斷請求是否來自前端（同 origin）
+    claims = decode_session_token(token)
+    if not claims:
+        return None
 
-    瀏覽器發送的請求會帶 Origin 或 Referer header，
-    如果 host 與 server 一致，視為前端請求。
-    """
-    request_hosts = _request_hostnames(request)
+    user_id = claims.get("sub")
+    role = claims.get("role")
+    app = claims.get("app")
+    store_name = None
 
-    # 檢查 Origin header
-    origin = request.headers.get("origin", "")
-    if origin:
-        parsed = urlparse(origin)
-        origin_host = parsed.hostname or ""
-        if _is_allowed_frontend_host(origin_host, request_hosts):
-            return True
+    from app import deps
 
-    # 檢查 Referer header
-    referer = request.headers.get("referer", "")
-    if referer:
-        parsed = urlparse(referer)
-        referer_host = parsed.hostname or ""
-        if _is_allowed_frontend_host(referer_host, request_hosts):
-            return True
+    if deps.user_manager is not None:
+        user = deps.user_manager.get_user(user_id) if user_id else None
+        if user is None:
+            raise HTTPException(status_code=401, detail="Session user not found")
+        if getattr(user, "disabled", False):
+            raise HTTPException(status_code=401, detail="User is disabled")
+        role = user.role
+        app = user.app
+        store_name = user.store_name
 
-    # Fetch Metadata still identifies same-origin browser requests without Origin/Referer.
-    if request.headers.get("sec-fetch-site", "").lower() == "same-origin":
-        return True
-
-    return False
+    return {
+        "role": role,
+        "app": app,
+        "store_name": store_name,
+        "user_id": user_id,
+    }
 
 
 def verify_auth(request: Request) -> dict:
     """
     驗證 API 請求
 
-    Returns:
-        {"role": "admin", "store_name": None}  # admin
-        {"role": "user", "store_name": "...", "prompt_index": ...}  # 一般 key
-    """
-    # 提取 token（支援 Authorization: Bearer 與 API-Token）
-    token = _extract_bearer_token(request) or _extract_api_token(request)
-    if not token:
-        # 同 origin（前端）請求自動視為 admin
-        if _is_same_origin(request):
-            return {"role": "admin", "store_name": None}
-        raise HTTPException(status_code=401, detail="Missing Authorization Bearer token or API-Token header")
+    優先序:
+    1. token 為有效 session JWT → 該使用者 auth dict (含 app/user_id)。
+    2. token == ADMIN_API_KEY → super_admin。
+    3. token == sk-xxx → 一般 user，綁定 store (形狀不變)。
+    4. 無 token → 401。
 
-    # 是 Admin Key？
+    Returns:
+        {"role": "super_admin", "store_name": None}  # ADMIN_API_KEY
+        {"role": "user", "store_name": "...", "prompt_index": ...}  # sk-xxx key
+        {"role": ..., "app": ..., "store_name": ..., "user_id": ...}  # session JWT
+    """
+    token = (
+        _extract_bearer_token(request)
+        or _extract_api_token(request)
+        or _extract_session_cookie(request)
+    )
+
+    if not token:
+        raise HTTPException(
+            status_code=401,
+            detail="Missing session token or authorization credentials",
+        )
+
+    # 是 session JWT？(優先序最高;sk-xxx 不會 decode 成功,順序安全)
+    jwt_auth = _resolve_session_jwt(token)
+    if jwt_auth is not None:
+        return jwt_auth
+
+    # 是 Admin Key？→ super_admin
     admin_key = os.getenv("ADMIN_API_KEY")
     if admin_key and token == admin_key:
-        return {"role": "admin", "store_name": None}
+        return {"role": "super_admin", "store_name": None}
 
     # 是一般 Key？（查 MongoDB）
     from app import deps
@@ -128,9 +140,33 @@ def verify_auth(request: Request) -> dict:
 
 
 def require_admin(auth_info: dict) -> None:
-    """檢查是否為 admin 權限"""
-    if auth_info.get("role") != "admin":
+    """檢查是否為 admin 權限。
+
+    向後兼容:接受既有 admin 與新的 super_admin。
+    """
+    if auth_info.get("role") not in {"admin", "super_admin"}:
         raise HTTPException(status_code=403, detail="Admin access required")
+
+
+def require_role(*allowed: str):
+    """產生一個 FastAPI dependency,要求 verify_auth 的 role 在 allowed 內。
+
+    角色映射:
+    - ADMIN_API_KEY → "super_admin"。
+    - session JWT / sk-xxx → claims / DB 中的 role。
+
+    因此 require_role("super_admin") 給真正的 super_admin (ADMIN_API_KEY 或
+    DB 中 role=super_admin 的 JWT) 用。
+    若要同時涵蓋兩者,明確列出: require_role("admin", "super_admin")。
+    """
+
+    def checker(request: Request) -> dict:
+        auth = verify_auth(request)
+        if auth.get("role") not in allowed:
+            raise HTTPException(status_code=403, detail="Insufficient role")
+        return auth
+
+    return checker
 
 
 def verify_admin(request: Request) -> dict:

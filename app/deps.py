@@ -8,6 +8,7 @@ without circular imports with main.py.
 import logging
 
 from .api_keys import APIKeyManager
+from .users import UserManager
 from .services.hciot.tts import get_hciot_tts_job_manager
 from .services.jti.tts import get_jti_tts_job_manager
 from .services.session.session_manager_factory import (
@@ -23,11 +24,12 @@ logger = logging.getLogger(__name__)
 # --- Mutable application state (set during startup) ---
 prompt_manager = None  # PromptManager
 api_key_manager: APIKeyManager | None = None
+user_manager: UserManager | None = None
 
 
 def init_managers():
     """Called from app startup event to initialise managers."""
-    global prompt_manager, api_key_manager
+    global prompt_manager, api_key_manager, user_manager
     try:
         from .services.gemini_clients import init_registry
         from .services.gemini_service import init_gemini_client
@@ -37,6 +39,7 @@ def init_managers():
         from .prompts import PromptManager
         prompt_manager = PromptManager()
         api_key_manager = APIKeyManager()
+        user_manager = UserManager()
         general_session_manager = get_general_chat_session_manager()
         get_jti_session_manager()
         get_jti_conversation_logger()

@@ -4,7 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from fastapi.testclient import TestClient
 
-from tests.support.app_test_support import get_test_app
+from tests.support.app_test_support import get_test_app, override_admin_auth
 
 
 app = get_test_app()
@@ -12,7 +12,11 @@ app = get_test_app()
 
 class TestJtiKnowledgeCoreValidation(unittest.TestCase):
     def setUp(self):
+        self.cleanup_auth = override_admin_auth(app)
         self.client = TestClient(app)
+
+    def tearDown(self):
+        self.cleanup_auth()
 
     def test_upload_rejects_core_marker_in_text_files(self):
         store = MagicMock()
