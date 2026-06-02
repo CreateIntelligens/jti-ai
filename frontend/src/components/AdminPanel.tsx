@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import type { Store } from '../types';
 import { getKeyInfos } from '../services/api/general';
 import { useEscapeKey } from '../hooks/useEscapeKey';
-import { getStoreIcon } from '../utils/storeDisplay';
+import { getStoreIcon, isManagedKnowledgeStore } from '../utils/storeDisplay';
 
 interface AdminPanelProps {
   isOpen: boolean;
@@ -56,14 +56,14 @@ export default function AdminPanel({
   };
 
   const handleDelete = async (store: Store) => {
-    if (store.managed_app) return;
+    if (isManagedKnowledgeStore(store)) return;
     const label = store.display_name || store.name;
     if (!confirm(`確定要刪除知識庫「${label}」嗎？此操作無法復原。`)) return;
     await onDeleteStore(store.name);
   };
 
   const storeMeta = (store: Store): string => {
-    if (store.managed_app) {
+    if (isManagedKnowledgeStore(store)) {
       const lang = store.managed_language === 'en' ? 'English' : '中文';
       return `固定 · ${store.managed_app.toUpperCase()} / ${lang}`;
     }
@@ -115,6 +115,7 @@ export default function AdminPanel({
                 </div>
               ) : (
                 stores.map((s) => {
+                  const isFixedStore = isManagedKnowledgeStore(s);
                   const keyName = keyNames.length > 1 && typeof s.key_index === 'number'
                     ? keyNames[s.key_index] || `Key #${s.key_index + 1}`
                     : null;
@@ -126,7 +127,7 @@ export default function AdminPanel({
                       <div className="kc-info">
                         <div className="kc-name-row">
                           <span className="kc-name">{s.display_name || s.name}</span>
-                          {s.managed_app && <span className="kc-badge system">固定</span>}
+                          {isFixedStore && <span className="kc-badge system">固定</span>}
                           {s.name === currentStore && <span className="kc-badge system">使用中</span>}
                         </div>
                         <div className="kc-meta">
@@ -134,7 +135,7 @@ export default function AdminPanel({
                           {keyName && ` · ${keyName}`}
                         </div>
                       </div>
-                      {!s.managed_app && (
+                      {!isFixedStore && (
                         <button
                           className="btn btn-danger btn-sm"
                           onClick={() => handleDelete(s)}

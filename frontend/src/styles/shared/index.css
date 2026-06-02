@@ -449,3 +449,22 @@ body::before {
 
 /* Hidden file input (used by uploads / quiz import) */
 .file-input-hidden { display: none; }
+
+/* ──────────────────────────────────────────────────────────────────────────
+   自訂 <select> 行為基底 (跨 app/jti/hciot 共用)。
+   只負責「移除原生外觀 + 自訂下拉箭頭」這層;顏色/尺寸/border 由各元件的
+   主題 class 自行疊加 (例: .header-app-nav / .input-base / .hciot-kb-select)。
+   箭頭 SVG 用 path fill 版 (Chrome 相容);勿改回 stroke/polyline 版,
+   未妥善編碼時 Chrome 會解析失敗使 background-image 變 none。
+   ────────────────────────────────────────────────────────────────────────── */
+.select-reset {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M2 4l4 4 4-4'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.65rem center;
+  padding-right: 2rem;
+}
+.select-reset::-ms-expand { display: none; }

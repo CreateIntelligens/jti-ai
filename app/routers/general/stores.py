@@ -24,7 +24,7 @@ from app.routers.knowledge_utils import (
     sync_to_rag,
     write_docx_text,
 )
-from app.services import gemini_clients
+from app.services import app_key_map, gemini_clients
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.jti.knowledge_store import get_jti_knowledge_store
 from app.services.knowledge_store import get_knowledge_store
@@ -40,7 +40,6 @@ class ManagedStoreConfig:
     display_name: str
     managed_app: str
     managed_language: str
-    key_keyword: str = ""
     key_index: int | None = None
 
 
@@ -81,6 +80,7 @@ class StoreRegistry:
             "key_index": doc.get("key_index"),
             "created_at": doc.get("created_at"),
             "owner_key_hash": doc.get("owner_key_hash"),
+            "managed_app": doc.get("managed_app") or "general",
         }
 
     @staticmethod
@@ -98,8 +98,39 @@ class StoreRegistry:
             ]
         }
 
-    def list_stores(self, owner_key_hash: str | None = None) -> list[dict[str, Any]]:
-        query = self._owner_filter(owner_key_hash)
+    @staticmethod
+    def _app_filter(app: str | None) -> dict[str, Any]:
+        normalized = (app or "").strip().lower()
+        if not normalized:
+            return {}
+        if normalized == "general":
+            return {
+                "$or": [
+                    {"managed_app": "general"},
+                    {"managed_app": {"$exists": False}},
+                    {"managed_app": None},
+                ]
+            }
+        return {"managed_app": normalized}
+
+    @staticmethod
+    def _merge_filters(*filters: dict[str, Any]) -> dict[str, Any]:
+        active_filters = [item for item in filters if item]
+        if not active_filters:
+            return {}
+        if len(active_filters) == 1:
+            return active_filters[0]
+        return {"$and": active_filters}
+
+    def list_stores(
+        self,
+        owner_key_hash: str | None = None,
+        app: str | None = None,
+    ) -> list[dict[str, Any]]:
+        query = self._merge_filters(
+            self._owner_filter(owner_key_hash),
+            self._app_filter(app),
+        )
         try:
             docs = self.collection.find(query, {"_id": 0}).sort("created_at", 1)
             return [self._payload(doc) for doc in docs]
@@ -112,13 +143,22 @@ class StoreRegistry:
         display_name: str,
         key_index: int = 0,
         owner_key_hash: str | None = None,
+        managed_app: str | None = None,
     ) -> dict[str, Any]:
         now = datetime.now(timezone.utc)
+        if managed_app is not None:
+            resolved_app = managed_app
+        elif owner_key_hash:
+            resolved_app = "general"
+        else:
+            resolved_app = app_key_map.resolve_app_for_key_index(int(key_index))
+        resolved_app = resolved_app.strip().lower() or "general"
         doc = {
             "name": self._new_store_name(),
             "display_name": display_name.strip(),
             "key_index": None if owner_key_hash else int(key_index),
             "owner_key_hash": owner_key_hash,
+            "managed_app": resolved_app,
             "created_at": now,
             "updated_at": now,
         }
@@ -147,10 +187,10 @@ def get_store_registry() -> StoreRegistry:
 
 
 MANAGED_STORES: tuple[ManagedStoreConfig, ...] = (
-    ManagedStoreConfig("__jti__", "JTI 中文", "jti", "zh", key_keyword="JTI"),
-    ManagedStoreConfig("__jti__en", "JTI English", "jti", "en", key_keyword="JTI"),
-    ManagedStoreConfig("__hciot__", "HCIoT 中文", "hciot", "zh", key_keyword="HCIOT"),
-    ManagedStoreConfig("__hciot__en", "HCIoT English", "hciot", "en", key_keyword="HCIOT"),
+    ManagedStoreConfig("__jti__", "JTI 中文", "jti", "zh"),
+    ManagedStoreConfig("__jti__en", "JTI English", "jti", "en"),
+    ManagedStoreConfig("__hciot__", "HCIoT 中文", "hciot", "zh"),
+    ManagedStoreConfig("__hciot__en", "HCIoT English", "hciot", "en"),
 )
 
 _STORE_ALIASES: dict[str, str] = {
@@ -191,7 +231,7 @@ def resolve_store_config(store_name: str | None, owner_key_hash: str | None = No
     return ManagedStoreConfig(
         name=dynamic["name"],
         display_name=dynamic.get("display_name") or dynamic["name"],
-        managed_app="",
+        managed_app=dynamic.get("managed_app", "general"),
         managed_language="",
         key_index=dynamic.get("key_index"),
     )
@@ -200,8 +240,17 @@ def resolve_store_config(store_name: str | None, owner_key_hash: str | None = No
 def resolve_key_index_for_store(store_name: str) -> int:
     """Return the Gemini key index for a managed or user-created store."""
     config = resolve_managed_store(store_name)
-    if config and config.key_keyword:
-        return gemini_clients.resolve_key_index_by_keyword(config.key_keyword)
+    if config is not None:
+        idx = app_key_map.resolve_key_index_for_app(config.managed_app)
+        if idx < 0:
+            # 找不到對應 key:明確告警,不靜默用第一把 key(避免用錯 key 還不報錯)。
+            logger.warning(
+                "[stores] managed_app=%s 無法從 APP_KEY_MAP 解析 Gemini key;"
+                "請檢查 APP_KEY_MAP 與 GEMINI_API_KEYS。退回 index 0。",
+                config.managed_app,
+            )
+            return 0
+        return idx
     dynamic = get_store_registry().get_store(normalize_store_name(store_name))
     if dynamic and isinstance(dynamic.get("key_index"), int):
         return int(dynamic["key_index"])
@@ -277,17 +326,95 @@ def _dynamic_store_payload(store: dict[str, Any]) -> dict[str, Any]:
         "display_name": store.get("display_name") or store_name,
         "file_count": len(_list_general_store_files(store_name)),
         "created_at": store.get("created_at"),
-        "managed_app": None,
+        "managed_app": store.get("managed_app") or "general",
         "managed_language": None,
         "key_index": store.get("key_index"),
     }
 
 
+def _normalize_app_filter(app: str | None) -> str | None:
+    normalized = (app or "").strip().lower()
+    return normalized or None
+
+
+def _list_app_scoped_store_payloads(owner_key_hash: str | None, app: str) -> list[dict[str, Any]]:
+    managed = [
+        _managed_store_payload(config)
+        for config in MANAGED_STORES
+        if config.managed_app == app
+    ]
+    dynamic = [
+        _dynamic_store_payload(store)
+        for store in get_store_registry().list_stores(owner_key_hash, app=app)
+    ]
+    return managed + dynamic
+
+
+def _list_assigned_store_payloads(
+    store_name: str,
+    owner_key_hash: str | None,
+    app_filter: str | None,
+    auth_app: str | None = None,
+) -> list[dict[str, Any]]:
+    expected_app = _normalize_app_filter(auth_app)
+    managed = resolve_managed_store(store_name)
+    if managed is not None:
+        if expected_app is not None and managed.managed_app != expected_app:
+            raise HTTPException(status_code=403, detail="Access denied")
+        if app_filter is not None and managed.managed_app != app_filter:
+            raise HTTPException(status_code=403, detail="Access denied")
+        return [_managed_store_payload(managed)]
+
+    normalized = normalize_store_name(store_name)
+    dynamic = get_store_registry().get_store(normalized, owner_key_hash)
+    if dynamic is None:
+        raise HTTPException(status_code=404, detail="Knowledge store not found")
+
+    dynamic_app = (dynamic.get("managed_app") or "general").strip().lower()
+    if expected_app is not None and dynamic_app != expected_app:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if app_filter is not None and dynamic_app != app_filter:
+        raise HTTPException(status_code=403, detail="Access denied")
+    return [_dynamic_store_payload(dynamic)]
+
+
+def _list_user_scoped_stores(
+    auth: dict,
+    owner_key_hash: str | None,
+    app_filter: str | None,
+) -> list[dict[str, Any]]:
+    assigned_store = (auth.get("store_name") or "").strip()
+    if assigned_store:
+        return _list_assigned_store_payloads(
+            assigned_store,
+            owner_key_hash,
+            app_filter,
+            auth.get("app"),
+        )
+
+    auth_app = (auth.get("app") or "").strip().lower()
+    if not auth_app:
+        raise HTTPException(status_code=403, detail="Access denied")
+    if app_filter is not None and app_filter != auth_app:
+        raise HTTPException(status_code=403, detail="Access denied")
+    return _list_app_scoped_store_payloads(owner_key_hash, auth_app)
+
+
 @router.get("/stores")
-def list_stores(request: Request, auth: dict = Depends(verify_auth)):
+def list_stores(
+    request: Request,
+    app: str | None = None,
+    auth: dict = Depends(verify_auth),
+):
     """Return fixed app stores plus key-owned general homepage stores."""
-    require_admin(auth)
+    app_filter = _normalize_app_filter(app)
     owner_hash = _owner_key_hash(request)
+    if auth.get("role") == "user":
+        return _list_user_scoped_stores(auth, owner_hash, app_filter)
+
+    require_admin(auth)
+    if app_filter is not None:
+        return _list_app_scoped_store_payloads(owner_hash, app_filter)
     managed = [_managed_store_payload(config) for config in MANAGED_STORES]
     dynamic = [_dynamic_store_payload(store) for store in get_store_registry().list_stores(owner_hash)]
     return managed + dynamic

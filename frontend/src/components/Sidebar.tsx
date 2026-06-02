@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { ChevronRight, FileText, Plus, Trash2 } from 'lucide-react';
 import type { FileItem, KnowledgeTarget, Store } from '../types';
-import { PROJECT_COLORS, getStoreIcon } from '../utils/storeDisplay';
+import { PROJECT_COLORS, getStoreIcon, isManagedKnowledgeStore } from '../utils/storeDisplay';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -190,6 +190,7 @@ export default function Sidebar({
                       (t) => t.kind === 'store' && t.storeName === store.name,
                     );
                     const isActive = target?.id === currentTargetId;
+                    const isFixedStore = isManagedKnowledgeStore(store);
                     return (
                       <li key={store.name}>
                         <button
@@ -202,7 +203,7 @@ export default function Sidebar({
                               {store.display_name || store.name}
                             </div>
                             <div className="si-meta">
-                              {store.managed_app
+                              {isFixedStore
                                 ? '固定知識庫'
                                 : `${store.file_count ?? 0} 個檔案`}
                             </div>
@@ -253,7 +254,7 @@ export default function Sidebar({
                       {f.display_name || f.name}
                     </span>
                   </button>
-                  {!activeStore.managed_app && (
+                  {!isManagedKnowledgeStore(activeStore) && (
                     <button
                       className="file-del"
                       onClick={(e) => {
@@ -269,7 +270,7 @@ export default function Sidebar({
               ))
             )}
           </ul>
-          {!activeStore.managed_app && (
+          {!isManagedKnowledgeStore(activeStore) && (
             <div
               className="drop-zone"
               onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}

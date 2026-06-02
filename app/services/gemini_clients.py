@@ -132,13 +132,19 @@ def get_client_for_store(store_name: str) -> genai.Client:
     return _store_to_client.get(store_name) or get_default_client()
 
 
-def resolve_key_index_by_keyword(keyword: str) -> int:
-    """Return the index of the first key whose name contains keyword (case-insensitive). Falls back to 0."""
-    kw = keyword.lower()
-    for i, name in enumerate(_key_names):
-        if kw in name.lower():
+def resolve_key_index_by_name(name: str) -> int:
+    """精確 (大小寫不敏感、去頭尾空白) 比對 key 名稱,回傳 index。
+
+    找不到回傳 -1 (而非 0),讓呼叫端能偵測失敗並明確處理,
+    避免「找不到就靜默用第一把 key」這種用錯 key 還不報錯的情況。
+    """
+    target = (name or "").strip().lower()
+    if not target:
+        return -1
+    for i, key_name in enumerate(_key_names):
+        if key_name.strip().lower() == target:
             return i
-    return 0
+    return -1
 
 
 def get_default_client() -> genai.Client:

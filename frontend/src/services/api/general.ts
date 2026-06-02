@@ -11,8 +11,8 @@ import { API_BASE, fetchAsAdmin, fetchWithApiKey, fetchWithUserGeminiKey, handle
 
 // ========== Stores & Files ==========
 
-export async function fetchStores(): Promise<Store[]> {
-  const response = await fetchWithUserGeminiKey(`${API_BASE}/stores`);
+export async function fetchStores(app?: string): Promise<Store[]> {
+  const response = await fetchWithUserGeminiKey(buildUrl(`${API_BASE}/stores`, { app }));
   return handleResponse<Store[]>(response);
 }
 
@@ -391,4 +391,3 @@ export async function getReindexStatus(sourceType: RagSourceType): Promise<Reind
 }
 
 export default reindexRag;
-

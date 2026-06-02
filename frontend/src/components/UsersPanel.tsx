@@ -35,6 +35,7 @@ function canModifyAccount(
 
 export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin', currentUserId }: UsersPanelProps) {
   const [users, setUsers] = useState<api.UserAccount[]>([]);
+  const [stores, setStores] = useState<api.Store[]>([]);
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState(DEFAULT_ROLE);
@@ -63,12 +64,22 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
     }
   }, []);
 
+  const loadStores = useCallback(async () => {
+    try {
+      const data = await api.fetchStores();
+      setStores(data);
+    } catch (err: unknown) {
+      console.error('無法獲取知識庫列表', err);
+    }
+  }, []);
+
   useEffect(() => {
     if (isOpen) {
       void loadUsers();
+      void loadStores();
       resetForm();
     }
-  }, [isOpen, loadUsers, resetForm]);
+  }, [isOpen, loadUsers, loadStores, resetForm]);
 
   if (!isOpen) return null;
 
@@ -171,7 +182,7 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
               <div className="field">
                 <label>角色類型</label>
                 <select
-                  className="input-base"
+                  className="select-reset input-base"
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
                   disabled={loading || !isSuperAdmin}
@@ -191,9 +202,13 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
                   <div className="field">
                     <label>綁定應用程式 (App)</label>
                     <select
-                      className="input-base"
+                      className="select-reset input-base"
                       value={app}
-                      onChange={(e) => setApp(e.target.value)}
+                      onChange={(e) => {
+                        const newApp = e.target.value;
+                        setApp(newApp);
+                        setStoreName('');
+                      }}
                       disabled={loading}
                     >
                       <option value="hciot">hciot</option>
@@ -203,13 +218,21 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
 
                   <div className="field">
                     <label>綁定知識庫名稱 (Store Name)</label>
-                    <input
-                      className="input-base"
-                      placeholder="綁定 Store 名稱 (非必填)"
+                    <select
+                      className="select-reset input-base"
                       value={storeName}
                       onChange={(e) => setStoreName(e.target.value)}
                       disabled={loading}
-                    />
+                    >
+                      <option value="">不選（此 App 下所有知識庫）</option>
+                      {stores
+                        .filter((s) => (s.managed_app || 'general') === app)
+                        .map((s) => (
+                          <option key={s.name} value={s.name}>
+                            {s.display_name || s.name}
+                          </option>
+                        ))}
+                    </select>
                   </div>
                 </>
               )}

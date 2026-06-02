@@ -44,6 +44,13 @@
   transition: border-color var(--trans), box-shadow var(--trans);
 }
 .input-base:focus { border-color: var(--primary); box-shadow: 0 0 0 .1875rem rgba(15,118,110,.1); }
+.input-base:disabled {
+  background-color: var(--border);
+  color: var(--text-3);
+  border-color: var(--border);
+  cursor: not-allowed;
+  opacity: 0.85;
+}
 .textarea-base {
   width: 100%; padding: .5rem .75rem; border: 0.0625rem solid var(--border-md);
   border-radius: var(--r-md); font-size: .875rem; font-family: var(--font);
@@ -52,7 +59,23 @@
   transition: border-color var(--trans), box-shadow var(--trans);
 }
 .textarea-base:focus { border-color: var(--primary); box-shadow: 0 0 0 .1875rem rgba(15,118,110,.1); }
-select.input-base { cursor: pointer; }
+.textarea-base:disabled {
+  background-color: var(--border);
+  color: var(--text-3);
+  border-color: var(--border);
+  cursor: not-allowed;
+  opacity: 0.85;
+}
+/* select.input-base 只管主題;appearance + 箭頭由 .select-reset 提供 (見 shared/index.css)。
+   元件需同時掛 class="select-reset input-base"。 */
+select.input-base {
+  padding: .5rem 2rem .5rem .75rem;
+  background-color: var(--bg);
+}
+select.input-base option {
+  background-color: var(--bg);
+  color: var(--text);
+}
 
 /* ── Panel Layout Helpers ── */
 .rp-overlay .inline-row { display: flex; gap: .5rem; }

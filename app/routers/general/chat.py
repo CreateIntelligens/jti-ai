@@ -68,11 +68,30 @@ def _resolve_request_store(
     auth: dict,
     owner_key_hash: str | None = None,
 ) -> str:
-    requested = auth.get("store_name") if auth.get("role") == "user" else req.store_name
-    config = resolve_store_config(requested, owner_key_hash)
-    if config is None:
-        raise HTTPException(status_code=404, detail="Knowledge store not found")
-    return config.name
+    def resolve_or_404(store_name: str | None):
+        config = resolve_store_config(store_name, owner_key_hash)
+        if config is None:
+            raise HTTPException(status_code=404, detail="Knowledge store not found")
+        return config
+
+    if auth.get("role") == "user":
+        assigned_store = auth.get("store_name")
+        if assigned_store:
+            config = resolve_or_404(assigned_store)
+            auth_app = auth.get("app")
+            if auth_app and config.managed_app and config.managed_app.lower() != auth_app.lower():
+                raise HTTPException(status_code=403, detail="Access denied")
+            return config.name
+
+        auth_app = auth.get("app")
+        if not auth_app:
+            raise HTTPException(status_code=403, detail="Access denied")
+        config = resolve_or_404(req.store_name)
+        if not config.managed_app or config.managed_app.lower() != auth_app.lower():
+            raise HTTPException(status_code=403, detail="Access denied")
+        return config.name
+
+    return resolve_or_404(req.store_name).name
 
 
 def _resolve_active_prompt(store_name: str, auth: dict):

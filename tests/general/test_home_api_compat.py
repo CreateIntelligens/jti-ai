@@ -1,4 +1,5 @@
 import hashlib
+import logging
 from types import SimpleNamespace
 
 import pytest
@@ -27,21 +28,35 @@ class FakeStoreRegistry:
             return store.get("owner_key_hash") == owner_key_hash
         return store.get("owner_key_hash") is None
 
-    def list_stores(self, owner_key_hash=None):
-        return [
+    def list_stores(self, owner_key_hash=None, app=None):
+        stores = [
             store
             for store in self.stores.values()
             if self._matches_owner(store, owner_key_hash)
         ]
+        if app is not None:
+            stores = [
+                s for s in stores
+                if s.get("managed_app", "general") == app
+            ]
+        return stores
 
-    def create_store(self, display_name, key_index=0, owner_key_hash=None):
+    def create_store(self, display_name, key_index=0, owner_key_hash=None, managed_app=None):
         name = "store_hotai"
+        from app.services import app_key_map
+        if managed_app is not None:
+            resolved_app = managed_app
+        elif owner_key_hash:
+            resolved_app = "general"
+        else:
+            resolved_app = app_key_map.resolve_app_for_key_index(key_index)
         store = {
             "name": name,
             "display_name": display_name,
-            "key_index": key_index,
+            "key_index": None if owner_key_hash else key_index,
             "created_at": "2026-04-30T00:00:00Z",
             "owner_key_hash": owner_key_hash,
+            "managed_app": resolved_app,
         }
         self.stores[name] = store
         return store
@@ -105,15 +120,15 @@ class FakeKnowledgeStore:
 def test_home_can_load_knowledge_store_list():
     from app.routers.general import stores as store_routes
 
-    key_indexes = {"JTI": 2, "HCIOT": 3}
-    original_resolver = store_routes.gemini_clients.resolve_key_index_by_keyword
-    store_routes.gemini_clients.resolve_key_index_by_keyword = lambda keyword: key_indexes[keyword]
+    key_indexes = {"jti": 2, "hciot": 3}
+    original_resolver = store_routes.app_key_map.resolve_key_index_for_app
+    store_routes.app_key_map.resolve_key_index_for_app = lambda app: key_indexes.get(app, -1)
     client = TestClient(app)
 
     try:
         response = client.get("/api/stores", headers={"Origin": "http://testserver"})
     finally:
-        store_routes.gemini_clients.resolve_key_index_by_keyword = original_resolver
+        store_routes.app_key_map.resolve_key_index_for_app = original_resolver
 
     assert response.status_code == 200
     stores = response.json()
@@ -127,6 +142,39 @@ def test_home_can_load_knowledge_store_list():
     assert stores[0]["managed_language"] == "zh"
     assert all("file_count" in store for store in stores)
     assert [store["key_index"] for store in stores] == [2, 2, 3, 3]
+
+
+def test_managed_store_key_resolution_warns_and_falls_back(monkeypatch, caplog):
+    from app.routers.general import stores as store_routes
+
+    monkeypatch.setattr(store_routes.app_key_map, "resolve_key_index_for_app", lambda app: -1)
+    caplog.set_level(logging.WARNING, logger="app.routers.general.stores")
+
+    assert store_routes.resolve_key_index_for_store("__jti__") == 0
+    assert "APP_KEY_MAP" in caplog.text
+    assert "GEMINI_API_KEYS" in caplog.text
+
+
+def test_store_registry_combines_owner_and_general_app_filters():
+    from app.routers.general.stores import StoreRegistry
+
+    query = StoreRegistry._merge_filters(
+        StoreRegistry._owner_filter("owner-hash"),
+        StoreRegistry._app_filter("general"),
+    )
+
+    assert query == {
+        "$and": [
+            {"owner_key_hash": "owner-hash"},
+            {
+                "$or": [
+                    {"managed_app": "general"},
+                    {"managed_app": {"$exists": False}},
+                    {"managed_app": None},
+                ],
+            },
+        ],
+    }
 
 
 def test_home_can_load_key_count_without_matching_key_id_route(monkeypatch):
@@ -165,12 +213,36 @@ def test_home_can_create_key_owned_general_store(monkeypatch):
     assert store["name"] == "store_hotai"
     assert store["display_name"] == "和泰"
     assert store["key_index"] == 1
-    assert store["managed_app"] is None
+    assert store["managed_app"] == "general"
     assert store["managed_language"] is None
     assert store_routes.resolve_key_index_for_store("store_hotai") == 1
 
     listed = client.get("/api/stores", headers={"Origin": "http://testserver"})
     assert any(item["name"] == "store_hotai" for item in listed.json())
+
+
+def test_browser_key_owned_created_store_remains_general(monkeypatch):
+    from app.routers.general import stores as store_routes
+    from app.services import gemini_clients
+
+    registry = FakeStoreRegistry()
+    monkeypatch.setattr(store_routes, "get_store_registry", lambda: registry, raising=False)
+    monkeypatch.setattr(gemini_clients, "get_key_count", lambda: 2)
+    monkeypatch.setattr(gemini_clients, "get_key_names", lambda: ["General", "HCIoT"])
+    monkeypatch.setattr(store_routes.app_key_map, "resolve_app_for_key_index", lambda key_index: "hciot")
+
+    client = TestClient(app)
+
+    created = client.post(
+        "/api/stores",
+        json={"display_name": "Browser Store", "key_index": 1},
+        headers={"Origin": "http://testserver", "X-Gemini-API-Key": "AIza-owner"},
+    )
+
+    assert created.status_code == 200
+    store = created.json()
+    assert store["managed_app"] == "general"
+    assert store["key_index"] is None
 
 
 def test_home_can_upload_and_delete_files_for_general_store(monkeypatch):
@@ -344,3 +416,262 @@ def test_home_can_start_and_send_general_chat(monkeypatch):
     assert response.status_code == 200
     assert response.json()["answer"] == "回答：常見問題"
     assert response.json()["citations"] == [{"title": "FAQ", "uri": "faq.csv", "text": "常見問題"}]
+
+
+def test_list_stores_filtering_by_app(monkeypatch):
+    from app.routers.general import stores as store_routes
+
+    registry = FakeStoreRegistry()
+    registry.stores["store_hciot_dyn"] = {
+        "name": "store_hciot_dyn",
+        "display_name": "HCIoT Dynamic",
+        "key_index": 1,
+        "created_at": "2026-04-30T00:00:00Z",
+        "owner_key_hash": None,
+        "managed_app": "hciot",
+    }
+    registry.stores["store_jti_dyn"] = {
+        "name": "store_jti_dyn",
+        "display_name": "JTI Dynamic",
+        "key_index": 2,
+        "created_at": "2026-04-30T00:00:00Z",
+        "owner_key_hash": None,
+        "managed_app": "jti",
+    }
+    registry.stores["store_gen_dyn"] = {
+        "name": "store_gen_dyn",
+        "display_name": "General Dynamic",
+        "key_index": 0,
+        "created_at": "2026-04-30T00:00:00Z",
+        "owner_key_hash": None,
+        "managed_app": "general",
+    }
+
+    monkeypatch.setattr(store_routes, "get_store_registry", lambda: registry, raising=False)
+
+    key_indexes = {"jti": 2, "hciot": 3}
+    original_resolver = store_routes.app_key_map.resolve_key_index_for_app
+    store_routes.app_key_map.resolve_key_index_for_app = lambda app: key_indexes.get(app, -1)
+    client = TestClient(app)
+
+    try:
+        response_hciot = client.get("/api/stores?app=hciot", headers={"Origin": "http://testserver"})
+        assert response_hciot.status_code == 200
+        stores_hciot = response_hciot.json()
+        assert set(store["name"] for store in stores_hciot) == {
+            "__hciot__",
+            "__hciot__en",
+            "store_hciot_dyn",
+        }
+        for store in stores_hciot:
+            assert store["managed_app"] == "hciot"
+
+        response_jti = client.get("/api/stores?app=jti", headers={"Origin": "http://testserver"})
+        assert response_jti.status_code == 200
+        stores_jti = response_jti.json()
+        assert set(store["name"] for store in stores_jti) == {
+            "__jti__",
+            "__jti__en",
+            "store_jti_dyn",
+        }
+        for store in stores_jti:
+            assert store["managed_app"] == "jti"
+
+    finally:
+        store_routes.app_key_map.resolve_key_index_for_app = original_resolver
+
+
+def test_user_without_store_lists_only_own_app_stores(monkeypatch):
+    from app.auth import verify_auth
+    from app.routers.general import stores as store_routes
+
+    registry = FakeStoreRegistry()
+    registry.stores["store_hciot_dyn"] = {
+        "name": "store_hciot_dyn",
+        "display_name": "HCIoT Dynamic",
+        "key_index": 1,
+        "created_at": "2026-04-30T00:00:00Z",
+        "owner_key_hash": None,
+        "managed_app": "hciot",
+    }
+    registry.stores["store_jti_dyn"] = {
+        "name": "store_jti_dyn",
+        "display_name": "JTI Dynamic",
+        "key_index": 2,
+        "created_at": "2026-04-30T00:00:00Z",
+        "owner_key_hash": None,
+        "managed_app": "jti",
+    }
+    monkeypatch.setattr(store_routes, "get_store_registry", lambda: registry, raising=False)
+    monkeypatch.setattr(
+        store_routes.app_key_map,
+        "resolve_key_index_for_app",
+        lambda app_name: {"jti": 2, "hciot": 3}.get(app_name, -1),
+    )
+
+    original_verify_auth = app.dependency_overrides.get(verify_auth)
+    app.dependency_overrides[verify_auth] = lambda: {
+        "role": "user",
+        "store_name": None,
+        "app": "hciot",
+        "prompt_index": None,
+    }
+    client = TestClient(app)
+
+    try:
+        response = client.get("/api/stores", headers={"Origin": "http://testserver"})
+        assert response.status_code == 200
+        assert {store["name"] for store in response.json()} == {
+            "__hciot__",
+            "__hciot__en",
+            "store_hciot_dyn",
+        }
+
+        cross_app = client.get("/api/stores?app=jti", headers={"Origin": "http://testserver"})
+        assert cross_app.status_code == 403
+    finally:
+        if original_verify_auth:
+            app.dependency_overrides[verify_auth] = original_verify_auth
+        else:
+            app.dependency_overrides.pop(verify_auth, None)
+
+
+def test_user_with_store_lists_only_assigned_store(monkeypatch):
+    from app.auth import verify_auth
+    from app.routers.general import stores as store_routes
+
+    registry = FakeStoreRegistry()
+    registry.stores["store_hciot_dyn"] = {
+        "name": "store_hciot_dyn",
+        "display_name": "HCIoT Dynamic",
+        "key_index": 1,
+        "created_at": "2026-04-30T00:00:00Z",
+        "owner_key_hash": None,
+        "managed_app": "hciot",
+    }
+    registry.stores["store_jti_dyn"] = {
+        "name": "store_jti_dyn",
+        "display_name": "JTI Dynamic",
+        "key_index": 2,
+        "created_at": "2026-04-30T00:00:00Z",
+        "owner_key_hash": None,
+        "managed_app": "jti",
+    }
+    monkeypatch.setattr(store_routes, "get_store_registry", lambda: registry, raising=False)
+
+    original_verify_auth = app.dependency_overrides.get(verify_auth)
+    app.dependency_overrides[verify_auth] = lambda: {
+        "role": "user",
+        "store_name": "store_hciot_dyn",
+        "app": "hciot",
+        "prompt_index": None,
+    }
+    client = TestClient(app)
+
+    try:
+        response = client.get("/api/stores", headers={"Origin": "http://testserver"})
+        assert response.status_code == 200
+        assert [store["name"] for store in response.json()] == ["store_hciot_dyn"]
+
+        cross_app = client.get("/api/stores?app=jti", headers={"Origin": "http://testserver"})
+        assert cross_app.status_code == 403
+
+        app.dependency_overrides[verify_auth] = lambda: {
+            "role": "user",
+            "store_name": "store_jti_dyn",
+            "app": "hciot",
+            "prompt_index": None,
+        }
+        mismatched_assignment = client.get("/api/stores", headers={"Origin": "http://testserver"})
+        assert mismatched_assignment.status_code == 403
+    finally:
+        if original_verify_auth:
+            app.dependency_overrides[verify_auth] = original_verify_auth
+        else:
+            app.dependency_overrides.pop(verify_auth, None)
+
+
+def test_resolve_request_store_scope_authorization():
+    from app.auth import verify_auth
+    from app import deps
+
+    client = TestClient(app)
+
+    def set_user_auth(store_name=None, app_name=None):
+        auth_info = {
+            "role": "user",
+            "store_name": store_name,
+            "app": app_name,
+            "prompt_index": None,
+        }
+        app.dependency_overrides[verify_auth] = lambda: auth_info
+
+    original_verify_auth = app.dependency_overrides.get(verify_auth)
+
+    try:
+        # Case 1: User with specific store_name set (can only chat with their assigned store)
+        set_user_auth(store_name="__hciot__")
+
+        res1 = client.post(
+            "/api/chat/start",
+            json={"store_name": "__jti__", "model": "gemini-test"},
+            headers={"Origin": "http://testserver"},
+        )
+        assert res1.status_code == 200
+        sid1 = res1.json()["session_id"]
+        session1 = deps.get_general_chat_session_manager().get_session(sid1)
+        assert session1.metadata["store_name"] == "__hciot__"
+
+        set_user_auth(store_name="__jti__", app_name="hciot")
+        app_mismatch = client.post(
+            "/api/chat/start",
+            json={"store_name": "__jti__", "model": "gemini-test"},
+            headers={"Origin": "http://testserver"},
+        )
+        assert app_mismatch.status_code == 403
+
+        # Case 2: User with null/empty store_name but assigned app (can chat with any store of that app)
+        set_user_auth(store_name=None, app_name="hciot")
+
+        res2 = client.post(
+            "/api/chat/start",
+            json={"store_name": "__hciot__", "model": "gemini-test"},
+            headers={"Origin": "http://testserver"},
+        )
+        assert res2.status_code == 200
+        sid2 = res2.json()["session_id"]
+        session2 = deps.get_general_chat_session_manager().get_session(sid2)
+        assert session2.metadata["store_name"] == "__hciot__"
+
+        res3 = client.post(
+            "/api/chat/start",
+            json={"store_name": "__hciot__en", "model": "gemini-test"},
+            headers={"Origin": "http://testserver"},
+        )
+        assert res3.status_code == 200
+        sid3 = res3.json()["session_id"]
+        session3 = deps.get_general_chat_session_manager().get_session(sid3)
+        assert session3.metadata["store_name"] == "__hciot__en"
+
+        # Case 3: User with null/empty store_name getting 403 when trying to access a store of another app
+        res4 = client.post(
+            "/api/chat/start",
+            json={"store_name": "__jti__", "model": "gemini-test"},
+            headers={"Origin": "http://testserver"},
+        )
+        assert res4.status_code == 403
+
+        # User has null/empty store_name and NO assigned app
+        set_user_auth(store_name=None, app_name=None)
+        res5 = client.post(
+            "/api/chat/start",
+            json={"store_name": "__hciot__", "model": "gemini-test"},
+            headers={"Origin": "http://testserver"},
+        )
+        assert res5.status_code == 403
+
+    finally:
+        if original_verify_auth:
+            app.dependency_overrides[verify_auth] = original_verify_auth
+        else:
+            app.dependency_overrides.pop(verify_auth, None)

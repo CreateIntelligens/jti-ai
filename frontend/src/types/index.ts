@@ -8,7 +8,7 @@ export interface Store {
   key_index?: number | null;
 }
 
-export type AppTarget = 'jti' | 'hciot';
+export type AppTarget = 'jti' | 'hciot' | 'general';
 export type KnowledgeLanguage = 'zh' | 'en';
 
 export type KnowledgeTarget =

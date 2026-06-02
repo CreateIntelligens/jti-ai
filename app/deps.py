@@ -31,9 +31,11 @@ def init_managers():
     """Called from app startup event to initialise managers."""
     global prompt_manager, api_key_manager, user_manager
     try:
+        from .services import app_key_map
         from .services.gemini_clients import init_registry
         from .services.gemini_service import init_gemini_client
         init_registry()
+        app_key_map.validate_app_key_map()
         init_gemini_client()
 
         from .prompts import PromptManager
