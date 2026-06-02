@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject, type SetStateAction } from 'react';
-import { ExternalLink, FileText, HeartPulse, History, Moon, RotateCcw, Settings, Sun, Menu, Volume2, Loader } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { ExternalLink, FileText, HeartPulse, History, Moon, RotateCcw, Settings, Sun, Menu, Volume2, Loader, ArrowLeft, LogOut } from 'lucide-react';
 import { fetchWithApiKey } from '../services/api';
 
 import HciotSelect from '../components/hciot/HciotSelect';
@@ -16,10 +17,13 @@ import {
   type HciotTopic,
 } from '../config/hciotTopics';
 import { useAutoResize } from '../hooks/useAutoResize';
+import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile';
 import { useEnterToSubmit } from '../hooks/useEnterToSubmit';
 import { useFocusOnOpen } from '../hooks/useFocusOnOpen';
+import { useLogoutRedirect } from '../hooks/useLogoutRedirect';
 import { useScrollToBottom } from '../hooks/useScrollToBottom';
 import { useTheme } from '../hooks/useTheme';
+import { isAdminRole } from '../utils/authRouting';
 import * as api from '../services/api';
 import type { TtsState } from '../types';
 import '../styles/shared/index.css';
@@ -213,7 +217,16 @@ function updateLastUserTurnNumber(
 }
 
 export default function Hciot() {
+  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
+  const logProfileError = useCallback((error: unknown) => {
+    console.error('Hciot failed to load profile on mount:', error);
+  }, []);
+  const logLogoutError = useCallback((error: unknown) => {
+    console.error('Logout failed:', error);
+  }, []);
+  const { profile } = useCurrentUserProfile({ onError: logProfileError });
+  const handleLogoutClick = useLogoutRedirect(undefined, logLogoutError);
 
   const [storeName, setStoreName] = useState<string | null>(null);
   const [storeMissing, setStoreMissing] = useState(false);
@@ -875,6 +888,29 @@ export default function Hciot() {
           <button className="hciot-icon-button" onClick={toggleTheme} title={HCIOT_UI_TEXT.themeTitle}>
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
+          {isAdminRole(profile?.role) && (
+            <button
+              className="hciot-icon-button"
+              onClick={() => navigate('/')}
+              title="返回後台"
+            >
+              <ArrowLeft size={18} />
+            </button>
+          )}
+          {profile && (
+            <>
+              <span className="hciot-profile-indicator">
+                {profile.username} ({profile.role})
+              </span>
+              <button
+                className="hciot-icon-button"
+                onClick={() => void handleLogoutClick()}
+                title="登出"
+              >
+                <LogOut size={18} />
+              </button>
+            </>
+          )}
         </div>
       </header>
 

@@ -100,6 +100,87 @@ select.input-base { cursor: pointer; }
 .kc-badge.external { background: var(--accent-lt); color: var(--accent); }
 .kc-active-tag { font-size: .75rem; color: var(--primary); font-weight: 600; }
 
+/* ── Users Panel ── */
+.rp-overlay .users-panel-body {
+  height: 100%;
+}
+.rp-overlay .users-panel-form {
+  gap: .75rem;
+}
+.rp-overlay .users-panel-error {
+  padding: .5rem .75rem;
+  border: 0.0625rem solid rgba(239, 68, 68, .2);
+  border-radius: .375rem;
+  background: rgba(239, 68, 68, .1);
+  color: #fca5a5;
+  font-size: .8125rem;
+}
+.rp-overlay .users-panel-list-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: .5rem;
+  min-height: 0;
+}
+.rp-overlay .users-panel-list {
+  flex: 1;
+  overflow-y: auto;
+  padding-right: .25rem;
+}
+.rp-overlay .users-panel-card {
+  justify-content: space-between;
+  transition: opacity .2s ease, background .2s ease;
+}
+.rp-overlay .users-panel-card.is-disabled {
+  opacity: .55;
+}
+.rp-overlay .users-panel-card.is-self {
+  border-color: var(--primary);
+  background: rgba(15, 118, 110, .05);
+}
+.rp-overlay .users-panel-name-row {
+  flex-wrap: wrap;
+  gap: .375rem;
+}
+.rp-overlay .users-panel-name {
+  word-break: break-all;
+}
+.rp-overlay .users-panel-meta {
+  margin-top: .25rem;
+}
+.rp-overlay .users-panel-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: .375rem;
+  margin-left: .5rem;
+}
+.rp-overlay .users-panel-actions .btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: .25rem .5rem;
+}
+.rp-overlay .kc-badge.role-super-admin {
+  border: 0.0625rem solid rgba(239, 68, 68, .2);
+  background: rgba(239, 68, 68, .1);
+  color: #f87171;
+}
+.rp-overlay .kc-badge.role-admin {
+  border: 0.0625rem solid rgba(245, 158, 11, .2);
+  background: rgba(245, 158, 11, .1);
+  color: #fbbf24;
+}
+.rp-overlay .kc-badge.role-user {
+  border: 0.0625rem solid rgba(139, 92, 246, .2);
+  background: rgba(139, 92, 246, .1);
+  color: #a78bfa;
+}
+.rp-overlay .kc-badge.self {
+  border: 0.0625rem solid rgba(59, 130, 246, .2);
+  background: rgba(59, 130, 246, .1);
+  color: #60a5fa;
+}
+
 /* ── External Key Row ── */
 .ext-key-row {
   display: flex; align-items: center; gap: .625rem; padding: .5rem .625rem;

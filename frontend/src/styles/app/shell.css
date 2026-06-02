@@ -37,6 +37,47 @@
 .app-shell .icon-btn-sm,
 .rp-overlay .icon-btn-sm,
 .overlay .icon-btn-sm { width: 1.5rem; height: 1.5rem; }
+.app-header .profile-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 2rem;
+  padding: 0 .625rem;
+  border-radius: var(--r-md);
+  background: var(--border);
+  color: var(--text);
+  font-size: .8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* ── Auth Guard ── */
+.auth-guard-loading-container {
+  display: flex;
+  width: 100%;
+  height: 100dvh;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  background-color: var(--bg, #0f172a);
+  color: var(--text, #f8fafc);
+  font-family: var(--font, sans-serif);
+}
+.auth-guard-spinner {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: .1875rem solid rgba(255, 255, 255, .1);
+  border-top-color: var(--primary, #3b82f6);
+  border-radius: 50%;
+  animation: auth-guard-spin 1s linear infinite;
+}
+@keyframes auth-guard-spin { to { transform: rotate(360deg); } }
+.auth-guard-text {
+  color: var(--text-2, #94a3b8);
+  font-size: .875rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
 
 /* ── Settings Dropdown ── */
 .dd-wrap { position: relative; }

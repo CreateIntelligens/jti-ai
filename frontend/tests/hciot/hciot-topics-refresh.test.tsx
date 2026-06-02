@@ -1,12 +1,14 @@
 import React from 'react';
 import { act, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 
 const apiMocks = vi.hoisted(() => ({
   fetchWithApiKey: vi.fn(),
   getHciotTtsCharacters: vi.fn(),
   hciotStartChat: vi.fn(),
   listHciotTopics: vi.fn(),
+  getMe: vi.fn(),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -32,6 +34,13 @@ describe('Hciot topic refresh', () => {
     vi.clearAllMocks();
     window.localStorage.clear();
     window.sessionStorage.clear();
+    apiMocks.getMe.mockResolvedValue({
+      user_id: 'user-1',
+      username: 'testuser',
+      role: 'user',
+      app: 'hciot',
+      store_name: null,
+    });
     apiMocks.getHciotTtsCharacters.mockResolvedValue({ characters: [] });
     apiMocks.hciotStartChat.mockResolvedValue({ session_id: 'session-1', opening_message: '' });
   });
@@ -49,7 +58,11 @@ describe('Hciot topic refresh', () => {
         ],
       });
 
-    render(<Hciot />);
+    render(
+      <MemoryRouter>
+        <Hciot />
+      </MemoryRouter>
+    );
 
     expect(await screen.findByText('舊問題')).toBeTruthy();
 

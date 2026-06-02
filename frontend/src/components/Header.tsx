@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Database,
   History,
@@ -11,9 +12,14 @@ import {
   RefreshCw,
   Settings,
   Sun,
+  Users,
+  LogOut,
 } from 'lucide-react';
 
 import reindexRag from '../services/api/general';
+import * as api from '../services/api';
+import { useLogoutRedirect } from '../hooks/useLogoutRedirect';
+import { isAdminRole } from '../utils/authRouting';
 
 interface HeaderProps {
   sidebarOpen: boolean;
@@ -28,6 +34,9 @@ interface HeaderProps {
   onOpenPromptPanel: () => void;
   onOpenExtKeysPanel: () => void;
   onShowStatus: (msg: string) => void;
+  userProfile?: api.UserProfile | null;
+  onOpenUsersPanel?: () => void;
+  onLogout?: () => void;
 }
 
 export default function Header({
@@ -43,10 +52,17 @@ export default function Header({
   onOpenPromptPanel,
   onOpenExtKeysPanel,
   onShowStatus,
+  userProfile,
+  onOpenUsersPanel,
+  onLogout,
 }: HeaderProps) {
+  const navigate = useNavigate();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isReindexing, setIsReindexing] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
+
+  const isAdmin = isAdminRole(userProfile?.role);
+  const handleLogoutClick = useLogoutRedirect(onLogout);
 
   const openPanel = (openFn: () => void) => {
     openFn();
@@ -92,6 +108,33 @@ export default function Header({
       </div>
 
       <div className="header-right">
+        {isAdmin && (
+          <>
+            <button
+              className="icon-btn icon-btn-pill"
+              onClick={() => navigate('/hciot')}
+              title="前往 HCIoT 衛教助理"
+            >
+              前往 HCIOT
+            </button>
+            <button
+              className="icon-btn icon-btn-pill"
+              onClick={() => navigate('/jti')}
+              title="前往 JTI 智慧助手"
+            >
+              前往 JTI
+            </button>
+            {onOpenUsersPanel && (
+              <button
+                className="icon-btn"
+                onClick={onOpenUsersPanel}
+                title="帳號管理"
+              >
+                <Users size={18} />
+              </button>
+            )}
+          </>
+        )}
         <button
           className="icon-btn"
           title="對話歷史"
@@ -149,6 +192,20 @@ export default function Header({
             </div>
           )}
         </div>
+        {userProfile && (
+          <>
+            <span className="profile-badge">
+              {userProfile.username} ({userProfile.role})
+            </span>
+            <button
+              className="icon-btn"
+              onClick={() => void handleLogoutClick()}
+              title="登出"
+            >
+              <LogOut size={18} />
+            </button>
+          </>
+        )}
       </div>
     </header>
   );

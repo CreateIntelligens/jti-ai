@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -7,12 +7,16 @@ import AdminPanel from './components/AdminPanel';
 import ApiKeysPanel from './components/ApiKeysPanel';
 import PromptPanel from './components/PromptPanel';
 import ExtKeysPanel from './components/ExtKeysPanel';
+import UsersPanel from './components/UsersPanel';
 import ConversationHistoryModal from './components/ConversationHistoryModal';
 import FilePreviewModal from './components/FilePreviewModal';
 import Jti from './pages/Jti';
 import Hciot from './pages/Hciot';
+import Login from './pages/Login';
 import { useAppChat } from './hooks/useAppChat';
+import { useCurrentUserProfile } from './hooks/useCurrentUserProfile';
 import { PROJECT_COLORS, getStoreIcon } from './utils/storeDisplay';
+import { getProfileRedirectPath } from './utils/authRouting';
 import type { FileItem } from './types';
 import './styles/shared/index.css';
 import './styles/app/layout.css';
@@ -27,7 +31,41 @@ import './styles/app/buttons.css';
 import './styles/app/utility.css';
 import './styles/conversation-history.css';
 
-type PanelId = 'admin' | 'apikeys' | 'prompt' | 'extkeys' | null;
+type PanelId = 'admin' | 'apikeys' | 'prompt' | 'extkeys' | 'users' | null;
+
+interface AuthGuardProps {
+  children: ReactNode;
+  allowedRoles?: string[];
+  allowedApp?: string;
+}
+
+function AuthGuard({ children, allowedRoles, allowedApp }: AuthGuardProps) {
+  const { profile, loading, error } = useCurrentUserProfile();
+
+  if (loading) {
+    return (
+      <div className="auth-guard-loading-container">
+        <div className="auth-guard-spinner" />
+        <div className="auth-guard-text">Loading profile...</div>
+      </div>
+    );
+  }
+
+  if (error || !profile) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(profile.role)) {
+    return <Navigate to={getProfileRedirectPath(profile)} replace />;
+  }
+
+  const isSimpleUser = profile.role !== 'admin' && profile.role !== 'super_admin';
+  if (allowedApp && isSimpleUser && profile.app !== allowedApp) {
+    return <Navigate to={getProfileRedirectPath(profile)} replace />;
+  }
+
+  return <>{children}</>;
+}
 
 export default function App() {
   // 受限 hostname（外網 domain）只顯示 ALLOWED_PAGES；其餘顯示全部
@@ -43,9 +81,43 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/jti" element={canShow('jti') ? <Jti /> : <Navigate to={fallback} replace />} />
-        <Route path="/hciot" element={canShow('hciot') ? <Hciot /> : <Navigate to={fallback} replace />} />
-        <Route path="/" element={canShow('home') ? <HomeShell /> : <Navigate to={fallback} replace />} />
+        <Route path="/login" element={<Login />} />
+        <Route
+          path="/jti"
+          element={
+            canShow('jti') ? (
+              <AuthGuard allowedApp="jti">
+                <Jti />
+              </AuthGuard>
+            ) : (
+              <Navigate to={fallback} replace />
+            )
+          }
+        />
+        <Route
+          path="/hciot"
+          element={
+            canShow('hciot') ? (
+              <AuthGuard allowedApp="hciot">
+                <Hciot />
+              </AuthGuard>
+            ) : (
+              <Navigate to={fallback} replace />
+            )
+          }
+        />
+        <Route
+          path="/"
+          element={
+            canShow('home') ? (
+              <AuthGuard allowedRoles={['admin', 'super_admin']}>
+                <HomeShell />
+              </AuthGuard>
+            ) : (
+              <Navigate to={fallback} replace />
+            )
+          }
+        />
         <Route path="*" element={<Navigate to={fallback} replace />} />
       </Routes>
     </BrowserRouter>
@@ -76,6 +148,7 @@ function HomeShell() {
   const closePanel = () => setPanel(null);
 
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+  const { profile, setProfile } = useCurrentUserProfile();
 
   // Derive store display info for chat area
   const activeStore = currentTarget?.kind === 'store'
@@ -105,6 +178,9 @@ function HomeShell() {
           onOpenPromptPanel={() => openPanel('prompt')}
           onOpenExtKeysPanel={() => openPanel('extkeys')}
           onShowStatus={showStatus}
+          userProfile={profile}
+          onOpenUsersPanel={() => openPanel('users')}
+          onLogout={() => setProfile(null)}
         />
         <div className="app-body">
           <Sidebar
@@ -148,6 +224,12 @@ function HomeShell() {
         onCreateStore={handleCreateStore}
         onDeleteStore={handleDeleteStore}
         onRefresh={refreshStores}
+      />
+      <UsersPanel
+        isOpen={panel === 'users'}
+        onClose={closePanel}
+        currentUserRole={profile?.role}
+        currentUserId={profile?.user_id}
       />
       <ApiKeysPanel
         isOpen={panel === 'apikeys'}

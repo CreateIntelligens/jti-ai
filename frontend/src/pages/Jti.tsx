@@ -1,15 +1,19 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
-import { History, RotateCcw, Sun, Moon, Settings } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { History, RotateCcw, Sun, Moon, Settings, ArrowLeft, LogOut } from 'lucide-react';
 import ConversationHistoryModal from '../components/ConversationHistoryModal';
 import JtiSettingsModal from '../components/JtiSettingsModal';
 import JtiMessageList from '../components/jti/JtiMessageList';
 import JtiInputArea from '../components/jti/JtiInputArea';
 import { fetchWithApiKey, getJtiRuntimeSettings } from '../services/api';
+import { useCurrentUserProfile } from '../hooks/useCurrentUserProfile';
+import { useLogoutRedirect } from '../hooks/useLogoutRedirect';
 import { useTheme } from '../hooks/useTheme';
 import { useAutoResize } from '../hooks/useAutoResize';
 import { useEnterToSubmit } from '../hooks/useEnterToSubmit';
 import { useFocusOnOpen } from '../hooks/useFocusOnOpen';
 import { useScrollToBottom } from '../hooks/useScrollToBottom';
+import { isAdminRole } from '../utils/authRouting';
 import '../styles/shared/index.css';
 import '../styles/jti/layout.css';
 import '../styles/jti/messages.css';
@@ -87,6 +91,16 @@ function sleep(ms: number): Promise<void> {
 }
 
 export default function Jti() {
+  const navigate = useNavigate();
+  const logProfileError = useCallback((error: unknown) => {
+    console.error('Jti failed to load profile on mount:', error);
+  }, []);
+  const logLogoutError = useCallback((error: unknown) => {
+    console.error('Logout failed:', error);
+  }, []);
+  const { profile } = useCurrentUserProfile({ onError: logProfileError });
+  const handleLogoutClick = useLogoutRedirect(undefined, logLogoutError);
+
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [userInput, setUserInput] = useState('');
@@ -634,6 +648,31 @@ export default function Jti() {
             >
               {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
+            {isAdminRole(profile?.role) && (
+              <button
+                className="icon-btn"
+                onClick={() => navigate('/')}
+                title="返回後台"
+                aria-label="返回後台"
+              >
+                <ArrowLeft size={18} />
+              </button>
+            )}
+            {profile && (
+              <>
+                <span className="profile-indicator">
+                  {profile.username} ({profile.role})
+                </span>
+                <button
+                  className="icon-btn"
+                  onClick={() => void handleLogoutClick()}
+                  title="登出"
+                  aria-label="登出"
+                >
+                  <LogOut size={18} />
+                </button>
+              </>
+            )}
           </div>
         </div>
       </header>

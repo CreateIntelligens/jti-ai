@@ -141,6 +141,20 @@
   gap: 0.5rem;
 }
 
+.hciot-profile-indicator {
+  display: inline-flex;
+  align-items: center;
+  height: 2.5rem;
+  padding: 0 0.625rem;
+  border: 0.0625rem solid var(--hciot-border);
+  border-radius: 0.5rem;
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--hciot-ink-soft, #64748b);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
 .hciot-view-toggle {
   display: inline-flex;
   align-items: center;

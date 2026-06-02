@@ -187,6 +187,21 @@
   outline-offset: 0.125rem;
 }
 
+.profile-indicator {
+  display: inline-flex;
+  align-items: center;
+  height: 2.75rem;
+  padding: 0 0.85rem;
+  border: 0.09375rem solid var(--border);
+  border-radius: 1.375rem;
+  background: var(--bg-light);
+  color: var(--text-muted);
+  box-shadow: var(--shadow-md);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
 /* ─── Language Switch ─── */
 
 .lang-switch {
