@@ -467,6 +467,15 @@
   padding: 0.25rem;
 }
 
+.app-select-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 0.5rem 0.75rem 0.25rem;
+  font-weight: 600;
+  cursor: default;
+  user-select: none;
+}
+
 .app-select-item {
   display: flex;
   align-items: center;

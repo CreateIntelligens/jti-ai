@@ -20,6 +20,7 @@ import reindexRag from '../services/api/general';
 import * as api from '../services/api';
 import { useLogoutRedirect } from '../hooks/useLogoutRedirect';
 import { isAdminRole } from '../utils/authRouting';
+import AppSelect from './AppSelect';
 
 interface HeaderProps {
   sidebarOpen: boolean;
@@ -110,19 +111,18 @@ export default function Header({
       <div className="header-right">
         {isAdmin && (
           <>
-            <select
-              className="select-reset header-app-nav"
+            <AppSelect
+              className="header-app-nav"
               value=""
-              title="前往應用"
-              aria-label="前往應用"
-              onChange={(e) => {
-                if (e.target.value) navigate(e.target.value);
+              onChange={(val) => {
+                if (val) navigate(val);
               }}
-            >
-              <option value="" disabled hidden>前往應用</option>
-              <option value="/hciot">HCIoT 衛教助手</option>
-              <option value="/jti">JTI 智慧助手</option>
-            </select>
+              placeholder="前往應用"
+              options={[
+                { value: '/hciot', label: 'HCIoT 衛教助手' },
+                { value: '/jti', label: 'JTI 智慧助手' },
+              ]}
+            />
             {onOpenUsersPanel && (
               <button
                 className="icon-btn"

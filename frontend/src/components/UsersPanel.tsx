@@ -3,6 +3,7 @@ import { X, UserPlus, Power, Trash2 } from 'lucide-react';
 import * as api from '../services/api';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { formatKeyScope, parseKeyScope, storeMatchesKeyName } from '../utils/scope';
+import AppSelect from './AppSelect';
 
 interface UsersPanelProps {
   isOpen: boolean;
@@ -45,6 +46,10 @@ function storeMatchesScope(store: api.Store, scope: string, keyNames: string[]):
     return storeMatchesKeyName(store, keyName, keyNames);
   }
   return (store.managed_app || 'general') === scope;
+}
+
+function isAppScope(scope: string): boolean {
+  return APP_SCOPE_OPTIONS.some((option) => option.value === scope);
 }
 
 function scopeLabel(scope: string | null): string {
@@ -177,12 +182,56 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
   };
 
   const isSuperAdmin = currentUserRole === 'super_admin';
+  // App-scoped users (jti/hciot) are not bound to a single store: the whole app's
+  // knowledge bases stay available, so we hide the per-store dropdown entirely.
+  // Key scopes and the "unbound" scope still pick a specific store.
+  const showStoreSelect = role === 'user' && !isAppScope(scope);
   const filteredStores = stores.filter((store) => storeMatchesScope(store, scope, keyNames));
   const canSubmit = Boolean(
     username.trim()
       && password.trim()
       && (role !== 'user' || scope.trim() || storeName.trim()),
   );
+
+  const roleOptions = [
+    { value: 'user', label: '一般用戶 (user)' },
+  ];
+  if (isSuperAdmin) {
+    roleOptions.push(
+      { value: 'admin', label: '管理者 (admin)' },
+      { value: 'super_admin', label: '超級管理員 (super_admin)' },
+    );
+  }
+
+  const keyScopeOptions = keyNames.map((name) => ({
+    value: formatKeyScope(name),
+    label: name,
+  }));
+
+  const scopeOptions = [
+    { value: '', label: '不綁定範圍（只選特定知識庫）' },
+    {
+      label: '應用程式',
+      options: APP_SCOPE_OPTIONS,
+    },
+  ];
+  if (keyScopeOptions.length > 0) {
+    scopeOptions.push({
+      label: '註冊 Key',
+      options: keyScopeOptions,
+    });
+  }
+
+  const storeOptions = [
+    {
+      value: '',
+      label: scope ? '不選（此範圍下所有知識庫）' : '請選擇特定知識庫',
+    },
+    ...filteredStores.map((s) => ({
+      value: s.name,
+      label: s.display_name || s.name,
+    })),
+  ];
 
   return (
     <div className="rp-overlay" onClick={onClose}>
@@ -229,76 +278,46 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
 
               <div className="field">
                 <label>角色類型</label>
-                <select
-                  className="select-reset input-base"
+                <AppSelect
+                  className="input-base"
                   value={role}
-                  onChange={(e) => {
-                    setRole(e.target.value);
+                  onChange={(val) => {
+                    setRole(val);
                     setStoreName('');
                   }}
+                  options={roleOptions}
                   disabled={loading || !isSuperAdmin}
-                >
-                  <option value="user">一般用戶 (user)</option>
-                  {isSuperAdmin && (
-                    <>
-                      <option value="admin">管理者 (admin)</option>
-                      <option value="super_admin">超級管理員 (super_admin)</option>
-                    </>
-                  )}
-                </select>
+                />
               </div>
 
               {role === 'user' && (
                 <>
                   <div className="field">
                     <label>帳號範圍</label>
-                    <select
-                      className="select-reset input-base"
+                    <AppSelect
+                      className="input-base"
                       value={scope}
-                      onChange={(e) => {
-                        setScope(e.target.value);
+                      onChange={(val) => {
+                        setScope(val);
                         setStoreName('');
                       }}
+                      options={scopeOptions}
                       disabled={loading}
-                    >
-                      <option value="">不綁定範圍（只選特定知識庫）</option>
-                      <optgroup label="應用程式">
-                        {APP_SCOPE_OPTIONS.map((option) => (
-                          <option key={option.value} value={option.value}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </optgroup>
-                      {keyNames.length > 0 && (
-                        <optgroup label="註冊 Key">
-                          {keyNames.map((name, index) => (
-                            <option key={index} value={formatKeyScope(name)}>
-                              {name}
-                            </option>
-                          ))}
-                        </optgroup>
-                      )}
-                    </select>
+                    />
                   </div>
 
-                  <div className="field">
-                    <label>綁定知識庫名稱 (Store Name)</label>
-                    <select
-                      className="select-reset input-base"
-                      value={storeName}
-                      onChange={(e) => setStoreName(e.target.value)}
-                      disabled={loading}
-                    >
-                      <option value="">
-                        {scope ? '不選（此範圍下所有知識庫）' : '請選擇特定知識庫'}
-                      </option>
-                      {filteredStores.map((s) => (
-                        <option key={s.name} value={s.name}>
-                          {s.display_name || s.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {showStoreSelect && (
+                    <div className="field">
+                      <label>綁定知識庫名稱 (Store Name)</label>
+                      <AppSelect
+                        className="input-base"
+                        value={storeName}
+                        onChange={setStoreName}
+                        options={storeOptions}
+                        disabled={loading}
+                      />
+                    </div>
+                  )}
                 </>
               )}
 
