@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
@@ -55,6 +55,7 @@ function pageNameForPath(path: string): string {
 function AuthGuard({ children, allowedRoles, allowedApp, allowGeneralUser = false, canShow }: AuthGuardProps) {
   const { profile, loading, error } = useCurrentUserProfile();
   const location = useLocation();
+  const navigate = useNavigate();
 
   if (loading) {
     return (
@@ -88,6 +89,16 @@ function AuthGuard({ children, allowedRoles, allowedApp, allowGeneralUser = fals
           <div className="auth-guard-text">
             此主機或服務不包含「{targetPage}」頁面，請聯絡開發人員。
           </div>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={async () => {
+              const { logout } = await import('./services/api/auth');
+              await logout().catch(() => {});
+              navigate('/login', { replace: true });
+            }}
+          >
+            返回登入頁
+          </button>
         </div>
       );
     }
