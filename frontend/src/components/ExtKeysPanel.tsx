@@ -161,6 +161,20 @@ export default function ExtKeysPanel({
     }
   };
 
+  const apiBase = 'http://<IP>:8913';
+  const curlExample = [
+    '# 1) 開啟對話 session，取得 session_id',
+    `curl -X POST "${apiBase}/api/chat/start" \\`,
+    '  -H "Authorization: Bearer sk-xxxxxxxx" \\',
+    '  -H "Content-Type: application/json" -d \'{}\'',
+    '',
+    '# 2) 送出訊息（SID 換成上一步拿到的 session_id）',
+    `curl -X POST "${apiBase}/api/chat/message" \\`,
+    '  -H "Authorization: Bearer sk-xxxxxxxx" \\',
+    '  -H "Content-Type: application/json" \\',
+    '  -d \'{"message":"你好","session_id":"SID"}\'',
+  ].join('\n');
+
   if (!isOpen) return null;
 
   return (
@@ -284,6 +298,26 @@ export default function ExtKeysPanel({
               </div>
             )}
           </div>
+
+          {/* 如何使用（curl 範例，佔位符 sk-xxxxxxxx） */}
+          <details className="ext-howto">
+            <summary>如何使用這把 Key（curl 範例）</summary>
+            <div className="ext-howto-body">
+              <div className="ext-howto-hint">
+                把 <code>sk-xxxxxxxx</code> 換成你上方複製的金鑰即可呼叫。
+              </div>
+              <div className="rp-key-result-row">
+                <pre className="ext-howto-code">{curlExample}</pre>
+                <button
+                  className="btn btn-ghost btn-sm shrink-0"
+                  onClick={() => copyToClipboard(curlExample)}
+                  title="複製範例"
+                >
+                  <Copy size={14} />
+                </button>
+              </div>
+            </div>
+          </details>
         </div>
       </div>
     </div>

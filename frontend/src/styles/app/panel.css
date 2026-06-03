@@ -239,6 +239,21 @@ select.input-base option {
   background: var(--bg); padding: .375rem .5rem; border-radius: .25rem;
 }
 
+/* ── 對外 Keys：如何使用 (curl 範例) ── */
+.ext-howto { margin-top: .75rem; }
+.ext-howto > summary {
+  cursor: pointer; font-size: .8125rem; color: var(--text-2);
+  padding: .375rem 0; user-select: none;
+}
+.ext-howto-body { margin-top: .5rem; }
+.ext-howto-hint { font-size: .75rem; color: var(--text-3); margin-bottom: .375rem; }
+.ext-howto-code {
+  flex: 1; min-width: 0; margin: 0;
+  font-size: .6875rem; line-height: 1.5;
+  background: var(--bg); padding: .5rem .625rem; border-radius: .25rem;
+  overflow-x: auto; white-space: pre;
+}
+
 /* ── Separator with optional label ── */
 .sep-row { display: flex; align-items: center; gap: .75rem; margin: .25rem 0; }
 .sep-line { flex: 1; height: 0.0625rem; background: var(--border); }
