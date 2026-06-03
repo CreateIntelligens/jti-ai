@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
@@ -38,10 +38,23 @@ interface AuthGuardProps {
   allowedRoles?: string[];
   allowedApp?: string;
   allowGeneralUser?: boolean;
+  // 回報某頁是否在當前主機/環境開放（由 App 的 canShow 注入）
+  canShow?: (page: string) => boolean;
 }
 
-function AuthGuard({ children, allowedRoles, allowedApp, allowGeneralUser = false }: AuthGuardProps) {
+// 把 redirect 目標路徑對應回「頁名」，用於提示訊息
+function pageNameForPath(path: string): string {
+  switch (path) {
+    case '/': return 'home';
+    case '/jti': return 'jti';
+    case '/hciot': return 'hciot';
+    default: return path;
+  }
+}
+
+function AuthGuard({ children, allowedRoles, allowedApp, allowGeneralUser = false, canShow }: AuthGuardProps) {
   const { profile, loading, error } = useCurrentUserProfile();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -56,17 +69,29 @@ function AuthGuard({ children, allowedRoles, allowedApp, allowGeneralUser = fals
     return <Navigate to="/login" replace />;
   }
 
-  if (
+  const roleBlocked =
     allowedRoles
     && !allowedRoles.includes(profile.role)
-    && !(allowGeneralUser && isGeneralUserScope(profile))
-  ) {
-    return <Navigate to={getProfileRedirectPath(profile)} replace />;
-  }
-
+    && !(allowGeneralUser && isGeneralUserScope(profile));
   const isSimpleUser = profile.role !== 'admin' && profile.role !== 'super_admin';
-  if (allowedApp && isSimpleUser && profile.scope !== allowedApp) {
-    return <Navigate to={getProfileRedirectPath(profile)} replace />;
+  const appBlocked = Boolean(allowedApp && isSimpleUser && profile.scope !== allowedApp);
+
+  if (roleBlocked || appBlocked) {
+    const target = getProfileRedirectPath(profile);
+    const targetPage = pageNameForPath(target);
+    // 目標頁在此環境不開放，或目標就是當前頁（會造成 redirect loop）→
+    // 不再 Navigate，直接顯示明確提示，避免空白或瘋狂重整。
+    const targetUnavailable = canShow ? !canShow(targetPage) : false;
+    if (target === location.pathname || targetUnavailable) {
+      return (
+        <div className="auth-guard-loading-container">
+          <div className="auth-guard-text">
+            此主機或服務不包含「{targetPage}」頁面，請聯絡開發人員。
+          </div>
+        </div>
+      );
+    }
+    return <Navigate to={target} replace />;
   }
 
   return <>{children}</>;
@@ -91,7 +116,7 @@ export default function App() {
           path="/jti"
           element={
             canShow('jti') ? (
-              <AuthGuard allowedApp="jti">
+              <AuthGuard allowedApp="jti" canShow={canShow}>
                 <Jti />
               </AuthGuard>
             ) : (
@@ -103,7 +128,7 @@ export default function App() {
           path="/hciot"
           element={
             canShow('hciot') ? (
-              <AuthGuard allowedApp="hciot">
+              <AuthGuard allowedApp="hciot" canShow={canShow}>
                 <Hciot />
               </AuthGuard>
             ) : (
@@ -115,7 +140,7 @@ export default function App() {
           path="/"
           element={
             canShow('home') ? (
-              <AuthGuard allowedRoles={['admin', 'super_admin']} allowGeneralUser>
+              <AuthGuard allowedRoles={['admin', 'super_admin']} allowGeneralUser canShow={canShow}>
                 <HomeShell />
               </AuthGuard>
             ) : (
