@@ -556,10 +556,31 @@ def create_store(request_data: CreateStoreRequest, request: Request, auth: dict 
     return _dynamic_store_payload(store)
 
 
+def _authorize_store_read(store_name: str, request: Request, auth: dict) -> None:
+    """Allow listing a store's files for admins, or for users whose scope/assigned
+    store covers it. Mutating endpoints (upload/delete) stay admin-only; this only
+    gates read access so regular users can see the knowledge base they chat against.
+    Mirrors the scope check used by the chat store resolver to avoid cross-app IDOR."""
+    if auth.get("role") in {"admin", "super_admin"}:
+        return
+
+    assigned_store = auth.get("store_name")
+    if assigned_store:
+        if normalize_store_name(assigned_store) != normalize_store_name(store_name):
+            raise HTTPException(status_code=403, detail="Access denied")
+        return
+
+    config = resolve_store_config(store_name, _owner_key_hash(request))
+    if config is None:
+        raise HTTPException(status_code=404, detail="Knowledge store not found")
+    if not store_config_matches_scope(config, auth.get("scope")):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
 @router.get("/stores/{store_name}/files")
 def list_files(store_name: str, request: Request, auth: dict = Depends(verify_auth)):
     """List files for a fixed managed store or a general key-owned store."""
-    require_admin(auth)
+    _authorize_store_read(store_name, request, auth)
     config = resolve_managed_store(store_name)
     if config is not None:
         return _list_store_files(config)
