@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useEscapeKey } from '../../../../hooks/useEscapeKey';
+import { useOverlayPressClose } from '../../../../hooks/useOverlayPressClose';
 import { Image as ImageIcon, Search, X } from 'lucide-react';
 
 import type { HciotLanguage } from '../../../../config/hciotTopics';
@@ -30,6 +31,7 @@ export default function ExistingImagePicker({
   onSelect,
 }: ExistingImagePickerProps) {
   const [query, setQuery] = useState('');
+  const overlayPressClose = useOverlayPressClose(onClose);
 
   useEffect(() => {
     if (open) {
@@ -111,7 +113,7 @@ export default function ExistingImagePicker({
       role="dialog"
       aria-modal="true"
       className="qa-workspace-image-picker-overlay"
-      onClick={onClose}
+      {...overlayPressClose}
     >
       <div
         className="qa-workspace-image-picker-dialog"

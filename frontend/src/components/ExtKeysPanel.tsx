@@ -3,7 +3,9 @@ import { Copy, Link2, X } from 'lucide-react';
 import * as api from '../services/api';
 import type { Store } from '../types';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useOverlayPressClose } from '../hooks/useOverlayPressClose';
 import { toErrorMessage } from '../utils/errors';
+import AppSelect from './AppSelect';
 
 interface ExtKeysPanelProps {
   isOpen: boolean;
@@ -33,8 +35,17 @@ export default function ExtKeysPanel({
   const [newKeyName, setNewKeyName] = useState('');
   const [targetStore, setTargetStore] = useState('');
   const [newKeyResult, setNewKeyResult] = useState<string | null>(null);
+  const overlayPressClose = useOverlayPressClose(onClose);
 
   useEscapeKey(onClose, isOpen);
+
+  const storeOptions = [
+    { value: '', label: '選擇目標知識庫...' },
+    ...stores.map((s) => ({
+      value: s.name,
+      label: s.display_name || s.name,
+    })),
+  ];
 
   useEffect(() => {
     if (isOpen) {
@@ -90,7 +101,7 @@ export default function ExtKeysPanel({
   if (!isOpen) return null;
 
   return (
-    <div className="rp-overlay" onClick={onClose}>
+    <div className="rp-overlay" {...overlayPressClose}>
       <div className="rp-panel" onClick={(e) => e.stopPropagation()}>
         <div className="rp-header">
           <span className="rp-title">對外 API Keys</span>
@@ -107,18 +118,13 @@ export default function ExtKeysPanel({
                 value={newKeyName}
                 onChange={(e) => setNewKeyName(e.target.value)}
               />
-              <select
+              <AppSelect
                 className="input-base"
                 value={targetStore}
-                onChange={(e) => setTargetStore(e.target.value)}
-              >
-                <option value="">選擇目標知識庫...</option>
-                {stores.map((s) => (
-                  <option key={s.name} value={s.name}>
-                    {s.display_name || s.name}
-                  </option>
-                ))}
-              </select>
+                onChange={setTargetStore}
+                options={storeOptions}
+                disabled={creating}
+              />
               <button className="btn btn-primary btn-sm self-start" onClick={handleCreate} disabled={creating || !newKeyName.trim() || !targetStore} >
                 {creating ? '建立中...' : '發行'}
               </button>

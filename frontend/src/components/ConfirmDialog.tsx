@@ -1,4 +1,5 @@
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useOverlayPressClose } from '../hooks/useOverlayPressClose';
 
 interface ConfirmDialogProps {
   isOpen: boolean;
@@ -19,12 +20,14 @@ export default function ConfirmDialog({
   confirmText = '確認刪除',
   cancelText = '取消',
 }: ConfirmDialogProps) {
+  const overlayPressClose = useOverlayPressClose(onCancel);
+
   useEscapeKey(onCancel, isOpen && !loading);
 
   if (!isOpen) return null;
 
   return (
-    <div className="jti-confirm-overlay" onClick={onCancel}>
+    <div className="jti-confirm-overlay" {...overlayPressClose}>
       <div className="jti-confirm-box" onClick={e => e.stopPropagation()}>
         <p className="jti-confirm-text">{message}</p>
         <div className="jti-confirm-actions">

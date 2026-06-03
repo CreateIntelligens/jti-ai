@@ -10,6 +10,7 @@ import type { AppTarget, FileItem, KnowledgeLanguage, Store } from '../types';
 import { toErrorMessage } from '../utils/errors';
 import { confirmDiscard } from '../utils/confirmDiscard';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useOverlayPressClose } from '../hooks/useOverlayPressClose';
 
 interface FilePreviewModalProps {
   isOpen: boolean;
@@ -44,6 +45,11 @@ export default function FilePreviewModal({
 
   const fileName = file?.name || '';
   const displayName = file?.display_name || fileName;
+
+  const requestClose = () => {
+    if (dirty && !confirmDiscard('close')) return;
+    onClose();
+  };
 
   useEffect(() => {
     if (!isOpen || !store || !file) return;
@@ -84,10 +90,8 @@ export default function FilePreviewModal({
     return () => { cancelled = true; };
   }, [isOpen, store, file]);
 
-  useEscapeKey(() => {
-    if (dirty && !confirmDiscard('close')) return;
-    onClose();
-  }, isOpen);
+  useEscapeKey(requestClose, isOpen);
+  const overlayPressClose = useOverlayPressClose(requestClose);
 
   if (!isOpen || !store || !file) return null;
 
@@ -116,13 +120,8 @@ export default function FilePreviewModal({
     }
   };
 
-  const requestClose = () => {
-    if (dirty && !confirmDiscard('close')) return;
-    onClose();
-  };
-
   return (
-    <div className="overlay" onClick={requestClose}>
+    <div className="overlay" {...overlayPressClose}>
       <div
         className="modal file-preview-modal"
         onClick={(e) => e.stopPropagation()}

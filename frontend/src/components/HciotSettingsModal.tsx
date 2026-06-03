@@ -7,6 +7,7 @@ import * as api from '../services/api';
 import { toErrorMessage } from '../utils/errors';
 import JtiPersonaTab from './jti/JtiPersonaTab';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useOverlayPressClose } from '../hooks/useOverlayPressClose';
 
 interface Prompt {
   id: string;
@@ -53,6 +54,7 @@ export default function HciotSettingsModal({
   const [runtimePromptId, setRuntimePromptId] = useState<string>(SYSTEM_DEFAULT_ID);
   const [defaultRuntimeSettings, setDefaultRuntimeSettings] = useState<api.HciotRuntimeSettings | null>(null);
   const [savingRuntimeSettings, setSavingRuntimeSettings] = useState(false);
+  const overlayPressClose = useOverlayPressClose(onClose);
 
   const resolveRuntimePromptId = (promptId?: string | null) => promptId || SYSTEM_DEFAULT_ID;
 
@@ -270,7 +272,7 @@ export default function HciotSettingsModal({
   }
 
   return (
-    <div className="jti-settings-overlay" onClick={onClose}>
+    <div className="jti-settings-overlay" {...overlayPressClose}>
       <div className="jti-settings-modal" onClick={(event) => event.stopPropagation()}>
         <div className="jti-settings-header">
           <div>

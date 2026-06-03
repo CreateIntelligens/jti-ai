@@ -5,6 +5,7 @@ import ConfirmDialog from '../ConfirmDialog';
 import HciotTopicEditor from './HciotTopicEditor';
 import { missingLabelMessage, NEW_VALUE, normalizeLabel, slugify } from '../_shared/qaKnowledgeWorkspace/topicUtils';
 import * as api from '../../services/api';
+import { useOverlayPressClose } from '../../hooks/useOverlayPressClose';
 
 interface KBFile {
   name: string;
@@ -78,6 +79,7 @@ export default function HciotKnowledgeTab({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const lang = language === 'en' ? 'en' : 'zh' as const;
+  const viewerOverlayPressClose = useOverlayPressClose(onCloseViewer);
 
   // Topic association state
   const [categories, setCategories] = useState<api.HciotTopicCategory[]>([]);
@@ -303,7 +305,7 @@ export default function HciotKnowledgeTab({
 
       {/* File viewer/editor modal */}
       {viewingFile && (
-        <div className="jti-viewer-overlay" onClick={onCloseViewer}>
+        <div className="jti-viewer-overlay" {...viewerOverlayPressClose}>
           <div className="jti-viewer-modal" onClick={e => e.stopPropagation()}>
             <div className="jti-viewer-header">
               <div className="jti-viewer-title">

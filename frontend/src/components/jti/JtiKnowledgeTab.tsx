@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Upload, FileText, Trash2, Download, Pencil, X } from 'lucide-react';
 import ConfirmDialog from '../ConfirmDialog';
+import { useOverlayPressClose } from '../../hooks/useOverlayPressClose';
 
 interface KBFile {
   name: string;
@@ -70,6 +71,7 @@ export default function JtiKnowledgeTab({
 }: JtiKnowledgeTabProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
+  const viewerOverlayPressClose = useOverlayPressClose(onCloseViewer);
 
   if (kbLoading) {
     return <div className="jti-settings-loading">載入中...</div>;
@@ -171,7 +173,7 @@ export default function JtiKnowledgeTab({
 
       {/* File viewer/editor modal */}
       {viewingFile && (
-        <div className="jti-viewer-overlay" onClick={onCloseViewer}>
+        <div className="jti-viewer-overlay" {...viewerOverlayPressClose}>
           <div className="jti-viewer-modal" onClick={e => e.stopPropagation()}>
             <div className="jti-viewer-header">
               <div className="jti-viewer-title">

@@ -3,7 +3,9 @@ import { X } from 'lucide-react';
 import type { Store } from '../types';
 import { getKeyInfos } from '../services/api/general';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useOverlayPressClose } from '../hooks/useOverlayPressClose';
 import { getStoreIcon, isManagedKnowledgeStore } from '../utils/storeDisplay';
+import AppSelect from './AppSelect';
 
 interface AdminPanelProps {
   isOpen: boolean;
@@ -28,6 +30,7 @@ export default function AdminPanel({
   const [newStoreName, setNewStoreName] = useState('');
   const [selectedKeyIndex, setSelectedKeyIndex] = useState('0');
   const [creating, setCreating] = useState(false);
+  const overlayPressClose = useOverlayPressClose(onClose);
 
   useEscapeKey(onClose, isOpen);
 
@@ -42,6 +45,11 @@ export default function AdminPanel({
   if (!isOpen) return null;
 
   const effectiveKeyNames = keyNames.length > 0 ? keyNames : ['全部專案'];
+
+  const keyOptions = effectiveKeyNames.map((name, i) => ({
+    value: String(i),
+    label: name || `Key #${i + 1}`,
+  }));
 
   const handleCreate = async () => {
     if (!newStoreName.trim()) return;
@@ -71,7 +79,7 @@ export default function AdminPanel({
   };
 
   return (
-    <div className="rp-overlay" onClick={onClose}>
+    <div className="rp-overlay" {...overlayPressClose}>
       <div className="rp-panel" onClick={(e) => e.stopPropagation()}>
         <div className="rp-header">
           <span className="rp-title">知識庫管理</span>
@@ -84,11 +92,12 @@ export default function AdminPanel({
             <div className="inline-row">
               <input className="input-base flex-2" placeholder="知識庫名稱" value={newStoreName} onChange={(e) => setNewStoreName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleCreate()} />
               {effectiveKeyNames.length > 1 && (
-                <select className="input-base flex-1" value={selectedKeyIndex} onChange={(e) => setSelectedKeyIndex(e.target.value)} >
-                  {effectiveKeyNames.map((name, i) => (
-                    <option key={i} value={String(i)}>{name || `Key #${i + 1}`}</option>
-                  ))}
-                </select>
+                <AppSelect
+                  className="input-base flex-1"
+                  value={selectedKeyIndex}
+                  onChange={setSelectedKeyIndex}
+                  options={keyOptions}
+                />
               )}
               <button
                 className="btn btn-primary btn-sm"

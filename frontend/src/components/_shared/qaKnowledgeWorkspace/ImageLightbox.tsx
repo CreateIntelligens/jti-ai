@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { useEscapeKey } from '../../../hooks/useEscapeKey';
+import { useOverlayPressClose } from '../../../hooks/useOverlayPressClose';
 
 interface ImageLightboxProps {
   url: string | null;
@@ -8,12 +9,14 @@ interface ImageLightboxProps {
 }
 
 export default function ImageLightbox({ url, alt = '', onClose }: ImageLightboxProps) {
+  const overlayPressClose = useOverlayPressClose(onClose);
+
   useEscapeKey(onClose, Boolean(url));
 
   if (!url) return null;
 
   return (
-    <div className="qa-workspace-image-lightbox" onClick={onClose}>
+    <div className="qa-workspace-image-lightbox" {...overlayPressClose}>
       <div className="qa-workspace-image-lightbox-frame" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"

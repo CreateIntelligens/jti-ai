@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { KeyRound, Users, X } from 'lucide-react';
 import * as api from '../services/api';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useOverlayPressClose } from '../hooks/useOverlayPressClose';
 
 interface ApiKeysPanelProps {
   isOpen: boolean;
@@ -15,6 +16,7 @@ export default function ApiKeysPanel({ isOpen, onClose, onApiKeySaved }: ApiKeys
   const [newName, setNewName] = useState('');
   const [newKey, setNewKey] = useState('');
   const [saving, setSaving] = useState(false);
+  const overlayPressClose = useOverlayPressClose(onClose);
 
   useEscapeKey(onClose, isOpen);
 
@@ -65,7 +67,7 @@ export default function ApiKeysPanel({ isOpen, onClose, onApiKeySaved }: ApiKeys
   };
 
   return (
-    <div className="rp-overlay" onClick={onClose}>
+    <div className="rp-overlay" {...overlayPressClose}>
       <div className="rp-panel" onClick={(e) => e.stopPropagation()}>
         <div className="rp-header">
           <span className="rp-title">API Key 管理</span>

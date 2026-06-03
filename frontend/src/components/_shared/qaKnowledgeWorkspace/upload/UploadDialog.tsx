@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { useEscapeKey } from '../../../../hooks/useEscapeKey';
+import { useOverlayPressClose } from '../../../../hooks/useOverlayPressClose';
 import { Image as ImageIcon, Plus, Upload, X } from 'lucide-react';
 
 import type { HciotLanguage } from '../../../../config/hciotTopics';
@@ -74,7 +75,7 @@ export default function UploadDialog({
   onUploadImageComplete,
 }: UploadDialogProps) {
   const [tab, setTab] = useState<Tab>('file');
-  const overlayPressStartedRef = useRef(false);
+  const overlayPressClose = useOverlayPressClose(onClose);
   const topic = useUploadTopicSelection(categories, open);
   const resolvedTopic = topic.resolvedTopic;
 
@@ -88,25 +89,8 @@ export default function UploadDialog({
 
   if (!open) return null;
 
-  const handleOverlayMouseDown = (event: MouseEvent<HTMLDivElement>) => {
-    overlayPressStartedRef.current = event.target === event.currentTarget;
-  };
-
-  const handleOverlayMouseUp = (event: MouseEvent<HTMLDivElement>) => {
-    const shouldClose = overlayPressStartedRef.current && event.target === event.currentTarget;
-    overlayPressStartedRef.current = false;
-
-    if (shouldClose) {
-      onClose();
-    }
-  };
-
   return (
-    <div
-      className="qa-workspace-qa-overlay"
-      onMouseDown={handleOverlayMouseDown}
-      onMouseUp={handleOverlayMouseUp}
-    >
+    <div className="qa-workspace-qa-overlay" {...overlayPressClose}>
       <div className="qa-workspace-qa-dialog">
         <div className="qa-workspace-qa-header">
           <h3>新增內容</h3>

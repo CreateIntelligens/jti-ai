@@ -4,6 +4,7 @@ import * as api from '../services/api';
 import { useTransientStatus } from '../hooks/useTransientStatus';
 import { toErrorMessage } from '../utils/errors';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useOverlayPressClose } from '../hooks/useOverlayPressClose';
 import JtiPersonaTab from './jti/JtiPersonaTab';
 import JtiKnowledgeTab from './jti/JtiKnowledgeTab';
 import JtiQuizTab from './jti/JtiQuizTab';
@@ -60,6 +61,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   const [fileEditContent, setFileEditContent] = useState('');
   const [saving, setSaving] = useState(false);
   const [fileLoading, setFileLoading] = useState(false);
+  const overlayPressClose = useOverlayPressClose(onClose);
 
   const resolveRuntimePromptId = (promptId?: string | null) => promptId || SYSTEM_DEFAULT_ID;
 
@@ -338,7 +340,7 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   if (!isOpen) return null;
 
   return (
-    <div className="jti-settings-overlay" onClick={onClose}>
+    <div className="jti-settings-overlay" {...overlayPressClose}>
       <div className="jti-settings-modal" onClick={e => e.stopPropagation()}>
         {/* Header */}
         <div className="jti-settings-header">

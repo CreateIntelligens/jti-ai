@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { X, UserPlus, Power, Trash2 } from 'lucide-react';
 import * as api from '../services/api';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useOverlayPressClose } from '../hooks/useOverlayPressClose';
 import { formatKeyScope, parseKeyScope, storeMatchesKeyName } from '../utils/scope';
 import AppSelect from './AppSelect';
 
@@ -81,6 +82,7 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
   const [storeName, setStoreName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const overlayPressClose = useOverlayPressClose(onClose);
 
   useEscapeKey(onClose, isOpen);
 
@@ -234,7 +236,7 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
   ];
 
   return (
-    <div className="rp-overlay" onClick={onClose}>
+    <div className="rp-overlay" {...overlayPressClose}>
       <div className="rp-panel" onClick={(e) => e.stopPropagation()}>
         <div className="rp-header">
           <span className="rp-title">帳號管理</span>
