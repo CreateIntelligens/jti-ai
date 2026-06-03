@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronRight, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Eye, X } from 'lucide-react';
 import * as api from '../services/api';
 import AppSelect from './AppSelect';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useOverlayPressClose } from '../hooks/useOverlayPressClose';
 import { toErrorMessage } from '../utils/errors';
 import { confirmDiscard } from '../utils/confirmDiscard';
 
@@ -16,6 +17,7 @@ interface PromptPanelProps {
 }
 
 type RuleSectionKey = 'role_scope' | 'scope_limits' | 'response_style' | 'knowledge_rules';
+type PromptLanguage = 'zh' | 'en';
 
 const NEW_PROMPT_ID = '__new__';
 const RULE_SECTION_KEYS: RuleSectionKey[] = [
@@ -50,8 +52,11 @@ interface Prompt {
   id: string;
   name: string;
   content: string;
+  content_en?: string | null;
   response_rule_sections?: { zh?: RuleSections; en?: RuleSections } | null;
   max_response_chars?: number | null;
+  // Built-in defaults also ship fully-assembled prompt text for preview/compat.
+  assembled?: { zh?: string; en?: string } | null;
   is_default?: boolean;
   readonly?: boolean;
   is_active?: boolean;
@@ -62,7 +67,9 @@ const SYSTEM_DEFAULT_PROMPT_ID = 'system_default';
 interface DraftState {
   name: string;
   content: string;
+  content_en: string;
   sections: RuleSections;
+  sections_en: RuleSections;
   max_response_chars: number;
 }
 
@@ -85,10 +92,13 @@ function makeRuleSections(source: RuleSections = {}): RuleSections {
 
 function makeDraft(prompt: Prompt | null): DraftState {
   const sections = prompt?.response_rule_sections?.zh || {};
+  const sectionsEn = prompt?.response_rule_sections?.en || {};
   return {
     name: prompt?.name ?? '',
     content: prompt?.content ?? '',
+    content_en: prompt?.content_en ?? '',
     sections: makeRuleSections(sections),
+    sections_en: makeRuleSections(sectionsEn),
     max_response_chars: prompt?.max_response_chars ?? 0,
   };
 }
@@ -98,15 +108,74 @@ function isDraftDirty(draft: DraftState, prompt: Prompt | null): boolean {
   return JSON.stringify(draft) !== JSON.stringify(baseline);
 }
 
-function buildSectionsPayload(draft: DraftState): { zh: RuleSections } | null {
+function trimRuleSections(source: RuleSections): RuleSections {
   const trimmed: RuleSections = {};
   RULE_SECTION_KEYS.forEach((key) => {
-    const value = (draft.sections[key] || '').trim();
+    const value = (source[key] || '').trim();
     if (value) {
       trimmed[key] = value;
     }
   });
-  return Object.keys(trimmed).length > 0 ? { zh: trimmed } : null;
+  return trimmed;
+}
+
+function buildSectionsPayload(draft: DraftState): { zh?: RuleSections; en?: RuleSections } | null {
+  const zh = trimRuleSections(draft.sections);
+  const en = trimRuleSections(draft.sections_en);
+  const payload: { zh?: RuleSections; en?: RuleSections } = {};
+  if (Object.keys(zh).length > 0) payload.zh = zh;
+  if (Object.keys(en).length > 0) payload.en = en;
+  return Object.keys(payload).length > 0 ? payload : null;
+}
+
+function resolvePromptLanguage(currentStore: string | null): PromptLanguage {
+  return currentStore === '__jti__en' || currentStore === '__hciot__en' ? 'en' : 'zh';
+}
+
+function promptPreviewContent(prompt: Prompt, language: PromptLanguage): string {
+  if (language === 'en' && prompt.content_en?.trim()) {
+    return prompt.content_en;
+  }
+  return prompt.content;
+}
+
+function promptPreviewSnippet(prompt: Prompt, language: PromptLanguage): string {
+  const content = promptPreviewContent(prompt, language);
+  return content.length > 80 ? content.slice(0, 80) + '...' : content;
+}
+
+function promptFullPreviewContent(prompt: Prompt, language: PromptLanguage): string {
+  const assembled = prompt.assembled?.[language]?.trim();
+  if (assembled) {
+    return assembled;
+  }
+
+  const persona = promptPreviewContent(prompt, language).trim();
+  const sections = ruleSectionsForLanguage(prompt.response_rule_sections, language);
+  const sectionBlocks = RULE_SECTION_KEYS.flatMap((key) => {
+    const content = sections[key]?.trim();
+    return content ? [`${RULE_SECTION_LABELS[key]}\n${content}`] : [];
+  });
+
+  return [persona, ...sectionBlocks].filter(Boolean).join('\n\n');
+}
+
+function draftPersonaContent(draft: DraftState, language: PromptLanguage): string {
+  if (language === 'en') {
+    return draft.content_en;
+  }
+  return draft.content;
+}
+
+function ruleSectionsForLanguage(
+  sections: { zh?: RuleSections; en?: RuleSections } | null | undefined,
+  language: PromptLanguage,
+): RuleSections {
+  return (language === 'en' ? sections?.en : sections?.zh) || {};
+}
+
+function hasSectionContent(sections: RuleSections): boolean {
+  return RULE_SECTION_KEYS.some((key) => Boolean(sections[key]?.trim()));
 }
 
 function getStoredSelectedModel(): string {
@@ -136,6 +205,7 @@ export default function PromptPanel({
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [activePromptId, setActivePromptId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
   const [draft, setDraft] = useState<DraftState>(makeDraft(null));
   const [showSections, setShowSections] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -145,10 +215,15 @@ export default function PromptPanel({
   const [availableModels, setAvailableModels] = useState<api.ModelInfo[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
   const [selectedModel, setSelectedModel] = useState(getStoredSelectedModel);
+  const overlayPressClose = useOverlayPressClose(onClose);
 
   useEscapeKey(onClose, isOpen);
 
   useEffect(() => {
+    setEditingId(null);
+    setPreviewingId(null);
+    setDraft(makeDraft(null));
+    setShowSections(false);
     if (isOpen && currentStore) void loadPrompts();
   }, [isOpen, currentStore]);
 
@@ -180,8 +255,31 @@ export default function PromptPanel({
   }, [isOpen]);
 
   const editingPrompt = prompts.find((p) => p.id === editingId) || null;
+  const previewingPrompt = prompts.find((p) => p.id === previewingId) || null;
   const isCreatingPrompt = editingId === NEW_PROMPT_ID;
   const dirty = editingId !== null && isDraftDirty(draft, editingPrompt);
+  const promptLanguage = resolvePromptLanguage(currentStore);
+  const visiblePersona = draftPersonaContent(draft, promptLanguage);
+  const visibleSections = promptLanguage === 'en' ? draft.sections_en : draft.sections;
+  const previewText = previewingPrompt
+    ? promptFullPreviewContent(previewingPrompt, promptLanguage)
+    : '';
+
+  const updateVisiblePersona = (content: string) => {
+    setDraft(
+      promptLanguage === 'en'
+        ? { ...draft, content_en: content }
+        : { ...draft, content },
+    );
+  };
+
+  const updateVisibleSection = (key: RuleSectionKey, content: string) => {
+    setDraft(
+      promptLanguage === 'en'
+        ? { ...draft, sections_en: { ...draft.sections_en, [key]: content } }
+        : { ...draft, sections: { ...draft.sections, [key]: content } },
+    );
+  };
 
   const resetEditor = () => {
     setEditingId(null);
@@ -201,6 +299,9 @@ export default function PromptPanel({
       if (editingId && !next.some((p) => p.id === editingId)) {
         resetEditor();
       }
+      if (previewingId && !next.some((p) => p.id === previewingId)) {
+        setPreviewingId(null);
+      }
     } catch (e) {
       console.error('Failed to load prompts:', e);
     } finally {
@@ -210,10 +311,11 @@ export default function PromptPanel({
 
   const startEditing = (prompt: Prompt) => {
     if (dirty && !confirmDiscard('switch')) return;
+    setPreviewingId(null);
     setEditingId(prompt.id);
     setDraft(makeDraft(prompt));
-    const hasSections = Boolean(
-      prompt.response_rule_sections?.zh && Object.keys(prompt.response_rule_sections.zh).length,
+    const hasSections = hasSectionContent(
+      ruleSectionsForLanguage(prompt.response_rule_sections, promptLanguage),
     );
     setShowSections(hasSections);
   };
@@ -225,14 +327,23 @@ export default function PromptPanel({
 
   const customPrompts = prompts.filter((p) => !p.readonly && p.id !== SYSTEM_DEFAULT_PROMPT_ID);
 
+  const startPreview = (prompt: Prompt) => {
+    if (dirty && !confirmDiscard('switch')) return;
+    resetEditor();
+    setPreviewingId(prompt.id);
+  };
+
   const handleCreateBlank = () => {
     if (!currentStore || customPrompts.length >= maxPrompts) return;
     if (dirty && !confirmDiscard('discard')) return;
+    setPreviewingId(null);
     setEditingId(NEW_PROMPT_ID);
     setDraft({
       name: `Prompt ${customPrompts.length + 1}`,
       content: '',
+      content_en: '',
       sections: makeEmptySections(),
+      sections_en: makeEmptySections(),
       max_response_chars: 0,
     });
     setShowSections(false);
@@ -241,20 +352,27 @@ export default function PromptPanel({
   const duplicateFromDefault = (source: Prompt) => {
     if (!currentStore || customPrompts.length >= maxPrompts) return;
     if (dirty && !confirmDiscard('discard')) return;
+    setPreviewingId(null);
+    // Copy the default split into its parts: persona into the content field and
+    // each rule section into its own field, so they stay individually editable.
     const sections = source.response_rule_sections?.zh || {};
+    const sectionsEn = source.response_rule_sections?.en || {};
     setEditingId(NEW_PROMPT_ID);
     setDraft({
       name: `自訂 ${customPrompts.length + 1}`,
       content: source.content || '',
+      content_en: source.content_en || '',
       sections: makeRuleSections(sections),
+      sections_en: makeRuleSections(sectionsEn),
       max_response_chars: source.max_response_chars ?? 0,
     });
-    setShowSections(Object.keys(sections).length > 0);
+    setShowSections(hasSectionContent(promptLanguage === 'en' ? sectionsEn : sections));
   };
 
   const handleSave = async () => {
     if (!currentStore) return;
-    if (!draft.content.trim()) {
+    const visiblePersonaText = draftPersonaContent(draft, promptLanguage).trim();
+    if (!visiblePersonaText) {
       alert('Persona 內容不可為空');
       return;
     }
@@ -262,7 +380,8 @@ export default function PromptPanel({
     try {
       const payload = {
         name: draft.name.trim() || `Prompt ${customPrompts.length + 1}`,
-        content: draft.content.trim(),
+        content: draft.content.trim() || visiblePersonaText,
+        content_en: draft.content_en.trim() || (promptLanguage === 'en' ? visiblePersonaText : null),
         response_rule_sections: buildSectionsPayload(draft),
         max_response_chars: draft.max_response_chars > 0 ? draft.max_response_chars : null,
       };
@@ -272,6 +391,7 @@ export default function PromptPanel({
           currentStore,
           payload.name,
           payload.content,
+          payload.content_en,
           payload.response_rule_sections,
           payload.max_response_chars,
         );
@@ -282,6 +402,7 @@ export default function PromptPanel({
           editingId,
           payload.name,
           payload.content,
+          payload.content_en,
           payload.response_rule_sections,
           payload.max_response_chars,
         );
@@ -332,8 +453,8 @@ export default function PromptPanel({
   if (!isOpen) return null;
 
   return (
-    <div className="rp-overlay" onClick={onClose}>
-      <div className="rp-panel" onClick={(e) => e.stopPropagation()}>
+    <div className="rp-overlay" {...overlayPressClose}>
+      <div className="rp-panel">
         <div className="rp-header">
           <span className="rp-title">Prompt 設定</span>
           <button className="icon-btn" onClick={onClose}><X size={18} /></button>
@@ -387,12 +508,20 @@ export default function PromptPanel({
                                   </div>
                                   {!isEditing && (
                                     <div className="kc-meta kc-meta-pre">
-                                      {p.content.length > 80 ? p.content.slice(0, 80) + '...' : p.content}
+                                      {promptPreviewSnippet(p, promptLanguage)}
                                     </div>
                                   )}
                                 </div>
                                 {!isEditing && (
                                   <div className="rp-card-actions">
+                                    <button
+                                      className="btn btn-ghost btn-sm"
+                                      onClick={() => startPreview(p)}
+                                      title="預覽完整 Prompt"
+                                    >
+                                      <Eye size={14} aria-hidden="true" />
+                                      預覽
+                                    </button>
                                     {isReadonly ? (
                                       <button
                                         className="btn btn-ghost btn-sm"
@@ -435,6 +564,28 @@ export default function PromptPanel({
                         </div>
                       )}
 
+                      {previewingPrompt && (
+                        <div className="rp-edit-card">
+                          <div className="field">
+                            <label>Prompt 預覽</label>
+                            <textarea
+                              className="textarea-base"
+                              rows={14}
+                              readOnly
+                              value={previewText}
+                            />
+                          </div>
+                          <div className="rp-card-actions">
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              onClick={() => setPreviewingId(null)}
+                            >
+                              關閉
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
                       {editingId !== null && (
                         <div className="rp-edit-card">
                           <div className="field">
@@ -453,8 +604,8 @@ export default function PromptPanel({
                               className="textarea-base"
                               placeholder="例：你是一個知識庫問答助手…"
                               rows={6}
-                              value={draft.content}
-                              onChange={(e) => setDraft({ ...draft, content: e.target.value })}
+                              value={visiblePersona}
+                              onChange={(e) => updateVisiblePersona(e.target.value)}
                             />
                           </div>
 
@@ -476,13 +627,8 @@ export default function PromptPanel({
                                     className="textarea-base"
                                     rows={3}
                                     placeholder={RULE_SECTION_PLACEHOLDERS[key]}
-                                    value={draft.sections[key] || ''}
-                                    onChange={(e) =>
-                                      setDraft({
-                                        ...draft,
-                                        sections: { ...draft.sections, [key]: e.target.value },
-                                      })
-                                    }
+                                    value={visibleSections[key] || ''}
+                                    onChange={(e) => updateVisibleSection(key, e.target.value)}
                                   />
                                 </div>
                               ))}
@@ -518,7 +664,7 @@ export default function PromptPanel({
                             <button
                               className="btn btn-primary btn-sm"
                               onClick={handleSave}
-                              disabled={saving || !draft.content.trim() || (!dirty && !isCreatingPrompt)}
+                              disabled={saving || !visiblePersona.trim() || (!dirty && !isCreatingPrompt)}
                             >
                               {saving ? '儲存中...' : '儲存'}
                             </button>

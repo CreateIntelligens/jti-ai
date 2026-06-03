@@ -7,7 +7,6 @@ import {
   Link2,
   Loader2,
   Menu,
-  MessageSquare,
   Moon,
   RefreshCw,
   Settings,
@@ -32,7 +31,6 @@ interface HeaderProps {
   onOpenConversationHistory: () => void;
   onOpenAdminPanel: () => void;
   onOpenApiKeysPanel: () => void;
-  onOpenPromptPanel: () => void;
   onOpenExtKeysPanel: () => void;
   onShowStatus: (msg: string) => void;
   userProfile?: api.UserProfile | null;
@@ -50,7 +48,6 @@ export default function Header({
   onOpenConversationHistory,
   onOpenAdminPanel,
   onOpenApiKeysPanel,
-  onOpenPromptPanel,
   onOpenExtKeysPanel,
   onShowStatus,
   userProfile,
@@ -177,9 +174,6 @@ export default function Header({
                   </button>
                   <button className="dd-item" onClick={() => openPanel(onOpenApiKeysPanel)}>
                     <KeyRound size={16} /> API Key 設定
-                  </button>
-                  <button className="dd-item" onClick={() => openPanel(onOpenPromptPanel)}>
-                    <MessageSquare size={16} /> Prompt 設定
                   </button>
                   <div className="dd-sep" />
                   <button

@@ -122,19 +122,24 @@ def _compose_prompt_system_instruction(prompt, language: str = "zh") -> str:
         if prompt.max_response_chars is not None
         else DEFAULT_MAX_RESPONSE_CHARS
     )
+    # English sessions use the English persona when one was imported/saved;
+    # otherwise fall back to the (zh) content so older prompts still work.
+    persona = prompt.content
+    if language == "en" and getattr(prompt, "content_en", None):
+        persona = prompt.content_en
     return build_system_instruction(
-        persona=prompt.content,
+        persona=persona,
         language=language,
         response_rule_sections=sections,
         max_response_chars=max_chars,
     )
 
 
-def _get_system_instruction(store_name: str, auth: dict) -> str | None:
+def _get_system_instruction(store_name: str, auth: dict, language: str = "zh") -> str | None:
     prompt = _resolve_active_prompt(store_name, auth)
     if prompt is None:
         return None
-    return _compose_prompt_system_instruction(prompt)
+    return _compose_prompt_system_instruction(prompt, language=language)
 
 
 def _app_default_system_instruction(managed_app: str, language: str = "zh") -> str | None:
@@ -196,13 +201,13 @@ def _resolve_general_system_instruction(store_name: str, auth: dict, config) -> 
       3. Otherwise: the generic General prompt, augmented with the store topic so
          terse queries can be expanded.
     """
-    custom = _get_system_instruction(store_name, auth)
+    language = getattr(config, "managed_language", None) or "zh"
+    custom = _get_system_instruction(store_name, auth, language=language)
     if custom is not None:
         return custom
 
     managed_app = getattr(config, "managed_app", None)
     if config is not None and config.managed_language and managed_app in {"jti", "hciot"}:
-        language = config.managed_language or "zh"
         app_instruction = _app_default_system_instruction(managed_app, language)
         if app_instruction is not None:
             return app_instruction

@@ -42,6 +42,7 @@ _SEARCH_KNOWLEDGE_DECL = build_search_knowledge_decl(
     ),
     queries_description=(
         "使用者問題拆解後的獨立查詢列表，每一筆應為完整的問題描述（包含上下文）。"
+        "Keep query language aligned with the conversation/user question: English questions use English queries; Chinese questions use Chinese queries. "
         "若使用者只有一個問題，仍以單元素陣列回傳。"
     ),
 )

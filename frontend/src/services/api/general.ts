@@ -198,12 +198,14 @@ export async function createPrompt(
   storeName: string,
   name: string,
   content: string,
+  contentEn?: string | null,
   responseRuleSections?: RuleSectionsByLanguage,
   maxResponseChars?: number | null,
 ): Promise<any> {
   const body = {
     name,
     content,
+    ...(contentEn !== undefined && { content_en: contentEn }),
     ...(responseRuleSections !== undefined && { response_rule_sections: responseRuleSections }),
     ...(maxResponseChars !== undefined && { max_response_chars: maxResponseChars }),
   };
@@ -220,12 +222,14 @@ export async function updatePrompt(
   promptId: string,
   name?: string,
   content?: string,
+  contentEn?: string | null,
   responseRuleSections?: RuleSectionsByLanguage,
   maxResponseChars?: number | null,
 ): Promise<any> {
   const body = {
     ...(name !== undefined && { name }),
     ...(content !== undefined && { content }),
+    ...(contentEn !== undefined && { content_en: contentEn }),
     ...(responseRuleSections !== undefined && { response_rule_sections: responseRuleSections }),
     ...(maxResponseChars !== undefined && { max_response_chars: maxResponseChars }),
   };

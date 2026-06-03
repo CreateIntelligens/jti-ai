@@ -181,7 +181,6 @@ function HomeShell() {
           onOpenConversationHistory={() => setConversationHistoryModalOpen(true)}
           onOpenAdminPanel={() => openPanel('admin')}
           onOpenApiKeysPanel={() => openPanel('apikeys')}
-          onOpenPromptPanel={() => openPanel('prompt')}
           onOpenExtKeysPanel={() => openPanel('extkeys')}
           onShowStatus={showStatus}
           userProfile={profile}

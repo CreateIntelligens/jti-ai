@@ -189,7 +189,8 @@ class MainAgent(BaseAgent):
         _get_store_name_for_session and _get_rag_source_type_for_session work.
         """
         sm = self._session_manager
-        session = sm.create_session(language=language)
+        effective_language = normalize_language(managed_language or language)
+        session = sm.create_session(language=effective_language)
         session.metadata = {
             "store_name": store_name,
             "model": model or self.CHAT_MODEL,

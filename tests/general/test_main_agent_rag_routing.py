@@ -26,6 +26,17 @@ def _session(**metadata):
     return SimpleNamespace(metadata=metadata)
 
 
+class FakeSessionManager:
+    def __init__(self):
+        self.updated = None
+
+    def create_session(self, language="zh"):
+        return SimpleNamespace(session_id="session-test", language=language, metadata={})
+
+    def update_session(self, session):
+        self.updated = session
+
+
 def _tool_description(tool):
     return tool.function_declarations[0].description
 
@@ -79,3 +90,25 @@ def test_dynamic_store_uses_general_rag_tool_template():
     session = _session(store_name="store_keymapped", managed_app="jti", managed_language="")
 
     assert _tool_description(agent._get_rag_tool_declaration_for_session(session)) == _tool_description(agent._rag_tool_declaration)
+
+
+def test_managed_english_store_creates_english_session(monkeypatch):
+    import app.services.general.main_agent as general_agent_mod
+
+    fake_manager = FakeSessionManager()
+    monkeypatch.setattr(
+        general_agent_mod.deps,
+        "get_general_chat_session_manager",
+        lambda: fake_manager,
+    )
+    agent = MainAgent()
+
+    session = agent.create_session(
+        store_name="__jti__en",
+        managed_app="jti",
+        managed_language="en",
+    )
+
+    assert session.language == "en"
+    assert agent._get_session_state(session).startswith("<Internal State Info")
+    assert agent._get_question_label(session.language) == "User question:"

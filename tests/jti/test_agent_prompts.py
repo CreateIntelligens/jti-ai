@@ -3,6 +3,7 @@
 import unittest
 
 from app.services.jti.agent_prompts import PERSONA, build_system_instruction
+from app.services.jti.main_agent import MainAgent
 
 
 class TestJtiAgentPrompts(unittest.TestCase):
@@ -32,6 +33,14 @@ class TestJtiAgentPrompts(unittest.TestCase):
             instruction = build_system_instruction(PERSONA[lang], lang)
             # The persona identity text should be present
             self.assertIn("Ploom X", instruction)
+
+    def test_search_tool_preserves_english_query_language(self):
+        agent = MainAgent()
+        tool = agent._rag_tool_declaration
+        declaration = tool.function_declarations[0]
+        description = declaration.parameters.properties["queries"].description
+
+        self.assertIn("English questions use English queries", description)
 
 
 if __name__ == "__main__":

@@ -30,6 +30,9 @@ class Prompt(BaseModel):
     id: str = Field(default_factory=lambda: f"prompt_{uuid.uuid4().hex[:8]}")
     name: str
     content: str
+    # English persona. `content` stays the zh persona for backward compat; when a
+    # session runs in English we use content_en if present, else fall back to content.
+    content_en: Optional[str] = None
     response_rule_sections: Optional[Dict[str, Dict[str, str]]] = None
     welcome: Optional[Dict[str, Dict[str, str]]] = None
     max_response_chars: Optional[int] = None
@@ -156,6 +159,7 @@ class PromptManager:
         store_name: str,
         name: str,
         content: str,
+        content_en: Optional[str] = None,
         response_rule_sections: Optional[Dict[str, Dict[str, str]]] = None,
         welcome: Optional[Dict[str, Dict[str, str]]] = None,
         max_response_chars: Optional[int] = None,
@@ -174,6 +178,7 @@ class PromptManager:
         new_prompt = Prompt(
             name=name,
             content=content,
+            content_en=content_en,
             response_rule_sections=response_rule_sections,
             welcome=welcome,
             max_response_chars=max_response_chars,
@@ -195,6 +200,7 @@ class PromptManager:
         prompt_id: str,
         name: Optional[str] = None,
         content: Optional[str] = None,
+        content_en: Optional[str] = None,
         response_rule_sections: Optional[Dict[str, Dict[str, str]]] = None,
         welcome: Optional[Dict[str, Dict[str, str]]] = None,
         max_response_chars: Optional[int] = None,
@@ -212,6 +218,8 @@ class PromptManager:
                     prompt.name = name
                 if content is not None:
                     prompt.content = content
+                if content_en is not None:
+                    prompt.content_en = content_en
                 if response_rule_sections is not None:
                     prompt.response_rule_sections = response_rule_sections
                 if welcome is not None:
