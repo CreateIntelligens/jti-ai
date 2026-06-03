@@ -20,6 +20,7 @@ import { deleteConversations, fetchAsAdmin, fetchWithApiKey, getGeneralConversat
 import MiniCalendar from './MiniCalendar';
 import HciotImageAttachment from './hciot/HciotImageAttachment';
 import { useEscapeKey } from '../hooks/useEscapeKey';
+import { useOverlayPressClose } from '../hooks/useOverlayPressClose';
 
 interface ConversationEntry {
   _id: string;
@@ -63,6 +64,26 @@ interface Session {
   total: number;
 }
 
+interface RawExportDoc {
+  timestamp: string;
+  user_message: string;
+  agent_response: string;
+}
+
+interface RawExportSession {
+  session_id: string;
+  conversations?: RawExportDoc[];
+}
+
+interface SimplifiedExportSession {
+  session_id: string;
+  conversations: {
+    timestamp: string;
+    question: string;
+    answer: string;
+  }[];
+}
+
 interface ConversationHistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -90,6 +111,40 @@ function getSessionLanguageBadge(language?: string) {
   };
 }
 
+function simplifyExportSessions(data: { sessions?: RawExportSession[] }): SimplifiedExportSession[] {
+  const simplified: SimplifiedExportSession[] = [];
+  if (!Array.isArray(data.sessions)) {
+    return simplified;
+  }
+
+  for (const session of data.sessions) {
+    const conversations = (session.conversations || []).map((conversation) => ({
+      timestamp: conversation.timestamp,
+      question: conversation.user_message || '',
+      answer: conversation.agent_response || '',
+    }));
+
+    if (conversations.length > 0) {
+      simplified.push({
+        session_id: session.session_id,
+        conversations,
+      });
+    }
+  }
+  return simplified;
+}
+
+function exportFilename(mode: string, sessionIds?: string[]): string {
+  const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+  if (!sessionIds || sessionIds.length === 0) {
+    return `${mode}_history_export_${dateStr}.json`;
+  }
+  if (sessionIds.length === 1) {
+    return `${mode}_session_${sessionIds[0].slice(0, 8)}_${dateStr}.json`;
+  }
+  return `${mode}_selected_sessions_${sessionIds.length}_${dateStr}.json`;
+}
+
 export default function ConversationHistoryModal({
   isOpen,
   onClose,
@@ -100,6 +155,7 @@ export default function ConversationHistoryModal({
 }: ConversationHistoryModalProps) {
   const { t } = useTranslation();
   const isAdminMode = mode === 'jti' || mode === 'hciot';
+  const overlayPressClose = useOverlayPressClose(onClose);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -183,6 +239,7 @@ export default function ConversationHistoryModal({
 
   // Selection state
   const [selectedSessions, setSelectedSessions] = useState<Set<string>>(new Set());
+  const [exporting, setExporting] = useState(false);
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -374,6 +431,7 @@ export default function ConversationHistoryModal({
 
   const exportAsJSON = async (sessionIds?: string[]) => {
     try {
+      setExporting(true);
       let url = '';
       if (mode === 'jti') {
         url = `/api/jti-admin/conversations/export`;
@@ -395,10 +453,30 @@ export default function ConversationHistoryModal({
         }
       }
 
-      window.open(url, '_blank');
+      const response = await (isAdminMode ? fetchAsAdmin(url) : fetchWithApiKey(url));
+      if (!response.ok) {
+        throw new Error(`Export API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const simplified = simplifyExportSessions(data);
+      const jsonString = JSON.stringify(simplified, null, 2);
+      const blob = new Blob([jsonString], { type: 'application/json' });
+      const blobUrl = URL.createObjectURL(blob);
+
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = exportFilename(mode, sessionIds);
+
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
     } catch (error) {
       console.error('[ConversationHistory] Export error:', error);
       alert('匯出失敗，請稍後再試');
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -477,7 +555,7 @@ export default function ConversationHistoryModal({
   if (!isOpen) return null;
 
   return (
-    <div className={`conversation-history-overlay ${mode === 'jti' ? 'jti-theme' : ''}`} onClick={onClose}>
+    <div className={`conversation-history-overlay ${mode === 'jti' ? 'jti-theme' : ''}`} {...overlayPressClose}>
       <div className={`conversation-history-modal ${mode === 'jti' ? 'jti-theme' : ''}`} onClick={(e) => e.stopPropagation()}>
 
         {/* Header */}
@@ -594,11 +672,14 @@ export default function ConversationHistoryModal({
             )}
           </div>
           <button
-            onClick={() => exportAsJSON()}
-            disabled={filteredSessions.length === 0}
+            onClick={() => {
+              const ids = selectedSessions.size > 0 ? Array.from(selectedSessions) : undefined;
+              exportAsJSON(ids);
+            }}
+            disabled={filteredSessions.length === 0 || exporting}
           >
-            <Download size={16} />
-            {t('export')}
+            <Download size={16} className={exporting ? 'animate-spin' : ''} />
+            {exporting ? '匯出中...' : (selectedSessions.size > 0 ? `匯出已選 (${selectedSessions.size})` : t('export'))}
           </button>
           <button
             onClick={() => {
@@ -754,8 +835,9 @@ export default function ConversationHistoryModal({
                           exportAsJSON([session.session_id]);
                         }}
                         title={t('export')}
+                        disabled={exporting}
                       >
-                        <Download size={16} />
+                        <Download size={16} className={exporting ? 'animate-spin' : ''} />
                       </button>
                       <button
                         className="session-delete-btn"

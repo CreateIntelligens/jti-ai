@@ -9,6 +9,7 @@ from typing import Optional
 _TZ_TAIPEI = timezone(timedelta(hours=8))
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import JSONResponse
 
 import app.deps as deps
 from app.auth import verify_admin, verify_auth
@@ -25,7 +26,16 @@ from app.schemas.chat import (
 from app.services.hciot.main_agent import main_agent
 from app.services.hciot.runtime_settings import get_available_tts_characters
 from app.services.hciot.tts import to_hciot_tts_text
-from app.utils import build_date_query, export_sessions_by_ids, group_conversations_by_session
+from app.utils import (
+    build_date_query,
+    count_session_conversations,
+    export_sessions_by_ids,
+    filter_conversations_by_session_language,
+    filter_export_sessions_by_language,
+    filter_session_ids_by_language,
+    group_conversations_by_session,
+    simplified_conversation_sessions,
+)
 
 
 _OPENING_MESSAGE: dict[str, str] = {
@@ -134,6 +144,7 @@ async def chat(request: ChatRequest):
             agent_response=answer,
             tool_calls=result.get("tool_calls", []),
             mode="hciot",
+            session_state={"language": language},
             citations=result.get("citations"),
             image_id=result.get("image_id"),
         ) or (None, None)
@@ -218,23 +229,53 @@ async def export_conversations(
     session_ids: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    simple: bool = False,
+    language: Optional[str] = None,
 ):
     mode = "hciot"
     try:
         conversation_logger = _get_conversation_logger()
+        session_manager = _get_session_manager()
+
         if session_ids:
             sessions, total_conversations = export_sessions_by_ids(conversation_logger, session_ids, mode)
-            return {"exported_at": datetime.now(_TZ_TAIPEI).isoformat(), "mode": mode, "sessions": sessions, "total_conversations": total_conversations, "total_sessions": len(sessions)}
-
-        if date_from or date_to:
-            query = build_date_query(mode, date_from, date_to)
-            sid_list, _ = conversation_logger.get_paginated_session_ids(query=query, page=1, page_size=100000)
-            all_conversations = conversation_logger.get_logs_for_sessions(sid_list)
+            if language:
+                sessions = filter_export_sessions_by_language(sessions, session_manager, language)
+                total_conversations = count_session_conversations(sessions)
+            result = {
+                "exported_at": datetime.now(_TZ_TAIPEI).isoformat(),
+                "mode": mode,
+                "sessions": sessions,
+                "total_conversations": total_conversations,
+                "total_sessions": len(sessions),
+            }
         else:
-            all_conversations = conversation_logger.get_session_logs_by_mode(mode)
+            if date_from or date_to:
+                query = build_date_query(mode, date_from, date_to)
+                sid_list, _ = conversation_logger.get_paginated_session_ids(query=query, page=1, page_size=100000)
+                sid_list = filter_session_ids_by_language(sid_list, session_manager, language)
+                all_conversations = conversation_logger.get_logs_for_sessions(sid_list)
+            else:
+                all_conversations = conversation_logger.get_session_logs_by_mode(mode)
+                all_conversations = filter_conversations_by_session_language(
+                    all_conversations,
+                    session_manager,
+                    language,
+                )
 
-        session_list = group_conversations_by_session(all_conversations)
-        return {"exported_at": datetime.now(_TZ_TAIPEI).isoformat(), "mode": mode, "sessions": session_list, "total_conversations": len(all_conversations), "total_sessions": len(session_list)}
+            session_list = group_conversations_by_session(all_conversations)
+            result = {
+                "exported_at": datetime.now(_TZ_TAIPEI).isoformat(),
+                "mode": mode,
+                "sessions": session_list,
+                "total_conversations": len(all_conversations),
+                "total_sessions": len(session_list),
+            }
+
+        if simple:
+            return JSONResponse(content=simplified_conversation_sessions(result.get("sessions", [])))
+
+        return result
     except Exception as e:
         logger.error("Failed to export HCIoT conversations: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

@@ -98,6 +98,90 @@ def group_conversations_by_session(conversations: list) -> list:
     return session_list
 
 
+def simplified_conversation_sessions(sessions: list[dict]) -> list[dict]:
+    """Return export sessions with only timestamp/question/answer fields."""
+    simplified = []
+    for session in sessions:
+        conversations = [
+            {
+                "timestamp": conversation.get("timestamp"),
+                "question": conversation.get("user_message", ""),
+                "answer": conversation.get("agent_response", ""),
+            }
+            for conversation in session.get("conversations", [])
+        ]
+        if conversations:
+            simplified.append({
+                "session_id": session.get("session_id"),
+                "conversations": conversations,
+            })
+    return simplified
+
+
+def filter_export_sessions_by_language(
+    sessions: list[dict],
+    session_manager,
+    language: Optional[str],
+) -> list[dict]:
+    """Filter grouped export sessions by their persisted session language."""
+    if not language:
+        return sessions
+
+    filtered = []
+    for session in sessions:
+        session_doc = session_manager.get_session(session.get("session_id"))
+        if session_doc and session_doc.language == language:
+            filtered.append(session)
+    return filtered
+
+
+def filter_session_ids_by_language(
+    session_ids: list[str],
+    session_manager,
+    language: Optional[str],
+) -> list[str]:
+    """Filter session ids by their persisted session language."""
+    if not language:
+        return session_ids
+
+    filtered = []
+    for session_id in session_ids:
+        session_doc = session_manager.get_session(session_id)
+        if session_doc and session_doc.language == language:
+            filtered.append(session_id)
+    return filtered
+
+
+def filter_conversations_by_session_language(
+    conversations: list[dict],
+    session_manager,
+    language: Optional[str],
+) -> list[dict]:
+    """Filter raw conversation docs by session language, caching session lookups."""
+    if not language:
+        return conversations
+
+    filtered = []
+    language_by_session: dict[str, str | None] = {}
+    for conversation in conversations:
+        session_id = conversation.get("session_id")
+        log_language = conversation.get("session_snapshot", {}).get("language")
+        if log_language:
+            language_by_session[session_id] = log_language
+        elif session_id not in language_by_session:
+            session_doc = session_manager.get_session(session_id)
+            language_by_session[session_id] = session_doc.language if session_doc else None
+
+        if language_by_session.get(session_id) == language:
+            filtered.append(conversation)
+    return filtered
+
+
+def count_session_conversations(sessions: list[dict]) -> int:
+    """Count conversations in grouped export sessions."""
+    return sum(len(session.get("conversations", [])) for session in sessions)
+
+
 def get_other_language(language: str) -> str:
     """Get the opposite language (en <-> zh)."""
     return "en" if language == "zh" else "zh"

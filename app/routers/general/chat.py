@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.auth import extract_user_gemini_api_key, verify_auth
@@ -26,7 +27,13 @@ from app.schemas.chat import (
     GeneralConversationsResponse,
 )
 from app.models_config import DEFAULT_RAG_MODEL
-from app.utils import build_date_query, export_sessions_by_ids, group_conversations_by_session, group_conversations_as_summary
+from app.utils import (
+    build_date_query,
+    export_sessions_by_ids,
+    group_conversations_as_summary,
+    group_conversations_by_session,
+    simplified_conversation_sessions,
+)
 import app.deps as deps
 from app.services.general.agent_prompts import (
     DEFAULT_MAX_RESPONSE_CHARS,
@@ -424,6 +431,7 @@ def get_general_conversations(
 def export_general_conversations(
     store_name: Optional[str] = None,
     session_ids: Optional[str] = None,
+    simple: bool = False,
     auth: dict = Depends(verify_auth),
 ):
     """匯出 general chat 的對話歷史為 JSON 格式"""
@@ -436,7 +444,7 @@ def export_general_conversations(
             sessions, total_conversations = export_sessions_by_ids(
                 conversation_logger, session_ids, "general", store_filter=store_name,
             )
-            return {
+            result = {
                 "exported_at": datetime.now(timezone.utc).isoformat(),
                 "store_name": store_name,
                 "mode": "general",
@@ -454,14 +462,19 @@ def export_general_conversations(
 
             session_list = group_conversations_by_session(store_conversations)
 
-            return {
+            result = {
                 "exported_at": datetime.now(timezone.utc).isoformat(),
                 "store_name": store_name,
                 "mode": "general",
                 "sessions": session_list,
                 "total_conversations": len(store_conversations),
                 "total_sessions": len(session_list)
-            }
+        }
+
+        if simple:
+            return JSONResponse(content=simplified_conversation_sessions(result.get("sessions", [])))
+
+        return result
 
     except Exception as e:
         logger.error("Failed to export general conversations: %s", e)
