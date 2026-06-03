@@ -27,7 +27,7 @@ class UserOut(BaseModel):
     id: str
     username: str
     role: str
-    app: str | None = None
+    scope: str | None = None
     store_name: str | None = None
     created_by: str | None = None
     created_at: str
@@ -39,7 +39,7 @@ class UserOut(BaseModel):
             id=user.id,
             username=user.username,
             role=user.role,
-            app=user.app,
+            scope=user.scope,
             store_name=user.store_name,
             created_by=user.created_by,
             created_at=user.created_at,
@@ -51,7 +51,7 @@ class CreateUserRequest(BaseModel):
     username: str
     password: str
     role: str
-    app: str | None = None
+    scope: str | None = None
     store_name: str | None = None
 
 
@@ -92,12 +92,12 @@ def _assert_can_target(auth: dict, target: User) -> None:
 @router.get("/users", response_model=list[UserOut])
 def list_users(
     role: str | None = None,
-    app: str | None = None,
+    scope: str | None = None,
     auth: dict = Depends(require_admin_dep),
 ):
-    """列出使用者,可選 role / app 篩選。"""
+    """列出使用者,可選 role / scope 篩選。"""
     manager = _require_manager()
-    return [UserOut.from_user(u) for u in manager.list_users(role=role, app=app)]
+    return [UserOut.from_user(u) for u in manager.list_users(role=role, scope=scope)]
 
 
 @router.post("/users", response_model=UserOut, status_code=201)
@@ -118,7 +118,7 @@ def create_user(request: CreateUserRequest, auth: dict = Depends(require_admin_d
             username=request.username,
             password=request.password,
             role=request.role,
-            app=request.app,
+            scope=request.scope,
             store_name=request.store_name,
             created_by=auth.get("user_id"),
         )

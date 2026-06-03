@@ -50,18 +50,18 @@ def test_round_trip_returns_claims(monkeypatch):
     assert claims is not None
     assert claims["sub"] == "user_1"
     assert claims["role"] == "user"
-    assert claims["app"] == "jti"
+    assert claims["scope"] == "jti"
     assert "iat" in claims
     assert "exp" in claims
 
 
 @requires_jwt
-def test_app_none_round_trips(monkeypatch):
+def test_scope_none_round_trips(monkeypatch):
     monkeypatch.setenv("SESSION_JWT_SECRET", "test-secret")
     token = create_session_token("u", "admin", None)
     claims = decode_session_token(token)
     assert claims is not None
-    assert claims["app"] is None
+    assert claims["scope"] is None
 
 
 @requires_jwt

@@ -463,12 +463,12 @@ def _list_assigned_store_payloads(
     store_name: str,
     owner_key_hash: str | None,
     app_filter: str | None,
-    auth_app: str | None = None,
+    auth_scope: str | None = None,
 ) -> list[dict[str, Any]]:
-    expected_app = _normalize_app_filter(auth_app)
+    expected_scope = _normalize_app_filter(auth_scope)
     managed = resolve_managed_store(store_name)
     if managed is not None:
-        if expected_app is not None and not store_config_matches_scope(managed, expected_app):
+        if expected_scope is not None and not store_config_matches_scope(managed, expected_scope):
             raise HTTPException(status_code=403, detail="Access denied")
         if app_filter is not None and not store_config_matches_scope(managed, app_filter):
             raise HTTPException(status_code=403, detail="Access denied")
@@ -479,7 +479,7 @@ def _list_assigned_store_payloads(
     if dynamic is None:
         raise HTTPException(status_code=404, detail="Knowledge store not found")
 
-    if expected_app is not None and not _dynamic_store_matches_scope(dynamic, expected_app):
+    if expected_scope is not None and not _dynamic_store_matches_scope(dynamic, expected_scope):
         raise HTTPException(status_code=403, detail="Access denied")
     if app_filter is not None and not _dynamic_store_matches_scope(dynamic, app_filter):
         raise HTTPException(status_code=403, detail="Access denied")
@@ -497,15 +497,15 @@ def _list_user_scoped_stores(
             assigned_store,
             owner_key_hash,
             app_filter,
-            auth.get("app"),
+            auth.get("scope"),
         )
 
-    auth_app = (auth.get("app") or "").strip().lower()
-    if not auth_app:
+    auth_scope = (auth.get("scope") or "").strip().lower()
+    if not auth_scope:
         raise HTTPException(status_code=403, detail="Access denied")
-    if app_filter is not None and not _scope_values_equal(app_filter, auth_app):
+    if app_filter is not None and not _scope_values_equal(app_filter, auth_scope):
         raise HTTPException(status_code=403, detail="Access denied")
-    return _list_scope_scoped_store_payloads(owner_key_hash, auth_app)
+    return _list_scope_scoped_store_payloads(owner_key_hash, auth_scope)
 
 
 @router.get("/stores")

@@ -1,6 +1,6 @@
 """UserManager / User 測試。
 
-純邏輯 (角色 / app 驗證、User 模型) 不需 Mongo;
+純邏輯 (角色 / scope 驗證、User 模型) 不需 Mongo;
 Mongo 相關方法以 MagicMock 取代 collection 測試 (與 tests/storage 慣例一致)。
 """
 
@@ -15,7 +15,7 @@ HAS_BCRYPT = importlib.util.find_spec("bcrypt") is not None
 requires_bcrypt = pytest.mark.skipif(not HAS_BCRYPT, reason="bcrypt 未安裝")
 
 
-# --- 純邏輯: 角色 / app 驗證 (不需 Mongo) ---
+# --- 純邏輯: 角色 / scope 驗證 (不需 Mongo) ---
 
 class TestValidateRoleScope:
     def test_allowed_roles_set(self):
@@ -23,30 +23,30 @@ class TestValidateRoleScope:
 
     def test_invalid_role_raises(self):
         with pytest.raises(ValueError):
-            UserManager._validate_role_scope("root", app="jti")
+            UserManager._validate_role_scope("root", scope="jti")
 
     @pytest.mark.parametrize("role", ["super_admin", "admin"])
-    def test_admin_roles_allow_none_app(self, role):
+    def test_admin_roles_allow_none_scope(self, role):
         # 不丟例外
-        UserManager._validate_role_scope(role, app=None, store_name=None)
+        UserManager._validate_role_scope(role, scope=None, store_name=None)
 
-    def test_user_role_requires_app_or_store(self):
-        with pytest.raises(ValueError, match="app.*store_name|store_name.*app"):
-            UserManager._validate_role_scope("user", app=None, store_name=None)
+    def test_user_role_requires_scope_or_store(self):
+        with pytest.raises(ValueError, match="scope.*store_name|store_name.*scope"):
+            UserManager._validate_role_scope("user", scope=None, store_name=None)
 
     def test_user_role_rejects_empty_scope(self):
-        with pytest.raises(ValueError, match="app.*store_name|store_name.*app"):
-            UserManager._validate_role_scope("user", app="", store_name="")
+        with pytest.raises(ValueError, match="scope.*store_name|store_name.*scope"):
+            UserManager._validate_role_scope("user", scope="", store_name="")
 
-    def test_user_role_with_app_ok(self):
-        UserManager._validate_role_scope("user", app="hciot", store_name=None)
+    def test_user_role_with_scope_ok(self):
+        UserManager._validate_role_scope("user", scope="hciot", store_name=None)
 
     def test_user_role_rejects_legacy_key_index_scope(self):
         with pytest.raises(ValueError, match="key_name"):
-            UserManager._validate_role_scope("user", app="key:1", store_name=None)
+            UserManager._validate_role_scope("user", scope="key:1", store_name=None)
 
     def test_user_role_with_store_only_ok(self):
-        UserManager._validate_role_scope("user", app=None, store_name="store_hotai")
+        UserManager._validate_role_scope("user", scope=None, store_name="store_hotai")
 
 
 # --- 純邏輯: User 模型 ---
@@ -55,7 +55,7 @@ class TestUserModel:
     def test_defaults(self):
         u = User(username="alice", password_hash="h", role="admin")
         assert u.id.startswith("user_")
-        assert u.app is None
+        assert u.scope is None
         assert u.store_name is None
         assert u.created_by is None
         assert u.disabled is False
@@ -92,10 +92,10 @@ class TestUserManagerMongo:
     @requires_bcrypt
     def test_create_user_hashes_password_and_inserts(self):
         mgr = _manager_with_mock_collection()
-        user = mgr.create_user("carol", "pw123", role="user", app="jti")
+        user = mgr.create_user("carol", "pw123", role="user", scope="jti")
         assert user.username == "carol"
         assert user.role == "user"
-        assert user.app == "jti"
+        assert user.scope == "jti"
         # 不存明文
         assert user.password_hash != "pw123"
         doc = mgr.collection.insert_one.call_args[0][0]
@@ -109,13 +109,13 @@ class TestUserManagerMongo:
             "hotai-user",
             "pw123",
             role="user",
-            app=None,
+            scope=None,
             store_name="store_hotai",
         )
-        assert user.app is None
+        assert user.scope is None
         assert user.store_name == "store_hotai"
         doc = mgr.collection.insert_one.call_args[0][0]
-        assert doc["app"] is None
+        assert doc["scope"] is None
         assert doc["store_name"] == "store_hotai"
 
     @requires_bcrypt
@@ -192,13 +192,13 @@ class TestUserManagerMongo:
         cursor.sort.assert_called_once_with("created_at", -1)
         assert mgr.collection.find.call_args[0][0] == {}
 
-    def test_list_users_filters_role_and_app(self):
+    def test_list_users_filters_role_and_scope(self):
         mgr = _manager_with_mock_collection()
         cursor = MagicMock()
         cursor.sort.return_value = []
         mgr.collection.find.return_value = cursor
-        mgr.list_users(role="user", app="jti")
-        assert mgr.collection.find.call_args[0][0] == {"role": "user", "app": "jti"}
+        mgr.list_users(role="user", scope="jti")
+        assert mgr.collection.find.call_args[0][0] == {"role": "user", "scope": "jti"}
 
     def test_set_disabled(self):
         mgr = _manager_with_mock_collection()
@@ -223,3 +223,35 @@ class TestUserManagerMongo:
         mgr = _manager_with_mock_collection()
         mgr.collection.delete_one.return_value = MagicMock(deleted_count=0)
         assert mgr.delete_user("nope") is False
+
+
+class TestUserScopeDerivation:
+    def _user(self, scope=None, store_name=None):
+        return User(
+            id="u1",
+            username="u",
+            password_hash="x",
+            role="user",
+            scope=scope,
+            store_name=store_name,
+        )
+
+    def test_store_name_takes_precedence(self):
+        u = self._user(scope="hciot", store_name="store_x")
+        assert u.scope_kind == "store"
+        assert u.scope_value == "store_x"
+
+    def test_key_name_scope(self):
+        u = self._user(scope="key_name:%E5%92%8C%E6%B3%B0%E6%B1%BD%E8%BB%8A")
+        assert u.scope_kind == "key"
+        assert u.scope_value == "和泰汽車"
+
+    def test_plain_app_scope(self):
+        u = self._user(scope="hciot")
+        assert u.scope_kind == "app"
+        assert u.scope_value == "hciot"
+
+    def test_empty_scope(self):
+        u = self._user()
+        assert u.scope_kind == "app"
+        assert u.scope_value is None

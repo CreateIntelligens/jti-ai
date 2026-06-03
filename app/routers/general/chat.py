@@ -79,16 +79,16 @@ def _resolve_request_store(
         assigned_store = auth.get("store_name")
         if assigned_store:
             config = resolve_or_404(assigned_store)
-            auth_app = auth.get("app")
-            if auth_app and not store_config_matches_scope(config, auth_app):
+            auth_scope = auth.get("scope")
+            if auth_scope and not store_config_matches_scope(config, auth_scope):
                 raise HTTPException(status_code=403, detail="Access denied")
             return config.name
 
-        auth_app = auth.get("app")
-        if not auth_app:
+        auth_scope = auth.get("scope")
+        if not auth_scope:
             raise HTTPException(status_code=403, detail="Access denied")
         config = resolve_or_404(req.store_name)
-        if not store_config_matches_scope(config, auth_app):
+        if not store_config_matches_scope(config, auth_scope):
             raise HTTPException(status_code=403, detail="Access denied")
         return config.name
 

@@ -40,9 +40,9 @@ def main() -> None:
         help="角色: super_admin / admin / user",
     )
     parser.add_argument(
-        "--app",
+        "--scope",
         default=None,
-        help="所屬 app (hciot/jti/general);role=user 必填,其餘留空",
+        help="所屬 scope (e.g. hciot/jti/general/key_name:<name>);role=user 必填,其餘留空",
     )
     parser.add_argument(
         "--store-name",
@@ -63,7 +63,7 @@ def main() -> None:
             username=args.username,
             password=password,
             role=args.role,
-            app=args.app,
+            scope=args.scope,
             store_name=args.store_name,
             created_by="seed-script",
         )
@@ -72,7 +72,7 @@ def main() -> None:
 
     print(
         f"已建立: id={user.id} username={user.username} "
-        f"role={user.role} app={user.app}",
+        f"role={user.role} scope={user.scope}",
         file=sys.stderr,
     )
 

@@ -1,6 +1,6 @@
 """JWT session token 工具 (HS256, PyJWT)。
 
-- create_session_token: 簽發含 sub/role/app/iat/exp 的 session token。
+- create_session_token: 簽發含 sub/role/scope/iat/exp 的 session token。
 - decode_session_token: 驗證並回傳 claims;任何失敗 (壞簽章 / 過期 / 格式錯) 一律回 None,絕不丟例外給呼叫端。
 
 secret 來源優先序:
@@ -26,13 +26,13 @@ def _get_secret() -> str | None:
 def create_session_token(
     user_id: str,
     role: str,
-    app: str | None,
+    scope: str | None,
     *,
     expires_in: int = 86400,
 ) -> str:
     """簽發 HS256 session token。
 
-    claims: sub=user_id, role, app, iat, exp。
+    claims: sub=user_id, role, scope, iat, exp。
 
     Raises:
         RuntimeError: 找不到任何可用 secret 時 (絕不退回 hardcode 預設值)。
@@ -49,7 +49,7 @@ def create_session_token(
     payload = {
         "sub": user_id,
         "role": role,
-        "app": app,
+        "scope": scope,
         "iat": now,
         "exp": now.timestamp() + expires_in,
     }

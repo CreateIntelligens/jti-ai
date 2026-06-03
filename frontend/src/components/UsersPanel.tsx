@@ -138,7 +138,7 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
       username: trimmedUsername,
       password,
       role,
-      app: role === 'user' && trimmedScope ? trimmedScope : null,
+      scope: role === 'user' && trimmedScope ? trimmedScope : null,
       store_name: role === 'user' && trimmedStoreName ? trimmedStoreName : null,
     };
 
@@ -345,9 +345,9 @@ export default function UsersPanel({ isOpen, onClose, currentUserRole = 'admin',
                           <span className={`kc-badge ${roleBadgeClass(u.role)}`}>
                             {u.role}
                           </span>
-                          {u.app && (
+                          {u.scope && (
                             <span className="kc-badge system">
-                              {scopeLabel(u.app)}
+                              {scopeLabel(u.scope)}
                             </span>
                           )}
                           {isSelf && (

@@ -1,6 +1,6 @@
 """登入 / 登出 API (session JWT)。
 
-- POST /api/auth/login: 驗證帳密,成功回 {token, role, app} 並設 httpOnly cookie `session`;
+- POST /api/auth/login: 驗證帳密,成功回 {token, role, scope} 並設 httpOnly cookie `session`;
   帳密錯一律 401 + 通用訊息 (不洩漏是帳號還是密碼錯)。
 - POST /api/auth/logout: 清除 `session` cookie,回 {ok: true} (stateless JWT,登出即清 cookie)。
 
@@ -44,7 +44,7 @@ def login(body: LoginRequest, response: Response):
         # 通用訊息,不洩漏帳號是否存在 / 密碼是否正確
         raise HTTPException(status_code=401, detail=_INVALID_CREDENTIALS)
 
-    token = create_session_token(user.id, user.role, user.app)
+    token = create_session_token(user.id, user.role, user.scope)
 
     response.set_cookie(
         key=_COOKIE_NAME,
@@ -54,7 +54,7 @@ def login(body: LoginRequest, response: Response):
         samesite="lax",
     )
 
-    return {"token": token, "role": user.role, "app": user.app}
+    return {"token": token, "role": user.role, "scope": user.scope}
 
 
 @router.post("/logout")
@@ -78,6 +78,6 @@ def get_me(auth: dict = Depends(verify_auth)):
         "user_id": user_id,
         "username": username,
         "role": auth.get("role"),
-        "app": auth.get("app"),
+        "scope": auth.get("scope"),
         "store_name": auth.get("store_name"),
     }

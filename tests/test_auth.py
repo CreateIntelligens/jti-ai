@@ -48,7 +48,7 @@ def test_verify_auth_extracts_token_from_cookie(monkeypatch):
     monkeypatch.setattr(
         auth_mod, "decode_session_token",
         lambda t: (
-            {"sub": "user_cookie", "role": "user", "app": "jti"}
+            {"sub": "user_cookie", "role": "user", "scope": "jti"}
             if t == "cookie-token"
             else None
         ),
@@ -63,4 +63,4 @@ def test_verify_auth_extracts_token_from_cookie(monkeypatch):
     )
     assert auth["user_id"] == "user_cookie"
     assert auth["role"] == "user"
-    assert auth["app"] == "jti"
+    assert auth["scope"] == "jti"

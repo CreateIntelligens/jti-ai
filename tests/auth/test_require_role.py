@@ -37,19 +37,19 @@ def _bearer(token: str):
 
 # --- session JWT branch (monkeypatched decode + user_manager) ---
 
-def test_jwt_returns_role_app_from_claims(monkeypatch):
+def test_jwt_returns_role_scope_from_claims(monkeypatch):
     monkeypatch.setattr(
         auth_mod, "decode_session_token",
-        lambda t: {"sub": "user_abc", "role": "user", "app": "jti"},
+        lambda t: {"sub": "user_abc", "role": "user", "scope": "jti"},
     )
     user = User(id="user_abc", username="alice", password_hash="x",
-                role="user", app="jti", store_name="store_jti")
+                role="user", scope="jti", store_name="store_jti")
     monkeypatch.setattr(deps, "user_manager",
                         SimpleNamespace(get_user=lambda uid: user), raising=False)
 
     auth = verify_auth(_bearer("any.jwt.token"))
     assert auth["role"] == "user"
-    assert auth["app"] == "jti"
+    assert auth["scope"] == "jti"
     assert auth["store_name"] == "store_jti"
     assert auth["user_id"] == "user_abc"
 
@@ -57,25 +57,25 @@ def test_jwt_returns_role_app_from_claims(monkeypatch):
 def test_jwt_admin_role(monkeypatch):
     monkeypatch.setattr(
         auth_mod, "decode_session_token",
-        lambda t: {"sub": "user_admin", "role": "admin", "app": None},
+        lambda t: {"sub": "user_admin", "role": "admin", "scope": None},
     )
     user = User(id="user_admin", username="boss", password_hash="x",
-                role="admin", app=None)
+                role="admin", scope=None)
     monkeypatch.setattr(deps, "user_manager",
                         SimpleNamespace(get_user=lambda uid: user), raising=False)
 
     auth = verify_auth(_bearer("any.jwt"))
     assert auth["role"] == "admin"
-    assert auth["app"] is None
+    assert auth["scope"] is None
 
 
 def test_jwt_disabled_user_raises_401(monkeypatch):
     monkeypatch.setattr(
         auth_mod, "decode_session_token",
-        lambda t: {"sub": "user_x", "role": "user", "app": "jti"},
+        lambda t: {"sub": "user_x", "role": "user", "scope": "jti"},
     )
     disabled = User(id="user_x", username="bob", password_hash="x",
-                    role="user", app="jti", disabled=True)
+                    role="user", scope="jti", disabled=True)
     monkeypatch.setattr(deps, "user_manager",
                         SimpleNamespace(get_user=lambda uid: disabled), raising=False)
 
@@ -87,7 +87,7 @@ def test_jwt_disabled_user_raises_401(monkeypatch):
 def test_jwt_unknown_user_raises_401(monkeypatch):
     monkeypatch.setattr(
         auth_mod, "decode_session_token",
-        lambda t: {"sub": "ghost", "role": "user", "app": "jti"},
+        lambda t: {"sub": "ghost", "role": "user", "scope": "jti"},
     )
     monkeypatch.setattr(deps, "user_manager",
                         SimpleNamespace(get_user=lambda uid: None), raising=False)
@@ -101,13 +101,13 @@ def test_jwt_without_user_manager_uses_claims(monkeypatch):
     """deps.user_manager is None (測試環境) → 直接信任 claims。"""
     monkeypatch.setattr(
         auth_mod, "decode_session_token",
-        lambda t: {"sub": "user_abc", "role": "user", "app": "general"},
+        lambda t: {"sub": "user_abc", "role": "user", "scope": "general"},
     )
     monkeypatch.setattr(deps, "user_manager", None, raising=False)
 
     auth = verify_auth(_bearer("any.jwt"))
     assert auth["role"] == "user"
-    assert auth["app"] == "general"
+    assert auth["scope"] == "general"
     assert auth["user_id"] == "user_abc"
 
 
@@ -137,7 +137,7 @@ def test_same_origin_without_token_raises_401():
 def test_require_role_allows_matching(monkeypatch):
     monkeypatch.setattr(
         auth_mod, "decode_session_token",
-        lambda t: {"sub": "u", "role": "user", "app": "jti"},
+        lambda t: {"sub": "u", "role": "user", "scope": "jti"},
     )
     monkeypatch.setattr(deps, "user_manager", None, raising=False)
     checker = require_role("user", "admin")
@@ -148,7 +148,7 @@ def test_require_role_allows_matching(monkeypatch):
 def test_require_role_denies_insufficient(monkeypatch):
     monkeypatch.setattr(
         auth_mod, "decode_session_token",
-        lambda t: {"sub": "u", "role": "user", "app": "jti"},
+        lambda t: {"sub": "u", "role": "user", "scope": "jti"},
     )
     monkeypatch.setattr(deps, "user_manager", None, raising=False)
     checker = require_role("admin", "super_admin")
@@ -192,7 +192,7 @@ def test_real_jwt_round_trip_through_verify_auth(monkeypatch):
     token = create_session_token("user_real", "user", "hciot")
     auth = verify_auth(_bearer(token))
     assert auth["role"] == "user"
-    assert auth["app"] == "hciot"
+    assert auth["scope"] == "hciot"
     assert auth["user_id"] == "user_real"
 
 
@@ -207,7 +207,7 @@ def test_api_auth_me_returns_profile_info(monkeypatch):
 
     app.dependency_overrides[auth_mod.verify_auth] = lambda: {
         "role": "user",
-        "app": "hciot",
+        "scope": "hciot",
         "store_name": "store_a",
         "user_id": "user_id_123",
     }
@@ -217,7 +217,7 @@ def test_api_auth_me_returns_profile_info(monkeypatch):
         username="alice",
         password_hash="x",
         role="user",
-        app="hciot",
+        scope="hciot",
         store_name="store_a",
     )
     monkeypatch.setattr(
@@ -234,7 +234,7 @@ def test_api_auth_me_returns_profile_info(monkeypatch):
             "user_id": "user_id_123",
             "username": "alice",
             "role": "user",
-            "app": "hciot",
+            "scope": "hciot",
             "store_name": "store_a",
         }
     finally:
@@ -250,7 +250,7 @@ def test_api_auth_me_no_user_manager_returns_claims_only(monkeypatch):
 
     app.dependency_overrides[auth_mod.verify_auth] = lambda: {
         "role": "admin",
-        "app": None,
+        "scope": None,
         "store_name": None,
         "user_id": "user_admin_123",
     }
@@ -263,7 +263,7 @@ def test_api_auth_me_no_user_manager_returns_claims_only(monkeypatch):
             "user_id": "user_admin_123",
             "username": None,
             "role": "admin",
-            "app": None,
+            "scope": None,
             "store_name": None,
         }
     finally:

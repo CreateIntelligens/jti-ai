@@ -23,7 +23,7 @@ app = get_test_app()
 
 
 def _make_user(**kw) -> User:
-    base = dict(username="u", password_hash="hash", role="user", app="general")
+    base = dict(username="u", password_hash="hash", role="user", scope="general")
     base.update(kw)
     return User(**base)
 
@@ -53,7 +53,7 @@ def test_admin_lists_users(client):
         _make_user(id="user_1", username="alice"),
         _make_user(id="user_2", username="bob"),
     ]
-    _override_auth({"role": "admin", "app": None, "store_name": None, "user_id": None})
+    _override_auth({"role": "admin", "scope": None, "store_name": None, "user_id": None})
 
     resp = client.get("/api/users")
     assert resp.status_code == 200
@@ -68,10 +68,10 @@ def test_admin_lists_users(client):
 def test_admin_creates_user_role_ok(client):
     deps.user_manager = MagicMock()
     deps.user_manager.create_user.return_value = _make_user(id="user_9", username="newbie")
-    _override_auth({"role": "admin", "app": None, "store_name": None, "user_id": "admin_1"})
+    _override_auth({"role": "admin", "scope": None, "store_name": None, "user_id": "admin_1"})
 
     resp = client.post("/api/users", json={
-        "username": "newbie", "password": "pw", "role": "user", "app": "general",
+        "username": "newbie", "password": "pw", "role": "user", "scope": "general",
     })
     assert resp.status_code in (200, 201)
     assert resp.json()["username"] == "newbie"
@@ -84,10 +84,10 @@ def test_admin_creates_store_only_user_ok(client):
     deps.user_manager.create_user.return_value = _make_user(
         id="user_store",
         username="hotai-user",
-        app=None,
+        scope=None,
         store_name="store_hotai",
     )
-    _override_auth({"role": "admin", "app": None, "store_name": None, "user_id": "admin_1"})
+    _override_auth({"role": "admin", "scope": None, "store_name": None, "user_id": "admin_1"})
 
     resp = client.post("/api/users", json={
         "username": "hotai-user",
@@ -97,13 +97,13 @@ def test_admin_creates_store_only_user_ok(client):
     })
 
     assert resp.status_code in (200, 201)
-    assert resp.json()["app"] is None
+    assert resp.json()["scope"] is None
     assert resp.json()["store_name"] == "store_hotai"
     deps.user_manager.create_user.assert_called_once_with(
         username="hotai-user",
         password="pw",
         role="user",
-        app=None,
+        scope=None,
         store_name="store_hotai",
         created_by="admin_1",
     )
@@ -111,7 +111,7 @@ def test_admin_creates_store_only_user_ok(client):
 
 def test_admin_creating_admin_role_forbidden(client):
     deps.user_manager = MagicMock()
-    _override_auth({"role": "admin", "app": None, "store_name": None, "user_id": "admin_1"})
+    _override_auth({"role": "admin", "scope": None, "store_name": None, "user_id": "admin_1"})
 
     resp = client.post("/api/users", json={
         "username": "x", "password": "pw", "role": "admin",
@@ -123,8 +123,8 @@ def test_admin_creating_admin_role_forbidden(client):
 def test_super_admin_creates_admin_role_ok(client):
     deps.user_manager = MagicMock()
     deps.user_manager.create_user.return_value = _make_user(
-        id="user_a", username="boss", role="admin", app=None)
-    _override_auth({"role": "super_admin", "app": None, "store_name": None, "user_id": "su_1"})
+        id="user_a", username="boss", role="admin", scope=None)
+    _override_auth({"role": "super_admin", "scope": None, "store_name": None, "user_id": "su_1"})
 
     resp = client.post("/api/users", json={
         "username": "boss", "password": "pw", "role": "admin",
@@ -136,24 +136,24 @@ def test_super_admin_creates_admin_role_ok(client):
 def test_create_duplicate_username_conflict(client):
     deps.user_manager = MagicMock()
     deps.user_manager.create_user.side_effect = DuplicateKeyError("dup")
-    _override_auth({"role": "super_admin", "app": None, "store_name": None, "user_id": "su_1"})
+    _override_auth({"role": "super_admin", "scope": None, "store_name": None, "user_id": "su_1"})
 
     resp = client.post("/api/users", json={
-        "username": "dup", "password": "pw", "role": "user", "app": "general",
+        "username": "dup", "password": "pw", "role": "user", "scope": "general",
     })
     assert resp.status_code == 409
 
 
 def test_create_user_without_scope_bad_request(client):
     deps.user_manager = MagicMock()
-    deps.user_manager.create_user.side_effect = ValueError("role=user 必須指定 app 或 store_name")
-    _override_auth({"role": "super_admin", "app": None, "store_name": None, "user_id": "su_1"})
+    deps.user_manager.create_user.side_effect = ValueError("role=user 必須指定 scope 或 store_name")
+    _override_auth({"role": "super_admin", "scope": None, "store_name": None, "user_id": "su_1"})
 
     resp = client.post("/api/users", json={
         "username": "noapp", "password": "pw", "role": "user",
     })
     assert resp.status_code == 400
-    assert "app" in resp.json()["detail"]
+    assert "scope" in resp.json()["detail"]
     assert "store_name" in resp.json()["detail"]
 
 
@@ -162,8 +162,8 @@ def test_create_user_without_scope_bad_request(client):
 def test_admin_disabling_admin_target_forbidden(client):
     deps.user_manager = MagicMock()
     deps.user_manager.get_user.return_value = _make_user(
-        id="user_adm", username="other", role="admin", app=None)
-    _override_auth({"role": "admin", "app": None, "store_name": None, "user_id": "admin_1"})
+        id="user_adm", username="other", role="admin", scope=None)
+    _override_auth({"role": "admin", "scope": None, "store_name": None, "user_id": "admin_1"})
 
     resp = client.patch("/api/users/user_adm/disabled", json={"disabled": True})
     assert resp.status_code == 403
@@ -173,9 +173,9 @@ def test_admin_disabling_admin_target_forbidden(client):
 def test_admin_disabling_user_target_ok(client):
     deps.user_manager = MagicMock()
     deps.user_manager.get_user.return_value = _make_user(
-        id="user_t", username="target", role="user", app="general")
+        id="user_t", username="target", role="user", scope="general")
     deps.user_manager.set_disabled.return_value = True
-    _override_auth({"role": "admin", "app": None, "store_name": None, "user_id": "admin_1"})
+    _override_auth({"role": "admin", "scope": None, "store_name": None, "user_id": "admin_1"})
 
     resp = client.patch("/api/users/user_t/disabled", json={"disabled": True})
     assert resp.status_code == 200
@@ -185,8 +185,8 @@ def test_admin_disabling_user_target_ok(client):
 def test_super_admin_disabling_self_bad_request(client):
     deps.user_manager = MagicMock()
     deps.user_manager.get_user.return_value = _make_user(
-        id="su_1", username="me", role="super_admin", app=None)
-    _override_auth({"role": "super_admin", "app": None, "store_name": None, "user_id": "su_1"})
+        id="su_1", username="me", role="super_admin", scope=None)
+    _override_auth({"role": "super_admin", "scope": None, "store_name": None, "user_id": "su_1"})
 
     resp = client.patch("/api/users/su_1/disabled", json={"disabled": True})
     assert resp.status_code == 400
@@ -199,7 +199,7 @@ def test_super_admin_disabling_self_bad_request(client):
 def test_delete_missing_user_not_found(client):
     deps.user_manager = MagicMock()
     deps.user_manager.get_user.return_value = None
-    _override_auth({"role": "super_admin", "app": None, "store_name": None, "user_id": "su_1"})
+    _override_auth({"role": "super_admin", "scope": None, "store_name": None, "user_id": "su_1"})
 
     resp = client.delete("/api/users/ghost")
     assert resp.status_code == 404
@@ -208,9 +208,9 @@ def test_delete_missing_user_not_found(client):
 def test_super_admin_deletes_user_ok(client):
     deps.user_manager = MagicMock()
     deps.user_manager.get_user.return_value = _make_user(
-        id="user_d", username="dead", role="user", app="general")
+        id="user_d", username="dead", role="user", scope="general")
     deps.user_manager.delete_user.return_value = True
-    _override_auth({"role": "super_admin", "app": None, "store_name": None, "user_id": "su_1"})
+    _override_auth({"role": "super_admin", "scope": None, "store_name": None, "user_id": "su_1"})
 
     resp = client.delete("/api/users/user_d")
     assert resp.status_code == 200
@@ -230,14 +230,14 @@ def test_plain_user_forbidden_on_every_endpoint(monkeypatch):
     monkeypatch.setattr(
         auth_mod,
         "decode_session_token",
-        lambda t: {"sub": "u", "role": "user", "app": "general"},
+        lambda t: {"sub": "u", "role": "user", "scope": "general"},
     )
 
     assert plain.get("/api/users", headers=headers).status_code == 403
     assert plain.post(
         "/api/users",
         json={
-            "username": "x", "password": "p", "role": "user", "app": "general",
+            "username": "x", "password": "p", "role": "user", "scope": "general",
         },
         headers=headers,
     ).status_code == 403

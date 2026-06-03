@@ -65,7 +65,7 @@ function AuthGuard({ children, allowedRoles, allowedApp, allowGeneralUser = fals
   }
 
   const isSimpleUser = profile.role !== 'admin' && profile.role !== 'super_admin';
-  if (allowedApp && isSimpleUser && profile.app !== allowedApp) {
+  if (allowedApp && isSimpleUser && profile.scope !== allowedApp) {
     return <Navigate to={getProfileRedirectPath(profile)} replace />;
   }
 

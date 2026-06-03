@@ -522,7 +522,7 @@ def test_user_without_store_lists_only_own_app_stores(monkeypatch):
     app.dependency_overrides[verify_auth] = lambda: {
         "role": "user",
         "store_name": None,
-        "app": "hciot",
+        "scope": "hciot",
         "prompt_index": None,
     }
     client = TestClient(app)
@@ -572,7 +572,7 @@ def test_legacy_key_index_scope_is_rejected(monkeypatch):
     app.dependency_overrides[verify_auth] = lambda: {
         "role": "user",
         "store_name": None,
-        "app": "key:1",
+        "scope": "key:1",
         "prompt_index": None,
     }
     client = TestClient(app)
@@ -628,7 +628,7 @@ def test_user_key_name_scope_survives_key_order_changes(monkeypatch):
     app.dependency_overrides[verify_auth] = lambda: {
         "role": "user",
         "store_name": None,
-        "app": scope,
+        "scope": scope,
         "prompt_index": None,
     }
     client = TestClient(app)
@@ -704,7 +704,7 @@ def test_user_with_store_lists_only_assigned_store(monkeypatch):
     app.dependency_overrides[verify_auth] = lambda: {
         "role": "user",
         "store_name": "store_hciot_dyn",
-        "app": "hciot",
+        "scope": "hciot",
         "prompt_index": None,
     }
     client = TestClient(app)
@@ -720,7 +720,7 @@ def test_user_with_store_lists_only_assigned_store(monkeypatch):
         app.dependency_overrides[verify_auth] = lambda: {
             "role": "user",
             "store_name": "store_jti_dyn",
-            "app": "hciot",
+            "scope": "hciot",
             "prompt_index": None,
         }
         mismatched_assignment = client.get("/api/stores", headers={"Origin": "http://testserver"})
@@ -729,7 +729,7 @@ def test_user_with_store_lists_only_assigned_store(monkeypatch):
         app.dependency_overrides[verify_auth] = lambda: {
             "role": "user",
             "store_name": "store_hciot_dyn",
-            "app": None,
+            "scope": None,
             "prompt_index": None,
         }
         store_only_assignment = client.get("/api/stores", headers={"Origin": "http://testserver"})
@@ -748,11 +748,11 @@ def test_resolve_request_store_scope_authorization():
 
     client = TestClient(app)
 
-    def set_user_auth(store_name=None, app_name=None):
+    def set_user_auth(store_name=None, scope=None):
         auth_info = {
             "role": "user",
             "store_name": store_name,
-            "app": app_name,
+            "scope": scope,
             "prompt_index": None,
         }
         app.dependency_overrides[verify_auth] = lambda: auth_info
@@ -773,7 +773,7 @@ def test_resolve_request_store_scope_authorization():
         session1 = deps.get_general_chat_session_manager().get_session(sid1)
         assert session1.metadata["store_name"] == "__hciot__"
 
-        set_user_auth(store_name="__jti__", app_name="hciot")
+        set_user_auth(store_name="__jti__", scope="hciot")
         app_mismatch = client.post(
             "/api/chat/start",
             json={"store_name": "__jti__", "model": "gemini-test"},
@@ -782,7 +782,7 @@ def test_resolve_request_store_scope_authorization():
         assert app_mismatch.status_code == 403
 
         # Case 2: User with null/empty store_name but assigned app (can chat with any store of that app)
-        set_user_auth(store_name=None, app_name="hciot")
+        set_user_auth(store_name=None, scope="hciot")
 
         res2 = client.post(
             "/api/chat/start",
@@ -813,7 +813,7 @@ def test_resolve_request_store_scope_authorization():
         assert res4.status_code == 403
 
         # User has null/empty store_name and NO assigned app
-        set_user_auth(store_name=None, app_name=None)
+        set_user_auth(store_name=None, scope=None)
         res5 = client.post(
             "/api/chat/start",
             json={"store_name": "__hciot__", "model": "gemini-test"},
@@ -855,7 +855,7 @@ def test_resolve_request_store_rejects_legacy_key_index_scope(monkeypatch):
     app.dependency_overrides[verify_auth] = lambda: {
         "role": "user",
         "store_name": None,
-        "app": "key:1",
+        "scope": "key:1",
         "prompt_index": None,
     }
     client = TestClient(app)

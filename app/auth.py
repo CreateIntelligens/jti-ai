@@ -53,10 +53,10 @@ def _resolve_session_jwt(token: str) -> dict | None:
     2. 解出 claims 後,若 deps.user_manager 可用則查使用者:
        - 不存在 → 401 (token 指向已刪除帳號)。
        - disabled → 401。
-       - 否則以 user 的 role/app/store_name 為準 (DB 為單一事實來源)。
+       - 否則以 user 的 role/scope/store_name 為準 (DB 為單一事實來源)。
     3. user_manager 不可用 (測試環境 / 尚未初始化) → 直接信任 claims。
 
-    回傳的 dict 比既有 sk-xxx 分支多帶 app / user_id 等欄位。
+    回傳的 dict 比既有 sk-xxx 分支多帶 scope / user_id 等欄位。
     """
     claims = decode_session_token(token)
     if not claims:
@@ -64,7 +64,7 @@ def _resolve_session_jwt(token: str) -> dict | None:
 
     user_id = claims.get("sub")
     role = claims.get("role")
-    app = claims.get("app")
+    scope = claims.get("scope", claims.get("app"))
     store_name = None
 
     from app import deps
@@ -76,12 +76,12 @@ def _resolve_session_jwt(token: str) -> dict | None:
         if getattr(user, "disabled", False):
             raise HTTPException(status_code=401, detail="User is disabled")
         role = user.role
-        app = user.app
+        scope = user.scope
         store_name = user.store_name
 
     return {
         "role": role,
-        "app": app,
+        "scope": scope,
         "store_name": store_name,
         "user_id": user_id,
     }
@@ -92,7 +92,7 @@ def verify_auth(request: Request) -> dict:
     驗證 API 請求
 
     優先序:
-    1. token 為有效 session JWT → 該使用者 auth dict (含 app/user_id)。
+    1. token 為有效 session JWT → 該使用者 auth dict (含 scope/user_id)。
     2. token == ADMIN_API_KEY → super_admin。
     3. token == sk-xxx → 一般 user，綁定 store (形狀不變)。
     4. 無 token → 401。
@@ -100,7 +100,7 @@ def verify_auth(request: Request) -> dict:
     Returns:
         {"role": "super_admin", "store_name": None}  # ADMIN_API_KEY
         {"role": "user", "store_name": "...", "prompt_index": ...}  # sk-xxx key
-        {"role": ..., "app": ..., "store_name": ..., "user_id": ...}  # session JWT
+        {"role": ..., "scope": ..., "store_name": ..., "user_id": ...}  # session JWT
     """
     token = (
         _extract_bearer_token(request)

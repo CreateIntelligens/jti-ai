@@ -1,8 +1,8 @@
 """
 使用者管理模組 (MongoDB 版本)
 三層 RBAC: super_admin / admin / user
-- super_admin / admin: app 為 None
-- user: 綁定單一 app / key 範圍,或綁定單一 store_name
+- super_admin / admin: scope 為 None
+- user: 綁定單一 app scope / key scope,或綁定單一 store_name
 密碼僅存 bcrypt 雜湊,不存明文。
 """
 
@@ -10,6 +10,7 @@ import logging
 import os
 import secrets
 from datetime import datetime, timezone
+from urllib.parse import unquote
 
 from pydantic import BaseModel, Field
 from pymongo import MongoClient
@@ -21,6 +22,17 @@ logger = logging.getLogger(__name__)
 
 # 允許的角色集合
 ALLOWED_ROLES = {"super_admin", "admin", "user"}
+KEY_SCOPE_PREFIX = "key_name:"
+LEGACY_KEY_SCOPE_PREFIX = "key:"
+
+
+def _decode_key_scope_value(scope: str) -> str | None:
+    raw_value = scope.removeprefix(KEY_SCOPE_PREFIX)
+    try:
+        decoded = unquote(raw_value)
+    except Exception:  # noqa: BLE001 - malformed percent escapes should not break display helpers
+        decoded = raw_value
+    return decoded.strip() or None
 
 
 class User(BaseModel):
@@ -29,11 +41,27 @@ class User(BaseModel):
     username: str
     password_hash: str  # 存 bcrypt 雜湊,不存明文
     role: str  # super_admin / admin / user
-    app: str | None = None  # app 或 key 範圍,如 hciot/jti/general/key_name:POC1;僅 role=user 有意義
+    scope: str | None = None  # app(hciot/jti/general) 或 key scope(key_name:<encoded>);僅 role=user 有意義
     store_name: str | None = None
     created_by: str | None = None
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     disabled: bool = False
+
+    @property
+    def scope_kind(self) -> str:
+        if self.store_name:
+            return "store"
+        if self.scope and self.scope.startswith(KEY_SCOPE_PREFIX):
+            return "key"
+        return "app"
+
+    @property
+    def scope_value(self) -> str | None:
+        if self.store_name:
+            return self.store_name
+        if self.scope and self.scope.startswith(KEY_SCOPE_PREFIX):
+            return _decode_key_scope_value(self.scope)
+        return self.scope or None
 
 
 class UserManager:
@@ -64,20 +92,20 @@ class UserManager:
     @staticmethod
     def _validate_role_scope(
         role: str,
-        app: str | None,
+        scope: str | None,
         store_name: str | None = None,
     ) -> None:
         """驗證角色與可存取範圍;不合法則丟 ValueError。
 
         - role 必須在 ALLOWED_ROLES 內
-        - role == "user" 必須有非空 app 或 store_name
+        - role == "user" 必須有非空 scope 或 store_name
         """
         if role not in ALLOWED_ROLES:
             raise ValueError(f"不合法的角色: {role!r} (允許: {sorted(ALLOWED_ROLES)})")
-        if role == "user" and not (app or store_name):
-            raise ValueError("role=user 必須指定 app 或 store_name")
-        normalized_app = (app or "").strip().lower()
-        if role == "user" and normalized_app.startswith("key:"):
+        if role == "user" and not (scope or store_name):
+            raise ValueError("role=user 必須指定 scope 或 store_name")
+        normalized_scope = (scope or "").strip().lower()
+        if role == "user" and normalized_scope.startswith(LEGACY_KEY_SCOPE_PREFIX):
             raise ValueError("role=user 的 key scope 必須使用 key_name:<name>")
 
     @staticmethod
@@ -91,7 +119,7 @@ class UserManager:
         username: str,
         password: str,
         role: str,
-        app: str | None = None,
+        scope: str | None = None,
         store_name: str | None = None,
         created_by: str | None = None,
     ) -> User:
@@ -101,23 +129,23 @@ class UserManager:
         角色 / 存取範圍驗證在任何 DB 操作之前進行。
         """
         # 驗證 (在連 DB 之前)
-        self._validate_role_scope(role, app, store_name)
+        self._validate_role_scope(role, scope, store_name)
 
         user = User(
             username=username,
             password_hash=hash_password(password),
             role=role,
-            app=app,
+            scope=scope,
             store_name=store_name,
             created_by=created_by,
         )
 
         self.collection.insert_one(user.model_dump())
         logger.info(
-            "[UserManager] 建立使用者: %s (role: %s, app: %s)",
+            "[UserManager] 建立使用者: %s (role: %s, scope: %s)",
             username,
             role,
-            app,
+            scope,
         )
 
         return user
@@ -158,14 +186,14 @@ class UserManager:
     def list_users(
         self,
         role: str | None = None,
-        app: str | None = None,
+        scope: str | None = None,
     ) -> list[User]:
         """列出使用者 (依 created_at 由新到舊)"""
         query = {}
         if role is not None:
             query["role"] = role
-        if app is not None:
-            query["app"] = app
+        if scope is not None:
+            query["scope"] = scope
 
         docs = self.collection.find(query).sort("created_at", -1)
 

@@ -4,14 +4,14 @@ export interface UserProfile {
   user_id: string | null;
   username: string | null;
   role: string;
-  app: string | null;
+  scope: string | null;
   store_name: string | null;
 }
 
 export interface LoginResponse {
   token: string;
   role: string;
-  app: string | null;
+  scope: string | null;
 }
 
 export interface LogoutResponse {
@@ -22,7 +22,7 @@ export interface UserAccount {
   id: string;
   username: string;
   role: string;
-  app: string | null;
+  scope: string | null;
   store_name: string | null;
   disabled: boolean;
   created_by?: string | null;
@@ -67,7 +67,7 @@ export async function createUser(data: {
   username: string;
   password: string;
   role: string;
-  app: string | null;
+  scope: string | null;
   store_name: string | null;
 }): Promise<UserAccount> {
   const response = await fetch(`${API_BASE}/users`, {

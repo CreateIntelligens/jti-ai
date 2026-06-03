@@ -43,7 +43,7 @@ def client(monkeypatch):
         username="alice",
         password_hash="x",
         role="user",
-        app="jti",
+        scope="jti",
     )
     monkeypatch.setattr(deps, "user_manager", _FakeUserManager(user), raising=False)
 
@@ -52,12 +52,12 @@ def client(monkeypatch):
     return TestClient(test_app)
 
 
-def test_login_success_returns_token_role_app(client):
+def test_login_success_returns_token_role_scope(client):
     resp = client.post("/api/auth/login", json={"username": "alice", "password": "pw"})
     assert resp.status_code == 200
     body = resp.json()
     assert body["role"] == "user"
-    assert body["app"] == "jti"
+    assert body["scope"] == "jti"
     assert body["token"]
 
 
@@ -75,7 +75,7 @@ def test_login_token_claims(client):
     assert claims is not None
     assert claims["sub"] == "user_abc"
     assert claims["role"] == "user"
-    assert claims["app"] == "jti"
+    assert claims["scope"] == "jti"
 
 
 def test_login_bad_credentials_returns_401_generic(client):
