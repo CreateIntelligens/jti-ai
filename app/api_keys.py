@@ -7,8 +7,10 @@ import os
 import secrets
 import hashlib
 from datetime import datetime, timezone
+from functools import lru_cache
 from typing import List, Optional
 
+from cryptography.fernet import Fernet, InvalidToken
 from pydantic import BaseModel, Field
 from pymongo import MongoClient
 
@@ -19,6 +21,26 @@ logger = logging.getLogger(__name__)
 
 def log(message: str) -> None:
     logger.info(message)
+
+
+@lru_cache(maxsize=1)
+def _get_fernet() -> Fernet:
+    """取得 Fernet 加密器 (用於對外 API key 明文的可逆加密)。
+
+    金鑰來自環境變數 API_ENCRYPTION_KEY (Fernet.generate_key() 產生的
+    base64 字串)。未設定則 fail-fast,不靜默降級成明文/不加密。
+    """
+    raw = os.getenv("API_ENCRYPTION_KEY")
+    if not raw:
+        raise RuntimeError(
+            "未設定 API_ENCRYPTION_KEY；對外 API key 需要它做可逆加密。"
+            "請以 `python -c \"from cryptography.fernet import Fernet; "
+            "print(Fernet.generate_key().decode())\"` 產生一把並設進環境變數。"
+        )
+    try:
+        return Fernet(raw.encode())
+    except (ValueError, TypeError) as exc:
+        raise RuntimeError(f"API_ENCRYPTION_KEY 格式無效 (需為 Fernet 金鑰): {exc}") from exc
 
 
 def _parse_iso_utc(value) -> Optional[datetime]:
@@ -34,10 +56,16 @@ def _parse_iso_utc(value) -> Optional[datetime]:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
+def _api_key_from_doc(doc: dict) -> "APIKey":
+    doc.pop("_id", None)
+    return APIKey(**doc)
+
+
 class APIKey(BaseModel):
     """API Key 模型"""
     id: str = Field(default_factory=lambda: f"key_{secrets.token_hex(4)}")
-    key_hash: str  # 存 hash，不存明文
+    key_hash: str  # 存 hash，用於驗證 sk-xxx（快速、不需解密）
+    key_encrypted: Optional[str] = None  # Fernet 加密後的明文，供事後 reveal/複製
     key_prefix: str  # 存前幾碼方便辨識，如 "sk-abc..."
     name: str  # 用途說明，如 "給 Cursor 用"
     store_name: str  # 綁定的知識庫
@@ -74,10 +102,10 @@ class APIKeyManager:
         """對 API Key 進行 hash"""
         return hashlib.sha256(key.encode()).hexdigest()
 
-    @staticmethod
-    def _generate_key() -> str:
+    @classmethod
+    def _generate_key(cls) -> str:
         """產生新的 API Key"""
-        return f"sk-{secrets.token_hex(24)}"
+        return f"{cls.KEY_PREFIX}{secrets.token_hex(24)}"
 
     def create_key(self, name: str, store_name: str, prompt_index: Optional[int] = None) -> tuple[APIKey, str]:
         """建立新的 API Key
@@ -89,10 +117,12 @@ class APIKeyManager:
         raw_key = self._generate_key()
         key_hash = self._hash_key(raw_key)
         key_prefix = raw_key[:10] + "..."
+        key_encrypted = _get_fernet().encrypt(raw_key.encode()).decode()
 
         # 建立記錄
         api_key = APIKey(
             key_hash=key_hash,
+            key_encrypted=key_encrypted,
             key_prefix=key_prefix,
             name=name,
             store_name=store_name,
@@ -128,8 +158,7 @@ class APIKeyManager:
                 {"$set": {"last_used_at": now.isoformat()}}
             )
 
-        doc.pop("_id", None)
-        return APIKey(**doc)
+        return _api_key_from_doc(doc)
 
     def list_keys(self, store_name: Optional[str] = None) -> List[APIKey]:
         """列出 API Keys
@@ -140,12 +169,7 @@ class APIKeyManager:
         query = {"store_name": store_name} if store_name else {}
         docs = self.collection.find(query).sort("created_at", -1)
 
-        keys = []
-        for doc in docs:
-            doc.pop("_id", None)
-            keys.append(APIKey(**doc))
-
-        return keys
+        return [_api_key_from_doc(doc) for doc in docs]
 
     def get_key(self, key_id: str) -> Optional[APIKey]:
         """根據 ID 取得 API Key"""
@@ -153,8 +177,28 @@ class APIKeyManager:
         if not doc:
             return None
 
-        doc.pop("_id", None)
-        return APIKey(**doc)
+        return _api_key_from_doc(doc)
+
+    def reveal_key(self, key_id: str) -> Optional[str]:
+        """解密回傳指定 key 的明文 sk-xxx。
+
+        Returns:
+            明文 key 字串；key 不存在回 None。
+            key 沒有加密欄位 (例如改版前的舊資料) 或解密失敗 → raise,
+            由呼叫端轉成適當的錯誤回應。
+        """
+        doc = self.collection.find_one({"id": key_id})
+        if not doc:
+            return None
+
+        encrypted = doc.get("key_encrypted")
+        if not encrypted:
+            raise ValueError("此 key 無加密明文 (可能為舊版資料)，無法還原")
+
+        try:
+            return _get_fernet().decrypt(encrypted.encode()).decode()
+        except InvalidToken as exc:
+            raise ValueError("解密失敗：API_ENCRYPTION_KEY 可能已變更") from exc
 
     def update_key(self, key_id: str, name: Optional[str] = None,
                    prompt_index: Optional[int] = None) -> Optional[APIKey]:

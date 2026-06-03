@@ -96,7 +96,7 @@ async function fetchFilesForTarget(target: KnowledgeTarget): Promise<FileItem[]>
   return files;
 }
 
-export function useAppChat() {
+export function useAppChat(isAdmin: boolean = false) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [conversationHistoryModalOpen, setConversationHistoryModalOpen] = useState(false);
   const [statusMessage, showStatus] = useTransientStatus();
@@ -145,9 +145,13 @@ export function useAppChat() {
 
   const refreshStores = useCallback(async () => {
     try {
+      // getKeyInfos() 是 admin only（數後端 Gemini 金鑰）；非 admin 不呼叫，
+      // 避免 console 噴 403。一般 user 不需要 key 名稱清單。
       const [data, keyInfo] = await Promise.all([
         api.fetchStores(),
-        api.getKeyInfos().catch(() => ({ count: 0, names: [] })),
+        isAdmin
+          ? api.getKeyInfos().catch(() => ({ count: 0, names: [] }))
+          : Promise.resolve({ count: 0, names: [] }),
       ]);
       setStores(data);
       setKeyNames(normalizeKeyLabels(keyInfo.names));
@@ -157,7 +161,7 @@ export function useAppChat() {
       console.error(e);
       return [];
     }
-  }, []);
+  }, [isAdmin]);
 
   const refreshFiles = useCallback(async (targetOverride?: KnowledgeTarget | null) => {
     const target = targetOverride ?? findKnowledgeTarget(currentTargetId, stores);

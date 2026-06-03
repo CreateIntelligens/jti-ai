@@ -1,5 +1,16 @@
 # Changelog
 
+## [Unreleased] - 2026-06-03
+
+### 對外 API Key / 權限
+
+- 對外 API key (`sk-xxx`) 改為 Fernet 加密儲存（`key_encrypted`），可在「對外 Keys」面板事後查看/複製，不再只顯示一次；需設定環境變數 `API_ENCRYPTION_KEY`
+- 面板列表預設遮罩，點「眼睛」二次確認後才向後端解密取回明文；複製在非 HTTPS 環境會 fallback 到 `execCommand`
+- 權限分層：發行 / 更新 / 撤銷金鑰僅限 admin / super_admin；一般 user 為唯讀
+- 可見範圍沿用知識庫面板的 scope→store 邏輯：admin 看全部，user 只看自己可見知識庫底下的 key（不另設 owner 欄位，避免雙重真相來源）
+- 對外 Keys 入口開放給一般 user（原本僅 admin 可見），面板依角色顯示對應功能
+- 顯式將 `cryptography` 加入 `requirements.txt`
+
 ## [Unreleased] - 2026-04-29
 
 ### RAG / AI 基礎設施

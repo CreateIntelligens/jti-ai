@@ -258,10 +258,9 @@ export async function setActivePrompt(storeName: string, promptId: string | null
 // ========== Server API Keys ==========
 
 export async function listApiKeys(storeName?: string): Promise<any[]> {
-  const url = storeName
-    ? `${API_BASE}/keys?store_name=${encodeURIComponent(storeName)}`
-    : `${API_BASE}/keys`;
-  const response = await fetchWithApiKey(url);
+  const response = await fetchWithApiKey(
+    buildUrl(`${API_BASE}/keys`, { store_name: storeName || undefined }),
+  );
   return handleResponse<any[]>(response);
 }
 
@@ -279,6 +278,12 @@ export async function createApiKey(name: string, storeName: string, promptIndex?
 export async function deleteServerApiKey(keyId: string): Promise<void> {
   const response = await fetchWithApiKey(`${API_BASE}/keys/${keyId}`, { method: 'DELETE' });
   await handleResponse<void>(response);
+}
+
+export async function revealApiKey(keyId: string): Promise<string> {
+  const response = await fetchWithApiKey(`${API_BASE}/keys/${keyId}/reveal`);
+  const data = await handleResponse<{ id: string; key: string }>(response);
+  return data.key;
 }
 
 // ========== User Gemini API Keys (localStorage) ==========

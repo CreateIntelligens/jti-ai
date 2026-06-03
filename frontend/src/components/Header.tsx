@@ -146,15 +146,15 @@ export default function Header({
         >
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
+        <button
+          className="icon-btn icon-btn-pill"
+          onClick={() => openPanel(onOpenExtKeysPanel)}
+          title="對外 API Keys"
+        >
+          <Link2 size={16} /> 對外 Keys
+        </button>
         {isAdmin && (
           <>
-            <button
-              className="icon-btn icon-btn-pill"
-              onClick={() => openPanel(onOpenExtKeysPanel)}
-              title="對外 API Keys"
-            >
-              <Link2 size={16} /> 對外 Keys
-            </button>
             <div
               className="dd-wrap"
               ref={wrapRef}

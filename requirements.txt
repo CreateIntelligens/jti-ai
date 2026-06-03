@@ -17,3 +17,4 @@ sentence-transformers==3.3.1
 tf-keras
 bcrypt>=4.0.0
 PyJWT>=2.8.0
+cryptography>=42.0.0

@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Copy, Link2, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Copy, Eye, Link2, X } from 'lucide-react';
 import * as api from '../services/api';
 import type { Store } from '../types';
 import { useEscapeKey } from '../hooks/useEscapeKey';
@@ -11,6 +11,7 @@ interface ExtKeysPanelProps {
   isOpen: boolean;
   onClose: () => void;
   stores: Store[];
+  isAdmin: boolean;
   onShowStatus?: (msg: string) => void;
 }
 
@@ -23,10 +24,34 @@ interface APIKey {
   created_at: string;
 }
 
+async function writeClipboard(text: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+
+  try {
+    textarea.focus();
+    textarea.select();
+    if (!document.execCommand('copy')) {
+      throw new Error('execCommand copy failed');
+    }
+  } finally {
+    document.body.removeChild(textarea);
+  }
+}
+
 export default function ExtKeysPanel({
   isOpen,
   onClose,
   stores,
+  isAdmin,
   onShowStatus,
 }: ExtKeysPanelProps) {
   const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
@@ -35,10 +60,16 @@ export default function ExtKeysPanel({
   const [newKeyName, setNewKeyName] = useState('');
   const [targetStore, setTargetStore] = useState('');
   const [newKeyResult, setNewKeyResult] = useState<string | null>(null);
+  const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({});
+  const [revealingId, setRevealingId] = useState<string | null>(null);
   const overlayPressClose = useOverlayPressClose(onClose);
 
   useEscapeKey(onClose, isOpen);
 
+  const storeLabelByName = useMemo(
+    () => new Map(stores.map((s) => [s.name, s.display_name || s.name])),
+    [stores],
+  );
   const storeOptions = [
     { value: '', label: '選擇目標知識庫...' },
     ...stores.map((s) => ({
@@ -51,6 +82,7 @@ export default function ExtKeysPanel({
     if (isOpen) {
       loadKeys();
       setNewKeyResult(null);
+      setRevealedKeys({});
     }
   }, [isOpen]);
 
@@ -67,10 +99,11 @@ export default function ExtKeysPanel({
   };
 
   const handleCreate = async () => {
-    if (!newKeyName.trim() || !targetStore) return;
+    const trimmedName = newKeyName.trim();
+    if (!trimmedName || !targetStore) return;
     setCreating(true);
     try {
-      const result = await api.createApiKey(newKeyName.trim(), targetStore, null);
+      const result = await api.createApiKey(trimmedName, targetStore, null);
       setNewKeyResult(result.key);
       setNewKeyName('');
       setTargetStore('');
@@ -94,8 +127,38 @@ export default function ExtKeysPanel({
     }
   };
 
-  const copyToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text).then(() => onShowStatus?.('✅ 已複製'));
+  const hideRevealedKey = (keyId: string) => {
+    setRevealedKeys((prev) => {
+      const next = { ...prev };
+      delete next[keyId];
+      return next;
+    });
+  };
+
+  const handleReveal = async (keyId: string) => {
+    if (revealedKeys[keyId]) {
+      hideRevealedKey(keyId);
+      return;
+    }
+    if (!confirm('注意：您正在檢視敏感金鑰，請確保周圍無人窺視。確定要顯示完整金鑰嗎？')) return;
+    setRevealingId(keyId);
+    try {
+      const plain = await api.revealApiKey(keyId);
+      setRevealedKeys((prev) => ({ ...prev, [keyId]: plain }));
+    } catch (e) {
+      alert('讀取失敗: ' + toErrorMessage(e));
+    } finally {
+      setRevealingId(null);
+    }
+  };
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await writeClipboard(text);
+      onShowStatus?.('✅ 已複製');
+    } catch {
+      onShowStatus?.('❌ 複製失敗，請手動複製');
+    }
   };
 
   if (!isOpen) return null;
@@ -108,55 +171,63 @@ export default function ExtKeysPanel({
           <button className="icon-btn" onClick={onClose}><X size={18} /></button>
         </div>
         <div className="rp-body">
-          {/* Create new key */}
-          <div>
-            <div className="rp-section-title">發行新 Key</div>
-            <div className="rp-form-stack">
-              <input
-                className="input-base"
-                placeholder="Key 名稱"
-                value={newKeyName}
-                onChange={(e) => setNewKeyName(e.target.value)}
-              />
-              <AppSelect
-                className="input-base"
-                value={targetStore}
-                onChange={setTargetStore}
-                options={storeOptions}
-                disabled={creating}
-              />
-              <button className="btn btn-primary btn-sm self-start" onClick={handleCreate} disabled={creating || !newKeyName.trim() || !targetStore} >
-                {creating ? '建立中...' : '發行'}
-              </button>
-            </div>
-
-            {/* Newly created key */}
-            {newKeyResult && (
-              <div className="rp-key-result">
-                <div className="rp-key-result-label">
-                  Key 已建立！請立即複製，離開後無法再查看：
-                </div>
-                <div className="rp-key-result-row">
-                  <code className="rp-key-result-code">
-                    {newKeyResult}
-                  </code>
+          {/* Create new key（僅 admin 可發行；user 為唯讀） */}
+          {isAdmin && (
+            <>
+              <div>
+                <div className="rp-section-title">發行新 Key</div>
+                <div className="rp-form-stack">
+                  <input
+                    className="input-base"
+                    placeholder="Key 名稱"
+                    value={newKeyName}
+                    onChange={(e) => setNewKeyName(e.target.value)}
+                  />
+                  <AppSelect
+                    className="input-base"
+                    value={targetStore}
+                    onChange={setTargetStore}
+                    options={storeOptions}
+                    disabled={creating}
+                  />
                   <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => copyToClipboard(newKeyResult)}
-                    title="複製"
+                    className="btn btn-primary btn-sm self-start"
+                    onClick={handleCreate}
+                    disabled={creating || !newKeyName.trim() || !targetStore}
                   >
-                    <Copy size={14} />
+                    {creating ? '建立中...' : '發行'}
                   </button>
                 </div>
-              </div>
-            )}
-          </div>
 
-          <div className="sep-row">
-            <div className="sep-line" />
-            <span className="sep-label">已發行</span>
-            <div className="sep-line" />
-          </div>
+                {/* Newly created key */}
+                {newKeyResult && (
+                  <div className="rp-key-result">
+                    <div className="rp-key-result-label">
+                      Key 已建立！
+                    </div>
+                    <div className="rp-key-result-row">
+                      <code className="rp-key-result-code">
+                        {newKeyResult}
+                      </code>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => copyToClipboard(newKeyResult)}
+                        title="複製"
+                      >
+                        <Copy size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="sep-row">
+                <div className="sep-line" />
+                <span className="sep-label">已發行</span>
+                <div className="sep-line" />
+              </div>
+            </>
+          )}
 
           {/* Key list */}
           <div>
@@ -168,19 +239,48 @@ export default function ExtKeysPanel({
               </div>
             ) : (
               <div className="rp-list">
-                {apiKeys.map((k) => (
-                  <div key={k.id} className="ext-key-row">
-                    <Link2 className="ekr-icon" size={14} />
-                    <span className="ekr-name">{k.name}</span>
-                    <span className="ekr-key">{k.key_prefix}••••</span>
-                    <span className="ekr-meta">
-                      {stores.find((s) => s.name === k.store_name)?.display_name || k.store_name}
-                    </span>
-                    <button className="btn btn-danger btn-sm shrink-0" onClick={() => handleDelete(k.id)} >
-                      撤銷
-                    </button>
-                  </div>
-                ))}
+                {apiKeys.map((k) => {
+                  const revealedKey = revealedKeys[k.id];
+                  return (
+                    <div key={k.id} className="ext-key-row">
+                      <Link2 className="ekr-icon" size={14} />
+                      <span className="ekr-name">{k.name}</span>
+                      {revealedKey ? (
+                        <code className="ekr-key">{revealedKey}</code>
+                      ) : (
+                        <span className="ekr-key">{k.key_prefix}••••</span>
+                      )}
+                      <button
+                        className="btn btn-ghost btn-sm shrink-0"
+                        onClick={() => handleReveal(k.id)}
+                        disabled={revealingId === k.id}
+                        title={revealedKey ? '隱藏金鑰' : '顯示完整金鑰'}
+                      >
+                        <Eye size={14} />
+                      </button>
+                      {revealedKey && (
+                        <button
+                          className="btn btn-ghost btn-sm shrink-0"
+                          onClick={() => copyToClipboard(revealedKey)}
+                          title="複製"
+                        >
+                          <Copy size={14} />
+                        </button>
+                      )}
+                      <span className="ekr-meta">
+                        {storeLabelByName.get(k.store_name) || k.store_name}
+                      </span>
+                      {isAdmin && (
+                        <button
+                          className="btn btn-danger btn-sm shrink-0"
+                          onClick={() => handleDelete(k.id)}
+                        >
+                          撤銷
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

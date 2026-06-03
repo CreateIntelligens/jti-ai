@@ -130,6 +130,9 @@ export default function App() {
 }
 
 function HomeShell() {
+  const { profile, setProfile } = useCurrentUserProfile();
+  const isAdmin = isAdminRole(profile?.role);
+
   const {
     sidebarOpen,
     conversationHistoryModalOpen, setConversationHistoryModalOpen,
@@ -146,15 +149,13 @@ function HomeShell() {
     handleCreateStore, handleDeleteStore,
     handleUploadFile, handleDeleteFile,
     handleSendMessage, handleRegenerate, handleEditAndResend,
-  } = useAppChat();
+  } = useAppChat(isAdmin);
 
   const [panel, setPanel] = useState<PanelId>(null);
   const openPanel = (id: PanelId) => setPanel(id);
   const closePanel = () => setPanel(null);
 
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
-  const { profile, setProfile } = useCurrentUserProfile();
-  const isAdmin = isAdminRole(profile?.role);
 
   // Derive store display info for chat area
   const activeStore = currentTarget?.kind === 'store'
@@ -257,6 +258,7 @@ function HomeShell() {
         isOpen={panel === 'extkeys'}
         onClose={closePanel}
         stores={stores}
+        isAdmin={isAdmin}
         onShowStatus={showStatus}
       />
 
