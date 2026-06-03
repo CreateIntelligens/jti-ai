@@ -3,7 +3,6 @@
 - **日期**：2026-06-02（v1 初版）
 - **狀態**：Draft（技術評估，尚未落地）
 - **分支**：`feat/rag`（worktree: `.worktrees/jtai-rag`）
-- **作者協作對象**：spark.cs.liao
 - **預期執行者**：Claude（可接受其他 AI 監督檢視）
 
 ---
@@ -268,3 +267,28 @@ dependencies=[Depends(require_role("super_admin"))]
 - [ ] 登出後 protected route 會踢回 `/login`。
 - [ ] `_is_same_origin` 自動 admin 已移除，且無殘留「不帶 token 也能 admin」的路徑。
 - [ ] CSS 用相對單位、無新增 px；無 `console.log` 殘留。
+
+---
+
+## 12. 對外上線前的傳輸層加固（⏸ 暫放，目前無計畫）
+
+> **狀態：未排程。** 記錄存查,目前內部 HTTP 測試不受影響,等真的要對外開放再執行本節。功能面（帳號、SESSION_JWT_SECRET、bcrypt/PyJWT）已就緒;本節只剩「傳輸安全」。
+
+對外開放（任何人從不受信任的網路連入）前必做三項：
+
+1. **HTTPS / TLS** — nginx 掛憑證（例如 Let's Encrypt）。HTTP 是明文傳輸,同 Wi-Fi / 中間節點 / ARP 欺騙都能側錄到登入密碼;HTTPS 加密線路後這些攔截失效。
+2. **session cookie 加 `secure` flag** — 目前 `app/routers/auth_routes.py` 的 login cookie 是 `httponly + samesite=lax`,**無 `secure`**。上 HTTPS 後補上。
+3. **HTTP → HTTPS 轉址** — nginx 80 轉 443,避免有人走到未加密的 HTTP。
+
+⚠️ **順序陷阱**：`secure` cookie 只在 HTTPS 下才會被瀏覽器送出。**不可先加 `secure` 而 HTTPS 還沒就緒**,否則登入 cookie 不被儲存 → 登不進去。第 2 項必須與第 1 項**同時**上線,不能搶跑。
+
+（補充：DevTools → Network 看得到自己送出的明文密碼是**正常**的,那是加密前、在自己瀏覽器內的內容,與傳輸攔截無關,上 HTTPS 後仍看得到,不是漏洞。）
+
+## 13. user.app 正名為 user.scope (2026-06-03 refactor)
+
+為了消除「欄位名與實際承載內容不符」的技術債（`user.app` 欄位同時存放了 `hciot`、`jti`、`general` 與 `key_name:<name>` 等值），我們將整個系統中的 `user.app` 統一重構並正名為 `user.scope`。
+
+- **推導屬性**：在 `User` 模型上提供 `scope_kind`（可為 `"store"`, `"key"`, `"app"`）與 `scope_value`（對 key 進行 url-decode）兩個推導屬性（僅為 property，不在資料庫中落庫存檔，避免產生同步債）。
+- **授權相容性**：`verify_auth` 提取 JWT token claims 時，相容舊 token 的 `"app"` claim fallback，以實現無痛熱升級。
+- **後端 REST API 與 前端**：API Request/Response Schema、JWT Session Claims、與前端 `UserProfile`、`LoginResponse`、`UserAccount` 的相關欄位一律正名為 `scope`。
+- **Migration 腳本**：建立 `scripts/migrate_user_scope.py` 將既有 `users` collection 中的 `app` 屬性 rename 成 `scope`。
