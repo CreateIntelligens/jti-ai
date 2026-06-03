@@ -137,6 +137,98 @@ def _get_system_instruction(store_name: str, auth: dict) -> str | None:
     return _compose_prompt_system_instruction(prompt)
 
 
+def _app_default_system_instruction(managed_app: str, language: str = "zh") -> str | None:
+    """Full system instruction (persona + rule sections) for a managed app.
+
+    When the General entry point opens a managed app's fixed store
+    (__jti__ / __hciot__), the session should behave like a chat inside that
+    app — same persona and the same response rule sections — rather than the
+    generic General assistant. Each app module owns its own
+    build_system_instruction (with app-specific safety wrap / headers), so we
+    defer to it instead of re-assembling the pieces here.
+    """
+    if managed_app == "jti":
+        from app.services.jti import agent_prompts as app_prompts
+    elif managed_app == "hciot":
+        from app.services.hciot import agent_prompts as app_prompts
+    else:
+        return None
+
+    persona = app_prompts.PERSONA.get(language, app_prompts.PERSONA["zh"])
+    sections = app_prompts.DEFAULT_RESPONSE_RULE_SECTIONS.get(
+        language, app_prompts.DEFAULT_RESPONSE_RULE_SECTIONS["zh"]
+    )
+    # NB: jti/hciot expose different names for the char-limit kwarg
+    # (max_response_chars vs limit); both default to their own
+    # DEFAULT_MAX_RESPONSE_CHARS, so we omit it and let each app decide.
+    return app_prompts.build_system_instruction(
+        persona=persona,
+        language=language,
+        response_rule_sections=sections,
+    )
+
+
+def _store_topic_label(config) -> str | None:
+    """Human-readable subject of a knowledge store, for grounding query rewrites.
+
+    Managed app stores (JTI/HCIoT) already carry that context in their own
+    persona, so we only surface this for dynamic/general stores whose display
+    name is the only hint of what the store is about.
+    """
+    if config is None or config.managed_language:
+        return None
+    label = (config.display_name or "").strip()
+    # A bare store_id (e.g. "store_8ad3...") tells the model nothing useful.
+    if not label or label == config.name:
+        return None
+    return label
+
+
+def _resolve_general_system_instruction(store_name: str, auth: dict, config) -> str | None:
+    """Pick the system instruction for a General-entry chat session.
+
+    Priority:
+      1. A user-defined prompt for this store (prompt_manager) — always wins, and
+         lives entirely in General's own prompt store, so editing it never touches
+         the app's own prompt (and vice versa). Only the *defaults* are shared.
+      2. No custom prompt + a managed app store (__jti__/__hciot__): borrow that
+         app's DEFAULT persona + rule sections, so it behaves like the app.
+      3. Otherwise: the generic General prompt, augmented with the store topic so
+         terse queries can be expanded.
+    """
+    custom = _get_system_instruction(store_name, auth)
+    if custom is not None:
+        return custom
+
+    managed_app = getattr(config, "managed_app", None)
+    if config is not None and config.managed_language and managed_app in {"jti", "hciot"}:
+        language = config.managed_language or "zh"
+        app_instruction = _app_default_system_instruction(managed_app, language)
+        if app_instruction is not None:
+            return app_instruction
+
+    return _augment_with_store_topic(None, config)
+
+
+def _augment_with_store_topic(system_instruction: str | None, config) -> str | None:
+    """Prepend the store's topic so the agent can expand terse queries.
+
+    General stores are dynamic: a user asking "顏色" gives the model no subject
+    to search on. Telling it the store is about e.g. "寶島釣魚" lets the query
+    rewrite step add that subject, the way JTI/HCIoT personas already do.
+    """
+    label = _store_topic_label(config)
+    if label is None:
+        return system_instruction
+    prefix = (
+        f"目前知識庫主題：{label}。"
+        "當使用者問題過於簡短或籠統時，請結合此主題補上明確的關鍵字後再檢索。"
+    )
+    if not system_instruction:
+        return prefix
+    return f"{prefix}\n\n{system_instruction}"
+
+
 # === Chat Endpoints ===
 
 @router.post("/start")
@@ -147,17 +239,18 @@ def start_chat(req: ChatStartRequest, request: Request, auth: dict = Depends(ver
         logger.info("Cleaned up previous general session: %s...", req.previous_session_id[:8])
 
     user_gemini_api_key = extract_user_gemini_api_key(request)
+    owner_key_hash = hash_user_gemini_api_key(user_gemini_api_key)
     store_name = _resolve_request_store(
         req,
         auth,
-        hash_user_gemini_api_key(user_gemini_api_key),
+        owner_key_hash,
     )
-    system_instruction = _get_system_instruction(store_name, auth)
-
     # Resolve managed_app / managed_language for RAG source_type routing
-    config = resolve_store_config(store_name, hash_user_gemini_api_key(user_gemini_api_key))
+    config = resolve_store_config(store_name, owner_key_hash)
     managed_app = config.managed_app if config else None
     managed_language = config.managed_language if config else None
+
+    system_instruction = _resolve_general_system_instruction(store_name, auth, config)
 
     session = main_agent.create_session(
         store_name=store_name,
@@ -197,7 +290,7 @@ async def send_message(req: ChatMessageRequest, request: Request, auth: dict = D
         session = main_agent.create_session(
             store_name=store_name,
             model=start_req.model,
-            system_instruction=_get_system_instruction(store_name, auth),
+            system_instruction=_resolve_general_system_instruction(store_name, auth, config),
             managed_app=config.managed_app if config else None,
             managed_language=config.managed_language if config else None,
         )

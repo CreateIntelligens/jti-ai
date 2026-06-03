@@ -43,6 +43,7 @@ _SEARCH_KNOWLEDGE_DECL = build_search_knowledge_decl(
     ),
     queries_description=(
         "使用者問題拆解後的獨立查詢列表，每一筆應為完整的問題描述（包含上下文）。"
+        "請使用與使用者問題相同的語言撰寫 query；英文問題用英文查詢，中文問題用中文查詢。"
         "若使用者只有一個問題，仍以單元素陣列回傳。"
     ),
 )
@@ -52,6 +53,18 @@ _RAG_TOOL = types.Tool(function_declarations=[_SEARCH_KNOWLEDGE_DECL])
 
 def _get_session_manager():
     return deps.get_general_chat_session_manager()
+
+
+def _get_app_rag_tool(managed_app: str | None) -> types.Tool | None:
+    if managed_app == "jti":
+        from app.services.jti.main_agent import _RAG_TOOL as jti_rag_tool
+
+        return jti_rag_tool
+    if managed_app == "hciot":
+        from app.services.hciot.main_agent import _RAG_TOOL as hciot_rag_tool
+
+        return hciot_rag_tool
+    return None
 
 
 class MainAgent(BaseAgent):
@@ -90,11 +103,21 @@ class MainAgent(BaseAgent):
         """Override: pull store_name from session.metadata (set during create)."""
         return session.metadata.get("store_name") or "__general__"
 
+    @staticmethod
+    def _is_managed_store_session(session: Session) -> bool:
+        """A managed store (the fixed JTI/HCIoT knowledge pages) is keyed by
+        language (zh/en) at write time and always carries a non-empty
+        managed_language. Dynamic stores — general OR key-mapped — leave it empty
+        and are keyed by store_name instead. managed_app truthiness is NOT a valid
+        discriminator: dynamic stores carry managed_app="general" (or an app name
+        via key mapping) yet still write under the general_knowledge namespace.
+        """
+        return bool(session.metadata.get("managed_language"))
+
     def _get_rag_source_type_for_session(self, session: Session) -> list[str]:
         """Dynamic source_type list based on whether the store is managed."""
-        managed_app = session.metadata.get("managed_app")
-        if managed_app:
-            return [f"{managed_app}_knowledge"]
+        if self._is_managed_store_session(session):
+            return [f"{session.metadata.get('managed_app')}_knowledge"]
         return ["general_knowledge"]
 
     def _get_rag_search_language_for_session(self, session: Session) -> str | None:
@@ -103,8 +126,7 @@ class MainAgent(BaseAgent):
         When the session is bound to a managed app (JTI/HCIoT), defer to
         managed_language so we hit the same index they wrote.
         """
-        managed_app = session.metadata.get("managed_app")
-        if managed_app:
+        if self._is_managed_store_session(session):
             managed_lang = session.metadata.get("managed_language")
             return normalize_language(managed_lang) if managed_lang else None
         return session.metadata.get("store_name")
@@ -115,6 +137,11 @@ class MainAgent(BaseAgent):
 
     @property
     def _rag_tool_declaration(self) -> types.Tool | None:
+        return _RAG_TOOL
+
+    def _get_rag_tool_declaration_for_session(self, session: Session) -> types.Tool | None:
+        if self._is_managed_store_session(session):
+            return _get_app_rag_tool(session.metadata.get("managed_app")) or _RAG_TOOL
         return _RAG_TOOL
 
     def _get_default_persona(self, language: str) -> str:

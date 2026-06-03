@@ -119,6 +119,10 @@ class BaseAgent:
         """Return the RAG tool declaration for this agent, or None if RAG tool is not used."""
         return None
 
+    def _get_rag_tool_declaration_for_session(self, session: Session) -> types.Tool | None:
+        """Return the RAG tool declaration for a specific session."""
+        return self._rag_tool_declaration
+
     # --- 共用 prompt / system instruction 邏輯 ---
 
     def _get_active_prompt_context(self, language: str = "zh"):
@@ -186,7 +190,7 @@ class BaseAgent:
     # --- 共用 session 管理 ---
 
     def _make_chat_config(self, session: Session) -> types.GenerateContentConfig:
-        tool = self._rag_tool_declaration
+        tool = self._get_rag_tool_declaration_for_session(session)
         model_name = session.metadata.get("model") or self.model_name
         name_lower = model_name.lower()
         is_thinking_model = "thinking" in name_lower or "gemini-3" in name_lower
