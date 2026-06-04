@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import QaKnowledgeWorkspace, {
   type QaWorkspaceConfig,
 } from '../../src/components/_shared/qaKnowledgeWorkspace/QaKnowledgeWorkspace';
+import { getVisibilityOrderCollisionIds } from '../../src/components/_shared/qaKnowledgeWorkspace/explorer/VisibilityOrderModal';
 
 function createApi(overrides: Record<string, unknown> = {}) {
   return {
@@ -86,6 +87,30 @@ afterEach(() => {
 });
 
 describe('VisibilityOrderModal', () => {
+  it('limits drag collision candidates to the active management lane', () => {
+    const droppableIds = [
+      'category:ortho',
+      'topic:ortho/prp',
+      'topic:ortho/faq',
+      'category:dental',
+      'topic:dental/implant',
+    ];
+    const topicOwnerByDragId = new Map([
+      ['topic:ortho/prp', 'ortho'],
+      ['topic:ortho/faq', 'ortho'],
+      ['topic:dental/implant', 'dental'],
+    ]);
+
+    expect(getVisibilityOrderCollisionIds('category:ortho', droppableIds, topicOwnerByDragId)).toEqual([
+      'category:ortho',
+      'category:dental',
+    ]);
+    expect(getVisibilityOrderCollisionIds('topic:ortho/prp', droppableIds, topicOwnerByDragId)).toEqual([
+      'topic:ortho/prp',
+      'topic:ortho/faq',
+    ]);
+  });
+
   it('saves category and topic visibility changes from the workspace management modal', async () => {
     const api = renderWorkspace();
 

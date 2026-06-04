@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from 'react';
 import { GripVertical, X } from 'lucide-react';
 import {
   DndContext,
@@ -6,6 +6,7 @@ import {
   closestCenter,
   useSensor,
   useSensors,
+  type CollisionDetection,
   type DragEndEvent,
 } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
@@ -48,6 +49,27 @@ function parseDragId(value: string): { kind: 'category' | 'topic' | null; id: st
     kind: kind === 'category' || kind === 'topic' ? kind : null,
     id,
   };
+}
+
+export function getVisibilityOrderCollisionIds(
+  activeId: string,
+  droppableIds: string[],
+  topicOwnerByDragId: Map<string, string>,
+): string[] {
+  const activeItem = parseDragId(activeId);
+  if (activeItem.kind === 'category') {
+    return droppableIds.filter((droppableId) => parseDragId(droppableId).kind === 'category');
+  }
+
+  if (activeItem.kind === 'topic') {
+    const ownerCategoryId = topicOwnerByDragId.get(activeId);
+    if (!ownerCategoryId) {
+      return [];
+    }
+    return droppableIds.filter((droppableId) => topicOwnerByDragId.get(droppableId) === ownerCategoryId);
+  }
+
+  return droppableIds;
 }
 
 function cloneCategories(categories: HciotTopicCategory[]): EditableCategory[] {
@@ -131,6 +153,29 @@ export default function VisibilityOrderModal({
     () => draftCategories.map((category) => categoryDragId(category.id)),
     [draftCategories],
   );
+  const topicOwnerByDragId = useMemo(() => {
+    const owners = new Map<string, string>();
+    draftCategories.forEach((category) => {
+      category.topics.forEach((topic) => {
+        owners.set(topicDragId(topic.id), category.id);
+      });
+    });
+    return owners;
+  }, [draftCategories]);
+  const collisionDetection = useCallback<CollisionDetection>((args) => {
+    const allowedIds = new Set(getVisibilityOrderCollisionIds(
+      String(args.active.id),
+      args.droppableContainers.map((container) => String(container.id)),
+      topicOwnerByDragId,
+    ));
+
+    return closestCenter({
+      ...args,
+      droppableContainers: args.droppableContainers.filter((container) =>
+        allowedIds.has(String(container.id))
+      ),
+    });
+  }, [topicOwnerByDragId]);
 
   if (!open) {
     return null;
@@ -232,7 +277,7 @@ export default function VisibilityOrderModal({
           </button>
         </header>
 
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={handleDragEnd}>
           <div className="qa-workspace-manage-tree">
             <SortableContext items={categoryIds} strategy={verticalListSortingStrategy}>
               {draftCategories.map((category) => {

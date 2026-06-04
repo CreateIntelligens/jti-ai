@@ -66,7 +66,9 @@ export async function fetchWithUserGeminiKey(url: string, options: RequestInit =
   if (apiKey) {
     headers.set('X-Gemini-API-Key', apiKey);
   }
-  return fetch(url, { ...options, headers });
+  // 帶上 session cookie：身份靠帳號登入的 cookie，X-Gemini-API-Key 只是使用者自帶的
+  // Gemini key（非身份憑證）。少了 credentials 後端就收不到登入身份 → store 操作 403。
+  return fetch(url, { ...options, headers, credentials: 'include' });
 }
 
 export async function fetchAsAdmin(url: string, options: RequestInit = {}): Promise<Response> {

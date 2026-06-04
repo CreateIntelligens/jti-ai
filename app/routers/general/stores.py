@@ -556,11 +556,14 @@ def create_store(request_data: CreateStoreRequest, request: Request, auth: dict 
     return _dynamic_store_payload(store)
 
 
-def _authorize_store_read(store_name: str, request: Request, auth: dict) -> None:
-    """Allow listing a store's files for admins, or for users whose scope/assigned
-    store covers it. Mutating endpoints (upload/delete) stay admin-only; this only
-    gates read access so regular users can see the knowledge base they chat against.
-    Mirrors the scope check used by the chat store resolver to avoid cross-app IDOR."""
+def _authorize_store_access(store_name: str, request: Request, auth: dict) -> None:
+    """Authorize read or content-mutation access to a general key-owned store.
+
+    Admins/super_admins pass unconditionally. A key-bound user (sk-xxx) may access
+    only the store its key is bound to — read AND content edits (upload/delete/update)
+    are consistent: if the key can see the store, it can manage its contents. Deleting
+    the store itself stays admin-only (handled separately). Mirrors the chat store
+    resolver scope check to avoid cross-app IDOR."""
     if auth.get("role") in {"admin", "super_admin"}:
         return
 
@@ -580,7 +583,7 @@ def _authorize_store_read(store_name: str, request: Request, auth: dict) -> None
 @router.get("/stores/{store_name}/files")
 def list_files(store_name: str, request: Request, auth: dict = Depends(verify_auth)):
     """List files for a fixed managed store or a general key-owned store."""
-    _authorize_store_read(store_name, request, auth)
+    _authorize_store_access(store_name, request, auth)
     config = resolve_managed_store(store_name)
     if config is not None:
         return _list_store_files(config)
@@ -599,7 +602,7 @@ async def upload_file(
     auth: dict = Depends(verify_auth),
 ):
     """Upload a file into a general key-owned knowledge store."""
-    require_admin(auth)
+    _authorize_store_access(store_name, request, auth)
     if resolve_managed_store(store_name) is not None:
         raise HTTPException(status_code=400, detail="Managed stores use their app-specific knowledge pages")
 
@@ -637,7 +640,7 @@ async def upload_file(
 @router.delete("/stores/{store_name}/files/{filename:path}")
 def delete_file(store_name: str, filename: str, request: Request, auth: dict = Depends(verify_auth)):
     """Delete a file from a general key-owned knowledge store."""
-    require_admin(auth)
+    _authorize_store_access(store_name, request, auth)
     if resolve_managed_store(store_name) is not None:
         raise HTTPException(status_code=400, detail="Managed stores use their app-specific knowledge pages")
 
@@ -669,7 +672,7 @@ def get_store_file_content(
     auth: dict = Depends(verify_auth),
 ):
     """Return text content of a file for inline preview/edit."""
-    require_admin(auth)
+    _authorize_store_access(store_name, request, auth)
     if resolve_managed_store(store_name) is not None:
         raise HTTPException(
             status_code=400,
@@ -726,7 +729,7 @@ async def update_store_file_content(
     auth: dict = Depends(verify_auth),
 ):
     """Save edited text content and re-index the file in RAG."""
-    require_admin(auth)
+    _authorize_store_access(store_name, request, auth)
     if resolve_managed_store(store_name) is not None:
         raise HTTPException(
             status_code=400,
