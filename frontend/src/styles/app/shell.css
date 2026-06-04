@@ -101,6 +101,108 @@
   letter-spacing: 0;
 }
 
+/* ── Auth Guard Error Page ── */
+.auth-guard-error-page {
+  display: flex;
+  width: 100%;
+  height: 100dvh;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at center, #1e1b4b 0%, #09090b 100%);
+  color: #ffffff;
+  font-family: var(--font, sans-serif);
+  padding: 1.5rem;
+  box-sizing: border-box;
+}
+
+.auth-guard-error-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 24rem;
+  width: 100%;
+  padding: 2.5rem 2rem;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(0.75rem);
+  -webkit-backdrop-filter: blur(0.75rem);
+  border: 0.0625rem solid rgba(255, 255, 255, 0.08);
+  border-radius: 1rem;
+  box-shadow: 0 1.5rem 3rem rgba(0, 0, 0, 0.4);
+  animation: auth-guard-fade-in 0.4s ease-out;
+}
+
+@keyframes auth-guard-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.auth-guard-error-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border-radius: 50%;
+  background: rgba(245, 158, 11, 0.1);
+  color: #f59e0b;
+  margin-bottom: 1.5rem;
+  border: 0.0625rem solid rgba(245, 158, 11, 0.2);
+}
+
+.auth-guard-error-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem 0;
+  color: #f8fafc;
+  letter-spacing: 0.05em;
+}
+
+.auth-guard-error-message {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #94a3b8;
+  margin: 0 0 2rem 0;
+}
+
+.auth-guard-error-message strong {
+  color: #f1f5f9;
+}
+
+.auth-guard-error-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: #3b82f6;
+  color: #ffffff;
+  transition: all 0.2s ease;
+  font-family: var(--font, sans-serif);
+  width: 100%;
+}
+
+.auth-guard-error-btn:hover {
+  background: #2563eb;
+  transform: translateY(-0.0625rem);
+  box-shadow: 0 0.25rem 0.75rem rgba(37, 99, 235, 0.3);
+}
+
+.auth-guard-error-btn:active {
+  transform: translateY(0);
+}
+
 /* ── Settings Dropdown ── */
 .dd-wrap { position: relative; }
 .dd-menu { position: absolute; top: calc(100% + .5rem); right: 0; background: var(--surface); border: 0.0625rem solid var(--border); border-radius: var(--r-lg); box-shadow: var(--shadow-lg); padding: .375rem; min-width: 14rem; z-index: 100; animation: dropIn .15s ease; }

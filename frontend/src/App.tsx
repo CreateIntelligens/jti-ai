@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
+import { AlertTriangle, LogOut } from 'lucide-react';
+import { logout } from './services/api';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import ChatArea from './components/ChatArea';
@@ -85,20 +87,27 @@ function AuthGuard({ children, allowedRoles, allowedApp, allowGeneralUser = fals
     const targetUnavailable = canShow ? !canShow(targetPage) : false;
     if (target === location.pathname || targetUnavailable) {
       return (
-        <div className="auth-guard-loading-container">
-          <div className="auth-guard-text">
-            此主機或服務不包含「{targetPage}」頁面，請聯絡開發人員。
+        <div className="auth-guard-error-page">
+          <div className="auth-guard-error-card">
+            <div className="auth-guard-error-icon">
+              <AlertTriangle size={32} />
+            </div>
+            <h1 className="auth-guard-error-title">無存取權限</h1>
+            <p className="auth-guard-error-message">
+              此主機或服務不包含「<strong>{targetPage}</strong>」頁面。<br />
+              請聯絡系統開發人員取得協助。
+            </p>
+            <button
+              className="auth-guard-error-btn"
+              onClick={async () => {
+                await logout().catch(() => {});
+                navigate('/login', { replace: true });
+              }}
+            >
+              <LogOut size={14} />
+              <span>返回登入頁</span>
+            </button>
           </div>
-          <button
-            className="btn btn-primary btn-sm"
-            onClick={async () => {
-              const { logout } = await import('./services/api/auth');
-              await logout().catch(() => {});
-              navigate('/login', { replace: true });
-            }}
-          >
-            返回登入頁
-          </button>
         </div>
       );
     }
