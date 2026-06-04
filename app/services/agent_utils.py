@@ -68,15 +68,35 @@ def strip_core_markup(text: str) -> str:
     return CORE_MARKER_PATTERN.sub(r"\1", text)
 
 
+# 餵給模型的歷史滑動視窗上限（則數，非輪數）。
+# 客戶情境本就不需長對話，此上限純為防呆：避免惡意狂灌訊息把 token 撐爆 / 拖慢回應。
+# MongoDB 仍儲存完整歷史，這裡只限制「每次請求帶給 Gemini」的筆數。
+# 20 輪來回 = 40 則。
+MAX_HISTORY_MESSAGES = 40
+
+
+def _chat_history_window(chat_history: list) -> list:
+    windowed = chat_history[-MAX_HISTORY_MESSAGES:]
+
+    # 對齊角色：history 必須以 user 開頭，否則 SDK 會報錯。
+    while windowed and windowed[0]["role"] != "user":
+        windowed = windowed[1:]
+
+    return windowed
+
+
+def _chat_message_to_content(msg: dict) -> types.Content:
+    role = "user" if msg["role"] == "user" else "model"
+    return types.Content(
+        role=role,
+        parts=[types.Part.from_text(text=msg["content"])],
+    )
+
+
 def build_chat_history(chat_history: list) -> list[types.Content]:
-    """將 MongoDB 格式的 chat_history 轉換為 Gemini SDK Content 物件列表。"""
-    contents = []
-    for msg in chat_history:
-        role = "user" if msg["role"] == "user" else "model"
-        contents.append(
-            types.Content(
-                role=role,
-                parts=[types.Part.from_text(text=msg["content"])],
-            )
-        )
-    return contents
+    """將 MongoDB 格式的 chat_history 轉換為 Gemini SDK Content 物件列表。
+
+    只保留最近 ``MAX_HISTORY_MESSAGES`` 則作為滑動視窗。取尾後會確保第一筆為
+    user 角色（Gemini 要求 history 以 user 開頭），若切到一半開頭是 model 則往後再裁一則。
+    """
+    return [_chat_message_to_content(msg) for msg in _chat_history_window(chat_history)]
