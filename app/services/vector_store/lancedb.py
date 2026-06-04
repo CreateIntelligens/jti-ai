@@ -75,7 +75,19 @@ class LanceDBStore:
                 where += f" AND source_type = '{source_type}'"
 
         try:
-            return tbl.search(query_vector).where(where).limit(top_k).to_list()
+            # Embeddings are L2-normalized, but LanceDB defaults to the L2
+            # metric. The RAG distance threshold is calibrated on cosine
+            # distance (range 0..2), so we pin the metric explicitly. Without
+            # this, normalized vectors yield L2 distances ~1.2-1.5 that the
+            # cosine-scaled threshold silently filters out (general KB returned
+            # zero hits despite exact term matches).
+            return (
+                tbl.search(query_vector)
+                .distance_type("cosine")
+                .where(where)
+                .limit(top_k)
+                .to_list()
+            )
         except Exception as e:
             logger.error(f"LanceDB search failed: {e}")
             return []
