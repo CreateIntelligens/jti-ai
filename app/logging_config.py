@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import logging
 import os
+import sys
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
@@ -76,6 +77,14 @@ def _build_handler(path: Path, level: int, module: str) -> TimedRotatingFileHand
     return handler
 
 
+def _warn_handler_skipped(path: Path, exc: OSError) -> None:
+    print(
+        f"[logging_config] 無法開啟 log 檔 {path}：{exc}；"
+        f"此 handler 略過，日誌改走 stderr。",
+        file=sys.stderr,
+    )
+
+
 def configure_file_logging() -> None:
     """Attach per-module file handlers to the root logger.
 
@@ -93,6 +102,13 @@ def configure_file_logging() -> None:
         module_dir.mkdir(parents=True, exist_ok=True)
 
         for filename, level in _HANDLER_SPECS:
-            handler = _build_handler(module_dir / filename, level, module)
+            path = module_dir / filename
+            try:
+                handler = _build_handler(path, level, module)
+            except OSError as exc:
+                # 防呆：log 檔開不起來（權限被污染、磁碟滿等）不該讓整個 app 倒。
+                # 退回 stderr，記一條 warning 方便定位，服務繼續活。
+                _warn_handler_skipped(path, exc)
+                continue
             setattr(handler, "_jtai_file_handler", True)
             root.addHandler(handler)
