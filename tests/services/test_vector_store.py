@@ -14,7 +14,6 @@ sys.modules['pandas'] = MagicMock()
 
 import app.services.vector_store.lancedb as lancedb_module
 from app.services.vector_store.lancedb import LanceDBStore
-from app.services.vector_store.mongodb_backup import MongoDBBackup
 
 class TestVectorStore(unittest.TestCase):
     def setUp(self):
@@ -50,21 +49,6 @@ class TestVectorStore(unittest.TestCase):
         results = store.search(np.array([0.1]*1024), language="zh", top_k=1)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["text"], "hello")
-
-    @patch('app.services.vector_store.mongodb_backup.get_mongo_db')
-    def test_mongodb_backup_sync(self, mock_get_db):
-        mock_db = MagicMock()
-        mock_get_db.return_value = mock_db
-        mock_collection = MagicMock()
-        mock_db.__getitem__.return_value = mock_collection
-        
-        backup = MongoDBBackup(db_name="jti_app")
-        
-        chunks = [
-            {"text": "hello", "vector": [0.1]*1024, "file_id": "f1", "source_language": "zh", "chunk_index": 0},
-        ]
-        backup.sync_to_mongodb(chunks)
-        mock_collection.bulk_write.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

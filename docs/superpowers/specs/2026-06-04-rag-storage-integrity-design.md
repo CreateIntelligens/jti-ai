@@ -1,7 +1,7 @@
 # JTAI RAG 儲存完整性與備份同步設計文件
 
 - **日期**：2026-06-04（v1 初版）
-- **狀態**：Draft（問題已確認，修法待排程）
+- **狀態**：Done（已實作並驗證通過）
 - **分支**：`feat/rag`（worktree: `.worktrees/jtai-rag`）
 - **預期執行者**：Claude（可接受其他 AI 監督檢視）
 - **相關文件**：[app↔key 綁定](2026-06-02-app-key-map.md)、[app/store 層級與 scope](2026-06-02-app-store-hierarchy-and-scope.md)
@@ -100,3 +100,39 @@
 4. **Reconcile CLI 雙向對齊指令**：
    - 開發 `scripts/reconcile_rag.py` 維護工具，用以雙向比對 LanceDB ↔ Mongo。
    - **權威性限制**：由於 LanceDB 是多部署本地儲存，從「本地 LanceDB 補回 Mongo」的寫入必須限制**只有指定的權威部署 (Authority Deployment) 才能寫入 Mongo**，其他部署僅允許進行「Mongo -> 本地 LanceDB」的單向還原同步，防止部署間向量互相覆蓋造成混亂。
+
+---
+
+## 5. 架構演進：general 統一走 backfill、廢除 vector_backup（v2 方向，待實作）
+
+> **狀態**：Draft，已決議方向、尚未實作。本節**取代** §1 步驟 1（restore）與 §4 的 restore/reconcile 路線。
+
+### 5.1 動機
+
+兩個關鍵事實改變了原本「general 走 restore」的權衡：
+
+1. **embedding 是地端模型**（BGE-M3 類，非付費 API）→ 重算 embedding **不花錢**，只花本地算力。原本「backfill 重算很貴」的反對理由不成立。
+2. **general 原始檔其實有存**：在 `get_knowledge_store()`（`namespace="general"`，以 `store_name` 為 key）。已確認 `list_files(store_name, namespace)` / `get_file_data(store_name, filename, namespace)` 可完整撈回 → general **有能力跟 jti/hciot 一樣 backfill 重算**。
+3. **`vector_backup` 大半是死重**：jti/hciot 走 backfill 重算、**從不讀 vector_backup**；只有 general 靠它 restore。它正是 Atlas 512MB 撐爆的幫凶之一。
+
+→ 既然地端重算免費、general 原始檔齊全，讓 general 也走 backfill，即可**徹底廢除 vector_backup**，同時消除 general 的特例路徑（機制與 jti/hciot 完全統一）。
+
+### 5.2 要做的改動
+
+1. **`backfill.py` `_get_files_and_data` 加 general 分支**：用 `get_knowledge_store()`，以 `store_name` 當 key、`namespace="general"` 撈檔；對應 `get_file_data` 帶 namespace。
+2. **`run_backfill` 支援 general**：`_BACKFILL_SOURCES` 加 general。注意 general 的「language 軸」實為 `store_name`（非 zh/en），需正確傳遞。
+3. **`main.py` lifespan**：列出所有 general `store_name`，對每個跑 backfill；**移除 restore 呼叫**。
+4. **prune 安全性（最高風險）**：general 的 `live_files` 必須是「該 store_name 的正確檔案清單」，否則整個 store 被誤判為孤兒清空。
+5. **廢除 vector_backup**：移除 `sync_to_mongodb` 寫入與 `restore_to_lancedb`；`MongoDBBackup` 與 `scripts/reconcile_rag.py` 隨之退場（reconcile 比對的就是 vector_backup，失去意義）。
+
+### 5.3 風險與取捨
+
+- ⚠️ **推翻既有改動**：本輪已實作的 restore 機制、reconcile CLI、db_name 參數化（VECTOR_BACKUP_DB）在 v2 下都將移除或失效。
+- ⚠️ **general key 語意差異**：backfill 既有路徑以 zh/en 為 key，general 以 store_name 為 key，`_get_files_and_data` 與 prune 須特別處理，最易出錯。
+- ⚠️ **單一來源**：廢除 vector_backup 後，general 資料唯一來源變成 knowledge store（與 jti/hciot 一致，可接受）。
+- ✅ **收益**：vector_backup 空間全省、機制完全統一、地端重算不花錢。
+
+### 5.4 待決
+
+1. lifespan 啟動逐一 backfill 所有 general store 的效能（store 多時）是否需要批次/並行控制？
+2. 是否保留一個輕量的「最終一致性檢查」取代 reconcile（純讀、不寫）？

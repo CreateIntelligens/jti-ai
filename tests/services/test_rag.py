@@ -10,7 +10,6 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")
 # Mock dependencies
 mock_embedding_service = MagicMock()
 mock_lancedb_store = MagicMock()
-mock_mongodb_backup = MagicMock()
 mock_knowledge_store = MagicMock()
 
 from app.services.rag.chunker import SemanticChunker
@@ -24,7 +23,6 @@ class TestRAGPipeline(unittest.TestCase):
             patch("app.services.rag.service.get_lancedb_store", return_value=mock_lancedb_store),
             patch("app.services.rag.backfill.get_embedding_service", return_value=mock_embedding_service),
             patch("app.services.rag.backfill.get_lancedb_store", return_value=mock_lancedb_store),
-            patch("app.services.rag.backfill.get_mongodb_backup", return_value=mock_mongodb_backup),
             patch("app.services.rag.backfill.get_jti_knowledge_store", return_value=mock_knowledge_store),
             patch("app.services.rag.backfill.get_hciot_knowledge_store", return_value=mock_knowledge_store),
         ]
@@ -32,7 +30,7 @@ class TestRAGPipeline(unittest.TestCase):
             patcher.start()
             self.addCleanup(patcher.stop)
 
-        for mocked in (mock_embedding_service, mock_lancedb_store, mock_mongodb_backup, mock_knowledge_store):
+        for mocked in (mock_embedding_service, mock_lancedb_store, mock_knowledge_store):
             mocked.reset_mock()
             mocked.side_effect = None
 
@@ -97,7 +95,22 @@ class TestRAGPipeline(unittest.TestCase):
         backfill.run_backfill("jti", "zh")
         
         mock_lancedb_store.insert_chunks.assert_called_once()
-        mock_mongodb_backup.sync_to_mongodb.assert_called_once()
+
+    def test_general_backfill(self):
+        backfill = BackfillService()
+        general_store = MagicMock()
+        general_store.list_files.return_value = [
+            {"filename": "general_file.txt", "display_name": "General File"}
+        ]
+        general_store.get_file_data.return_value = b"general store text data"
+        mock_embedding_service.encode.return_value = np.random.rand(1, 1024)
+
+        with patch("app.services.rag.backfill.get_knowledge_store", return_value=general_store):
+            backfill.run_backfill("general", "store_123")
+
+        mock_lancedb_store.insert_chunks.assert_called_once()
+        general_store.list_files.assert_called_once_with("store_123", namespace="general")
+        general_store.get_file_data.assert_called_once_with("store_123", "general_file.txt", namespace="general")
 
     def test_hciot_english_backfill_uses_topic_store_labels_for_prefix(self):
         backfill = BackfillService()

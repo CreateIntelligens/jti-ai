@@ -22,6 +22,12 @@ RESET = "\033[0m"
 _NOISY_LOGGERS = ("httpx", "google")
 _UVICORN_LOGGERS = ("uvicorn", "uvicorn.access", "uvicorn.error")
 _AFC_WARNING_PATTERNS = (".*automatic function calling.*", ".*AFC.*")
+_FIXED_RAG_BACKFILL_JOBS = (
+    ("jti", "zh"),
+    ("jti", "en"),
+    ("hciot", "zh"),
+    ("hciot", "en"),
+)
 
 # Status code color mapping
 _STATUS_COLORS: dict[str, str] = {
@@ -131,7 +137,7 @@ async def lifespan(_: FastAPI):
     """Initialize managers and background backfill on application startup."""
     deps.init_managers()
     
-    # Self-Hosted RAG: Parallel backfill
+    # Self-Hosted RAG: background backfill
     try:
         from app.services.rag.backfill import get_backfill_service
         asyncio.create_task(_run_rag_backfill(get_backfill_service()))
@@ -151,11 +157,30 @@ async def lifespan(_: FastAPI):
         logger.warning(f"[Shutdown] Embedding cleanup failed: {e}")
 
 
+def _list_general_store_names() -> list[str]:
+    try:
+        from app.routers.general.stores import get_store_registry
+
+        return [
+            store["name"]
+            for store in get_store_registry().list_stores(app="general")
+            if store.get("name")
+        ]
+    except Exception as e:
+        logger.error("[RAG] Failed to list general stores: %s", e)
+        return []
+
+
+def _build_rag_backfill_jobs(general_store_names: list[str]) -> list[tuple[str, str]]:
+    jobs = list(_FIXED_RAG_BACKFILL_JOBS)
+    jobs.extend(("general", store_name) for store_name in general_store_names)
+    return jobs
+
+
 async def _run_rag_backfill(backfill):
     """Background task to warm up embedding model and index knowledge files."""
-    import time as _time
     loop = asyncio.get_running_loop()
-    t0 = _time.time()
+    t0 = time.time()
     try:
         await loop.run_in_executor(None, backfill.embedding_service.encode, "warmup")
     except Exception as e:
@@ -163,27 +188,19 @@ async def _run_rag_backfill(backfill):
         return
 
     try:
-        tasks = [
-            loop.run_in_executor(None, backfill.run_backfill, src, lang)
-            for src in ["jti", "hciot"] for lang in ["zh", "en"]
-        ]
-        await asyncio.gather(*tasks)
-        # Restore missing files from MongoDB vector backup!
-        try:
-            from app.services.vector_store.mongodb_backup import get_mongodb_backup
-            restored = await loop.run_in_executor(
-                None,
-                get_mongodb_backup().restore_to_lancedb,
-                backfill.lancedb_store
-            )
-            if restored > 0:
-                logger.info("[RAG Restore] Successfully restored %d files from MongoDB backup.", restored)
-        except Exception as e:
-            logger.error("[RAG Restore] Failed to restore during startup: %s", e)
+        general_store_names = _list_general_store_names()
+        # Await each executor submission before the next one; building all
+        # futures first would run LanceDB writes concurrently and recreate the
+        # boot-time file descriptor spike this path avoids.
+        for source_type, partition in _build_rag_backfill_jobs(general_store_names):
+            await loop.run_in_executor(None, backfill.run_backfill, source_type, partition)
 
         total = backfill.lancedb_store.get_stats().get("count", 0)
-        elapsed = _time.time() - t0
-        logger.info("[RAG] Ready — %d chunks indexed in %.1fs", total, elapsed)
+        elapsed = time.time() - t0
+        logger.info(
+            "[RAG] Ready — %d chunks indexed in %.1fs (%d general stores)",
+            total, elapsed, len(general_store_names),
+        )
     except Exception as e:
         logger.error("[RAG] Backfill failed: %s", e)
 

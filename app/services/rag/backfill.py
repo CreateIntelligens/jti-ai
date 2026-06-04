@@ -7,13 +7,14 @@ from typing import Dict, Optional
 from app.services.rag.chunker import SemanticChunker
 from app.services.embedding.service import get_embedding_service
 from app.services.vector_store.lancedb import get_lancedb_store
-from app.services.vector_store.mongodb_backup import get_mongodb_backup
+from app.services.knowledge_store import get_knowledge_store
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.hciot.topic_store import get_hciot_topic_store
 from app.services.jti.knowledge_store import get_jti_knowledge_store
 
 logger = logging.getLogger(__name__)
 _SUPPORTED_KNOWLEDGE_EXTENSIONS = (".csv", ".txt", ".md", ".docx")
+_GENERAL_NAMESPACE = "general"
 
 
 def _knowledge_source_type(source_type: str) -> str:
@@ -32,12 +33,14 @@ class BackfillService:
     _DOC_CHUNK_SIZE_TOKENS = 500
     _DOC_CHUNK_OVERLAP_TOKENS = 80
 
-    # File-backed sources that have an authoritative store to rebuild from and
-    # are safe to prune against. `general` is intentionally excluded: it has no
-    # source-file registry here (it is dynamic, restored from Mongo via
-    # restore_to_lancedb), so pruning it against another store's file list
-    # would wipe all its data. Guard against accidental backfill of such types.
-    _BACKFILL_SOURCES = ("jti", "hciot")
+    # Sources with an authoritative MongoDB-backed store to rebuild from, safe
+    # to prune against. `general` is included: its raw files live in the shared
+    # knowledge store under namespace="general", keyed by store_name (passed as
+    # `language`), so it backfills/reembeds exactly like jti/hciot. Embedding is
+    # a local model, so reembedding on every boot is free — there is no Mongo
+    # vector mirror to restore from. Anything not listed here has no source-file
+    # registry and must not be backfilled (it would mis-prune and wipe data).
+    _BACKFILL_SOURCES = ("jti", "hciot", "general")
     _TEST_ORPHAN_PREFIXES = ("test_", "qa_", "QA254-")
 
     def __init__(self):
@@ -45,7 +48,6 @@ class BackfillService:
         self._doc_chunker: Optional[SemanticChunker] = None
         self._embedding_service = None
         self._lancedb_store = None
-        self._mongodb_backup = None
 
     @property
     def chunker(self) -> SemanticChunker:
@@ -77,12 +79,6 @@ class BackfillService:
         if self._lancedb_store is None:
             self._lancedb_store = get_lancedb_store()
         return self._lancedb_store
-
-    @property
-    def mongodb_backup(self):
-        if self._mongodb_backup is None:
-            self._mongodb_backup = get_mongodb_backup()
-        return self._mongodb_backup
 
     @staticmethod
     def _normalize_image_id(raw: str) -> str | None:
@@ -211,13 +207,13 @@ class BackfillService:
         return filename.lower().endswith(_SUPPORTED_KNOWLEDGE_EXTENSIONS)
 
     @staticmethod
-    def _iter_store_files(store, language: str, fetch_data):
-        for file_info in store.list_files(language):
+    def _iter_store_files(files, fetch_data):
+        for file_info in files:
             filename = file_info.get("filename") or file_info.get("name", "")
             if not BackfillService._is_supported_knowledge_file(filename):
                 continue
 
-            data = fetch_data(store, language, filename)
+            data = fetch_data(filename)
             if data:
                 yield filename, file_info.get("display_name", filename), data, file_info
 
@@ -232,21 +228,42 @@ class BackfillService:
     def _fetch_jti_file_data(store, language: str, filename: str) -> bytes | None:
         return store.get_file_data(language, filename)
 
+    @staticmethod
+    def _fetch_general_file_data(store, store_name: str, filename: str) -> bytes | None:
+        return store.get_file_data(store_name, filename, namespace=_GENERAL_NAMESPACE)
+
     def _get_files_and_data(self, source_type: str, language: str):
-        """Yields source files and file metadata from the correct MongoDB store."""
+        """Yields source files and file metadata from the correct MongoDB store.
+        general partitions by store_name (passed as `language`) under the shared
+        knowledge store's "general" namespace; jti/hciot partition by zh/en."""
+        if source_type == "general":
+            store = get_knowledge_store()
+            yield from self._iter_store_files(
+                store.list_files(language, namespace=_GENERAL_NAMESPACE),
+                lambda filename: self._fetch_general_file_data(store, language, filename),
+            )
+            return
+
         if source_type == "hciot":
             store = get_hciot_knowledge_store()
-            yield from self._iter_store_files(store, language, self._fetch_hciot_file_data)
+            yield from self._iter_store_files(
+                store.list_files(language),
+                lambda filename: self._fetch_hciot_file_data(store, language, filename),
+            )
             return
 
         store = get_jti_knowledge_store()
-        yield from self._iter_store_files(store, language, self._fetch_jti_file_data)
+        yield from self._iter_store_files(
+            store.list_files(language),
+            lambda filename: self._fetch_jti_file_data(store, language, filename),
+        )
 
     def run_backfill(self, source_type: str, language: str, force: bool = False):
         """Runs incremental backfill for a specific source and language.
         Always prunes orphans (indexed file_ids absent from the store registry).
-        Only supports file-backed sources; dynamic stores (general) are restored
-        from Mongo backup instead and must not be backfilled here."""
+        Supports jti/hciot (language=zh/en) and general (language=store_name);
+        all rebuild from their MongoDB-backed store. Other source_types have no
+        source-file registry and are refused to avoid mis-pruning."""
         if source_type not in self._BACKFILL_SOURCES:
             logger.error(
                 "[Backfill] Refusing to backfill unsupported source_type %r "
@@ -288,11 +305,6 @@ class BackfillService:
             logger.error(f"[Backfill] Failed to list file ids from LanceDB for test pruning: {e}")
             indexed = set()
 
-        try:
-            indexed |= self.mongodb_backup.list_file_ids(full_source_type, language)
-        except Exception as e:
-            logger.error(f"[Backfill] Failed to list file ids from MongoDB for test pruning: {e}")
-
         test_orphans = {
             f_id for f_id in indexed
             if f_id.startswith(self._TEST_ORPHAN_PREFIXES)
@@ -304,11 +316,10 @@ class BackfillService:
                 self.delete_from_rag(source_type, orphan, language=language)
 
     def _prune_orphans(self, source_type: str, language: str, live_files: set[str]) -> None:
-        """Remove file_ids from LanceDB / mongodb_backup that aren't in live_files.
+        """Remove file_ids from LanceDB that aren't in live_files.
         Only safe for file-backed sources after their full store registry has been read."""
         full_source_type = _knowledge_source_type(source_type)
         indexed = self.lancedb_store.list_file_ids(full_source_type, language)
-        indexed |= self.mongodb_backup.list_file_ids(full_source_type, language)
         orphans = indexed - live_files
         if not orphans:
             return
@@ -317,16 +328,12 @@ class BackfillService:
             self.delete_from_rag(source_type, orphan, language=language)
 
     def delete_from_rag(self, source_type: str, filename: str, language: str | None = None):
-        """Removes a file's chunks from the local RAG store and its mongo mirror."""
+        """Removes a file's chunks from the local RAG store."""
         full_source_type = _knowledge_source_type(source_type)
         try:
             self.lancedb_store.delete_by_file(filename, full_source_type, source_language=language)
         except Exception as e:
             logger.error(f"[RAG] Failed to delete {filename} from LanceDB: {e}")
-        try:
-            self.mongodb_backup.delete_by_file(filename, full_source_type)
-        except Exception as e:
-            logger.error(f"[RAG] Failed to delete {filename} from mongodb_backup: {e}")
         logger.info(f"[RAG] Removed {filename} from {full_source_type}")
 
     def index_single_file(
@@ -401,7 +408,6 @@ class BackfillService:
             # Atomic Replace in current LanceDB table
             self.lancedb_store.delete_by_file(filename, full_source_type, source_language=language)
             self.lancedb_store.insert_chunks(records)
-            self.mongodb_backup.sync_to_mongodb(records)
             
             logger.debug(f"[RAG] Indexed {filename} ({len(records)} chunks)")
         except Exception as e:

@@ -3,6 +3,13 @@ services:
     build:
       context: .
       dockerfile: docker/backend.Dockerfile
+    # LanceDB opens many file descriptors per write; the 1024 default is too low
+    # for boot-time backfill across jti/hciot/general stores (hit "Too many open
+    # files"). 65536 is the standard nofile limit for DB/retrieval services.
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
     env_file:
       - .env
     volumes:

@@ -69,11 +69,11 @@ class TestRagLimitsAndPruning(unittest.TestCase):
     def test_prune_test_orphans(self):
         service = BackfillService()
         service._lancedb_store = MagicMock()
-        service._mongodb_backup = MagicMock()
         service.delete_from_rag = MagicMock()
 
-        service.lancedb_store.list_file_ids.return_value = {"qa_1.txt", "test_2.txt", "normal_3.txt"}
-        service.mongodb_backup.list_file_ids.return_value = {"QA254-4.txt", "normal_3.txt"}
+        service.lancedb_store.list_file_ids.return_value = {
+            "qa_1.txt", "test_2.txt", "QA254-4.txt", "normal_3.txt",
+        }
 
         service._prune_test_orphans("hciot", "zh")
 
