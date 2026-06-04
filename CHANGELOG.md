@@ -11,6 +11,14 @@
 - 對外 Keys 入口開放給一般 user（原本僅 admin 可見），面板依角色顯示對應功能
 - 顯式將 `cryptography` 加入 `requirements.txt`
 
+### 知識庫 Scope 授權
+
+- 知識庫管理端點（HCIoT / JTI 的檔案、圖片、主題）從 admin-only 改為 scope 授權：super_admin / admin 可跨應用，一般 user 可管理自己 scope 所屬應用的知識庫，但碰不到其他應用
+- 新增 `can_access_kb(auth, app)` / `require_kb_access(app)`，各 router 明確帶入自己的 app 名與 `user.scope` 比對；對話歷史（conversations）維持 admin-only
+- `/admin/rag/status` 改為依 `source_type` 動態做 scope 檢查（查 `all` 需通過每個應用）；`/admin/rag/reindex` 維持 admin 限定
+- 修正前端 `fetchAsAdmin` 未帶 `credentials: 'include'`，導致登入後 admin/scope 請求漏帶 session cookie 而 403
+- 設計文件：`docs/superpowers/specs/2026-06-04-kb-scope-access-design.md`
+
 ## [Unreleased] - 2026-04-29
 
 ### RAG / AI 基礎設施

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from fastapi import BackgroundTasks
 
-from app.auth import verify_admin
 from app.routers._shared.qa_kb_router import (
     QaKbRouterConfig,
     build_qa_kb_router,
@@ -24,7 +23,7 @@ from app.utils import get_other_language
 def _make_config() -> QaKbRouterConfig:
     return QaKbRouterConfig(
         tag="HCIoT Knowledge",
-        auth_dep=verify_admin,
+        app="hciot",
         knowledge_store_factory=lambda: get_hciot_knowledge_store(),
         topic_store_factory=lambda language: get_hciot_topic_store(language),
         rag_source_type="hciot",

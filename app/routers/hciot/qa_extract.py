@@ -5,7 +5,6 @@ from __future__ import annotations
 import inspect
 from pathlib import Path
 
-from app.auth import verify_admin
 from app.routers._shared.qa_kb_router import (
     MAX_QA_EXTRACT_FILE_SIZE_BYTES,
     MAX_QA_EXTRACT_TEXT_LENGTH,
@@ -44,7 +43,7 @@ def _extract_text_from_upload(file_bytes: bytes, filename: str) -> str:
 def _make_config() -> QaKbRouterConfig:
     return QaKbRouterConfig(
         tag="HCIoT Knowledge",
-        auth_dep=verify_admin,
+        app="hciot",
         knowledge_store_factory=lambda: hciot_knowledge.get_hciot_knowledge_store(),
         topic_store_factory=lambda language: hciot_knowledge.get_hciot_topic_store(language),
         rag_source_type="hciot",

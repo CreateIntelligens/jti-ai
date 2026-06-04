@@ -1,12 +1,13 @@
 import unittest
 from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
-from app.auth import verify_admin
+from app.auth import verify_admin, verify_auth
 from tests.support.app_test_support import get_test_app
 from app.services.hciot.qa_extract_jobs import _JOBS
 
 app = get_test_app()
 app.dependency_overrides[verify_admin] = lambda: {"role": "admin"}
+app.dependency_overrides[verify_auth] = lambda: {"role": "admin"}
 
 
 class TestHciotQaExtract(unittest.TestCase):

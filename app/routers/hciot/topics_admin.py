@@ -5,11 +5,11 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.auth import verify_admin
+from app.auth import require_kb_access
 from app.services.hciot.topic_store import Language, get_hciot_topic_store
 from app.utils import get_other_language
 
-router = APIRouter(tags=["HCIoT Topics"], dependencies=[Depends(verify_admin)])
+router = APIRouter(tags=["HCIoT Topics"], dependencies=[Depends(require_kb_access("hciot"))])
 
 Lang = Language
 

@@ -16,6 +16,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPExcepti
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
+from app.auth import require_kb_access
 from app.routers.knowledge_utils import (
     EDITABLE_EXTENSIONS,
     TEXT_PREVIEW_EXTENSIONS,
@@ -53,7 +54,7 @@ MAX_QA_EXTRACT_TEXT_LENGTH = 30000
 @dataclass(frozen=True)
 class QaKbRouterConfig:
     tag: str
-    auth_dep: Callable[..., Any]
+    app: str
     knowledge_store_factory: Callable[[], Any]
     topic_store_factory: Callable[[str | None], Any]
     rag_source_type: str
@@ -504,7 +505,7 @@ def build_qa_kb_router(
     include_knowledge: bool = True,
     include_extract: bool = True,
 ) -> APIRouter:
-    router = APIRouter(tags=[config.tag], dependencies=[Depends(config.auth_dep)])
+    router = APIRouter(tags=[config.tag], dependencies=[Depends(require_kb_access(config.app))])
     if include_knowledge:
         _add_knowledge_routes(router, config)
     if include_extract:

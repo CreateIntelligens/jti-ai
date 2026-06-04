@@ -10,9 +10,12 @@ API 認證模組
 
 import os
 
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 
 from app.security.tokens import decode_session_token
+
+ADMIN_ROLES = {"admin", "super_admin"}
+KB_ACCESS_DENIED_DETAIL = "Insufficient permission for this knowledge base"
 
 
 def _extract_bearer_token(request: Request) -> str | None:
@@ -144,8 +147,35 @@ def require_admin(auth_info: dict) -> None:
 
     向後兼容:接受既有 admin 與新的 super_admin。
     """
-    if auth_info.get("role") not in {"admin", "super_admin"}:
+    if auth_info.get("role") not in ADMIN_ROLES:
         raise HTTPException(status_code=403, detail="Admin access required")
+
+
+def can_access_kb(auth_info: dict, app: str) -> bool:
+    """Return whether auth_info may manage the app knowledge workspace."""
+    role = auth_info.get("role")
+    if role in ADMIN_ROLES:
+        return True
+    if role == "user":
+        return auth_info.get("scope") == app
+    return False
+
+
+def require_kb_access(app: str):
+    """產生知識庫 workspace dependency。
+
+    super_admin/admin 可跨 app;role=user 只能管理同 scope 的 app 知識庫。
+    """
+
+    def checker(auth: dict = Depends(verify_auth)) -> dict:
+        if not can_access_kb(auth, app):
+            raise HTTPException(
+                status_code=403,
+                detail=KB_ACCESS_DENIED_DETAIL,
+            )
+        return auth
+
+    return checker
 
 
 def require_role(*allowed: str):

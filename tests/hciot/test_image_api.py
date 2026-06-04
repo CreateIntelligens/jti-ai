@@ -9,12 +9,13 @@ install_app_import_mocks()
 mock_store = MagicMock()
 mock_knowledge_store = MagicMock()
 
-from app.auth import verify_admin
+from app.auth import verify_admin, verify_auth
 from app.routers.hciot.images import router, admin_router
 from fastapi import FastAPI
 
 app = FastAPI()
 app.dependency_overrides[verify_admin] = lambda: {"role": "admin"}
+app.dependency_overrides[verify_auth] = lambda: {"role": "admin"}
 app.include_router(router, prefix="/api/hciot")
 app.include_router(admin_router, prefix="/api/hciot-admin/images")
 

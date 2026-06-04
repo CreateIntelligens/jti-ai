@@ -70,7 +70,10 @@ export async function fetchWithUserGeminiKey(url: string, options: RequestInit =
 }
 
 export async function fetchAsAdmin(url: string, options: RequestInit = {}): Promise<Response> {
-  return fetch(url, options);
+  // Admin 身份走 cookie-based session（login 時後端 set 的 httpOnly cookie）。
+  // 必須帶 credentials:'include' 瀏覽器才會把 cookie 送出，否則後端收到匿名請求 → 403。
+  // 與 auth.ts 各呼叫保持一致。
+  return fetch(url, { ...options, credentials: 'include' });
 }
 
 export function normLang(language: string): string {

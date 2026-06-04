@@ -7,13 +7,13 @@ from pathlib import PurePosixPath
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import Response
 
-from app.auth import verify_admin
+from app.auth import require_kb_access
 from app.services.hciot.csv_utils import _parse_csv_rows
 from app.services.hciot.image_store import get_hciot_image_store
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 
 router = APIRouter(tags=["HCIoT Images"])
-admin_router = APIRouter(tags=["HCIoT Admin Images"], dependencies=[Depends(verify_admin)])
+admin_router = APIRouter(tags=["HCIoT Admin Images"], dependencies=[Depends(require_kb_access("hciot"))])
 
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
 _EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp")

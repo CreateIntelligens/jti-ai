@@ -13,7 +13,7 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from urllib.parse import quote
 
-from app.auth import verify_admin
+from app.auth import require_kb_access
 
 from app.routers.knowledge_utils import (
     EDITABLE_EXTENSIONS,
@@ -28,7 +28,7 @@ from app.services.jti.knowledge_store import get_jti_knowledge_store
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["JTI Knowledge"], dependencies=[Depends(verify_admin)])
+router = APIRouter(tags=["JTI Knowledge"], dependencies=[Depends(require_kb_access("jti"))])
 
 SOURCE_TYPE = "jti"
 CORE_MARKER_PATTERN = re.compile(r"\[CORE\s*:", re.IGNORECASE)
