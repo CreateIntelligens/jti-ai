@@ -16,6 +16,10 @@ logger = logging.getLogger(__name__)
 _SUPPORTED_KNOWLEDGE_EXTENSIONS = (".csv", ".txt", ".md", ".docx")
 
 
+def _knowledge_source_type(source_type: str) -> str:
+    return f"{source_type}_knowledge"
+
+
 class BackfillService:
     """Handles incremental document indexing into the local vector store."""
 
@@ -27,6 +31,14 @@ class BackfillService:
     # Larger chunks for non-QA document uploads so paragraphs stay intact.
     _DOC_CHUNK_SIZE_TOKENS = 500
     _DOC_CHUNK_OVERLAP_TOKENS = 80
+
+    # File-backed sources that have an authoritative store to rebuild from and
+    # are safe to prune against. `general` is intentionally excluded: it has no
+    # source-file registry here (it is dynamic, restored from Mongo via
+    # restore_to_lancedb), so pruning it against another store's file list
+    # would wipe all its data. Guard against accidental backfill of such types.
+    _BACKFILL_SOURCES = ("jti", "hciot")
+    _TEST_ORPHAN_PREFIXES = ("test_", "qa_", "QA254-")
 
     def __init__(self):
         self._chunker: Optional[SemanticChunker] = None
@@ -171,7 +183,7 @@ class BackfillService:
         return merged
 
     @staticmethod
-    def _build_topic_prefix(topic_info: dict[str, str], language: str) -> str:
+    def _build_topic_prefix(topic_info: dict[str, str]) -> str:
         topic_label = topic_info.get("topic_label") or ""
         category_label = topic_info.get("category_label") or ""
         if topic_label and category_label:
@@ -221,7 +233,7 @@ class BackfillService:
         return store.get_file_data(language, filename)
 
     def _get_files_and_data(self, source_type: str, language: str):
-        """Yields (filename, display_name, data_bytes) from the correct MongoDB store."""
+        """Yields source files and file metadata from the correct MongoDB store."""
         if source_type == "hciot":
             store = get_hciot_knowledge_store()
             yield from self._iter_store_files(store, language, self._fetch_hciot_file_data)
@@ -232,8 +244,16 @@ class BackfillService:
 
     def run_backfill(self, source_type: str, language: str, force: bool = False):
         """Runs incremental backfill for a specific source and language.
-        When force=True also prunes orphans (file_ids in vector store / mongo
-        backup that no longer have a source file in mongo)."""
+        Always prunes orphans (indexed file_ids absent from the store registry).
+        Only supports file-backed sources; dynamic stores (general) are restored
+        from Mongo backup instead and must not be backfilled here."""
+        if source_type not in self._BACKFILL_SOURCES:
+            logger.error(
+                "[Backfill] Refusing to backfill unsupported source_type %r "
+                "(no source-file registry; would mis-prune). Supported: %s",
+                source_type, self._BACKFILL_SOURCES,
+            )
+            return
         try:
             items = list(self._get_files_and_data(source_type, language))
         except Exception as e:
@@ -253,13 +273,40 @@ class BackfillService:
                 topic_info=BackfillService._extract_topic_info(file_info),
             )
 
-        if force:
-            self._prune_orphans(source_type, language, {f for f, *_ in items})
+        live_file_ids = {filename for filename, *_ in items}
+
+        # API-injected stress-test ids have no source-file registry entry.
+        self._prune_test_orphans(source_type, language)
+        self._prune_orphans(source_type, language, live_file_ids)
+
+    def _prune_test_orphans(self, source_type: str, language: str) -> None:
+        """主動偵測並清除前綴型測試/壓測孤兒（如 test_*, qa_*, QA254-*）。"""
+        full_source_type = _knowledge_source_type(source_type)
+        try:
+            indexed = self.lancedb_store.list_file_ids(full_source_type, language)
+        except Exception as e:
+            logger.error(f"[Backfill] Failed to list file ids from LanceDB for test pruning: {e}")
+            indexed = set()
+
+        try:
+            indexed |= self.mongodb_backup.list_file_ids(full_source_type, language)
+        except Exception as e:
+            logger.error(f"[Backfill] Failed to list file ids from MongoDB for test pruning: {e}")
+
+        test_orphans = {
+            f_id for f_id in indexed
+            if f_id.startswith(self._TEST_ORPHAN_PREFIXES)
+        }
+
+        if test_orphans:
+            logger.info(f"[Backfill] Proactively pruning {len(test_orphans)} test/qa orphans in {source_type}/{language}")
+            for orphan in test_orphans:
+                self.delete_from_rag(source_type, orphan, language=language)
 
     def _prune_orphans(self, source_type: str, language: str, live_files: set[str]) -> None:
         """Remove file_ids from LanceDB / mongodb_backup that aren't in live_files.
-        Only safe to call after a full force-reindex of the same (source, language)."""
-        full_source_type = f"{source_type}_knowledge"
+        Only safe for file-backed sources after their full store registry has been read."""
+        full_source_type = _knowledge_source_type(source_type)
         indexed = self.lancedb_store.list_file_ids(full_source_type, language)
         indexed |= self.mongodb_backup.list_file_ids(full_source_type, language)
         orphans = indexed - live_files
@@ -271,7 +318,7 @@ class BackfillService:
 
     def delete_from_rag(self, source_type: str, filename: str, language: str | None = None):
         """Removes a file's chunks from the local RAG store and its mongo mirror."""
-        full_source_type = f"{source_type}_knowledge"
+        full_source_type = _knowledge_source_type(source_type)
         try:
             self.lancedb_store.delete_by_file(filename, full_source_type, source_language=language)
         except Exception as e:
@@ -295,7 +342,7 @@ class BackfillService:
     ):
         """Indexes a single file into the local RAG store. Skips if content is unchanged unless force=True.
         Pass topic_info if already fetched (e.g. from list_files) to avoid an extra Mongo query."""
-        full_source_type = f"{source_type}_knowledge"
+        full_source_type = _knowledge_source_type(source_type)
         fingerprint = self._compute_fingerprint(data)
 
         if not force:
@@ -313,7 +360,7 @@ class BackfillService:
             if topic_info is None:
                 topic_info = self._fetch_topic_info(source_type, language, filename)
             topic_info = self._merge_topic_store_labels(source_type, language, topic_info)
-            topic_prefix = self._build_topic_prefix(topic_info, language)
+            topic_prefix = self._build_topic_prefix(topic_info)
 
             if filename_lower.endswith(".csv") and not force_text_chunking:
                 csv_rows = self._chunk_csv_by_row(text, topic_prefix=topic_prefix)

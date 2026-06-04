@@ -2,6 +2,7 @@ import { useState, useRef } from 'react';
 import { Upload, FileText, Trash2, Download, Pencil, X } from 'lucide-react';
 import ConfirmDialog from '../ConfirmDialog';
 import { useOverlayPressClose } from '../../hooks/useOverlayPressClose';
+import { validateUploadFiles } from '../../utils/uploadLimits';
 
 interface KBFile {
   name: string;
@@ -73,6 +74,15 @@ export default function JtiKnowledgeTab({
   const [dragOver, setDragOver] = useState(false);
   const viewerOverlayPressClose = useOverlayPressClose(onCloseViewer);
 
+  const handleUpload = (files: FileList | File[]) => {
+    const validationError = validateUploadFiles(Array.from(files));
+    if (validationError) {
+      alert(validationError);
+      return;
+    }
+    void onUploadFiles(files);
+  };
+
   if (kbLoading) {
     return <div className="jti-settings-loading">載入中...</div>;
   }
@@ -92,7 +102,7 @@ export default function JtiKnowledgeTab({
         onDrop={(e) => {
           e.preventDefault();
           setDragOver(false);
-          if (e.dataTransfer.files.length > 0) onUploadFiles(e.dataTransfer.files);
+          if (e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files);
         }}
       >
         <input
@@ -102,7 +112,7 @@ export default function JtiKnowledgeTab({
           hidden
           onChange={(e) => {
             if (e.target.files && e.target.files.length > 0) {
-              onUploadFiles(e.target.files);
+              handleUpload(e.target.files);
               e.target.value = '';
             }
           }}

@@ -3,12 +3,32 @@ from unittest import mock
 from fastapi.testclient import TestClient
 
 from app.auth import verify_admin, verify_auth
+from app.routers._shared.qa_kb_router import QaPairImport
+from app.routers._shared.qa_kb_upload import _qa_pairs_to_csv_bytes
 from tests.support.app_test_support import get_test_app
 
 
 app = get_test_app()
 app.dependency_overrides[verify_admin] = lambda: {"role": "admin"}
 app.dependency_overrides[verify_auth] = lambda: {"role": "admin"}
+
+
+def test_qa_pair_import_preserves_full_csv_fields():
+    csv_bytes = _qa_pairs_to_csv_bytes([
+        QaPairImport(
+            index="2",
+            q="題目",
+            a="答案",
+            img="IMG_001",
+            url="https://example.test",
+            display="false",
+        )
+    ])
+
+    assert csv_bytes.decode("utf-8") == (
+        "index,q,a,img,url,display\n"
+        "2,題目,答案,IMG_001,https://example.test,false\n"
+    )
 
 
 class FakeKnowledgeStore:

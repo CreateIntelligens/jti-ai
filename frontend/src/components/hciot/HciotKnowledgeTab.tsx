@@ -6,6 +6,7 @@ import HciotTopicEditor from './HciotTopicEditor';
 import { missingLabelMessage, NEW_VALUE, normalizeLabel, slugify } from '../_shared/qaKnowledgeWorkspace/topicUtils';
 import * as api from '../../services/api';
 import { useOverlayPressClose } from '../../hooks/useOverlayPressClose';
+import { validateUploadFiles } from '../../utils/uploadLimits';
 
 interface KBFile {
   name: string;
@@ -154,6 +155,11 @@ export default function HciotKnowledgeTab({
     }
     if (isNewTopic && !newTopicLabelValue) {
       alert(missingLabelMessage('topic', lang));
+      return;
+    }
+    const validationError = validateUploadFiles(Array.from(files));
+    if (validationError) {
+      alert(validationError);
       return;
     }
     void onUploadFiles(files, buildTopicOpts());

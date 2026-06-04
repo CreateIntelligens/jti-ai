@@ -168,6 +168,19 @@ async def _run_rag_backfill(backfill):
             for src in ["jti", "hciot"] for lang in ["zh", "en"]
         ]
         await asyncio.gather(*tasks)
+        # Restore missing files from MongoDB vector backup!
+        try:
+            from app.services.vector_store.mongodb_backup import get_mongodb_backup
+            restored = await loop.run_in_executor(
+                None,
+                get_mongodb_backup().restore_to_lancedb,
+                backfill.lancedb_store
+            )
+            if restored > 0:
+                logger.info("[RAG Restore] Successfully restored %d files from MongoDB backup.", restored)
+        except Exception as e:
+            logger.error("[RAG Restore] Failed to restore during startup: %s", e)
+
         total = backfill.lancedb_store.get_stats().get("count", 0)
         elapsed = _time.time() - t0
         logger.info("[RAG] Ready — %d chunks indexed in %.1fs", total, elapsed)

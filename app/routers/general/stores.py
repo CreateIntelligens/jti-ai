@@ -24,6 +24,8 @@ from app.routers.knowledge_utils import (
     safe_filename,
     sync_to_rag,
     write_docx_text,
+    check_upload_rate_limit,
+    validate_upload_limits,
 )
 from app.services import app_key_map, gemini_clients
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
@@ -602,6 +604,7 @@ async def upload_file(
     auth: dict = Depends(verify_auth),
 ):
     """Upload a file into a general key-owned knowledge store."""
+    check_upload_rate_limit(request)
     _authorize_store_access(store_name, request, auth)
     if resolve_managed_store(store_name) is not None:
         raise HTTPException(status_code=400, detail="Managed stores use their app-specific knowledge pages")
@@ -613,6 +616,11 @@ async def upload_file(
     display_name = file.filename or f"file_{uuid.uuid4().hex[:8]}"
     safe_name = safe_filename(display_name)
     file_bytes = await file.read()
+
+    # Validate file size, count, and total store storage limit
+    files = _list_general_store_files(normalized)
+    validate_upload_limits(files, safe_name, file_bytes)
+
     content_type = file.content_type or mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
     saved = get_knowledge_store().insert_file(
         language=normalized,

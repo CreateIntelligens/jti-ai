@@ -10,6 +10,18 @@ import csv
 import io
 import re
 from pathlib import Path
+from typing import Iterable
+
+
+def _dedupe_non_empty(values: Iterable[str | None]) -> list[str]:
+    seen: set[str] = set()
+    result: list[str] = []
+    for raw in values:
+        value = (raw or "").strip()
+        if value and value not in seen:
+            seen.add(value)
+            result.append(value)
+    return result
 
 
 def extract_questions_from_csv(file_bytes: bytes) -> list[str] | None:
@@ -26,15 +38,38 @@ def extract_questions_from_csv(file_bytes: bytes) -> list[str] | None:
     if "q" not in fieldnames:
         return None
 
-    seen: set[str] = set()
-    questions: list[str] = []
-    for row in rows:
-        q = (row.get("q") or "").strip()
-        if q and q not in seen:
-            seen.add(q)
-            questions.append(q)
-
+    questions = _dedupe_non_empty(row.get("q") for row in rows)
     return questions if questions else None
+
+
+# display-column values that mean "hide this question from the public menu".
+# Mirrors the frontend's HIDDEN_DISPLAY_VALUES (DocumentToQaTab.tsx) so the
+# backend is the single authority — display is applied even when the frontend
+# didn't pre-compute hidden_questions.
+_HIDDEN_DISPLAY_VALUES = frozenset({"false", "0", "否", "n", "no"})
+
+
+def extract_hidden_from_csv(file_bytes: bytes) -> list[str]:
+    """Extract questions explicitly marked hidden via the ``display`` column.
+
+    Returns de-duplicated ``q`` values whose ``display`` cell is a falsey
+    marker (see ``_HIDDEN_DISPLAY_VALUES``). Empty list when the CSV has no
+    ``q``/``display`` columns or nothing is hidden — callers union this into
+    any caller-supplied hidden_questions.
+    """
+    parsed = _parse_csv_rows(file_bytes)
+    if parsed is None:
+        return []
+
+    fieldnames, rows = parsed
+    if "q" not in fieldnames or "display" not in fieldnames:
+        return []
+
+    return _dedupe_non_empty(
+        row.get("q")
+        for row in rows
+        if (row.get("display") or "").strip().lower() in _HIDDEN_DISPLAY_VALUES
+    )
 
 
 _FIELD_ALIASES: dict[str, list[str]] = {

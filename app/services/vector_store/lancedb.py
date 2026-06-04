@@ -138,6 +138,19 @@ class LanceDBStore:
             where += f" AND source_language = '{source_language}'"
         tbl.delete(where)
 
+    def get_file_chunks(self, file_id: str, source_type: str, source_language: str) -> List[Dict[str, Any]]:
+        """Returns all chunks for a specific file."""
+        tbl = self.table
+        if tbl is None:
+            return []
+        try:
+            where = f"file_id = '{file_id}' AND source_type = '{source_type}' AND source_language = '{source_language}'"
+            rows = tbl.search().where(where).limit(100000).to_list()
+            return rows
+        except Exception as e:
+            logger.warning(f"LanceDB get_file_chunks failed: {e}")
+            return []
+
     def list_file_ids(self, source_type: str, source_language: str) -> set[str]:
         """Returns a set of all file_ids indexed for the given type and language."""
         tbl = self.table

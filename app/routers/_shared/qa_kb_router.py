@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
@@ -24,6 +24,8 @@ from app.routers.knowledge_utils import (
     safe_filename,
     write_docx_text,
     xlsx_to_csv_bytes,
+    check_upload_rate_limit,
+    validate_upload_limits,
 )
 from app.routers._shared.qa_kb_sync import _sync_topic_questions_for_doc
 from app.routers._shared.qa_kb_upload import (
@@ -81,8 +83,12 @@ class UpdateFileMetadataRequest(BaseModel):
 
 
 class QaPairImport(BaseModel):
+    index: str | None = None
     q: str
     a: str
+    img: str | None = None
+    url: str | None = None
+    display: str | None = None
 
 
 class ImportQaRequest(BaseModel):
@@ -236,6 +242,7 @@ def _add_knowledge_routes(router: APIRouter, config: QaKbRouterConfig) -> None:
 
     @router.post("/upload/")
     async def upload_knowledge_file(
+        request: Request,
         background_tasks: BackgroundTasks,
         language: str = "zh",
         file: UploadFile = File(...),
@@ -246,6 +253,7 @@ def _add_knowledge_routes(router: APIRouter, config: QaKbRouterConfig) -> None:
         skip_topic: bool = Form(False),  # noqa: ARG001
         hidden_questions: str | None = Form(None),
     ):
+        check_upload_rate_limit(request)
         display_name = file.filename or f"file_{uuid.uuid4().hex[:8]}"
         safe_name = safe_filename(display_name)
         file_bytes = await file.read()
@@ -258,6 +266,12 @@ def _add_knowledge_routes(router: APIRouter, config: QaKbRouterConfig) -> None:
                 return _fallback_upload_error_response(f"XLSX 轉檔失敗: {error}")
             safe_name = Path(safe_name).with_suffix(".csv").name
             ext = ".csv"
+
+        # Validate file size, count, and total store storage limit
+        store = config.knowledge_store_factory()
+        files = store.list_files(language)
+        validate_upload_limits(files, safe_name, file_bytes)
+
         editable = ext in EDITABLE_EXTENSIONS
         content_type = file.content_type or mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
         if ext == ".csv":

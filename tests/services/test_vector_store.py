@@ -42,6 +42,7 @@ class TestVectorStore(unittest.TestCase):
         # Test search
         mock_query = MagicMock()
         mock_table.search.return_value = mock_query
+        mock_query.distance_type.return_value = mock_query
         mock_query.where.return_value = mock_query
         mock_query.limit.return_value = mock_query
         mock_query.to_list.return_value = [{"text": "hello"}]

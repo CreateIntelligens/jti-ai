@@ -4,12 +4,16 @@ Shared utilities for knowledge management routers (JTI and HCIoT).
 Contains common file operations, docx processing, and RAG sync logic.
 """
 
+from collections import defaultdict
 import io
 import logging
+import time
 import zipfile
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Protocol
+
+from fastapi import HTTPException, Request
 
 from app.services.rag.backfill import get_backfill_service
 
@@ -17,6 +21,12 @@ logger = logging.getLogger(__name__)
 
 EDITABLE_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".yaml", ".yml", ".docx"}
 TEXT_PREVIEW_EXTENSIONS = EDITABLE_EXTENSIONS | {".log", ".py", ".js", ".html"}
+ALLOWED_UPLOAD_EXTENSIONS = {".csv", ".txt", ".md", ".docx", ".xlsx"}
+MAX_SINGLE_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
+MAX_TOTAL_UPLOAD_FILES = 100
+MAX_TOTAL_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024
+UPLOAD_RATE_LIMIT = 10
+UPLOAD_RATE_WINDOW_SECONDS = 60
 
 
 class KnowledgeStoreProtocol(Protocol):
@@ -120,3 +130,54 @@ def xlsx_to_csv_bytes(xlsx_bytes: bytes) -> bytes:
         workbook.close()
 
     return buffer.getvalue().encode("utf-8")
+
+
+class SimpleRateLimiter:
+    def __init__(self, requests_limit: int, window_seconds: int):
+        self.requests_limit = requests_limit
+        self.window_seconds = window_seconds
+        self.requests = defaultdict(list)
+
+    def is_allowed(self, key: str) -> bool:
+        now = time.time()
+        self.requests[key] = [t for t in self.requests[key] if now - t < self.window_seconds]
+        if len(self.requests[key]) >= self.requests_limit:
+            return False
+        self.requests[key].append(now)
+        return True
+
+
+upload_rate_limiter = SimpleRateLimiter(
+    requests_limit=UPLOAD_RATE_LIMIT,
+    window_seconds=UPLOAD_RATE_WINDOW_SECONDS,
+)
+
+
+def check_upload_rate_limit(request: Request) -> None:
+    client_ip = request.client.host if request.client else "unknown"
+    if not upload_rate_limiter.is_allowed(client_ip):
+        raise HTTPException(status_code=429, detail="上傳頻率過高，請稍後再試")
+
+
+def _stored_file_matches_name(file_info: dict, filename: str) -> bool:
+    return file_info.get("filename") == filename or file_info.get("name") == filename
+
+
+def validate_upload_limits(files: list[dict], new_file_name: str, new_file_bytes: bytes) -> None:
+    ext = Path(new_file_name).suffix.lower()
+    if ext not in ALLOWED_UPLOAD_EXTENSIONS:
+        raise HTTPException(status_code=400, detail="不支援的檔案格式，僅支援 .docx, .txt, .md, .csv, .xlsx")
+
+    new_size = len(new_file_bytes)
+    if new_size > MAX_SINGLE_UPLOAD_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail="單一檔案大小不可超過 5 MB")
+
+    existing_file = next((item for item in files if _stored_file_matches_name(item, new_file_name)), None)
+    if existing_file is None and len(files) >= MAX_TOTAL_UPLOAD_FILES:
+        raise HTTPException(status_code=400, detail="知識庫檔案數量已達上限 (100 個檔案)")
+
+    existing_size = sum(f.get("size", 0) for f in files)
+    replaced_size = existing_file.get("size", 0) if existing_file else 0
+    total_size = existing_size - replaced_size + new_size
+    if total_size > MAX_TOTAL_UPLOAD_SIZE_BYTES:
+        raise HTTPException(status_code=400, detail="知識庫總容量已達上限 (50 MB)")

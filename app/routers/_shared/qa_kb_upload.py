@@ -25,6 +25,7 @@ from app.routers._shared.qa_kb_sync import (
 )
 from app.services._shared.qa_kb.csv_utils import (
     UnsupportedQaCsvError,
+    extract_hidden_from_csv,
     extract_questions_from_csv,
     normalize_qa_csv_rows,
     split_qa_csv_by_image,
@@ -39,6 +40,7 @@ if TYPE_CHECKING:
     )
 
 logger = logging.getLogger(__name__)
+_QA_PAIR_CSV_FIELDS = ["index", "q", "a", "img", "url", "display"]
 
 
 def _schedule_rag_sync(
@@ -157,6 +159,14 @@ def _insert_uploaded_file(
     )
 
 
+def _merge_csv_hidden_questions(csv_bytes: bytes, hidden_questions: list[str] | None) -> list[str] | None:
+    """Apply the CSV `display` column as the backend authority for hidden questions."""
+    csv_hidden = extract_hidden_from_csv(csv_bytes)
+    if not csv_hidden:
+        return hidden_questions
+    return sorted(set(hidden_questions or []) | set(csv_hidden))
+
+
 def save_qa_csv_to_topic(
     *,
     config: QaKbRouterConfig,
@@ -185,6 +195,8 @@ def save_qa_csv_to_topic(
         csv_bytes = filtered
 
     imported_count = len(extract_questions_from_csv(csv_bytes) or [])
+    hidden_questions = _merge_csv_hidden_questions(csv_bytes, hidden_questions)
+
     uploads = split_qa_csv_by_image(csv_bytes, filename) or [(filename, csv_bytes)]
 
     saved_files = []
@@ -421,12 +433,19 @@ def _create_pending_job(
 
 def _qa_pairs_to_csv_bytes(qa_pairs: list[QaPairImport]) -> bytes:
     output = io.StringIO()
-    writer = csv.DictWriter(output, fieldnames=["q", "a"], lineterminator="\n")
+    # Carry `display` through so the backend's display→hidden authority
+    # (extract_hidden_from_csv in save_qa_csv_to_topic) sees it on the paste/
+    # import path too, not just direct CSV uploads.
+    writer = csv.DictWriter(output, fieldnames=_QA_PAIR_CSV_FIELDS, lineterminator="\n")
     writer.writeheader()
     for pair in qa_pairs:
         writer.writerow({
+            "index": (pair.index or "").strip(),
             "q": pair.q.strip(),
             "a": pair.a.strip(),
+            "img": (pair.img or "").strip(),
+            "url": (pair.url or "").strip(),
+            "display": (pair.display or "").strip(),
         })
     return output.getvalue().encode("utf-8")
 
