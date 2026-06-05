@@ -3,6 +3,7 @@ Prompt 管理模組 (MongoDB 版本)
 每個 Store 可以有多個 Prompt (最多3個)
 """
 
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
@@ -11,7 +12,7 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from pymongo import MongoClient
 
-import logging
+from app.services.db_names import CONTROL_PLANE_DB_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -83,7 +84,7 @@ class PromptManager:
     """Prompt 管理器 (MongoDB 版本)"""
 
     MAX_PROMPTS_PER_STORE = 3
-    DB_NAME = "gemini_notebook"
+    DB_NAME = CONTROL_PLANE_DB_NAME
     COLLECTION_NAME = "prompts"
 
     def __init__(self, mongodb_uri: str = None):

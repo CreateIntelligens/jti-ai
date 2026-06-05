@@ -13,6 +13,7 @@ from .services.hciot.tts import get_hciot_tts_job_manager
 from .services.jti.tts import get_jti_tts_job_manager
 from .services.session.session_manager_factory import (
     get_general_chat_session_manager,
+    get_general_conversation_logger,
     get_hciot_conversation_logger,
     get_hciot_session_manager,
     get_jti_conversation_logger,
@@ -43,6 +44,7 @@ def init_managers():
         api_key_manager = APIKeyManager()
         user_manager = UserManager()
         general_session_manager = get_general_chat_session_manager()
+        get_general_conversation_logger()
         get_jti_session_manager()
         get_jti_conversation_logger()
         get_jti_tts_job_manager()

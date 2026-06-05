@@ -56,6 +56,7 @@ class MongoConversationLogger:
         responded_at: Optional[datetime] = None,
         citations: Optional[List[Dict]] = None,
         image_id: Optional[str] = None,
+        store_name: Optional[str] = None,
     ) -> Optional[str]:
         """記錄一次對話
 
@@ -98,6 +99,10 @@ class MongoConversationLogger:
             }
             if isinstance(image_id, str) and image_id.strip():
                 log_entry["image_id"] = image_id.strip()
+            # general 等以 store 區分知識庫的對話，落 store_name 為頂層可查欄位，
+            # 免去日後查「某店對話」還要反查 session.metadata。
+            if isinstance(store_name, str) and store_name.strip():
+                log_entry["store_name"] = store_name.strip()
 
             result = self.conversations_collection.insert_one(log_entry)
 

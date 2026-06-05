@@ -28,6 +28,7 @@ from app.routers.knowledge_utils import (
     validate_upload_limits,
 )
 from app.services import app_key_map, gemini_clients
+from app.services.db_names import CONTROL_PLANE_DB_NAME
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.jti.knowledge_store import get_jti_knowledge_store
 from app.services.knowledge_store import get_knowledge_store
@@ -60,14 +61,19 @@ GENERAL_NAMESPACE = "general"
 
 
 class StoreRegistry:
-    """Mongo-backed metadata for user-created homepage knowledge stores."""
+    """Mongo-backed metadata for user-created homepage knowledge stores.
+
+    knowledge_stores 是跨 app 的中央知識庫註冊表（以 managed_app 區分 jti/hciot/
+    general），屬控制面範疇，存於 system_config（不再寄居 jti_app）。各 app 自己的
+    knowledge_files 仍留在各自的數據面庫，不隨此遷移。
+    """
 
     COLLECTION_NAME = "knowledge_stores"
 
-    def __init__(self, db_name: str = "jti_app") -> None:
-        from app.services.mongo_client import get_mongo_db
+    def __init__(self, db_name: str | None = None) -> None:
+        from app.services.mongo_client import get_raw_mongo_db
 
-        self.collection = get_mongo_db(db_name)[self.COLLECTION_NAME]
+        self.collection = get_raw_mongo_db(db_name or CONTROL_PLANE_DB_NAME)[self.COLLECTION_NAME]
         try:
             self.collection.create_index("name", unique=True)
             self.collection.create_index("key_index")

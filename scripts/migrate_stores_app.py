@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app.routers.general.stores import StoreRegistry
 from app.services import app_key_map, gemini_clients
+from app.services.db_names import CONTROL_PLANE_DB_NAME
 
 
 def main() -> None:
@@ -32,7 +33,7 @@ def main() -> None:
     try:
         client = MongoClient(uri, serverSelectionTimeoutMS=5000)
         client.admin.command("ping")
-        collection = client["jti_app"][StoreRegistry.COLLECTION_NAME]
+        collection = client[CONTROL_PLANE_DB_NAME][StoreRegistry.COLLECTION_NAME]
     except PyMongoError as exc:
         print(f"MongoDB connection failed: {exc}")
         sys.exit(1)

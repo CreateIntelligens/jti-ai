@@ -22,13 +22,15 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from pymongo import MongoClient
 
+from app.services.db_names import CONTROL_PLANE_DB_NAME
+
 MONGODB_URI = os.getenv("MONGODB_URI")
 if not MONGODB_URI:
     print("ERROR: MONGODB_URI not set")
     sys.exit(1)
 
 client = MongoClient(MONGODB_URI, serverSelectionTimeoutMS=5000)
-db = client["gemini_notebook"]
+db = client[CONTROL_PLANE_DB_NAME]
 collection = db["prompts"]
 
 # Store name -> (prompt_index_attr, active_prompt_id_attr)

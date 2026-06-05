@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from pymongo import MongoClient
 
 from app.security.passwords import hash_password, verify_password
+from app.services.db_names import CONTROL_PLANE_DB_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ class User(BaseModel):
 class UserManager:
     """使用者管理器"""
 
-    DB_NAME = "gemini_notebook"
+    DB_NAME = CONTROL_PLANE_DB_NAME
     COLLECTION_NAME = "users"
 
     def __init__(self, mongodb_uri: str | None = None):

@@ -61,10 +61,9 @@ class ChatMessageRequest(BaseModel):
 
 
 def _get_conversation_logger():
-    # General chat shares the JTI conversation log collection — the logger
-    # itself accepts a `mode` per-call so logs from different chat surfaces
-    # coexist in the same store. There is no separate general logger.
-    return deps.get_jti_conversation_logger()
+    # General chat 使用獨立的 general_app conversation logger（不再寄生於
+    # jti_app）。logger 仍以 mode="general" 標記，與同庫的其他來源區分。
+    return deps.get_general_conversation_logger()
 
 
 def _get_session_manager():
@@ -345,6 +344,7 @@ async def send_message(req: ChatMessageRequest, request: Request, auth: dict = D
         session_state={"store": session.metadata.get("store_name", "")},
         mode="general",
         citations=citations,
+        store_name=session.metadata.get("store_name") or None,
     )
     turn_number = log_result[1] if log_result else None
 

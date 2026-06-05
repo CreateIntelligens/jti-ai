@@ -13,7 +13,29 @@ from typing import Optional
 from pymongo import MongoClient
 from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 
+from app.services.db_names import JTI_DB_NAME
+
 logger = logging.getLogger(__name__)
+
+
+def _ensure_session_indexes(sessions, *, include_mode: bool = False) -> None:
+    sessions.create_index("session_id", unique=True)
+    if include_mode:
+        sessions.create_index("mode")
+    sessions.create_index("language")
+    sessions.create_index([("created_at", -1)])
+    # 動態 TTL：依各 session 文件自帶的 expires_at 過期。
+    # expireAfterSeconds=0 表示「到 expires_at 指定的時間點即過期」。
+    sessions.create_index("expires_at", expireAfterSeconds=0)
+
+
+def _ensure_conversation_indexes(conversations) -> None:
+    conversations.create_index([("session_id", 1), ("turn_number", 1)])
+    conversations.create_index([("mode", 1), ("timestamp", -1)])
+    conversations.create_index([("timestamp", -1)])
+    # general 等以 store 區分知識庫的對話，可直接依 store_name 查詢「某店對話」。
+    # 稀疏索引：jti/hciot 的 conversation 無此欄位，不佔索引空間。
+    conversations.create_index("store_name", sparse=True)
 
 
 class MongoDBClient:
@@ -49,7 +71,7 @@ class MongoDBClient:
 
     def _initialize_collections(self) -> None:
         """初始化集合和索引"""
-        db = self.get_client()["jti_app"]
+        db = self.get_client()[JTI_DB_NAME]
         collections_ready: list[str] = []
 
         # ===== sessions 集合 =====
@@ -60,13 +82,7 @@ class MongoDBClient:
 
         # 創建索引
         try:
-            sessions.create_index("session_id", unique=True)
-            sessions.create_index("mode")
-            sessions.create_index("language")
-            sessions.create_index([("created_at", -1)])
-            # 動態 TTL：依各 session 文件自帶的 expires_at 過期。
-            # expireAfterSeconds=0 表示「到 expires_at 指定的時間點即過期」。
-            sessions.create_index("expires_at", expireAfterSeconds=0)
+            _ensure_session_indexes(sessions, include_mode=True)
             collections_ready.append("sessions")
         except Exception as e:
             logger.warning(f"Index creation for 'sessions': {e}")
@@ -78,9 +94,7 @@ class MongoDBClient:
         conversations = db["conversations"]
 
         try:
-            conversations.create_index([("session_id", 1), ("turn_number", 1)])
-            conversations.create_index([("mode", 1), ("timestamp", -1)])
-            conversations.create_index([("timestamp", -1)])
+            _ensure_conversation_indexes(conversations)
             collections_ready.append("conversations")
         except Exception as e:
             logger.warning(f"Index creation for 'conversations': {e}")
@@ -219,30 +233,24 @@ _initialized_dbs: set = set()
 
 
 def get_mongo_db(db_name: str):
-    """便利函數：取得資料庫實例。必須明確指定 db_name（如 'jti_app' 或 'hciot_app'）。"""
-    client = get_mongo_client()
-    db = client.get_client()[db_name]
+    """取得數據面資料庫實例，並確保 sessions/conversations 基礎索引。"""
+    db = get_raw_mongo_db(db_name)
     if db_name not in _initialized_dbs:
         _initialized_dbs.add(db_name)
         _ensure_base_indexes(db, db_name)
     return db
 
 
-def _ensure_base_indexes(db, db_name: str) -> None:
-    """為非預設 database 建立基本的 sessions/conversations 索引"""
-    try:
-        sessions = db["sessions"]
-        sessions.create_index("session_id", unique=True)
-        sessions.create_index("language")
-        sessions.create_index([("created_at", -1)])
-        # 動態 TTL：依各 session 文件自帶的 expires_at 過期。
-        # expireAfterSeconds=0 表示「到 expires_at 指定的時間點即過期」。
-        sessions.create_index("expires_at", expireAfterSeconds=0)
+def get_raw_mongo_db(db_name: str):
+    """取得資料庫實例，不建立 data-plane sessions/conversations 索引。"""
+    return get_mongo_client().get_client()[db_name]
 
-        conversations = db["conversations"]
-        conversations.create_index([("session_id", 1), ("turn_number", 1)])
-        conversations.create_index([("mode", 1), ("timestamp", -1)])
-        conversations.create_index([("timestamp", -1)])
+
+def _ensure_base_indexes(db, db_name: str) -> None:
+    """為數據面 database 建立基本的 sessions/conversations 索引。"""
+    try:
+        _ensure_session_indexes(db["sessions"])
+        _ensure_conversation_indexes(db["conversations"])
 
         logger.debug("Ensured base indexes for database '%s'", db_name)
     except Exception as e:

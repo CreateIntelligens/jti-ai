@@ -3,9 +3,10 @@ API Key 管理模組 (MongoDB 版本)
 每個 API Key 綁定一個知識庫，可選指定 prompt_index
 """
 
+import hashlib
+import logging
 import os
 import secrets
-import hashlib
 from datetime import datetime, timezone
 from functools import lru_cache
 from typing import List, Optional
@@ -14,7 +15,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from pydantic import BaseModel, Field
 from pymongo import MongoClient
 
-import logging
+from app.services.db_names import CONTROL_PLANE_DB_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +78,7 @@ class APIKey(BaseModel):
 class APIKeyManager:
     """API Key 管理器"""
 
-    DB_NAME = "gemini_notebook"
+    DB_NAME = CONTROL_PLANE_DB_NAME
     COLLECTION_NAME = "api_keys"
     KEY_PREFIX = "sk-"
 
