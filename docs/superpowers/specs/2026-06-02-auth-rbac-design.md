@@ -1,11 +1,28 @@
 # JTAI 認證與三層角色（RBAC）設計文件
 
-- **日期**：2026-06-02（v1 初版）
-- **狀態**：Draft（技術評估，尚未落地）
+- **日期**：2026-06-02（v1 初版）；2026-06-05 更新狀態（核對程式碼 + 端到端驗證）
+- **狀態**：**大部分已實作並通過端到端驗證**（待使用者最終確認 Done）。§1–8 的權限模型、資料模型、auth.py 升級、role guard、UsersPanel 後端、登入/JWT 導向、§7 安全洞拔除皆已落地；剩餘為文件收尾與少數可選收斂（見下方落地對照）。
 - **分支**：`feat/rag`（worktree: `.worktrees/jtai-rag`）
 - **預期執行者**：Claude（可接受其他 AI 監督檢視）
 
 ---
+
+## 0. 落地現況對照（2026-06-05 核對）
+
+| 章節 | 設計要求 | 現況 | 狀態 |
+| :--- | :--- | :--- | :--- |
+| §3 | 三層 super_admin/admin/user | `app/users.py` `ALLOWED_ROLES` 三層齊全 | ✅ 已實作 |
+| §5 | users 集合含 role/scope/store_name | `system_config.users`（1 super_admin + 3 user） | ✅ 已實作 |
+| §6 | auth.py：JWT 優先、ADMIN_API_KEY→super_admin、sk-xxx→user、`require_role()` | `app/auth.py` 全到位 | ✅ 已實作 |
+| §6 | role guard 掛端點 | general 後台/帳號/prompts/api_keys 皆掛 `require_role` | ✅ 已實作 |
+| §8 | UsersPanel 後端（建/改/停用，不可操作自己） | `app/routers/general/users.py` 完整含 `_assert_can_target` | ✅ 已實作 |
+| §4 | 登入頁 + JWT 簽發 + cookie | `auth_routes.py` `/api/auth/login`；前端 `Login.tsx` | ✅ 已實作 |
+| §7 | 拔除 same-origin 自動 admin 安全洞 | `auth.py` 已無 `_is_same_origin`；無 token 一律 401 | ✅ 已拔除 |
+
+**端到端驗證（2026-06-05，透過真實 HTTP + 各 role JWT）9/9 通過**：
+無 token→401、user 進後台→403、admin/super 進後台→200、admin 建 admin→403、super 建 admin→201、super 停自己→400、同 origin 無 token→401（證明 §7 洞已拔）、jti-user 進 general 後台→403（scope 隔離）。
+
+**剩餘（非阻擋）**：① 本文件狀態收尾（即此次更新）；② `ADMIN_ROLES`/`require_admin` 為向後相容舊路徑，與新 `require_role` 並存，未來可選擇性收斂。
 
 ## 1. 背景與動機
 
@@ -127,15 +144,13 @@ dependencies=[Depends(require_role("admin", "super_admin"))]
 dependencies=[Depends(require_role("super_admin"))]
 ```
 
-## 7. ⚠️ 必須處理的既有安全洞
+## 7. ✅ 既有安全洞（已拔除）
 
-現有 `auth.py` 的 `_is_same_origin()`：**任何同 origin（瀏覽器連到前端）的請求自動被視為 admin**。
+原始問題：舊 `auth.py` 的 `_is_same_origin()` —— **任何同 origin（瀏覽器連到前端）的請求自動被視為 admin**，對外開放等於任何人開瀏覽器就是 admin，屬嚴重權限漏洞。
 
-- 現在內部使用無妨。
-- **一旦對外開放，等於任何人開瀏覽器就是 admin——嚴重權限漏洞。**
-- 升級時這條必須拔掉，改成「同 origin 也要登入、也要驗 session JWT」。
+**處置（已完成）**：現行 `app/auth.py` 已**無任何 same-origin / referer 自動授權邏輯**；`verify_auth` 無有效 token 一律 401，同 origin 也須登入並驗 session JWT。
 
-這正是「不留技術債」要一併解決的項目，不可遺漏。
+**驗證（2026-06-05）**：以帶 `Origin` / `Referer` 的同 origin 請求但**不帶 token** 打受保護端點 → 回 **401**（非 admin），確認洞已拔除。
 
 ## 8. general 後台 UI（UsersPanel）
 
