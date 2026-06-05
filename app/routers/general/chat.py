@@ -395,9 +395,14 @@ def get_general_conversations(
         if not store_name:
             raise HTTPException(status_code=400, detail="未指定知識庫")
 
+        # 以 store 過濾：新資料用頂層 store_name（已建 sparse 索引），舊資料退回
+        # session_snapshot.store，兩者皆比對以免遺漏歷史（含回填前的紀錄）。
         query = build_date_query(
             "general", date_from, date_to,
-            extras={"session_snapshot.store": store_name},
+            extras={"$or": [
+                {"store_name": store_name},
+                {"session_snapshot.store": store_name},
+            ]},
         )
 
         session_ids, total_sessions = conversation_logger.get_paginated_session_ids(
@@ -455,9 +460,11 @@ def export_general_conversations(
         else:
             all_conversations = conversation_logger.get_session_logs_by_mode("general")
 
+            # 比對頂層 store_name（新資料）或 session_snapshot.store（舊資料），兩者皆可。
             store_conversations = [
                 c for c in all_conversations
-                if c.get("session_snapshot", {}).get("store") == store_name
+                if c.get("store_name") == store_name
+                or c.get("session_snapshot", {}).get("store") == store_name
             ]
 
             session_list = group_conversations_by_session(store_conversations)
