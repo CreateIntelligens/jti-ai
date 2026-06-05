@@ -199,7 +199,7 @@ class MainAgent(BaseAgent):
         }
         if system_instruction:
             session.metadata["system_instruction"] = system_instruction
-        sm.update_session(session)
+        # Keep /start lazy; the first real message flushes metadata with the session.
         return session
 
     def _get_system_instruction(self, session: Session) -> str:

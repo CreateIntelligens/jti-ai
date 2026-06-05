@@ -8,7 +8,7 @@ LLM 不得根據對話內容自行判斷進度，只能依賴 session。
 from enum import Enum
 from typing import Dict, Optional, Any, List
 from pydantic import BaseModel, Field
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 
 
@@ -19,6 +19,32 @@ class SessionStep(str, Enum):
     SCORING = "SCORING"     # 計分中（不可與 user 互動）
     RECOMMEND = "RECOMMEND" # 商品推薦
     DONE = "DONE"          # 流程完成
+
+
+# 動態 TTL：依 step 決定 session 存活時間。
+# 配合 sessions 集合上的 expireAfterSeconds=0 TTL 索引，MongoDB 會在
+# expires_at 到期後自動回收文件。
+#
+# 角色定位：純開頁、零對話的 session 已由 lazy 建立策略擋在 DB 外（不落庫），
+# 故此 TTL 主要兜底「有過對話但中途停擺」的 session：
+#   - WELCOME / DONE（未進行或已結束）：3 天回收
+#   - QUIZ / SCORING / RECOMMEND（測驗進行中）：7 天，保障中斷續答
+_SHORT_SESSION_TTL = timedelta(days=3)
+_ACTIVE_SESSION_TTL = timedelta(days=7)
+_TTL_BY_STEP: Dict[str, timedelta] = {
+    SessionStep.WELCOME.value: _SHORT_SESSION_TTL,    # 未進行/僅開場
+    SessionStep.DONE.value: _SHORT_SESSION_TTL,       # 流程已完成
+    SessionStep.QUIZ.value: _ACTIVE_SESSION_TTL,      # 答題中，保障續答
+    SessionStep.SCORING.value: _ACTIVE_SESSION_TTL,   # 計分中（短暫過渡，從寬）
+    SessionStep.RECOMMEND.value: _ACTIVE_SESSION_TTL,  # 推薦階段
+}
+
+
+def compute_expires_at(step: "SessionStep", now: Optional[datetime] = None) -> datetime:
+    """依 session 步驟計算動態過期時間點。"""
+    base = now or datetime.now()
+    step_value = step.value if isinstance(step, SessionStep) else str(step)
+    return base + _TTL_BY_STEP.get(step_value, _SHORT_SESSION_TTL)
 
 
 class Session(BaseModel):

@@ -64,6 +64,9 @@ class MongoDBClient:
             sessions.create_index("mode")
             sessions.create_index("language")
             sessions.create_index([("created_at", -1)])
+            # 動態 TTL：依各 session 文件自帶的 expires_at 過期。
+            # expireAfterSeconds=0 表示「到 expires_at 指定的時間點即過期」。
+            sessions.create_index("expires_at", expireAfterSeconds=0)
             collections_ready.append("sessions")
         except Exception as e:
             logger.warning(f"Index creation for 'sessions': {e}")
@@ -232,6 +235,9 @@ def _ensure_base_indexes(db, db_name: str) -> None:
         sessions.create_index("session_id", unique=True)
         sessions.create_index("language")
         sessions.create_index([("created_at", -1)])
+        # 動態 TTL：依各 session 文件自帶的 expires_at 過期。
+        # expireAfterSeconds=0 表示「到 expires_at 指定的時間點即過期」。
+        sessions.create_index("expires_at", expireAfterSeconds=0)
 
         conversations = db["conversations"]
         conversations.create_index([("session_id", 1), ("turn_number", 1)])

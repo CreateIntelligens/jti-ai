@@ -89,10 +89,10 @@ async def create_session(request: CreateSessionRequest):
             logger.info("Cleaned up previous HCIoT session: %s...", request.previous_session_id[:8])
 
         session = session_manager.create_session(language=request.language)
+        # Keep /chat/start lazy; the first real message flushes app_mode with the session.
         session.metadata["app_mode"] = "hciot"
-        session_manager.update_session(session)
         logger.info(
-            "Created new HCIoT session: %s (language=%s)",
+            "Created new HCIoT session (pending): %s (language=%s)",
             session.session_id,
             request.language,
         )

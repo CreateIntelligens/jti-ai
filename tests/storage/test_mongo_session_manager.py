@@ -8,7 +8,7 @@ MongoDB SessionManager 單元測試
 """
 
 import unittest
-from datetime import datetime, timedelta
+from datetime import datetime
 from unittest.mock import patch, MagicMock
 
 from app.models.session import Session, SessionStep
@@ -51,18 +51,41 @@ class TestMongoSessionManager(unittest.TestCase):
         doc.update(overrides)
         return doc
 
-    def test_create_session(self):
-        """測試建立 session"""
-        mock_result = MagicMock()
-        mock_result.upserted_id = "test_id"
-        self.mock_sessions.update_one.return_value = mock_result
+    def test_create_session_is_lazy(self):
+        """測試建立 session 為 lazy：不立即落庫，僅暫存於 _pending。
 
+        為避免開頁/重整即產生空 WELCOME session 積壓，create_session 不再
+        寫入 MongoDB，而是把 session 放進 _pending，待首則真實訊息經
+        update_session 才 flush 落庫。
+        """
         session = self.manager.create_session(language="zh")
 
         self.assertIsNotNone(session)
         self.assertEqual(session.language, "zh")
         self.assertEqual(session.step, SessionStep.WELCOME)
+        # 不應寫入 DB
+        self.mock_sessions.update_one.assert_not_called()
+        # 應暫存於 _pending，且可由 get_session 讀回（不查 DB）
+        self.assertIn(session.session_id, self.manager._pending)
+        fetched = self.manager.get_session(session.session_id)
+        self.assertIs(fetched, session)
+        self.mock_sessions.find_one.assert_not_called()
+
+    def test_update_session_flushes_pending_with_expires_at(self):
+        """測試 update_session 會 flush pending session 並寫入動態 expires_at。"""
+        session = self.manager.create_session(language="zh")
+        self.mock_sessions.update_one.return_value = MagicMock(matched_count=1)
+
+        self.manager.update_session(session)
+
+        # 落庫後應從 _pending 移除
+        self.assertNotIn(session.session_id, self.manager._pending)
         self.mock_sessions.update_one.assert_called_once()
+        set_doc = self.mock_sessions.update_one.call_args.args[1]["$set"]
+        self.assertIn("expires_at", set_doc)
+        self.assertIsInstance(set_doc["expires_at"], datetime)
+        # WELCOME 預設 3 天 TTL，過期時間應在未來
+        self.assertGreater(set_doc["expires_at"], datetime.now())
 
     def test_get_session(self):
         """測試取得 session"""
