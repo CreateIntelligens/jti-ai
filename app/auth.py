@@ -204,3 +204,8 @@ def verify_admin(request: Request) -> dict:
     auth_info = verify_auth(request)
     require_admin(auth_info)
     return auth_info
+
+
+def verify_authenticated(request: Request) -> dict:
+    """驗證已登入使用者,不限制 role。"""
+    return verify_auth(request)

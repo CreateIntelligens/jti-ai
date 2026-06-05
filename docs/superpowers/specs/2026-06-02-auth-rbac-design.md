@@ -14,7 +14,8 @@
 | §3 | 三層 super_admin/admin/user | `app/users.py` `ALLOWED_ROLES` 三層齊全 | ✅ 已實作 |
 | §5 | users 集合含 role/scope/store_name | `system_config.users`（1 super_admin + 3 user） | ✅ 已實作 |
 | §6 | auth.py：JWT 優先、ADMIN_API_KEY→super_admin、sk-xxx→user、`require_role()` | `app/auth.py` 全到位 | ✅ 已實作 |
-| §6 | role guard 掛端點 | general 後台/帳號/prompts/api_keys 皆掛 `require_role` | ✅ 已實作 |
+| §6 | general 後台 / 帳號 / api_keys 端點掛 role guard（擋 user） | 皆掛 `require_role` / `verify_admin` | ✅ 已實作 |
+| §2.3 §6 | app 內容編輯（prompt / 題庫）登入即可，三種 role 都行 | prompts.py 與 jti/quiz_bank.py 原誤掛 admin-only，**2026-06-05 修正**為登入即放行；前端 prompt 按鈕同步對 user 顯示 | ✅ 已修正 |
 | §8 | UsersPanel 後端（建/改/停用，不可操作自己） | `app/routers/general/users.py` 完整含 `_assert_can_target` | ✅ 已實作 |
 | §4 | 登入頁 + JWT 簽發 + cookie | `auth_routes.py` `/api/auth/login`；前端 `Login.tsx` | ✅ 已實作 |
 | §7 | 拔除 same-origin 自動 admin 安全洞 | `auth.py` 已無 `_is_same_origin`；無 token 一律 401 | ✅ 已拔除 |
@@ -135,6 +136,9 @@ def require_role(*allowed: str):
 
 ```python
 # app 內容編輯 API:登入即可(三種 role 都行)
+# 等價寫法:Depends(verify_authenticated)、Depends(verify_auth),
+# 或 require_role("user", "admin", "super_admin")。
+# prompts.py 採 router dependency; jti/quiz_bank.py 各 endpoint 保留 verify_auth 取得 auth。
 dependencies=[Depends(require_role("user", "admin", "super_admin"))]
 
 # general 後台 API:擋掉 user

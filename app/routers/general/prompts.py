@@ -10,16 +10,20 @@ Prompt Management API Endpoints
 
 from typing import Dict, Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.auth import verify_auth, require_admin
+from app.auth import verify_authenticated
 from app.routers.general.stores import resolve_store_config
 import app.deps as deps
 
 SYSTEM_DEFAULT_PROMPT_ID = "system_default"
 
-router = APIRouter(prefix="/api/stores", tags=["Prompt Management"])
+router = APIRouter(
+    prefix="/api/stores",
+    tags=["Prompt Management"],
+    dependencies=[Depends(verify_authenticated)],
+)
 
 
 class CreatePromptRequest(BaseModel):
@@ -112,15 +116,14 @@ def _system_default_prompt_item(store_name: str) -> dict:
 
 
 @router.get("/app-default-prompts/{app}")
-def get_app_default_prompt(app: str, auth: dict = Depends(verify_auth)):
+def get_app_default_prompt(app: str):
     """Return a managed app's built-in DEFAULT prompt, fully assembled.
 
     Read-only convenience so the prompt editor can show the complete JTI/HCIoT
-    default text (per language) for an admin to copy wholesale into another
-    store's custom prompt. Reads only module-level constants — never mutates the
-    app modules — and only jti/hciot have a built-in default (others 404).
+    default text (per language) to copy wholesale into another store's custom
+    prompt. Reads only module-level constants — never mutates the app modules —
+    and only jti/hciot have a built-in default (others 404).
     """
-    require_admin(auth)
     normalized = (app or "").strip().lower()
     if normalized not in _APP_PROMPT_MODULES:
         raise HTTPException(status_code=404, detail="No built-in default prompt for this app")
@@ -141,12 +144,11 @@ def get_app_default_prompt(app: str, auth: dict = Depends(verify_auth)):
 
 
 @router.get("/{store_name:path}/prompts")
-def list_store_prompts(store_name: str, auth: dict = Depends(verify_auth)):
-    """列出 Store 的所有 Prompts（Admin only）。
+def list_store_prompts(store_name: str):
+    """列出 Store 的所有 Prompts。
 
     只回傳使用者自訂的 prompts。沒建任何 prompt 時列表為空。
     """
-    require_admin(auth)
     if not deps.prompt_manager:
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
 
@@ -172,9 +174,8 @@ def list_store_prompts(store_name: str, auth: dict = Depends(verify_auth)):
 
 
 @router.post("/{store_name:path}/prompts")
-def create_store_prompt(store_name: str, request: CreatePromptRequest, auth: dict = Depends(verify_auth)):
-    """建立新的 Prompt（Admin only）"""
-    require_admin(auth)
+def create_store_prompt(store_name: str, request: CreatePromptRequest):
+    """建立新的 Prompt"""
     if not deps.prompt_manager:
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
 
@@ -194,9 +195,8 @@ def create_store_prompt(store_name: str, request: CreatePromptRequest, auth: dic
 
 
 @router.get("/{store_name:path}/prompts/{prompt_id}")
-def get_store_prompt(store_name: str, prompt_id: str, auth: dict = Depends(verify_auth)):
-    """取得特定 Prompt（Admin only）"""
-    require_admin(auth)
+def get_store_prompt(store_name: str, prompt_id: str):
+    """取得特定 Prompt"""
     if not deps.prompt_manager:
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
 
@@ -208,9 +208,12 @@ def get_store_prompt(store_name: str, prompt_id: str, auth: dict = Depends(verif
 
 
 @router.put("/{store_name:path}/prompts/{prompt_id}")
-def update_store_prompt(store_name: str, prompt_id: str, request: UpdatePromptRequest, auth: dict = Depends(verify_auth)):
-    """更新 Prompt（Admin only）"""
-    require_admin(auth)
+def update_store_prompt(
+    store_name: str,
+    prompt_id: str,
+    request: UpdatePromptRequest,
+):
+    """更新 Prompt"""
     if not deps.prompt_manager:
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
 
@@ -231,9 +234,8 @@ def update_store_prompt(store_name: str, prompt_id: str, request: UpdatePromptRe
 
 
 @router.delete("/{store_name:path}/prompts/{prompt_id}")
-def delete_store_prompt(store_name: str, prompt_id: str, auth: dict = Depends(verify_auth)):
-    """刪除 Prompt（Admin only）"""
-    require_admin(auth)
+def delete_store_prompt(store_name: str, prompt_id: str):
+    """刪除 Prompt"""
     if not deps.prompt_manager:
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
 
@@ -245,9 +247,8 @@ def delete_store_prompt(store_name: str, prompt_id: str, auth: dict = Depends(ve
 
 
 @router.post("/{store_name:path}/prompts/active")
-def set_active_store_prompt(store_name: str, request: SetActivePromptRequest, auth: dict = Depends(verify_auth)):
-    """設定啟用的 Prompt（Admin only）"""
-    require_admin(auth)
+def set_active_store_prompt(store_name: str, request: SetActivePromptRequest):
+    """設定啟用的 Prompt"""
     if not deps.prompt_manager:
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
 
@@ -262,9 +263,8 @@ def set_active_store_prompt(store_name: str, request: SetActivePromptRequest, au
 
 
 @router.get("/{store_name:path}/prompts/active")
-def get_active_store_prompt(store_name: str, auth: dict = Depends(verify_auth)):
-    """取得當前啟用的 Prompt（Admin only）"""
-    require_admin(auth)
+def get_active_store_prompt(store_name: str):
+    """取得當前啟用的 Prompt"""
     if not deps.prompt_manager:
         raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
 

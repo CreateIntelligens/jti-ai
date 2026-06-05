@@ -56,7 +56,6 @@ def test_general_prompt_handlers_pass_content_en_to_manager(monkeypatch):
             content="中文 persona",
             content_en="English persona",
         ),
-        auth={"role": "admin"},
     )
 
     assert created["content_en"] == "English persona"
@@ -65,7 +64,6 @@ def test_general_prompt_handlers_pass_content_en_to_manager(monkeypatch):
         "store_prompt_handler_en",
         created["id"],
         prompt_routes.UpdatePromptRequest(content_en="Updated English persona"),
-        auth={"role": "admin"},
     )
 
     assert updated["content_en"] == "Updated English persona"

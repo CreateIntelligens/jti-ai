@@ -260,7 +260,7 @@ function HomeShell() {
             currentStoreIcon={currentStoreIcon}
             currentProjectName={currentProjectName}
             currentProjectColor={currentProjectColor}
-            onOpenPromptPanel={isAdmin ? () => openPanel('prompt') : undefined}
+            onOpenPromptPanel={() => openPanel('prompt')}
             onRestartChat={handleRestartChat}
             onCreateStore={isAdmin ? () => openPanel('admin') : undefined}
           />
