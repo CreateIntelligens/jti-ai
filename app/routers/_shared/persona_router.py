@@ -16,7 +16,7 @@ from typing import Any, Callable, Dict, Optional, Tuple, Type
 from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.auth import verify_admin
+from app.auth import verify_authenticated
 from app.services.agent_utils import normalize_language as _normalize_language
 import app.deps as deps
 
@@ -168,7 +168,7 @@ class _UpdateRuntimeSettingsRequestBase(BaseModel):
 
 
 def build_persona_router(config: PersonaRouterConfig) -> APIRouter:
-    router = APIRouter(tags=[config.tag], dependencies=[Depends(verify_admin)])
+    router = APIRouter(tags=[config.tag], dependencies=[Depends(verify_authenticated)])
 
     def require_prompt_manager():
         if not deps.prompt_manager:
