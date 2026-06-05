@@ -35,6 +35,20 @@ class QuizBankStore:
         self.db = get_mongo_db("jti_app")
         self.questions = self.db[self.QUESTIONS_COLLECTION]
         self.metadata = self.db[self.METADATA_COLLECTION]
+        self._ensure_indexes()
+
+    def _ensure_indexes(self) -> None:
+        """確保 (language, bank_id) 唯一,避免重複 default bank。"""
+        try:
+            self.metadata.create_index(
+                [("language", 1), ("bank_id", 1)],
+                unique=True,
+                name="language_1_bank_id_1",
+            )
+        except Exception as exc:  # noqa: BLE001 — 啟動期僅記錄,不阻斷
+            logger.warning(
+                "[QuizBank] 建立 (language, bank_id) unique index 失敗: %s", exc
+            )
 
     # ===================== Bank Management =====================
 
@@ -135,13 +149,33 @@ class QuizBankStore:
     # ===================== Metadata CRUD =====================
 
     def get_metadata(self, language: str, bank_id: str | None = None) -> dict | None:
-        """Get quiz bank metadata. If bank_id is None, returns the active bank."""
+        """Get quiz bank metadata. If bank_id is None, returns the active bank.
+
+        若同語言出現多筆 is_active=True(髒資料),以確定性順序挑選:
+        自訂 bank 優先,其次最新建立,避免 find_one 不確定回傳。
+        """
         if bank_id:
-            query = {"language": language, "bank_id": bank_id}
-        else:
-            query = {"language": language, "is_active": True}
-        doc = self.metadata.find_one(query, {"_id": 0})
-        return doc
+            doc = self.metadata.find_one(
+                {"language": language, "bank_id": bank_id}, {"_id": 0}
+            )
+            return doc
+
+        active_banks = list(
+            self.metadata.find(
+                {"language": language, "is_active": True}, {"_id": 0}
+            ).sort([("is_default", 1), ("created_at", -1)])
+        )
+        if not active_banks:
+            return None
+        if len(active_banks) > 1:
+            logger.warning(
+                "[QuizBank] %s 有 %d 筆 is_active 題庫(預期 1 筆);"
+                "暫以 '%s' 為準。請收斂 active 狀態。",
+                language,
+                len(active_banks),
+                active_banks[0].get("bank_id"),
+            )
+        return active_banks[0]
 
     def upsert_metadata(self, language: str, bank_id: str, data: dict) -> dict:
         """Upsert quiz bank metadata."""

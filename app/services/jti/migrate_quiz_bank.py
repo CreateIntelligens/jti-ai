@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -86,6 +87,11 @@ def _upgrade_legacy_data() -> None:
 
 
 def _default_bank_seed_payload(data: dict[str, Any]) -> dict[str, Any]:
+    """Default bank 的「內容」欄位 (JSON 同步用)。
+
+    不含 is_active: active 是執行期狀態,只在首次播種時補上 default。
+    之後 JSON 同步只更新內容欄位,避免覆寫使用者已啟用的自訂 bank。
+    """
     return {
         "name": "預設題庫",
         "title": data.get("title", ""),
@@ -94,7 +100,6 @@ def _default_bank_seed_payload(data: dict[str, Any]) -> dict[str, Any]:
         "dimensions": data.get("dimensions", []),
         "tie_breaker_priority": data.get("tie_breaker_priority", []),
         "selection_rules": data.get("selection_rules", {}),
-        "is_active": True,
         "is_default": True,
     }
 
@@ -168,12 +173,20 @@ def migrate_quiz_bank() -> None:
 
         existing_meta = store.get_metadata(lang, bank_id=DEFAULT_BANK_ID)
         existing_questions = store.list_questions(lang, DEFAULT_BANK_ID)
+
+        # 判斷需在 upsert 前完成,避免 JSON 同步覆寫使用者已啟用的自訂 bank。
+        has_active_bank = store.get_metadata(lang) is not None
+
         if not _default_bank_is_outdated(existing_meta, existing_questions, data):
             logger.debug("Quiz bank (%s) up to date, skipping", lang)
             continue
 
-        # Upsert metadata with multi-set fields
+        # Upsert metadata with multi-set fields (內容同步,不含 is_active)。
         store.upsert_metadata(lang, DEFAULT_BANK_ID, _default_bank_seed_payload(data))
+
+        if not has_active_bank:
+            store.set_active_bank(lang, DEFAULT_BANK_ID)
+            logger.info("[Startup] Activated default quiz bank (%s) on first seed", lang)
 
         # Replace all questions so stale extras are removed during sync.
         questions = data.get("questions", [])
@@ -212,22 +225,25 @@ def _upgrade_legacy_quiz_results() -> None:
     if legacy_docs:
         logger.info("[Startup] Processed %d legacy quiz result docs", len(legacy_docs))
 
-    # Ensure default set metadata exists
+    # 原子建立 default set metadata,避免啟動/併發時重複 insert。
     meta_col = db["quiz_results_metadata"]
     for lang in ["zh", "en"]:
-        existing_meta = meta_col.find_one({"language": lang, "set_id": DEFAULT_SET_ID})
-        if not existing_meta:
-            now = __import__("datetime").datetime.now(__import__("datetime").timezone.utc)
-            meta_col.insert_one({
-                "language": lang,
-                "set_id": DEFAULT_SET_ID,
-                "name": _default_quiz_results_set_payload(lang)["name"],
-                "is_active": True,
-                "is_default": True,
-                "created_at": now,
-                "updated_at": now,
-            })
-            logger.info("[Startup] Created default quiz results metadata for %s", lang)
+        now = datetime.now(timezone.utc)
+        meta_col.update_one(
+            {"language": lang, "set_id": DEFAULT_SET_ID},
+            {
+                "$setOnInsert": {
+                    "language": lang,
+                    "set_id": DEFAULT_SET_ID,
+                    "name": _default_quiz_results_set_payload(lang)["name"],
+                    "is_active": True,
+                    "is_default": True,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            },
+            upsert=True,
+        )
 
 
 def migrate_quiz_results() -> None:

@@ -33,6 +33,20 @@ class QuizResultsStore:
         self.db = get_mongo_db("jti_app")
         self.collection = self.db[self.COLLECTION_NAME]
         self.metadata = self.db[self.METADATA_COLLECTION]
+        self._ensure_indexes()
+
+    def _ensure_indexes(self) -> None:
+        """確保 (language, set_id) 唯一,避免重複 default set。"""
+        try:
+            self.metadata.create_index(
+                [("language", 1), ("set_id", 1)],
+                unique=True,
+                name="uniq_language_set_id",
+            )
+        except Exception as exc:  # noqa: BLE001 — 啟動期僅記錄,不阻斷
+            logger.warning(
+                "[QuizResults] 建立 (language, set_id) unique index 失敗: %s", exc
+            )
 
     # ===================== Set Management =====================
 
