@@ -18,6 +18,74 @@ from app.services.db_names import JTI_DB_NAME
 logger = logging.getLogger(__name__)
 
 
+# 啟動時解析一次的有效連線字串，全程序共用，確保所有 client 連同一個目標
+# （避免部分 client 連主庫、部分連備援庫造成資料分裂）。
+_resolved_uri: Optional[str] = None
+
+
+def _remember_mongodb_uri(uri: str) -> str:
+    global _resolved_uri
+    _resolved_uri = uri
+    return uri
+
+
+def _probe_mongodb_uri(uri: str, timeout_ms: int) -> tuple[bool, Exception | None]:
+    probe = MongoClient(uri, serverSelectionTimeoutMS=timeout_ms)
+    try:
+        probe.admin.command("ping")
+        return True, None
+    except (ConnectionFailure, ServerSelectionTimeoutError) as exc:
+        return False, exc
+    finally:
+        probe.close()
+
+
+def resolve_mongodb_uri(mongodb_uri: str | None = None) -> str:
+    """取得明確指定的 MongoDB URI，或啟動時決定要連主庫/備援庫。
+
+    策略（一次性，非執行中動態切換）：
+    0. 呼叫端若明確傳入 mongodb_uri，直接使用，不參與全域快取。
+    1. 試連 MONGODB_URI（主，通常為 DocumentDB，經 db-tunnel）。
+    2. 連得到 → 用主庫。
+    3. 連不到，且有設定 MONGODB_URI_FALLBACK（Atlas）→ fallback 用備援庫，
+       讓服務在跳板/主庫長時間不可用時仍能啟動運作。
+    4. 連不到也無備援 → 回主庫字串（沿用既有行為，由上層處理連線錯誤）。
+
+    注意：結果在程序啟動時固定。主庫之後恢復需重啟程序才會切回；
+    fallback 期間寫入備援庫，需事後人工合併回主庫（限只增型資料）。
+    """
+    if mongodb_uri:
+        return mongodb_uri
+    if _resolved_uri is not None:
+        return _resolved_uri
+
+    primary = os.getenv("MONGODB_URI")
+    fallback = os.getenv("MONGODB_URI_FALLBACK")
+
+    if not primary:
+        if fallback:
+            logger.warning("未設定 MONGODB_URI，直接使用 MONGODB_URI_FALLBACK")
+            return _remember_mongodb_uri(fallback)
+        raise ValueError("未設定 MONGODB_URI")
+
+    if not fallback:
+        # 無備援設定：維持原行為，不做試連，交由實際連線時報錯。
+        return _remember_mongodb_uri(primary)
+
+    # 有備援：啟動時試連主庫一次，決定用哪個。
+    probe_timeout_ms = int(os.getenv("MONGODB_PROBE_TIMEOUT_MS", "5000"))
+    primary_available, reason = _probe_mongodb_uri(primary, probe_timeout_ms)
+    if primary_available:
+        logger.info("主資料庫 (MONGODB_URI) 連線正常，使用主庫")
+        return _remember_mongodb_uri(primary)
+
+    logger.warning(
+        "主資料庫無法連線，fallback 至備援庫 (MONGODB_URI_FALLBACK)。原因: %s",
+        reason,
+    )
+    return _remember_mongodb_uri(fallback)
+
+
 def _ensure_session_indexes(sessions, *, include_mode: bool = False) -> None:
     sessions.create_index("session_id", unique=True)
     if include_mode:
@@ -54,7 +122,7 @@ class MongoDBClient:
         if self._client is not None:
             return
 
-        self.uri = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
+        self.uri = resolve_mongodb_uri()
         self.connect()
 
     def connect(self) -> None:

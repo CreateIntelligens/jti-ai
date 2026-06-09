@@ -97,3 +97,11 @@ data/lancedb/
 
 # Git worktrees
 .worktrees/
+
+# DocumentDB tunnel secrets (do NOT commit private keys / certs)
+docker/tunnel/bastion_key
+docker/tunnel/bastion_key.pub
+docker/tunnel/known_hosts
+*.pem
+# 例外：AWS RDS/DocumentDB 公開 CA bundle（非機密，需隨 repo 部署供 TLS 連線）
+!global-bundle.pem

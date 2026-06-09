@@ -4,7 +4,6 @@ Prompt 管理模組 (MongoDB 版本)
 """
 
 import logging
-import os
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional, Dict, Any
@@ -13,6 +12,7 @@ from pydantic import BaseModel, Field
 from pymongo import MongoClient
 
 from app.services.db_names import CONTROL_PLANE_DB_NAME
+from app.services.mongo_client import resolve_mongodb_uri
 
 logger = logging.getLogger(__name__)
 
@@ -87,13 +87,13 @@ class PromptManager:
     DB_NAME = CONTROL_PLANE_DB_NAME
     COLLECTION_NAME = "prompts"
 
-    def __init__(self, mongodb_uri: str = None):
+    def __init__(self, mongodb_uri: str | None = None):
         """初始化 Prompt Manager
 
         Args:
             mongodb_uri: MongoDB 連線字串，預設從環境變數取得
         """
-        uri = mongodb_uri or os.getenv("MONGODB_URI")
+        uri = resolve_mongodb_uri(mongodb_uri)
         if not uri:
             raise ValueError("未設定 MONGODB_URI")
 

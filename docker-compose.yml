@@ -1,8 +1,36 @@
 services:
+  # DocumentDB 連線中繼：自動判斷 VPC 內(socat 直連) / VPC 外(autossh 經跳板)。
+  # backend 一律連 db-tunnel:27017，無需區分部署環境。詳見 docker/tunnel/README.md
+  db-tunnel:
+    build:
+      context: .
+      dockerfile: docker/tunnel/Dockerfile
+    environment:
+      - DOCDB_ENDPOINT=${DOCDB_ENDPOINT:-us-west-2-mongodb-cluster.cluster-caep6t8j4kmy.us-west-2.docdb.amazonaws.com}
+      - DOCDB_PORT=${DOCDB_PORT:-27017}
+      - LISTEN_PORT=27017
+      - BASTION_HOST=${BASTION_HOST:-52.12.0.227}
+      - BASTION_USER=${BASTION_USER:-ec2-user}
+      - BASTION_KEY=/id_rsa
+      - TZ=Asia/Taipei
+    volumes:
+      # VPC 外才會用到；VPC 內 socat 直連不讀這些。檔案由 .gitignore 排除。
+      - ./docker/tunnel/bastion_key:/id_rsa:ro
+      - ./docker/tunnel/known_hosts:/known_hosts:ro
+    expose:
+      - "27017"
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z localhost 27017 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
   backend:
     build:
       context: .
-      dockerfile: docker/backend.Dockerfile
+      dockerfile: docker/backend/Dockerfile
     # LanceDB opens many file descriptors per write; the 1024 default is too low
     # for boot-time backfill across jti/hciot/general stores (hit "Too many open
     # files"). 65536 is the standard nofile limit for DB/retrieval services.
@@ -20,6 +48,11 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./.hf_cache:/home/appuser/.cache/huggingface
+      # DocumentDB TLS CA（連 DocumentDB 時 MONGODB_URI 以 tlsCAFile 指向此路徑）
+      - ./global-bundle.pem:/app/global-bundle.pem:ro
+    depends_on:
+      db-tunnel:
+        condition: service_healthy
     deploy:
       resources:
         reservations:
@@ -46,7 +79,7 @@ services:
   frontend:
     build:
       context: .
-      dockerfile: docker/frontend.Dockerfile
+      dockerfile: docker/frontend/Dockerfile
     volumes:
       - ./frontend:/app
       - /app/node_modules

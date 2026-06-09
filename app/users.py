@@ -7,7 +7,6 @@
 """
 
 import logging
-import os
 import secrets
 from datetime import datetime, timezone
 from urllib.parse import unquote
@@ -17,6 +16,7 @@ from pymongo import MongoClient
 
 from app.security.passwords import hash_password, verify_password
 from app.services.db_names import CONTROL_PLANE_DB_NAME
+from app.services.mongo_client import resolve_mongodb_uri
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +73,7 @@ class UserManager:
 
     def __init__(self, mongodb_uri: str | None = None):
         """初始化 User Manager"""
-        uri = mongodb_uri or os.getenv("MONGODB_URI")
+        uri = resolve_mongodb_uri(mongodb_uri)
         if not uri:
             raise ValueError("未設定 MONGODB_URI")
 

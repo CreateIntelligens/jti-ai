@@ -1,0 +1,17 @@
+-----BEGIN OPENSSH PRIVATE KEY-----
+# 範本檔 —— 請勿填入真實金鑰於此檔。
+#
+# 這是 db-tunnel 容器在「VPC 外」連跳板機所需的 SSH 私鑰範本。
+# VPC 內（如 hciot 正式機）會直連 DocumentDB，不需要此金鑰。
+#
+# 使用方式：
+#   1. 將實際的私鑰複製到同目錄並命名為 bastion_key：
+#        cp /path/to/your/bastion_key docker/tunnel/bastion_key
+#        chmod 600 docker/tunnel/bastion_key
+#   2. bastion_key 已被 .gitignore 排除，不會進入版控。
+#   3. 對應的「公鑰」需事先加入跳板機的 ~/.ssh/authorized_keys。
+#
+# 產生新金鑰（建議每台部署機各自產生、單獨可撤銷）：
+#   ssh-keygen -t ed25519 -f docker/tunnel/bastion_key -C "jtai-<host>-to-bastion" -N ""
+# 然後把 docker/tunnel/bastion_key.pub 內容加到跳板機 authorized_keys。
+-----END OPENSSH PRIVATE KEY-----
