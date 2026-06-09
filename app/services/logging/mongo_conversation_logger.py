@@ -200,39 +200,31 @@ class MongoConversationLogger:
             (session_ids, total_sessions)
         """
         try:
-            # Aggregation Pipeline
-            # 1. Match filter
-            # 2. Group by session_id to get distinct sessions and their latest timestamp
-            # 3. Sort by latest timestamp descending
-            # 4. Facet for pagination (data) and count (metadata)
-
-            pipeline = [
+            # 先 group by session_id 取每個 session 的最後活動時間,再 sort。
+            # 不用 $facet（AWS DocumentDB 不支援該 stage,會丟 OperationFailure
+            # code 304）—— 改拆成「分頁 data」與「總數 count」兩個 pipeline,
+            # 都只用 DocumentDB 支援的 stage。
+            base = [
                 {"$match": query},
                 {"$group": {
                     "_id": "$session_id",
                     "last_active": {"$max": "$timestamp"}
                 }},
-                {"$sort": {"last_active": -1}},
-                {"$facet": {
-                    "metadata": [{"$count": "total"}],
-                    "data": [
-                        {"$skip": (page - 1) * page_size},
-                        {"$limit": page_size},
-                        {"$project": {"_id": 1}}
-                    ]
-                }}
             ]
 
-            result = list(self.conversations_collection.aggregate(pipeline))
+            data_pipeline = base + [
+                {"$sort": {"last_active": -1}},
+                {"$skip": (page - 1) * page_size},
+                {"$limit": page_size},
+                {"$project": {"_id": 1}},
+            ]
+            count_pipeline = base + [{"$count": "total"}]
 
-            if not result:
-                return [], 0
-
-            data = result[0]["data"]
-            metadata = result[0]["metadata"]
+            data = list(self.conversations_collection.aggregate(data_pipeline))
+            count_result = list(self.conversations_collection.aggregate(count_pipeline))
 
             session_ids = [item["_id"] for item in data]
-            total_sessions = metadata[0]["total"] if metadata else 0
+            total_sessions = count_result[0]["total"] if count_result else 0
 
             return session_ids, total_sessions
 
