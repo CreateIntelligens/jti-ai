@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
 import app.deps as deps
-from app.auth import verify_admin, verify_auth
+from app.auth import require_history_access, verify_admin, verify_auth
 from app.routers.tts_utils import attach_tts_message_id, register_tts_endpoints
 from app.schemas.chat import (
     ChatRequest,
@@ -47,13 +47,26 @@ logger = logging.getLogger(__name__)
 
 
 runtime_router = APIRouter(prefix="/api/hciot", tags=["HCIoT Chat"], dependencies=[Depends(verify_auth)])
+# 讀取/匯出對話歷史：放寬到已登入使用者（user 只能看自己綁定的 app）。
 compat_history_router = APIRouter(
+    prefix="/api/hciot",
+    tags=["HCIoT Conversations"],
+    include_in_schema=False,
+    dependencies=[Depends(require_history_access("hciot"))],
+)
+admin_history_router = APIRouter(
+    prefix="/api/hciot-admin/conversations",
+    tags=["HCIoT Conversations"],
+    dependencies=[Depends(require_history_access("hciot"))],
+)
+# 刪除對話歷史：維持 admin only。
+compat_history_admin_router = APIRouter(
     prefix="/api/hciot",
     tags=["HCIoT Conversations"],
     include_in_schema=False,
     dependencies=[Depends(verify_admin)],
 )
-admin_history_router = APIRouter(
+admin_history_admin_router = APIRouter(
     prefix="/api/hciot-admin/conversations",
     tags=["HCIoT Conversations"],
     dependencies=[Depends(verify_admin)],
@@ -199,8 +212,8 @@ async def get_conversations(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@compat_history_router.delete("/history", response_model=DeleteConversationResponse)
-@admin_history_router.delete("", response_model=DeleteConversationResponse)
+@compat_history_admin_router.delete("/history", response_model=DeleteConversationResponse)
+@admin_history_admin_router.delete("", response_model=DeleteConversationResponse)
 async def delete_conversations(request: DeleteConversationRequest):
     session_manager = _get_session_manager()
     conversation_logger = _get_conversation_logger()

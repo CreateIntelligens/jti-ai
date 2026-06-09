@@ -178,6 +178,59 @@ def require_kb_access(app: str):
     return checker
 
 
+def _resolve_user_app(auth_info: dict) -> str | None:
+    """推導 role=user 綁定的 app（jti/hciot/general）。
+
+    優先用 JWT 的 scope；sk-xxx key 沒有 scope，改由綁定的 store_name 反查
+    其 managed_app。解析失敗回 None（呼叫端視為不符、拒絕）。
+    """
+    scope = auth_info.get("scope")
+    if scope:
+        return str(scope).lower()
+
+    store_name = auth_info.get("store_name")
+    if not store_name:
+        return None
+    try:
+        # 延遲 import：避免 auth 模組與 general stores 形成載入期循環依賴。
+        from app.routers.general.stores import resolve_store_config
+
+        config = resolve_store_config(store_name)
+    except Exception:
+        return None
+    if config is None or not config.managed_app:
+        return None
+    return str(config.managed_app).lower()
+
+
+def can_access_history(auth_info: dict, app: str) -> bool:
+    """Return whether auth_info may read/export the app's conversation history.
+
+    super_admin/admin 可跨 app；role=user 只能看自己綁定 app 的歷史。
+    """
+    role = auth_info.get("role")
+    if role in ADMIN_ROLES:
+        return True
+    if role == "user":
+        return _resolve_user_app(auth_info) == app.lower()
+    return False
+
+
+def require_history_access(app: str):
+    """產生對話歷史讀取/匯出的 dependency（user 只能看自己 app）。"""
+
+    def checker(request: Request) -> dict:
+        auth = verify_auth(request)
+        if not can_access_history(auth, app):
+            raise HTTPException(
+                status_code=403,
+                detail="Insufficient permission for this conversation history",
+            )
+        return auth
+
+    return checker
+
+
 def require_role(*allowed: str):
     """產生一個 FastAPI dependency,要求 verify_auth 的 role 在 allowed 內。
 
