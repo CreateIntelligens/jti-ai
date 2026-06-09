@@ -9,8 +9,8 @@ RUN apk add --no-cache nginx gettext && \
     chown -R node:node /app
 
 # 複製 nginx 配置模板與啟動腳本
-COPY docker/nginx.conf.template /etc/nginx/nginx.conf.template
-COPY docker/frontend-start.sh /start.sh
+COPY docker/frontend/nginx.conf.template /etc/nginx/nginx.conf.template
+COPY docker/frontend/start.sh /start.sh
 RUN chmod +x /start.sh
 
 # 注意：EXPOSE 只是文檔用途，實際端口由 docker-compose.yml 的 ports 控制

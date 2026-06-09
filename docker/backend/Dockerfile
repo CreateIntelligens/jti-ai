@@ -68,7 +68,7 @@ WORKDIR /app
 RUN mkdir -p /app/data/lancedb /app/logs /home/appuser/.cache/huggingface \
     && chown -R appuser:appuser /app /home/appuser/.cache
 
-COPY docker/backend-entrypoint.sh /usr/local/bin/backend-entrypoint.sh
+COPY docker/backend/entrypoint.sh /usr/local/bin/backend-entrypoint.sh
 RUN chmod +x /usr/local/bin/backend-entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/backend-entrypoint.sh"]
