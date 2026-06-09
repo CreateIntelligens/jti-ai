@@ -418,6 +418,11 @@ async def health_check():
     # 4. General Session Manager (MongoDB persistence)
     checks["general_session_manager"] = deps.get_general_chat_session_manager() is not None
 
+    # 是否運行在 Atlas 備援庫上。fallback 期間撤權（停用帳號 / 撤銷 key / 刪帳號）
+    # 可能尚未同步至備援，屬 fail-open 風險窗口，明確標示供監控告警。
+    from .services.mongo_client import is_using_fallback
+    on_fallback = is_using_fallback()
+
     all_ok = all(checks.values())
     status_code = 200 if all_ok else 503
 
@@ -426,6 +431,8 @@ async def health_check():
         content={
             "status": "ok" if all_ok else "degraded",
             "checks": checks,
+            # True = 正用備援庫，撤權可能落後（fail-open 風險），應儘速修復主庫並重啟。
+            "database_fallback": on_fallback,
         },
     )
 

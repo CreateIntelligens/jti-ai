@@ -22,6 +22,17 @@ logger = logging.getLogger(__name__)
 # （避免部分 client 連主庫、部分連備援庫造成資料分裂）。
 _resolved_uri: Optional[str] = None
 
+# 是否正運行在 Atlas 備援庫上（主庫啟動時連不到而 fallback）。
+# 安全意義：同步腳本只 upsert 不刪除，Atlas 鏡像可能落後主庫的「撤權」
+# （停用帳號 / 撤銷 API key / 刪帳號）。降級期間這些撤銷可能尚未生效，
+# 等同 fail-open 風險窗口，必須讓營運端可察覺（見 is_using_fallback / /health）。
+_using_fallback: bool = False
+
+
+def is_using_fallback() -> bool:
+    """是否正運行在備援庫（Atlas）上。供 /health 等對外標示降級狀態。"""
+    return _using_fallback
+
 # 啟動時試連主庫的逾時（一次性開機判斷，非執行中查詢逾時）。
 # 寫死而非走 env：DocumentDB 經 db-tunnel 還要 TLS 握手，冷啟動疊加時 5s 偏緊，
 # 誤判會掉 Atlas 備援且需人工合資料，代價高；開機多等幾秒無感，故給寬。
@@ -83,8 +94,13 @@ def resolve_mongodb_uri(mongodb_uri: str | None = None) -> str:
         logger.info("主資料庫 (MONGODB_URI) 連線正常，使用主庫")
         return _remember_mongodb_uri(primary)
 
-    logger.warning(
-        "主資料庫無法連線，fallback 至備援庫 (MONGODB_URI_FALLBACK)。原因: %s",
+    global _using_fallback
+    _using_fallback = True
+    logger.critical(
+        "⚠ 資料庫降級：主庫無法連線，已 fallback 至備援庫 (Atlas)。"
+        "安全注意：備援鏡像可能落後主庫的撤權（停用帳號 / 撤銷 API key / 刪帳號），"
+        "降級期間這些撤銷可能尚未生效（fail-open 風險）。請儘速修復主庫並重啟切回。"
+        "原因: %s",
         reason,
     )
     return _remember_mongodb_uri(fallback)
