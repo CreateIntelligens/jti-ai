@@ -20,7 +20,10 @@ BASTION_HOST="${BASTION_HOST:-52.12.0.227}"
 BASTION_USER="${BASTION_USER:-ec2-user}"
 BASTION_KEY="${BASTION_KEY:-/id_rsa}"
 
-PROBE_TIMEOUT="${PROBE_TIMEOUT:-5}"
+# 直連探測逾時：寫死 10s。搬遷初期網路未知時，5s 偏緊易誤判成「連不到」
+# 而退去走 SSH tunnel，但目標機（VPC 內）未必放 bastion_key → 容器 exit 1 起不來。
+# VPC 內直連通常 <1s，多等的秒數只在真的連不到時才發生，對正常啟動無感。
+PROBE_TIMEOUT="${PROBE_TIMEOUT:-10}"
 
 log() {
     echo "[db-tunnel] $*"

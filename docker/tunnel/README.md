@@ -56,4 +56,4 @@ ssh-keyscan -t ed25519,rsa <跳板IP> > docker/tunnel/known_hosts
 | `BASTION_HOST` | 52.12.0.227 | 跳板機（VPC 外才用） |
 | `BASTION_USER` | ec2-user | 跳板登入帳號 |
 | `BASTION_KEY` | /id_rsa | 容器內金鑰路徑（由 volume 掛入） |
-| `PROBE_TIMEOUT` | 5 | 直連探測逾時秒數 |
+| `PROBE_TIMEOUT` | 10 | 直連探測逾時秒數 |

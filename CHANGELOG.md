@@ -1,113 +1,125 @@
 # Changelog
 
-## [Unreleased] - 2026-06-03
+## [1.0.0] - 2026-06-09
 
-### 對外 API Key / 權限
+首個正式版本。整合 JTI 活動助理、HCIoT 醫院衛教助理與通用知識庫聊天於同一後端,
+具備 self-hosted RAG、三層 RBAC、DocumentDB 主庫 + Atlas 備援,以及 OpenAI-compatible API。
 
-- 對外 API key (`sk-xxx`) 改為 Fernet 加密儲存（`key_encrypted`），可在「對外 Keys」面板事後查看/複製，不再只顯示一次；需設定環境變數 `API_ENCRYPTION_KEY`
-- 面板列表預設遮罩，點「眼睛」二次確認後才向後端解密取回明文；複製在非 HTTPS 環境會 fallback 到 `execCommand`
-- 權限分層：發行 / 更新 / 撤銷金鑰僅限 admin / super_admin；一般 user 為唯讀
-- 可見範圍沿用知識庫面板的 scope→store 邏輯：admin 看全部，user 只看自己可見知識庫底下的 key（不另設 owner 欄位，避免雙重真相來源）
-- 對外 Keys 入口開放給一般 user（原本僅 admin 可見），面板依角色顯示對應功能
-- 顯式將 `cryptography` 加入 `requirements.txt`
+### 應用與 AI
 
-### 知識庫 Scope 授權
-
-- 知識庫管理端點（HCIoT / JTI 的檔案、圖片、主題）從 admin-only 改為 scope 授權：super_admin / admin 可跨應用，一般 user 可管理自己 scope 所屬應用的知識庫，但碰不到其他應用
-- 新增 `can_access_kb(auth, app)` / `require_kb_access(app)`，各 router 明確帶入自己的 app 名與 `user.scope` 比對；對話歷史（conversations）維持 admin-only
-- `/admin/rag/status` 改為依 `source_type` 動態做 scope 檢查（查 `all` 需通過每個應用）；`/admin/rag/reindex` 維持 admin 限定
-- 修正前端 `fetchAsAdmin` 未帶 `credentials: 'include'`，導致登入後 admin/scope 請求漏帶 session cookie 而 403
-- 設計文件：`docs/superpowers/specs/2026-06-04-kb-scope-access-design.md`
-
-## [Unreleased] - 2026-04-29
-
-### RAG / AI 基礎設施
-
-- Self-hosted RAG 成為主要檢索路徑：BAAI/bge-m3 + FlagEmbedding 產生 embedding，LanceDB 做本地向量檢索，MongoDB 做知識庫與向量備份
-- FastAPI lifespan 會背景 warm up embedding model，並自動 backfill JTI/HCIoT 的中英文知識庫
-- 知識庫上傳、更新、刪除後會排程同步 RAG；CSV 以 row 為 chunk，並保留 `img` 欄位解析出的 `image_id`
-- `/v1/chat/completions` 改為 OpenAI-compatible 入口，會先查本地 RAG，再用 Gemini 產生回答
-- RAG 檢索新增 distance threshold，可用 `RAG_DISTANCE_THRESHOLD` 調整結果過濾
-
-### 應用切分與後端整理
-
-- JTI、HCIoT 的 service wiring 已拆開：各自擁有 session manager、conversation logger、knowledge store 與 TTS manager
-- 共用 persona router factory、safety prompts、緊急電話讀法與知識庫工具，減少跨 app 分支邏輯
-- MongoDB session/conversation storage 測試補強，包含 rollback、session rebuild、分頁與匯出流程
-
-### HCIoT 工作台
-
-- HCIoT 知識庫工作台支援 topic/category 管理，CSV 上傳可帶 topic metadata，並自動從 `q` 欄位同步題目
-- 新增 topic 合併 CSV API 與前端整合預覽，支援同 topic 多個 CSV 合併檢視與編輯
-- 圖片改由 MongoDB image store 管理，支援上傳、列表、刪除、引用次數統計與未使用圖片清理
-- 圖片引用統一使用 `image_id`，前端以 `normalizeImageId()` 和 `/api/hciot/images/{image_id}` 載入
-- HCIoT TTS 角色選擇移到主要頁面，送出訊息時可指定 voice
+- **多應用架構**:JTI、HCIoT、通用知識庫共用後端基礎設施,但各自獨立的 session manager、conversation logger、knowledge store、prompt 與 TTS。
+- **Self-hosted RAG**:BAAI/bge-m3 + FlagEmbedding 產生本地 embedding,LanceDB 做向量檢索,MongoDB 做知識庫與向量備份;啟動時背景 warm up 模型並 backfill JTI/HCIoT 中英知識庫。知識庫上傳/更新/刪除會排程同步 RAG,檢索支援 `RAG_DISTANCE_THRESHOLD` 過濾。
+- **OpenAI-compatible API**:`/v1/chat/completions` 先查本地 RAG 再用 Gemini 生成回答。
+- **Gemini multi-key**:`GEMINI_API_KEYS` 逗號分隔多把 key,啟動掃 stores 建 key→store mapping;統一重試包裝與 grounding metadata 容錯。
 
 ### JTI
 
-- JTI 回應組裝、測驗流程、quiz bank/result store 與 TTS 文本產生已模組化
-- 題庫與測驗結果管理支援多 bank/set、啟用切換、CSV 匯入匯出與 metadata 編輯
-- 知識庫上傳/編輯會拒絕 `[CORE: ...]` 標記，避免把內部優先權語法寫入可檢索內容
+- 後端接管測驗流程,答題優先走規則(A/B/數字/選項文字),規則判不出才呼叫 LLM;測驗可中斷/重啟、支援重新生成與編輯重送(turn_number rollback)。
+- 兩層 AI 架構(File Search 取來源 + Chat Session 帶 persona),session 過期可從 conversation logs 自動重建。
+- 中英文測驗結果(4 種個性類型),citation 系統解析來源 image_id。
+- 題庫與測驗結果支援多 bank/set、啟用切換、CSV 匯入匯出與 metadata 編輯。
+
+### HCIoT
+
+- 獨立 `hciot_app` 資料庫,與 JTI 完全隔離。
+- 知識庫工作台:topic/category 管理、Q&A CSV 上傳(可帶 topic metadata、自動從 `q` 欄位同步題目)、多 CSV 合併預覽。
+- 一般文件知識通道(非 Q&A):走 `DocumentRagService` 與獨立的 `{app}_doc_knowledge` RAG 池,不掛 topic。
+- 圖片由 MongoDB image store 管理(上傳/列表/刪除/引用統計/未使用清理),前端以 `image_id` 統一引用。
+- topic 預設問題可逐題隱藏(只影響前端 chips,不影響檢索);TTS 角色可在主頁選擇。
+
+### 權限與帳號(三層 RBAC)
+
+- 三層 role:super_admin / admin / user。一帳號綁一應用(scope),app 不進權限判斷。
+- **知識庫 scope 授權**:HCIoT/JTI 的檔案、圖片、主題管理由 admin-only 改為 scope 授權 —— super_admin/admin 可跨應用,user 只能管理自己 scope 所屬應用的知識庫。
+- **對話歷史**:由 admin-only 放寬給已登入 user 讀取/匯出,但 user 只能看自己應用(由綁定 store 反查 app 比對);刪除維持 admin-only。
+- **對外 API key**(`sk-xxx`):Fernet 加密儲存,可在面板事後查看/複製(預設遮罩、二次確認解密);發行/更新/撤銷限 admin,user 唯讀且只看自己可見知識庫的 key。
+
+### Session 與對話管理
+
+- MongoDB 持久化 session 與 conversation logs:CRUD、TTL 自動清理、turn_number、rollback、分頁查詢、匯出、批次刪除與 session 重建。
+- 各應用獨立資料庫(`jti_app` / `hciot_app` / `general_app`),控制面集中於 `system_config`。
 
 ### TTS
 
-- TTS job manager 改為 shared file-based cache，支援 pending/ready/failed metadata、TTL prune 與 job 上限
-- JTI/HCIoT 共用中文 TTS normalization：優先呼叫 `NORMALIZE_API_URL`，失敗或未設定時 fallback 到本地 regex + OpenCC
-- 中文 TTS fallback 會處理 hotline、電話、年份與三位數以上數字轉中文讀法
+- 背景 job 產生語音並以檔案快取,支援 pending/ready/failed 狀態、TTL prune 與 job 上限。
+- 中文 normalization 優先呼叫 `NORMALIZE_API_URL`,失敗或未設定時 fallback 本地 regex + OpenCC(處理 hotline、電話、年份與多位數字讀法)。
 
-### Docker / Frontend / 維運
+### 資料庫容錯(DocumentDB 主庫 + Atlas 備援)
 
-- Backend Dockerfile 採 builder -> deps -> runner 多階段建置，runtime 以非 root `appuser` 執行
-- Backend entrypoint 會修正 bind-mounted `data`、`logs`、Hugging Face cache 權限，降低 Docker 權限摩擦
-- Frontend container 內 nginx 維持單一公開 port，代理 `/api`、`/v1`、`/docs`、`/health` 到 backend，其他路由給 Vite
-- 過濾 `/health` 與 TTS polling 202 access logs，降低開發與營運 log 噪音
-- Pin `FlagEmbedding==1.3.5`，穩定 BGE-m3 embedding 依賴組合
+- 主庫為 **AWS DocumentDB**(經 `db-tunnel` 連線),**Atlas** 作為啟動時 fallback,主庫不可用時自動頂上且資料不致大量落後。
+- **DocumentDB → Atlas 同步**:平時備份,可由 super_admin 在前端按鈕(JTI/HCIoT 同步自身應用、General 全域同步含系統設定)或 cron 觸發;業務鍵 upsert、只補不刪。
+- **Atlas → DocumentDB 補回**:災後恢復用,衝突以主庫(AWS)為準(只補不覆蓋);前端反向按鈕先 dry-run 預演再確認。
+- 連線探測逾時放寬,避免 VPC/跳板環境冷啟動時誤判而錯誤 fallback。
+
+### 前端
+
+- React + Vite,JTI/HCIoT 頁面 + 通用後台;全域 i18n(中/英)、per-persona 語言隔離。
+- 對話歷史(多選刪除、日期篩選、重新生成)、TTS 播放控制、知識庫工作台。
+
+### Docker / 維運
+
+- 單一公開 port:frontend container 內 nginx 代理 `/api`、`/v1`、`/docs`、`/health` 到 backend,其餘給 Vite。
+- Backend 多階段建置(builder → runner),runtime 以非 root `appuser` 執行,entrypoint 修正 bind-mount 權限。
 
 ## [0.1.0] - 2026-04-14
 
 ### JTI — 命定前蓋測驗
 
-- 後端完全接管測驗流程，答題判斷優先走規則（A/B/數字/選項文字），規則判不出時才呼叫 LLM
-- 兩層 AI 架構：第一層 File Search（無 system_instruction，規避 flash-lite grounding bug），第二層 Chat Session（帶 persona）
-- JTI agent 鎖定 gemini-2.5-flash-lite，避免較強的 model 自行進行測驗
-- 測驗中途可說「中斷」暫停，隨時說「測驗」重新開始
-- 支援重新生成／編輯重送（turn_number rollback），回滾後保留原有抽題序列
-- Session 過期後可從 conversation logs 自動重建（`rebuild_session_from_logs`）
-- 中文測驗結果：4 種個性類型（彩虹系 quiz），英文版同步支援
-- Citation 系統：File Search 引用來源，附帶 image_id 解析（從 citation 檔名提取）
-- 測驗問答 CSV 帶圖片的題目獨立成檔，image_id 由第一層 citation 排序決定
+- 後端完全接管測驗流程,答題判斷優先走規則(A/B/數字/選項文字),規則判不出時才呼叫 LLM
+- 兩層 AI 架構:第一層 File Search(無 system_instruction,規避 flash-lite grounding bug),第二層 Chat Session(帶 persona)
+- JTI agent 鎖定 gemini-2.5-flash-lite,避免較強的 model 自行進行測驗
+- 測驗中途可說「中斷」暫停,隨時說「測驗」重新開始
+- 支援重新生成／編輯重送(turn_number rollback),回滾後保留原有抽題序列
+- Session 過期後可從 conversation logs 自動重建(`rebuild_session_from_logs`)
+- 中文測驗結果:4 種個性類型(彩虹系 quiz),英文版同步支援
+- Citation 系統:File Search 引用來源,附帶 image_id 解析(從 citation 檔名提取)
+- 測驗問答 CSV 帶圖片的題目獨立成檔,image_id 由第一層 citation 排序決定
 
 ### HCIoT — 醫院衛教智慧助理
 
-- 獨立的 `hciot_app` MongoDB database，與 JTI 資料完全隔離
-- 知識庫管理：Topic 分類、CSV 上傳（Q&A 格式）、圖片管理（MongoDB GridFS）
-- 圖片管理：上傳、更新、刪除、image picker，圖片在對話中以附件形式呈現
+- 獨立的 `hciot_app` MongoDB database,與 JTI 資料完全隔離
+- 知識庫管理:Topic 分類、CSV 上傳(Q&A 格式)、圖片管理(MongoDB GridFS)
+- 圖片管理:上傳、更新、刪除、image picker,圖片在對話中以附件形式呈現
 - Backend normalize 時自動生成 CSV index
 - TTS 語音角色可透過環境變數設定
 
 ### 知識庫 / AI 基礎設施
 
-- Gemini multi-key registry：`GEMINI_API_KEYS` 逗號分隔，啟動時掃 stores 建 key→store mapping
-- `get_client_for_store(store_name)` 取對應 key，`get_default_client()` 取第一把 key
-- BaseAgent 統一 File Search + Intent Check 併發邏輯，兩個 agent 共用
-- `gemini_with_retry` 包裝器，所有 Gemini 呼叫統一加上重試
-- File Search grounding metadata 容錯（有時為 None）
-- MongoDB 知識庫檔案儲存，取代本地檔案系統
+- Gemini multi-key registry:`GEMINI_API_KEYS` 逗號分隔,啟動時掃 stores 建 key→store mapping
+- `get_client_for_store(store_name)` 取對應 key,`get_default_client()` 取第一把 key
+- BaseAgent 統一 File Search + Intent Check 併發邏輯,兩個 agent 共用
+- `gemini_with_retry` 包裝器,所有 Gemini 呼叫統一加上重試
+- File Search grounding metadata 容錯(有時為 None)
+- MongoDB 知識庫檔案儲存,取代本地檔案系統
 
 ### Session / 對話管理
 
-- `MongoSessionManager`：Session CRUD，TTL index 自動清理
-- `MongoConversationLogger`：對話紀錄、turn_number、rollback、分頁查詢
-- Session manager factory lazy singleton，有 MongoDB 就用，否則 fallback 記憶體版
-- 修正：`get_mongo_db()` 改為必須傳入明確 db_name，預設 `"jti_app"`（修復 JTI session 落入記憶體版的 bug）
-- 一般知識庫 Chat Session（`GeneralChatSessionManager`）也持久化到 MongoDB
+- `MongoSessionManager`:Session CRUD,TTL index 自動清理
+- `MongoConversationLogger`:對話紀錄、turn_number、rollback、分頁查詢
+- Session manager factory lazy singleton,有 MongoDB 就用,否則 fallback 記憶體版
+- 修正:`get_mongo_db()` 改為必須傳入明確 db_name,預設 `"jti_app"`(修復 JTI session 落入記憶體版的 bug)
+- 一般知識庫 Chat Session(`GeneralChatSessionManager`)也持久化到 MongoDB
 
 ### Frontend
 
-- React + Vite，支援 JTI 和 HCIoT 兩個頁面
-- 全域 i18n（中/英），per-persona 語言隔離
-- TTS 播放控制（播放中顯示 spinner、自動重試、session 重啟自動恢復）
-- 對話歷史：多選刪除、日期篩選、重新生成
-- AppSelect（Radix UI）取代原生 select
+- React + Vite,支援 JTI 和 HCIoT 兩個頁面
+- 全域 i18n(中/英),per-persona 語言隔離
+- TTS 播放控制(播放中顯示 spinner、自動重試、session 重啟自動恢復)
+- 對話歷史:多選刪除、日期篩選、重新生成
+- AppSelect(Radix UI)取代原生 select
 - Esc 關閉所有 modal
-- HCIoT workspace：Topic 分類、檔案管理、圖片 picker、CSV 格式提示、樣本下載
+- HCIoT workspace:Topic 分類、檔案管理、圖片 picker、CSV 格式提示、樣本下載
+
+### TTS
+
+- TTS job manager 改為 shared file-based cache,支援 pending/ready/failed metadata、TTL prune 與 job 上限
+- JTI/HCIoT 共用中文 TTS normalization:優先呼叫 `NORMALIZE_API_URL`,失敗或未設定時 fallback 到本地 regex + OpenCC
+- 中文 TTS fallback 會處理 hotline、電話、年份與三位數以上數字轉中文讀法
+
+### Docker / Frontend / 維運
+
+- Backend Dockerfile 採 builder -> deps -> runner 多階段建置,runtime 以非 root `appuser` 執行
+- Backend entrypoint 會修正 bind-mounted `data`、`logs`、Hugging Face cache 權限,降低 Docker 權限摩擦
+- Frontend container 內 nginx 維持單一公開 port,代理 `/api`、`/v1`、`/docs`、`/health` 到 backend,其他路由給 Vite
+- 過濾 `/health` 與 TTS polling 202 access logs,降低開發與營運 log 噪音
+- Pin `FlagEmbedding==1.3.5`,穩定 BGE-m3 embedding 依賴組合
