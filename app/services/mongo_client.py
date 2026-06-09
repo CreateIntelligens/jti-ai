@@ -22,6 +22,11 @@ logger = logging.getLogger(__name__)
 # （避免部分 client 連主庫、部分連備援庫造成資料分裂）。
 _resolved_uri: Optional[str] = None
 
+# 啟動時試連主庫的逾時（一次性開機判斷，非執行中查詢逾時）。
+# 寫死而非走 env：DocumentDB 經 db-tunnel 還要 TLS 握手，冷啟動疊加時 5s 偏緊，
+# 誤判會掉 Atlas 備援且需人工合資料，代價高；開機多等幾秒無感，故給寬。
+MONGODB_PROBE_TIMEOUT_MS = 10000
+
 
 def _remember_mongodb_uri(uri: str) -> str:
     global _resolved_uri
@@ -73,8 +78,7 @@ def resolve_mongodb_uri(mongodb_uri: str | None = None) -> str:
         return _remember_mongodb_uri(primary)
 
     # 有備援：啟動時試連主庫一次，決定用哪個。
-    probe_timeout_ms = int(os.getenv("MONGODB_PROBE_TIMEOUT_MS", "5000"))
-    primary_available, reason = _probe_mongodb_uri(primary, probe_timeout_ms)
+    primary_available, reason = _probe_mongodb_uri(primary, MONGODB_PROBE_TIMEOUT_MS)
     if primary_available:
         logger.info("主資料庫 (MONGODB_URI) 連線正常，使用主庫")
         return _remember_mongodb_uri(primary)
