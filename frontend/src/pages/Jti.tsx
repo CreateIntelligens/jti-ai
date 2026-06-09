@@ -13,7 +13,8 @@ import { useAutoResize } from '../hooks/useAutoResize';
 import { useEnterToSubmit } from '../hooks/useEnterToSubmit';
 import { useFocusOnOpen } from '../hooks/useFocusOnOpen';
 import { useScrollToBottom } from '../hooks/useScrollToBottom';
-import { isAdminRole } from '../utils/authRouting';
+import { isAdminRole, isSuperAdmin } from '../utils/authRouting';
+import DbSyncButton from '../components/DbSyncButton';
 import '../styles/shared/index.css';
 import '../styles/jti/layout.css';
 import '../styles/jti/messages.css';
@@ -648,6 +649,9 @@ export default function Jti() {
             >
               {theme === 'dark' ? <Moon size={18} /> : <Sun size={18} />}
             </button>
+            {isSuperAdmin(profile?.role) && (
+              <DbSyncButton app="jti" className="icon-btn" />
+            )}
             {isAdminRole(profile?.role) && (
               <button
                 className="icon-btn"

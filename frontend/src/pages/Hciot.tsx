@@ -23,7 +23,8 @@ import { useFocusOnOpen } from '../hooks/useFocusOnOpen';
 import { useLogoutRedirect } from '../hooks/useLogoutRedirect';
 import { useScrollToBottom } from '../hooks/useScrollToBottom';
 import { useTheme } from '../hooks/useTheme';
-import { isAdminRole } from '../utils/authRouting';
+import { isAdminRole, isSuperAdmin } from '../utils/authRouting';
+import DbSyncButton from '../components/DbSyncButton';
 import * as api from '../services/api';
 import type { TtsState } from '../types';
 import '../styles/shared/index.css';
@@ -888,6 +889,9 @@ export default function Hciot() {
           <button className="hciot-icon-button" onClick={toggleTheme} title={HCIOT_UI_TEXT.themeTitle}>
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
+          {isSuperAdmin(profile?.role) && (
+            <DbSyncButton app="hciot" className="hciot-icon-button" />
+          )}
           {isAdminRole(profile?.role) && (
             <button
               className="hciot-icon-button"

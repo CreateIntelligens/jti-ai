@@ -4,6 +4,10 @@ export function isAdminRole(role?: string | null): boolean {
   return role === 'admin' || role === 'super_admin';
 }
 
+export function isSuperAdmin(role?: string | null): boolean {
+  return role === 'super_admin';
+}
+
 export function isGeneralUserScope(profile: Pick<UserProfile, 'scope' | 'store_name' | 'role'>): boolean {
   if (isAdminRole(profile.role)) return false;
   if (profile.store_name) return true;

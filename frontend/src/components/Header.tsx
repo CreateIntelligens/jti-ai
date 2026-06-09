@@ -2,6 +2,8 @@ import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Database,
+  DatabaseBackup,
+  DatabaseZap,
   History,
   KeyRound,
   Link2,
@@ -18,7 +20,7 @@ import {
 import reindexRag from '../services/api/general';
 import * as api from '../services/api';
 import { useLogoutRedirect } from '../hooks/useLogoutRedirect';
-import { isAdminRole } from '../utils/authRouting';
+import { isAdminRole, isSuperAdmin } from '../utils/authRouting';
 import AppSelect from './AppSelect';
 
 interface HeaderProps {
@@ -57,9 +59,11 @@ export default function Header({
   const navigate = useNavigate();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isReindexing, setIsReindexing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   const isAdmin = isAdminRole(userProfile?.role);
+  const isSuper = isSuperAdmin(userProfile?.role);
   const handleLogoutClick = useLogoutRedirect(onLogout);
 
   const openPanel = (openFn: () => void) => {
@@ -83,6 +87,63 @@ export default function Header({
       onShowStatus(error instanceof Error ? error.message : '重新索引失敗');
     } finally {
       setIsReindexing(false);
+    }
+  };
+
+  const handleGlobalDbSync = async () => {
+    if (isSyncing) return;
+    setSettingsOpen(false);
+    const confirmed = window.confirm(
+      '全域同步會將所有應用資料與系統設定同步至備援庫，可能需要約 1 分鐘。是否繼續？',
+    );
+    if (!confirmed) return;
+    setIsSyncing(true);
+    onShowStatus('全域同步已啟動...');
+    try {
+      const result = await api.triggerDbSync('general');
+      const dbCount = Object.keys(result.databases).length;
+      onShowStatus(
+        `✅ 全域同步完成（${dbCount} 庫）：新增 ${result.total_upserted}、` +
+          `實際更新 ${result.total_modified}，耗時 ${result.elapsed_sec}s`,
+      );
+    } catch (error) {
+      onShowStatus(error instanceof Error ? error.message : '全域同步失敗');
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
+  const handleReverseRestore = async () => {
+    if (isSyncing) return;
+    setSettingsOpen(false);
+    // 反向會寫「主庫」,危險。先 dry-run 預演,顯示會補幾筆,使用者確認後才正式寫。
+    setIsSyncing(true);
+    onShowStatus('預演中:計算需補回主庫的資料...');
+    try {
+      const preview = await api.triggerDbSync('general', { direction: 'reverse', dryRun: true });
+      if (preview.total_inserted === 0) {
+        onShowStatus('✅ 主庫已是最新,沒有需要補回的資料');
+        return;
+      }
+      const confirmed = window.confirm(
+        `預演結果:備援庫有 ${preview.total_inserted} 筆主庫沒有的資料。\n\n` +
+          '這會把這些資料補回主庫(DocumentDB)。衝突時以主庫(AWS)為準,只補不覆蓋既有資料。\n\n' +
+          '確定要補回主庫嗎？',
+      );
+      if (!confirmed) {
+        onShowStatus('已取消反向補資料');
+        return;
+      }
+      onShowStatus('補回主庫中...');
+      const result = await api.triggerDbSync('general', { direction: 'reverse' });
+      onShowStatus(
+        `✅ 反向補資料完成:補入 ${result.total_inserted} 筆、` +
+          `略過(主庫已有)${result.total_skipped} 筆,耗時 ${result.elapsed_sec}s`,
+      );
+    } catch (error) {
+      onShowStatus(error instanceof Error ? error.message : '反向補資料失敗');
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -184,6 +245,28 @@ export default function Header({
                     {isReindexing ? <Loader2 size={16} /> : <RefreshCw size={16} />}
                     重新索引 RAG
                   </button>
+                  {isSuper && (
+                    <>
+                      <button
+                        className="dd-item"
+                        onClick={handleGlobalDbSync}
+                        disabled={isSyncing}
+                        title="全域同步（所有應用 + 系統設定）至備援庫"
+                      >
+                        {isSyncing ? <Loader2 size={16} /> : <DatabaseBackup size={16} />}
+                        全域同步至備援庫
+                      </button>
+                      <button
+                        className="dd-item"
+                        onClick={handleReverseRestore}
+                        disabled={isSyncing}
+                        title="災後從備援庫補回主庫（AWS 為主，只補不覆蓋；先預演再確認）"
+                      >
+                        {isSyncing ? <Loader2 size={16} /> : <DatabaseZap size={16} />}
+                        從備援庫補回主庫
+                      </button>
+                    </>
+                  )}
                 </div>
               )}
             </div>
