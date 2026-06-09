@@ -52,7 +52,9 @@ services:
       - ./global-bundle.pem:/app/global-bundle.pem:ro
     depends_on:
       db-tunnel:
-        condition: service_healthy
+        # service_started(非 healthy):tunnel 連不上主庫時 backend 仍啟動,
+        # 由 app 端 resolve_mongodb_uri() fallback 至 Atlas 備援。
+        condition: service_started
     deploy:
       resources:
         reservations:
