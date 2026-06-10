@@ -146,15 +146,17 @@ async def lifespan(_: FastAPI):
         
     yield
 
-    # Teardown: release embedding model to avoid semaphore leak warnings
+    # Teardown: stop the embedding model's multiprocess pool before exit so
+    # its semaphores are reclaimed deterministically (avoids the resource_tracker
+    # "leaked semaphore" warning that __del__-at-shutdown would otherwise emit).
     try:
         from app.services.embedding.service import EmbeddingService
-        if EmbeddingService._model is not None:
-            EmbeddingService._model = None
-            EmbeddingService._instance = None
+        if EmbeddingService.release():
             logger.info("[Shutdown] Embedding model released.")
     except Exception as e:
         logger.warning(f"[Shutdown] Embedding cleanup failed: {e}")
+
+    logger.info("👋 JTAI API shut down cleanly. Goodbye!")
 
 
 def _list_general_store_names() -> list[str]:

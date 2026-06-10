@@ -26,6 +26,25 @@ def _resolve_device(explicit: Optional[str]) -> str:
         return "cpu"
 
 
+def _shutdown_loky_executor() -> None:
+    """Shut down joblib/loky's reusable process pool if it was started.
+
+    FlagEmbedding pulls in joblib, whose loky backend keeps a reusable
+    executor backed by a POSIX semaphore (/dev/shm/sem.loky-*). It is only
+    reclaimed by loky's own atexit, which races the multiprocessing
+    resource_tracker and triggers a "leaked semaphore" warning. Stopping it
+    during teardown reclaims the semaphore deterministically. No-op if loky
+    was never used.
+    """
+    for path in ("joblib.externals.loky", "loky"):
+        try:
+            module = __import__(path, fromlist=["get_reusable_executor"])
+            module.get_reusable_executor().shutdown(wait=True, kill_workers=True)
+            return
+        except Exception:
+            continue
+
+
 class EmbeddingService:
     _instance: Optional['EmbeddingService'] = None
     _model: Optional[Any] = None
@@ -46,6 +65,32 @@ class EmbeddingService:
         if cls._instance is None:
             cls._instance = cls()
         return cls._instance
+
+    @classmethod
+    def release(cls) -> bool:
+        """Release the shared embedding model and stop its multiprocess pool.
+
+        FlagModel spawns a multiprocessing pool whose semaphores are only
+        reclaimed via stop_self_pool(). Relying on __del__ at interpreter
+        shutdown races the resource_tracker and emits a "leaked semaphore"
+        UserWarning, so we stop the pool explicitly during teardown.
+
+        Returns True if a loaded model was released, False if nothing to do.
+        """
+        model = cls._model
+        if model is None:
+            cls._instance = None
+            return False
+
+        stop_self_pool = getattr(model, "stop_self_pool", None)
+        if callable(stop_self_pool):
+            stop_self_pool()
+
+        _shutdown_loky_executor()
+
+        cls._model = None
+        cls._instance = None
+        return True
 
     @property
     def model(self):
