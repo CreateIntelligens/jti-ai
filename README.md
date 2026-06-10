@@ -113,6 +113,11 @@ docker compose up -d --build
 - API docs: http://localhost:8008/docs
 - Health check: http://localhost:8008/health
 
+## 相關文件
+
+- [第三方開源軟體清單](docs/第三方開源軟體清單.md)
+- [第三方開源授權與聲明](docs/第三方開源授權與聲明.md)
+
 ## 專案結構
 
 ```text

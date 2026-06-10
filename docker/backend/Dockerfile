@@ -26,7 +26,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
         accelerate==0.34.2 \
         sentence-transformers==3.3.1 \
         FlagEmbedding==1.3.5 \
-        tf-keras
+        numpy==2.4.6 \
+        pandas==3.0.3 \
+        tf-keras==2.21.0
 
 # ---- 輕 & 易變相依：改動頻繁，放在重相依之後 ----
 COPY requirements.txt .
