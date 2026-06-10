@@ -9,7 +9,10 @@ import {
   type QaMergedCsvResponse,
   type QaMergedCsvRow,
   type QaPair,
+  type SaveTopicCsvMergedPayload,
 } from './_shared/qaKnowledge';
+
+export type { SaveTopicCsvMergedPayload };
 
 export interface HciotRuntimeSettings {
   response_rule_sections: {
@@ -395,6 +398,14 @@ export type HciotMergedCsvResponse = QaMergedCsvResponse;
 
 export async function getHciotTopicMergedCsv(topicId: string, language: HciotLanguage = 'zh'): Promise<HciotMergedCsvResponse> {
   return hciotQaKnowledgeApi.getTopicMergedCsv(topicId, language);
+}
+
+export async function saveHciotTopicMergedCsv(
+  topicId: string,
+  payload: SaveTopicCsvMergedPayload,
+  language: HciotLanguage = 'zh',
+): Promise<{ message: string; topic_synced: boolean }> {
+  return hciotQaKnowledgeApi.saveTopicMergedCsv(topicId, payload, language);
 }
 
 // ========== Document to Q&A Extraction API ==========

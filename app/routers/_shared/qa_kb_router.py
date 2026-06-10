@@ -27,7 +27,10 @@ from app.routers.knowledge_utils import (
     check_upload_rate_limit,
     validate_upload_limits,
 )
-from app.routers._shared.qa_kb_sync import _sync_topic_questions_for_doc
+from app.routers._shared.qa_kb_sync import (
+    _sync_topic_questions_for_doc,
+    _sync_topic_questions_from_store,
+)
 from app.routers._shared.qa_kb_upload import (
     _create_pending_job,
     _extract_text_from_upload,
@@ -100,6 +103,17 @@ class ParseCsvTextRequest(BaseModel):
     text: str
 
 
+class SaveTopicCsvFile(BaseModel):
+    filename: str
+    content: str
+
+
+class SaveTopicCsvMergedRequest(BaseModel):
+    files: list[SaveTopicCsvFile]
+    delete_files: list[str] = []
+    hidden_questions: list[str] | None = None
+
+
 def _required(value: Any, name: str) -> Any:
     if value is None:
         raise RuntimeError(f"QaKbRouterConfig.{name} is required for this route")
@@ -165,7 +179,7 @@ def _add_knowledge_routes(router: APIRouter, config: QaKbRouterConfig) -> None:
         return Response(content=file_bytes, media_type=content_type, headers=headers)
 
     @router.put("/files/{filename}/content")
-    async def update_file_content(
+    def update_file_content(
         filename: str,
         req: UpdateContentRequest,
         background_tasks: BackgroundTasks,
@@ -363,6 +377,74 @@ def _add_knowledge_routes(router: APIRouter, config: QaKbRouterConfig) -> None:
 
         rows = merge_csv_files(csv_contents, source_filenames=source_files)
         return {"rows": rows, "source_files": source_files}
+
+    @router.put("/topic-csv-merged")
+    def save_topic_csv_merged(
+        request: SaveTopicCsvMergedRequest,
+        background_tasks: BackgroundTasks,
+        topic_id: str,
+        language: str = "zh",
+    ):
+        """Save all CSV files of a topic in one request.
+
+        Replaces the per-file content PUTs the merged editor used to issue:
+        the expensive topic-question sync runs once instead of once per file,
+        and validation happens up front so a malformed CSV aborts before any
+        write. Deliberately a sync handler — the blocking DB round trips run
+        in the threadpool instead of stalling the event loop.
+        """
+        store = config.knowledge_store_factory()
+
+        prepared: list[tuple[str, dict, bytes]] = []
+        for item in request.files:
+            safe_name, doc = _get_doc_or_404(config, language, item.filename)
+            if doc.get("topic_id") != topic_id:
+                raise HTTPException(status_code=400, detail=f"{safe_name} 不屬於此主題")
+            if Path(safe_name).suffix.lower() != ".csv":
+                raise HTTPException(status_code=400, detail=f"{safe_name} 不是 CSV 檔")
+            prepared.append((safe_name, doc, _prepare_csv_bytes(item.content.encode("utf-8"))))
+
+        for safe_name, doc, new_bytes in prepared:
+            _rewrite_csv_file_with_split_uploads(
+                config,
+                store=store,
+                language=language,
+                safe_name=safe_name,
+                doc=doc,
+                new_bytes=new_bytes,
+                background_tasks=background_tasks,
+            )
+
+        for filename in request.delete_files:
+            safe_name = safe_filename(filename)
+            if store.delete_file(language, safe_name):
+                _schedule_rag_delete(config, background_tasks, language, safe_name)
+
+        first_doc = prepared[0][1] if prepared else {}
+        topic_synced = _sync_topic_questions_from_store(
+            config,
+            language=language,
+            topic_id=topic_id,
+            topic_label=first_doc.get("topic_label"),
+            category_label=first_doc.get("category_label"),
+        )
+
+        # Replace (not union) hidden questions, mirroring the standalone
+        # topic-update call the frontend used to make after saving.
+        if request.hidden_questions is not None:
+            topic_store = config.topic_store_factory(language)
+            topic = topic_store.get_topic(topic_id)
+            if topic:
+                current_questions = set((topic.get("questions") or {}).get(language) or [])
+                topic_store.update_topic(topic_id, {
+                    f"hidden_questions.{language}": [
+                        question for question in request.hidden_questions
+                        if question in current_questions
+                    ],
+                })
+
+        config.invalidate_cache(language)
+        return {"message": "已更新", "topic_synced": topic_synced}
 
 
 def _add_extract_routes(router: APIRouter, config: QaKbRouterConfig) -> None:

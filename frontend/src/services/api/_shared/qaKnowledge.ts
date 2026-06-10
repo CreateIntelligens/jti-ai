@@ -68,6 +68,12 @@ export interface QaImportResponse {
   topic_id?: string | null;
 }
 
+export interface SaveTopicCsvMergedPayload {
+  files: Array<{ filename: string; content: string }>;
+  delete_files?: string[];
+  hidden_questions?: string[];
+}
+
 export interface QaKnowledgeApi {
   listKnowledgeFiles(language?: string): Promise<{ files: QaKnowledgeFile[] }>;
   getKnowledgeFileContent(filename: string, language?: string): Promise<QaKnowledgeFileContent>;
@@ -85,6 +91,11 @@ export interface QaKnowledgeApi {
   ): Promise<QaKnowledgeFile & { topic_synced: boolean }>;
   uploadKnowledgeFileWithTopic(opts: QaKnowledgeUploadWithTopicOptions): Promise<KnowledgeUploadResponse>;
   getTopicMergedCsv(topicId: string, language?: string): Promise<QaMergedCsvResponse>;
+  saveTopicMergedCsv(
+    topicId: string,
+    payload: SaveTopicCsvMergedPayload,
+    language?: string,
+  ): Promise<{ message: string; topic_synced: boolean }>;
   createQaExtractJob(
     language: string,
     source: { file: File } | { text: string },
@@ -199,6 +210,14 @@ export function createQaKnowledgeApi(basePath: string): QaKnowledgeApi {
         topic_id: topicId,
         language: normLang(language),
       });
+    },
+
+    saveTopicMergedCsv(topicId: string, payload: SaveTopicCsvMergedPayload, language: string = 'zh') {
+      return fetchJson<{ message: string; topic_synced: boolean }>(
+        '/topic-csv-merged',
+        jsonRequest('PUT', payload),
+        { topic_id: topicId, language: normLang(language) },
+      );
     },
 
     createQaExtractJob(language, source, categoryId, topicId, categoryLabel, topicLabel) {

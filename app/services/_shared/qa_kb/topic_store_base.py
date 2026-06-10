@@ -10,6 +10,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Literal
 
+from pymongo import UpdateOne
+
 from app.services.mongo_client import get_mongo_db
 
 Topic = dict[str, Any]
@@ -117,15 +119,20 @@ class QaKbTopicStoreBase:
 
     def reorder_topics(self, topic_ids: list[str]) -> int:
         """Rewrite order for the given topics; untouched topics keep their order."""
+        if not topic_ids:
+            return 0
         now = datetime.now(timezone.utc)
-        updated = 0
-        for index, topic_id in enumerate(topic_ids):
-            result = self.collection.update_one(
-                self._topic_query(topic_id),
-                {"$set": {"order": index, "updated_at": now}},
-            )
-            updated += result.matched_count
-        return updated
+        result = self.collection.bulk_write(
+            [
+                UpdateOne(
+                    self._topic_query(topic_id),
+                    {"$set": {"order": index, "updated_at": now}},
+                )
+                for index, topic_id in enumerate(topic_ids)
+            ],
+            ordered=False,
+        )
+        return result.matched_count
 
     def get_category_meta(self) -> dict[str, dict[str, Any]]:
         """Return category metadata keyed by category id for the active language."""

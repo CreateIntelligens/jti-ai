@@ -9,6 +9,7 @@ import type {
   HciotTopicCategory,
   QaExtractJobResponse,
   QaImportResponse,
+  SaveTopicCsvMergedPayload,
 } from '../../../services/api/hciot';
 import ExplorerSidebar from './explorer/ExplorerSidebar';
 import VisibilityOrderModal from './explorer/VisibilityOrderModal';
@@ -86,6 +87,11 @@ export interface QaWorkspaceApiClient {
   updateKnowledgeFileContent(filename: string, content: string, language: HciotLanguage): Promise<{ message: string; synced: boolean; topic_synced: boolean }>;
   downloadKnowledgeFile(filename: string, language: HciotLanguage): void;
   getTopicMergedCsv(topicId: string, language: HciotLanguage): Promise<MergedCsvResponse>;
+  saveTopicMergedCsv(
+    topicId: string,
+    payload: SaveTopicCsvMergedPayload,
+    language: HciotLanguage,
+  ): Promise<{ message: string; topic_synced: boolean }>;
   createQaExtractJob(
     language: HciotLanguage,
     source: { file: File } | { text: string },
