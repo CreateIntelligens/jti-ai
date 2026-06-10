@@ -88,6 +88,28 @@ export async function getJtiRuntimeSettings(promptId?: string, language: string 
   return apiCall('GET', '/prompts/runtime-settings', language, undefined, promptId ? { prompt_id: promptId } : {});
 }
 
+export async function getJtiConversationDetail(sessionId: string): Promise<Record<string, unknown>> {
+  const response = await fetchAsAdmin(buildUrl(`${JTI_ADMIN_BASE}/conversations`, { session_id: sessionId }));
+  return handleResponse<Record<string, unknown>>(response);
+}
+
+export async function getJtiConversations(params: {
+  page?: number;
+  pageSize?: number;
+  dateFrom?: string;
+  dateTo?: string;
+} = {}): Promise<Record<string, unknown>> {
+  const response = await fetchAsAdmin(
+    buildUrl(`${JTI_ADMIN_BASE}/conversations`, {
+      page: params.page,
+      page_size: params.pageSize,
+      date_from: params.dateFrom,
+      date_to: params.dateTo,
+    }),
+  );
+  return handleResponse<Record<string, unknown>>(response);
+}
+
 export async function updateJtiRuntimeSettings(
   settings: JtiRuntimeSettings,
   promptId?: string,

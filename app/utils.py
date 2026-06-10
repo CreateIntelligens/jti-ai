@@ -3,7 +3,46 @@
 """
 
 from datetime import datetime
+from math import ceil
 from typing import Optional
+
+
+DEFAULT_HISTORY_PAGE_SIZE = 20
+MAX_HISTORY_PAGE_SIZE = 100
+
+
+def normalize_history_pagination(
+    page: int = 1,
+    page_size: int = DEFAULT_HISTORY_PAGE_SIZE,
+) -> tuple[int, int]:
+    """Clamp conversation-history pagination inputs to safe bounds."""
+    page = max(1, int(page or 1))
+    page_size = max(1, min(int(page_size or DEFAULT_HISTORY_PAGE_SIZE), MAX_HISTORY_PAGE_SIZE))
+    return page, page_size
+
+
+def build_history_summary_response(
+    *,
+    mode: str,
+    sessions: list[dict],
+    total_sessions: int,
+    page: int,
+    page_size: int,
+    extra: Optional[dict] = None,
+) -> dict:
+    """Build the shared summary-only conversation history list payload."""
+    payload = {
+        "mode": mode,
+        "sessions": sessions,
+        "total_conversations": sum(session.get("message_count", 0) for session in sessions),
+        "total_sessions": total_sessions,
+        "page": page,
+        "page_size": page_size,
+        "total_pages": ceil(total_sessions / page_size) if total_sessions else 0,
+    }
+    if extra:
+        payload.update(extra)
+    return payload
 
 
 def export_sessions_by_ids(

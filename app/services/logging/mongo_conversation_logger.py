@@ -32,6 +32,12 @@ class MongoConversationLogger:
         logger.info("MongoConversationLogger initialized")
 
     @staticmethod
+    def _serialize_datetime(value: Any) -> Any:
+        if isinstance(value, datetime):
+            return value.isoformat()
+        return value
+
+    @staticmethod
     def _serialize_doc(doc: Dict) -> Dict:
         """將 MongoDB document 轉換為可序列化格式（_id → str, datetime → ISO）。"""
         doc["_id"] = str(doc["_id"])
@@ -247,6 +253,51 @@ class MongoConversationLogger:
 
         except Exception as e:
             logger.error(f"Failed to get logs for sessions: {e}")
+            return []
+
+    def get_session_summaries(
+        self,
+        session_ids: List[str],
+        query: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict]:
+        """取得指定 session_ids 的列表摘要，不載入完整對話內容。"""
+        if not session_ids:
+            return []
+
+        try:
+            match_query = dict(query or {})
+            match_query["session_id"] = {"$in": session_ids}
+            pipeline = [
+                {"$match": match_query},
+                {"$sort": {"session_id": 1, "turn_number": 1, "timestamp": 1}},
+                {
+                    "$group": {
+                        "_id": "$session_id",
+                        "first_message_time": {"$first": "$timestamp"},
+                        "last_message_time": {"$max": "$timestamp"},
+                        "message_count": {"$sum": 1},
+                        "preview": {"$first": "$user_message"},
+                        "language": {"$first": "$session_snapshot.language"},
+                    }
+                },
+            ]
+            docs = list(self.conversations_collection.aggregate(pipeline))
+            summaries_by_id = {}
+            for doc in docs:
+                preview = doc.get("preview")
+                summaries_by_id[doc["_id"]] = {
+                    "session_id": doc["_id"],
+                    "first_message_time": self._serialize_datetime(doc.get("first_message_time")),
+                    "last_message_time": self._serialize_datetime(doc.get("last_message_time")),
+                    "message_count": doc.get("message_count", 0),
+                    "preview": preview[:100] if isinstance(preview, str) and preview else None,
+                    "language": doc.get("language") or None,
+                }
+
+            return [summaries_by_id[sid] for sid in session_ids if sid in summaries_by_id]
+
+        except Exception as e:
+            logger.error(f"Failed to get session summaries: {e}")
             return []
 
     def get_statistics(self) -> Dict[str, Any]:

@@ -294,3 +294,42 @@ class ConversationLogger:
         except Exception as e:
             logger.error(f"Failed to get logs for sessions: {e}")
         return sorted(logs, key=lambda x: (x.get("session_id", ""), x.get("turn_number", 0)))
+
+    def get_session_summaries(
+        self,
+        session_ids: List[str],
+        query: Optional[Dict[str, Any]] = None,
+    ) -> List[Dict]:
+        """取得指定 session_ids 的列表摘要。"""
+        if not session_ids:
+            return []
+
+        logs = [
+            doc
+            for doc in self.get_logs_for_sessions(session_ids)
+            if self._matches_query(doc, query or {})
+        ]
+        summaries: dict[str, dict] = {}
+        for doc in sorted(logs, key=lambda item: (item.get("session_id", ""), item.get("turn_number", 0), item.get("timestamp", ""))):
+            sid = doc.get("session_id")
+            if not sid:
+                continue
+            ts = doc.get("timestamp")
+            language = doc.get("session_snapshot", {}).get("language")
+            if sid not in summaries:
+                preview = doc.get("user_message")
+                summaries[sid] = {
+                    "session_id": sid,
+                    "first_message_time": ts,
+                    "last_message_time": ts,
+                    "message_count": 0,
+                    "preview": preview[:100] if isinstance(preview, str) and preview else None,
+                    "language": language or None,
+                }
+            if ts and (not summaries[sid]["last_message_time"] or ts > summaries[sid]["last_message_time"]):
+                summaries[sid]["last_message_time"] = ts
+            if language and not summaries[sid].get("language"):
+                summaries[sid]["language"] = language
+            summaries[sid]["message_count"] += 1
+
+        return [summaries[sid] for sid in session_ids if sid in summaries]

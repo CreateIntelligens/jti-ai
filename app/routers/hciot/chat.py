@@ -28,12 +28,14 @@ from app.services.hciot.runtime_settings import get_available_tts_characters
 from app.services.hciot.tts import to_hciot_tts_text
 from app.utils import (
     build_date_query,
+    build_history_summary_response,
     count_session_conversations,
     export_sessions_by_ids,
     filter_conversations_by_session_language,
     filter_export_sessions_by_language,
     filter_session_ids_by_language,
     group_conversations_by_session,
+    normalize_history_pagination,
     simplified_conversation_sessions,
 )
 
@@ -182,6 +184,8 @@ async def get_conversations(
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
     session_id: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
 ):
     mode = "hciot"
     try:
@@ -196,17 +200,28 @@ async def get_conversations(
             )
             return {"mode": mode, "conversations": conversations}
 
+        page, page_size = normalize_history_pagination(page, page_size)
         query = build_date_query(mode, date_from, date_to)
-        session_ids, total_sessions = conversation_logger.get_paginated_session_ids(query=query, page=1, page_size=100000)
-        all_conversations = conversation_logger.get_logs_for_sessions(session_ids)
-        session_list = group_conversations_by_session(all_conversations)
+        session_ids, total_sessions = conversation_logger.get_paginated_session_ids(
+            query=query,
+            page=page,
+            page_size=page_size,
+        )
+        session_list = conversation_logger.get_session_summaries(session_ids, query=query)
         logger.info(
-            "Retrieved %d HCIoT conversations across %d sessions (total %d)",
-            len(all_conversations),
+            "Retrieved %d HCIoT session summaries on page %d/%d (total %d)",
             len(session_list),
+            page,
+            page_size,
             total_sessions,
         )
-        return {"mode": mode, "sessions": session_list, "total_conversations": len(all_conversations), "total_sessions": total_sessions}
+        return build_history_summary_response(
+            mode=mode,
+            sessions=session_list,
+            total_sessions=total_sessions,
+            page=page,
+            page_size=page_size,
+        )
     except Exception as e:
         logger.error("Failed to get HCIoT conversations: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

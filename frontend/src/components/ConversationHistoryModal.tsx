@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import '../styles/conversation-history.css';
 import {
@@ -10,22 +10,34 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  ChevronsRight,
   Trash2,
   Play,
   CornerDownRight,
   Calendar,
   X,
 } from 'lucide-react';
-import { deleteConversations, fetchAsAdmin, fetchWithApiKey, getGeneralConversationDetail, getHciotConversationDetail } from '../services/api';
+import {
+  buildUrl,
+  deleteConversations,
+  fetchAsAdmin,
+  fetchWithApiKey,
+  getGeneralConversationDetail,
+  getHciotConversationDetail,
+  getJtiConversationDetail,
+} from '../services/api';
 import MiniCalendar from './MiniCalendar';
 import HciotImageAttachment from './hciot/HciotImageAttachment';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { useOverlayPressClose } from '../hooks/useOverlayPressClose';
+import { resolveHistoryPageJump } from '../utils/conversationHistoryPagination';
+
+type ConversationMode = 'jti' | 'hciot' | 'general';
 
 interface ConversationEntry {
   _id: string;
   session_id: string;
-  mode: 'jti' | 'hciot' | 'general';
+  mode: ConversationMode;
   turn_number?: number;
   timestamp: string;
   user_message: string;
@@ -89,8 +101,16 @@ interface ConversationHistoryModalProps {
   onClose: () => void;
   sessionId?: string;
   storeName?: string;
-  mode?: 'jti' | 'hciot' | 'general';
+  mode?: ConversationMode;
   onResumeSession?: (sessionId: string, messages: Array<{ role: 'user' | 'assistant'; text: string; turnNumber?: number; citations?: Array<{ title: string; uri: string; text?: string }>; imageId?: string }>, language?: string) => void;
+}
+
+interface HistoryPageInfo {
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  totalSessions: number;
+  totalConversations: number;
 }
 
 function getSessionLanguageBadge(language?: string) {
@@ -134,6 +154,98 @@ function simplifyExportSessions(data: { sessions?: RawExportSession[] }): Simpli
   return simplified;
 }
 
+function readConversationEntries(data: Record<string, unknown>): ConversationEntry[] {
+  return Array.isArray(data.conversations) ? (data.conversations as ConversationEntry[]) : [];
+}
+
+function buildHistoryListUrl(
+  mode: ConversationMode,
+  storeName: string | undefined,
+  params: Record<string, string | number | undefined>,
+): string {
+  if (mode === 'jti') {
+    return buildUrl('/api/jti-admin/conversations', params);
+  }
+  if (mode === 'hciot') {
+    return buildUrl('/api/hciot-admin/conversations', params);
+  }
+  return buildUrl('/api/chat/history', {
+    ...params,
+    store_name: storeName || undefined,
+  });
+}
+
+function getHistoryFetcher(mode: ConversationMode): typeof fetchAsAdmin {
+  return mode === 'general' ? fetchWithApiKey : fetchAsAdmin;
+}
+
+function buildExportUrl(
+  mode: ConversationMode,
+  storeName: string | undefined,
+  sessionIds?: string[],
+): string {
+  const selectedSessionIds = sessionIds?.length ? sessionIds.join(',') : undefined;
+  if (mode === 'jti') {
+    return buildUrl('/api/jti-admin/conversations/export', { session_ids: selectedSessionIds });
+  }
+  if (mode === 'hciot') {
+    return buildUrl('/api/hciot-admin/conversations/export', { session_ids: selectedSessionIds });
+  }
+  return buildUrl('/api/chat/history/export', {
+    store_name: storeName || undefined,
+    session_ids: selectedSessionIds,
+  });
+}
+
+async function fetchConversationEntries(mode: ConversationMode, sid: string): Promise<ConversationEntry[]> {
+  let data: Record<string, unknown>;
+  if (mode === 'jti') {
+    data = await getJtiConversationDetail(sid);
+  } else if (mode === 'hciot') {
+    data = await getHciotConversationDetail(sid);
+  } else {
+    data = await getGeneralConversationDetail(sid);
+  }
+  return readConversationEntries(data);
+}
+
+function getHeaderSubtitle(
+  mode: ConversationMode,
+  storeName: string | undefined,
+  knowledgeBaseLabel: string,
+): string {
+  if (mode === 'jti') {
+    return 'JTI Quiz Sessions';
+  }
+  if (mode === 'hciot') {
+    return 'HCIoT Education Sessions';
+  }
+  return `${knowledgeBaseLabel}：${storeName || 'All'}`;
+}
+
+function getExportButtonLabel(exporting: boolean, selectedCount: number, exportLabel: string): string {
+  if (exporting) {
+    return '匯出中...';
+  }
+  if (selectedCount > 0) {
+    return `匯出已選 (${selectedCount})`;
+  }
+  return exportLabel;
+}
+
+function buildResumeMessages(conversations: ConversationEntry[]) {
+  return conversations.flatMap((conv) => [
+    { role: 'user' as const, text: conv.user_message, turnNumber: conv.turn_number },
+    {
+      role: 'assistant' as const,
+      text: conv.agent_response,
+      turnNumber: conv.turn_number,
+      citations: conv.citations,
+      imageId: conv.image_id,
+    },
+  ]);
+}
+
 function exportFilename(mode: string, sessionIds?: string[]): string {
   const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   if (!sessionIds || sessionIds.length === 0) {
@@ -154,7 +266,6 @@ export default function ConversationHistoryModal({
   onResumeSession,
 }: ConversationHistoryModalProps) {
   const { t } = useTranslation();
-  const isAdminMode = mode === 'jti' || mode === 'hciot';
   const overlayPressClose = useOverlayPressClose(onClose);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [loading, setLoading] = useState(false);
@@ -243,7 +354,15 @@ export default function ConversationHistoryModal({
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize] = useState(10);
+  const [pageSize] = useState(20);
+  const [pageInfo, setPageInfo] = useState<HistoryPageInfo>({
+    page: 1,
+    pageSize,
+    totalPages: 0,
+    totalSessions: 0,
+    totalConversations: 0,
+  });
+  const [pageJumpValue, setPageJumpValue] = useState('1');
 
 
   // Reset page when context or date filter changes
@@ -256,6 +375,10 @@ export default function ConversationHistoryModal({
   }, [isOpen, sessionId, storeName, mode, activeDateFrom, activeDateTo]);
 
   useEffect(() => {
+    setPageJumpValue(String(pageInfo.page || currentPage));
+  }, [pageInfo.page, currentPage]);
+
+  useEffect(() => {
     if (!isOpen) return;
 
     const fetchConversations = async () => {
@@ -263,24 +386,14 @@ export default function ConversationHistoryModal({
         setLoading(true);
         setDetailCache({});
 
-        let url = '';
-        if (mode === 'jti') {
-          url = `/api/jti-admin/conversations`;
-        } else if (mode === 'hciot') {
-          url = `/api/hciot-admin/conversations`;
-        } else {
-          url = `/api/chat/history${storeName ? `?store_name=${encodeURIComponent(storeName)}` : ''}`;
-        }
-
-        // Add date filter params
-        if (dateFrom && /^\d{4}-\d{2}-\d{2}$/.test(dateFrom)) {
-          url += `${url.includes('?') ? '&' : '?'}date_from=${dateFrom}`;
-        }
-        if (dateTo && /^\d{4}-\d{2}-\d{2}$/.test(dateTo)) {
-          url += `${url.includes('?') ? '&' : '?'}date_to=${dateTo}`;
-        }
-
-        const response = await (isAdminMode ? fetchAsAdmin(url) : fetchWithApiKey(url));
+        const params = {
+          page: currentPage,
+          page_size: pageSize,
+          date_from: activeDateFrom || undefined,
+          date_to: activeDateTo || undefined,
+        };
+        const url = buildHistoryListUrl(mode, storeName, params);
+        const response = await getHistoryFetcher(mode)(url);
         if (!response.ok) {
           console.error('[ConversationHistory] API Error:', response.status, response.statusText);
           throw new Error('Failed to fetch conversations');
@@ -290,6 +403,13 @@ export default function ConversationHistoryModal({
 
         const sessionsList = data.sessions || [];
         setSessions(sessionsList);
+        setPageInfo({
+          page: data.page || currentPage,
+          pageSize: data.page_size || pageSize,
+          totalPages: data.total_pages || 0,
+          totalSessions: data.total_sessions || 0,
+          totalConversations: data.total_conversations || 0,
+        });
 
         setFilteredSessions(sessionsList);
 
@@ -304,7 +424,7 @@ export default function ConversationHistoryModal({
     };
 
     fetchConversations();
-  }, [isOpen, sessionId, storeName, mode, activeDateFrom, activeDateTo]);
+  }, [isOpen, sessionId, storeName, mode, activeDateFrom, activeDateTo, currentPage, pageSize]);
 
   useEscapeKey(() => {
     if (openCal) { setOpenCal(null); return; }
@@ -344,49 +464,27 @@ export default function ConversationHistoryModal({
       return;
     }
 
-    if (mode === 'general') {
-      const filtered = sessions.filter((session) => {
-        if (!sessionInDateRange(session)) return false;
-        if (!hasTextFilter) return true;
-        return (
-          (session.preview && session.preview.toLowerCase().includes(query)) ||
-          session.session_id.toLowerCase().includes(query)
-        );
-      });
-      setFilteredSessions(filtered);
-    } else {
-      // JTI 模式：搜完整對話內容 + 日期篩選
-      const filtered = (sessions as unknown as Session[])
-        .filter((session) => sessionInDateRange(session))
-        .map((session) => {
-          if (!hasTextFilter) return session;
+    const filtered = sessions.filter((session) => {
+      if (!sessionInDateRange(session)) return false;
+      if (!hasTextFilter) return true;
 
-          const matchedConversations = session.conversations.filter((conv) => {
-            return (
-              conv.user_message.toLowerCase().includes(query) ||
-              conv.agent_response.toLowerCase().includes(query) ||
-              conv.tool_calls?.some(
-                (tc) =>
-                  (tc.tool_name || tc.tool || '').toLowerCase().includes(query) ||
-                  JSON.stringify(tc.result || {}).toLowerCase().includes(query)
-              )
-            );
-          });
-
-          if (matchedConversations.length > 0) {
-            return {
-              ...session,
-              conversations: matchedConversations,
-              total: matchedConversations.length,
-            };
-          }
-          return null;
-        })
-        .filter((s): s is Session => s !== null);
-
-      setFilteredSessions(filtered as unknown as SessionSummary[]);
-    }
-  }, [searchQuery, dateFrom, dateTo, sessions, mode]);
+      const cachedConversations = detailCache[session.session_id] || (session as unknown as Session).conversations || [];
+      return (
+        (session.preview && session.preview.toLowerCase().includes(query)) ||
+        session.session_id.toLowerCase().includes(query) ||
+        cachedConversations.some((conv) => (
+          conv.user_message.toLowerCase().includes(query) ||
+          conv.agent_response.toLowerCase().includes(query) ||
+          conv.tool_calls?.some(
+            (tc) =>
+              (tc.tool_name || tc.tool || '').toLowerCase().includes(query) ||
+              JSON.stringify(tc.result || {}).toLowerCase().includes(query)
+          )
+        ))
+      );
+    });
+    setFilteredSessions(filtered);
+  }, [searchQuery, dateFrom, dateTo, sessions, detailCache]);
 
   const handleExpandSession = async (sid: string) => {
     if (expandedSessionId === sid) {
@@ -395,19 +493,29 @@ export default function ConversationHistoryModal({
     }
     setExpandedSessionId(sid);
 
-    // General / HCIoT 模式：按需載入完整對話
-    if ((mode === 'general' || mode === 'hciot') && !detailCache[sid]) {
+    if (!detailCache[sid]) {
       setDetailLoading(sid);
       try {
-        const data = mode === 'hciot'
-          ? await getHciotConversationDetail(sid)
-          : await getGeneralConversationDetail(sid);
-        setDetailCache((prev) => ({ ...prev, [sid]: (data.conversations || []) as ConversationEntry[] }));
+        const conversations = await fetchConversationEntries(mode, sid);
+        setDetailCache((prev) => ({ ...prev, [sid]: conversations }));
       } catch (error) {
         console.error('[ConversationHistory] Failed to load detail:', error);
       } finally {
         setDetailLoading(null);
       }
+    }
+  };
+
+  const handlePageJump = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const targetPage = resolveHistoryPageJump(
+      pageJumpValue,
+      pageInfo.totalPages,
+      currentPage,
+    );
+    setPageJumpValue(String(targetPage));
+    if (targetPage !== currentPage) {
+      setCurrentPage(targetPage);
     }
   };
 
@@ -432,28 +540,7 @@ export default function ConversationHistoryModal({
   const exportAsJSON = async (sessionIds?: string[]) => {
     try {
       setExporting(true);
-      let url = '';
-      if (mode === 'jti') {
-        url = `/api/jti-admin/conversations/export`;
-        if (sessionIds && sessionIds.length > 0) {
-          url += `?session_ids=${sessionIds.join(',')}`;
-        }
-      } else if (mode === 'hciot') {
-        url = `/api/hciot-admin/conversations/export`;
-        if (sessionIds && sessionIds.length > 0) {
-          url += `?session_ids=${sessionIds.join(',')}`;
-        }
-      } else {
-        url = `/api/chat/history/export`;
-        if (storeName) {
-          url += `?store_name=${encodeURIComponent(storeName)}`;
-        }
-        if (sessionIds && sessionIds.length > 0) {
-          url += `${storeName ? '&' : '?'}session_ids=${sessionIds.join(',')}`;
-        }
-      }
-
-      const response = await (isAdminMode ? fetchAsAdmin(url) : fetchWithApiKey(url));
+      const response = await getHistoryFetcher(mode)(buildExportUrl(mode, storeName, sessionIds));
       if (!response.ok) {
         throw new Error(`Export API error: ${response.statusText}`);
       }
@@ -516,10 +603,7 @@ export default function ConversationHistoryModal({
     let convs = detailCache[sid];
     if (!convs) {
       try {
-        const data = mode === 'hciot'
-          ? await getHciotConversationDetail(sid)
-          : await getGeneralConversationDetail(sid);
-        convs = data.conversations || [];
+        convs = await fetchConversationEntries(mode, sid);
         setDetailCache((prev) => ({ ...prev, [sid]: convs }));
       } catch (error) {
         console.error('[ConversationHistory] Failed to load for resume from turn:', error);
@@ -529,10 +613,7 @@ export default function ConversationHistoryModal({
 
     // 只取到指定 turn 為止
     const truncated = convs.filter((conv) => (conv.turn_number || 0) <= turnNumber);
-    const messages = truncated.flatMap((conv) => [
-      { role: 'user' as const, text: conv.user_message, turnNumber: conv.turn_number },
-      { role: 'assistant' as const, text: conv.agent_response, turnNumber: conv.turn_number, citations: conv.citations, imageId: conv.image_id },
-    ]);
+    const messages = buildResumeMessages(truncated);
 
     onResumeSession(sid, messages);
     onClose();
@@ -567,11 +648,7 @@ export default function ConversationHistoryModal({
             <div>
               <h2>{t('conversation_history')}</h2>
               <p className="conversation-header-subtitle">
-                {mode === 'jti'
-                  ? 'JTI Quiz Sessions'
-                  : mode === 'hciot'
-                    ? 'HCIoT Education Sessions'
-                    : `${t('knowledge_base') || '知識庫'}：${storeName || 'All'}`}
+                {getHeaderSubtitle(mode, storeName, t('knowledge_base') || '知識庫')}
               </p>
             </div>
           </div>
@@ -679,13 +756,11 @@ export default function ConversationHistoryModal({
             disabled={filteredSessions.length === 0 || exporting}
           >
             <Download size={16} className={exporting ? 'animate-spin' : ''} />
-            {exporting ? '匯出中...' : (selectedSessions.size > 0 ? `匯出已選 (${selectedSessions.size})` : t('export'))}
+            {getExportButtonLabel(exporting, selectedSessions.size, t('export'))}
           </button>
           <button
             onClick={() => {
-              const pageIds = filteredSessions
-                .slice((currentPage - 1) * pageSize, currentPage * pageSize)
-                .map(s => s.session_id);
+              const pageIds = filteredSessions.map(s => s.session_id);
               const allSelected = pageIds.every(id => selectedSessions.has(id));
               setSelectedSessions(prev => {
                 const next = new Set(prev);
@@ -694,7 +769,7 @@ export default function ConversationHistoryModal({
               });
             }}
             disabled={filteredSessions.length === 0}
-            className={`select-all-btn${filteredSessions.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+            className={`select-all-btn${filteredSessions
               .every(s => selectedSessions.has(s.session_id)) && filteredSessions.length > 0
               ? ' all-selected' : ''
               }`}
@@ -733,17 +808,13 @@ export default function ConversationHistoryModal({
               </div>
             </div>
           ) : (
-            filteredSessions.slice((currentPage - 1) * pageSize, currentPage * pageSize
-            ).map((session, sessionIndex) => {
+            filteredSessions.map((session, sessionIndex) => {
               const isSessionExpanded = expandedSessionId === session.session_id;
               const sessionTurnMap = expandedTurnMap[session.session_id] ?? null;
               const msgCount = (session as SessionSummary).message_count ?? (session as unknown as Session).total ?? 0;
               const sessionLanguageBadge = getSessionLanguageBadge(session.language);
 
-              // 取得展開時的 conversations：general 模式用 detailCache，JTI 用 session 自帶的
-              const conversations: ConversationEntry[] = mode === 'general'
-                ? (detailCache[session.session_id] || [])
-                : ((session as unknown as Session).conversations || []);
+              const conversations: ConversationEntry[] = detailCache[session.session_id] || ((session as unknown as Session).conversations || []);
 
               return (
                 <div
@@ -772,7 +843,7 @@ export default function ConversationHistoryModal({
                     >
                       <div className="flex-1">
                         <div className="session-card-meta">
-                          <span className="session-badge">Session {sessionIndex + 1}</span>
+                          <span className="session-badge">Session {(pageInfo.page - 1) * pageInfo.pageSize + sessionIndex + 1}</span>
                           <span className="session-count">{msgCount} {t('conversations_count')}</span>
                           {sessionLanguageBadge && (
                             <span className={sessionLanguageBadge.className}>
@@ -784,7 +855,7 @@ export default function ConversationHistoryModal({
                             {formatTime(session.first_message_time)}
                           </span>
                         </div>
-                        {mode === 'general' && (session as SessionSummary).preview && (
+                        {(session as SessionSummary).preview && (
                           <p className="session-preview">{(session as SessionSummary).preview}</p>
                         )}
                         <p className="session-id">ID: {session.session_id.substring(0, 24)}...</p>
@@ -802,24 +873,17 @@ export default function ConversationHistoryModal({
                         <button className="icon-action-btn"
                           onClick={async (e) => {
                             e.stopPropagation();
-                            // General 模式：確保已載入完整對話
                             let convs = conversations;
-                            if ((mode === 'general' || mode === 'hciot') && !detailCache[session.session_id]) {
+                            if (!detailCache[session.session_id]) {
                               try {
-                                const data = mode === 'hciot'
-                                  ? await getHciotConversationDetail(session.session_id)
-                                  : await getGeneralConversationDetail(session.session_id);
-                                convs = data.conversations || [];
+                                convs = await fetchConversationEntries(mode, session.session_id);
                                 setDetailCache((prev) => ({ ...prev, [session.session_id]: convs }));
                               } catch (error) {
                                 console.error('[ConversationHistory] Failed to load for resume:', error);
                                 return;
                               }
                             }
-                            const messages = convs.flatMap((conv) => [
-                              { role: 'user' as const, text: conv.user_message, turnNumber: conv.turn_number },
-                              { role: 'assistant' as const, text: conv.agent_response, turnNumber: conv.turn_number, citations: conv.citations, imageId: conv.image_id },
-                            ]);
+                            const messages = buildResumeMessages(convs);
                             const sessionLanguage = (session as SessionSummary).language || convs[0]?.session_snapshot?.language;
                             onResumeSession(session.session_id, messages, sessionLanguage);
                             onClose();
@@ -964,9 +1028,7 @@ export default function ConversationHistoryModal({
 
         {/* Footer */}
         <div className="conversation-footer">
-          {(() => {
-            const totalPages = Math.ceil(filteredSessions.length / pageSize);
-            return totalPages > 1 ? (
+          {pageInfo.totalPages > 1 ? (
               <div className="pagination-controls">
                 <button
                   disabled={currentPage === 1 || loading}
@@ -975,25 +1037,50 @@ export default function ConversationHistoryModal({
                   &lt; {t('prev') || 'Prev'}
                 </button>
                 <span>
-                  {t('page') || 'Page'} {currentPage} / {totalPages}
+                  {t('page') || 'Page'} {pageInfo.page} / {pageInfo.totalPages}
                 </span>
+                <form className="pagination-jump" onSubmit={handlePageJump}>
+                  <label htmlFor={`history-page-jump-${mode}`}>
+                    跳至
+                  </label>
+                  <input
+                    id={`history-page-jump-${mode}`}
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={Math.max(pageInfo.totalPages, 1)}
+                    value={pageJumpValue}
+                    onChange={(event) => setPageJumpValue(event.target.value.replace(/\D/g, ''))}
+                    aria-label="跳至頁次"
+                    disabled={loading}
+                  />
+                  <button
+                    type="submit"
+                    title="跳至頁次"
+                    aria-label="跳至頁次"
+                    disabled={loading || pageInfo.totalPages <= 0}
+                  >
+                    <ChevronsRight size={14} />
+                  </button>
+                </form>
                 <button
-                  disabled={currentPage >= totalPages || loading}
+                  disabled={currentPage >= pageInfo.totalPages || loading}
                   onClick={() => setCurrentPage((p) => p + 1)}
                 >
                   {t('next') || 'Next'} &gt;
                 </button>
               </div>
-            ) : null;
-          })()}
+            ) : null}
           <div className="conversation-footer-stats">
             <span>
-              Sessions: <span className="stat-value">{filteredSessions.length}</span>
+              Sessions: <span className="stat-value">{filteredSessions.length}</span> / {pageInfo.totalSessions}
             </span>
             <span className="stat-sep">|</span>
             <span>
               {t('total_conversations')}: <span className="stat-value">
-                {filteredSessions.reduce((sum, s) => sum + ((s as SessionSummary).message_count ?? (s as unknown as Session).total ?? 0), 0)}
+                {searchQuery
+                  ? filteredSessions.reduce((sum, s) => sum + ((s as SessionSummary).message_count ?? (s as unknown as Session).total ?? 0), 0)
+                  : pageInfo.totalConversations}
               </span> {t('conversations_count')}
             </span>
             {searchQuery && (

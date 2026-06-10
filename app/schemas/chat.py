@@ -89,6 +89,7 @@ class ConversationSessionSummary(BaseModel):
     last_message_time: Optional[str] = None
     message_count: int
     preview: Optional[str] = None
+    language: Optional[str] = None
 
 
 class ConversationsBySessionResponse(BaseModel):
@@ -100,9 +101,12 @@ class ConversationsBySessionResponse(BaseModel):
 
 class ConversationsGroupedResponse(BaseModel):
     mode: str
-    sessions: List[ConversationSessionGroup]
+    sessions: List[ConversationSessionSummary]
     total_conversations: int
     total_sessions: int
+    page: int
+    page_size: int
+    total_pages: int
 
 
 class DeleteConversationRequest(BaseModel):
@@ -137,6 +141,9 @@ class GeneralConversationsResponse(BaseModel):
     sessions: List[ConversationSessionSummary]
     total_conversations: int
     total_sessions: int
+    page: int
+    page_size: int
+    total_pages: int
 
 
 class ExportGeneralConversationsResponse(BaseModel):

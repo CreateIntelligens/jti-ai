@@ -167,6 +167,55 @@ class TestMongoConversationLogger(unittest.TestCase):
         self.assertEqual(len(logs), 5)
         self.mock_conversations.find.return_value.limit.assert_called_once_with(5)
 
+    def test_get_session_summaries_uses_aggregation_without_loading_full_logs(self):
+        """測試列表摘要只用 aggregation，不撈完整對話內容。"""
+        first_a = datetime(2026, 6, 1, 10, 0, 0)
+        last_a = datetime(2026, 6, 1, 10, 3, 0)
+        first_b = datetime(2026, 6, 1, 11, 0, 0)
+        last_b = datetime(2026, 6, 1, 11, 4, 0)
+        self.mock_conversations.aggregate.return_value = [
+            {
+                "_id": "session-b",
+                "first_message_time": first_b,
+                "last_message_time": last_b,
+                "message_count": 4,
+                "preview": "Second session",
+                "language": "en",
+            },
+            {
+                "_id": "session-a",
+                "first_message_time": first_a,
+                "last_message_time": last_a,
+                "message_count": 2,
+                "preview": "First session",
+                "language": "zh",
+            },
+        ]
+
+        summaries = self.logger.get_session_summaries(
+            ["session-a", "session-b"],
+            query={"mode": "jti"},
+        )
+
+        self.mock_conversations.find.assert_not_called()
+        pipeline = self.mock_conversations.aggregate.call_args.args[0]
+        self.assertEqual(
+            pipeline[0],
+            {"$match": {"mode": "jti", "session_id": {"$in": ["session-a", "session-b"]}}},
+        )
+        self.assertEqual([summary["session_id"] for summary in summaries], ["session-a", "session-b"])
+        self.assertEqual(summaries[0]["message_count"], 2)
+        self.assertEqual(summaries[0]["preview"], "First session")
+        self.assertEqual(summaries[0]["language"], "zh")
+        self.assertEqual(summaries[0]["first_message_time"], first_a.isoformat())
+        self.assertEqual(summaries[1]["last_message_time"], last_b.isoformat())
+
+    def test_get_session_summaries_skips_database_when_no_session_ids(self):
+        summaries = self.logger.get_session_summaries([])
+
+        self.assertEqual(summaries, [])
+        self.mock_conversations.aggregate.assert_not_called()
+
     def test_list_sessions(self):
         """測試列出所有有對話的 sessions"""
         mock_results = [

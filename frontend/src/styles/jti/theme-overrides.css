@@ -179,6 +179,14 @@
   background: var(--gold-tint-strong) !important;
 }
 
+.conversation-history-modal.jti-theme .pagination-jump input {
+  border-color: var(--border-strong) !important;
+}
+
+.conversation-history-modal.jti-theme .pagination-jump input:focus {
+  box-shadow: 0 0 0 0.1875rem var(--gold-tint) !important;
+}
+
 .conversation-history-modal.jti-theme .conversation-list::-webkit-scrollbar-thumb {
   background: linear-gradient(180deg, var(--gold), var(--gold-dark)) !important;
 }

@@ -341,9 +341,26 @@ export function setActiveApiKey(name: string): void {
 
 // ========== General Chat Conversations ==========
 
-export async function getGeneralConversations(storeName?: string): Promise<any> {
-  const params = storeName ? `?store_name=${encodeURIComponent(storeName)}` : '';
-  const response = await fetchWithUserGeminiKey(`${API_BASE}/chat/history${params}`);
+export interface ConversationHistoryPageParams {
+  page?: number;
+  pageSize?: number;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export async function getGeneralConversations(
+  storeName?: string,
+  params: ConversationHistoryPageParams = {},
+): Promise<any> {
+  const response = await fetchWithUserGeminiKey(
+    buildUrl(`${API_BASE}/chat/history`, {
+      store_name: storeName || undefined,
+      page: params.page,
+      page_size: params.pageSize,
+      date_from: params.dateFrom,
+      date_to: params.dateTo,
+    }),
+  );
   return handleResponse<any>(response);
 }
 

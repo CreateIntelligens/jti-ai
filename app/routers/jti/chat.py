@@ -34,11 +34,13 @@ from app.services.jti.tts import to_jti_tts_text
 from app.utils import (
     build_date_query,
     count_session_conversations,
+    build_history_summary_response,
     export_sessions_by_ids,
     filter_conversations_by_session_language,
     filter_export_sessions_by_language,
     filter_session_ids_by_language,
     group_conversations_by_session,
+    normalize_history_pagination,
     simplified_conversation_sessions,
 )
 from app.services.jti.quiz_helpers import (
@@ -253,6 +255,8 @@ async def get_conversations(
     session_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
 ):
     """取得對話歷史"""
     mode = "jti"
@@ -264,14 +268,26 @@ async def get_conversations(
             logger.info(f"Retrieved {len(conversations)} conversations for session {session_id}")
             return {"session_id": session_id, "mode": mode, "conversations": conversations, "total": len(conversations)}
         else:
+            page, page_size = normalize_history_pagination(page, page_size)
             query = build_date_query(mode, date_from, date_to)
             session_ids, total_sessions = conversation_logger.get_paginated_session_ids(
-                query=query, page=1, page_size=100000
+                query=query, page=page, page_size=page_size
             )
-            all_conversations = conversation_logger.get_logs_for_sessions(session_ids)
-            session_list = group_conversations_by_session(all_conversations)
-            logger.info(f"Retrieved {len(all_conversations)} conversations across {len(session_list)} sessions (total {total_sessions})")
-            return {"mode": mode, "sessions": session_list, "total_conversations": len(all_conversations), "total_sessions": total_sessions}
+            session_list = conversation_logger.get_session_summaries(session_ids, query=query)
+            logger.info(
+                "Retrieved %d JTI session summaries on page %d/%d (total %d)",
+                len(session_list),
+                page,
+                page_size,
+                total_sessions,
+            )
+            return build_history_summary_response(
+                mode=mode,
+                sessions=session_list,
+                total_sessions=total_sessions,
+                page=page,
+                page_size=page_size,
+            )
 
     except Exception as e:
         logger.error(f"Failed to get conversations: {e}")

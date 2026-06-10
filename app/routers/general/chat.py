@@ -29,9 +29,10 @@ from app.schemas.chat import (
 from app.models_config import DEFAULT_RAG_MODEL
 from app.utils import (
     build_date_query,
+    build_history_summary_response,
     export_sessions_by_ids,
-    group_conversations_as_summary,
     group_conversations_by_session,
+    normalize_history_pagination,
     simplified_conversation_sessions,
 )
 import app.deps as deps
@@ -387,6 +388,8 @@ def get_general_conversations(
     store_name: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
     auth: dict = Depends(verify_auth),
 ):
     """取得 general chat 的對話歷史（session 列表）"""
@@ -405,23 +408,23 @@ def get_general_conversations(
             ]},
         )
 
+        page, page_size = normalize_history_pagination(page, page_size)
         session_ids, total_sessions = conversation_logger.get_paginated_session_ids(
             query=query,
-            page=1,
-            page_size=100000
+            page=page,
+            page_size=page_size,
         )
 
-        all_conversations = conversation_logger.get_logs_for_sessions(session_ids)
+        session_list = conversation_logger.get_session_summaries(session_ids, query=query)
 
-        session_list = group_conversations_as_summary(all_conversations)
-
-        return {
-            "store_name": store_name,
-            "mode": "general",
-            "sessions": session_list,
-            "total_conversations": len(all_conversations),
-            "total_sessions": total_sessions
-        }
+        return build_history_summary_response(
+            mode="general",
+            sessions=session_list,
+            total_sessions=total_sessions,
+            page=page,
+            page_size=page_size,
+            extra={"store_name": store_name},
+        )
 
     except Exception as e:
         logger.error("Failed to get general conversations: %s", e)

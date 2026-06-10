@@ -52,7 +52,7 @@ const HCIOT_ADMIN_BASE = `${API_BASE}/hciot-admin`;
 const HCIOT_API_BASE = `${API_BASE}/hciot`;
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 const hciotQaKnowledgeApi = createQaKnowledgeApi(`${HCIOT_ADMIN_BASE}/knowledge`);
-type QueryValue = string | null | undefined;
+type QueryValue = string | number | boolean | null | undefined;
 
 function buildAdminUrl(path: string, params?: Record<string, string | number | boolean | null | undefined>): string {
   return buildUrl(`${HCIOT_ADMIN_BASE}${path}`, params);
@@ -210,6 +210,20 @@ export async function deleteHciotKnowledgeFile(fileName: string, language: strin
 export async function getHciotConversationDetail(sessionId: string): Promise<Record<string, unknown>> {
   return fetchAdminJson<Record<string, unknown>>('/conversations', undefined, {
     session_id: sessionId,
+  });
+}
+
+export async function getHciotConversations(params: {
+  page?: number;
+  pageSize?: number;
+  dateFrom?: string;
+  dateTo?: string;
+} = {}): Promise<Record<string, unknown>> {
+  return fetchAdminJson<Record<string, unknown>>('/conversations', undefined, {
+    page: params.page,
+    page_size: params.pageSize,
+    date_from: params.dateFrom,
+    date_to: params.dateTo,
   });
 }
 
