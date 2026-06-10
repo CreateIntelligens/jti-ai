@@ -28,6 +28,7 @@ import DbSyncButton from '../components/DbSyncButton';
 import * as api from '../services/api';
 import type { TtsState } from '../types';
 import '../styles/shared/index.css';
+import '../styles/shared/animations.css';
 import '../styles/shared/settings.css';
 import '../styles/hciot/layout.css';
 import '../styles/hciot/components.css';
@@ -35,6 +36,10 @@ import '../styles/hciot/components-chat.css';
 import '../styles/hciot/components-topic.css';
 import '../styles/hciot/workspace.css';
 import '../styles/hciot/workspace-upload.css';
+import '../styles/hciot/workspace-upload-images.css';
+import '../styles/hciot/workspace-upload-enhancements.css';
+import '../styles/hciot/workspace-upload-preview.css';
+import '../styles/hciot/workspace-upload-edit.css';
 import '../styles/hciot/workspace-table.css';
 import '../styles/hciot/workspace-images.css';
 

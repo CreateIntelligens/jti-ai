@@ -16,6 +16,7 @@ import { useScrollToBottom } from '../hooks/useScrollToBottom';
 import { isAdminRole, isSuperAdmin } from '../utils/authRouting';
 import DbSyncButton from '../components/DbSyncButton';
 import '../styles/shared/index.css';
+import '../styles/shared/animations.css';
 import '../styles/jti/layout.css';
 import '../styles/jti/messages.css';
 import '../styles/shared/settings.css';

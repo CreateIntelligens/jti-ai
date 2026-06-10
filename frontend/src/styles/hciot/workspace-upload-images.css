@@ -1,0 +1,124 @@
+/* ==========================================================================
+   QA Row Image Controls (Upload Dialog)
+   ========================================================================== */
+.qa-workspace-qa-row-image {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  position: relative;
+}
+
+.qa-workspace-qa-image-actions {
+  display: flex;
+  gap: 0.375rem;
+}
+
+.qa-workspace-qa-image-actions.has-preview {
+  margin-top: 0.25rem;
+}
+
+.qa-workspace-qa-image-btn {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  height: 2.25rem;
+  padding: 0 0.75rem;
+  border: 0.0625rem solid var(--hciot-border);
+  border-radius: 0.375rem;
+  background: var(--hciot-panel-strong, rgba(148, 163, 184, 0.05));
+  color: var(--hciot-ink-soft);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0.0625rem 0.125rem rgba(0,0,0,0.05);
+}
+
+.qa-workspace-qa-image-btn:hover {
+  background: var(--hciot-hover);
+  border-color: var(--hciot-accent);
+  color: var(--hciot-accent);
+  transform: translateY(-0.0625rem);
+  box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.08);
+}
+
+.qa-workspace-qa-image-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem;
+  border: 0.0625rem solid var(--hciot-border);
+  border-radius: 0.375rem;
+  background: var(--hciot-panel);
+  max-width: 8.75rem;
+}
+
+.qa-workspace-qa-image-thumb {
+  width: 3.5rem;
+  height: 3.5rem;
+  object-fit: cover;
+  border-radius: 0.25rem;
+}
+
+.qa-workspace-qa-image-name {
+  font-size: 0.7rem;
+  color: var(--hciot-ink-soft);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 4.5rem;
+}
+
+.qa-workspace-qa-image-clear {
+  position: absolute;
+  top: -0.375rem;
+  right: -0.375rem;
+  width: 1.125rem;
+  height: 1.125rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--hciot-ink-soft);
+  color: white;
+  border-radius: 50%;
+  border: 0.125rem solid var(--hciot-panel);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.qa-workspace-qa-image-clear:hover {
+  background: #ef4444;
+}
+
+/* Image tab - file item layout */
+.qa-workspace-upload-file-item.image-item {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  padding: 0.5rem 0.625rem;
+}
+
+.qa-workspace-upload-image-thumb {
+  width: 3rem;
+  height: 3rem;
+  object-fit: cover;
+  border-radius: 0.375rem;
+  flex-shrink: 0;
+}
+
+.qa-workspace-upload-image-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: 0.25rem;
+  min-width: 0;
+}
+
+.qa-workspace-upload-image-id-input {
+  font-size: 0.75rem;
+  padding: 0.125rem 0.5rem;
+  height: 1.625rem;
+}

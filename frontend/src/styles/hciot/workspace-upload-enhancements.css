@@ -1,0 +1,169 @@
+/* ==========================================================================
+   Upload Dialog Enhancements
+   ========================================================================== */
+.qa-workspace-file-type-icon {
+  flex-shrink: 0;
+}
+
+.qa-workspace-file-status-icon {
+  flex-shrink: 0;
+}
+
+.hciot-status-uploading {
+  animation: spin 1s linear infinite;
+  will-change: transform;
+}
+
+.qa-workspace-file-warning {
+  flex-shrink: 0;
+}
+
+/* Icons & Layout Utilities */
+.hciot-icon-blue {
+  color: #3b82f6;
+}
+
+.hciot-icon-red {
+  color: #ef4444;
+}
+
+.hciot-icon-dark-blue {
+  color: #1d4ed8;
+}
+
+.hciot-icon-green {
+  color: #22c55e;
+}
+
+.hciot-icon-muted {
+  color: #6b7280;
+}
+
+.hciot-icon-warning {
+  color: #f59e0b;
+}
+
+.qa-workspace-qa-row-fields-inner {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.qa-workspace-qa-textarea-flexible {
+  flex: 1;
+}
+
+
+.qa-workspace-file-warning-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+}
+
+/* ==========================================================================
+   CSV Format Hint (File Upload Tab)
+   ========================================================================== */
+.qa-workspace-csv-hint {
+  margin: 0 1.25rem 0.5rem;
+}
+
+.qa-workspace-csv-hint-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.qa-workspace-csv-hint-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--hciot-text-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.qa-workspace-csv-hint-toggle:hover {
+  color: var(--hciot-accent, #6366f1);
+}
+
+.qa-workspace-csv-hint-download {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.2rem 0.5rem;
+  border: 0.0625rem solid var(--hciot-border);
+  border-radius: 0.25rem;
+  background: none;
+  color: var(--hciot-text-muted);
+  font-size: 0.72rem;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.qa-workspace-csv-hint-download:hover {
+  color: var(--hciot-accent, #6366f1);
+  border-color: var(--hciot-accent, #6366f1);
+}
+
+.qa-workspace-csv-hint-content {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  border: 0.0625rem solid var(--hciot-border);
+  border-radius: 0.5rem;
+  background: var(--hciot-hover);
+}
+
+.qa-workspace-csv-hint-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.qa-workspace-csv-hint-table th,
+.qa-workspace-csv-hint-table td {
+  padding: 0.35rem 0.5rem;
+  border: 0.0625rem solid var(--hciot-border);
+  text-align: left;
+}
+
+.qa-workspace-csv-hint-table th {
+  background: var(--hciot-panel-strong, rgba(148, 163, 184, 0.15));
+  color: var(--hciot-text);
+  font-weight: 600;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.qa-workspace-csv-hint-table td {
+  color: var(--hciot-text);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+  font-size: 0.72rem;
+}
+
+.qa-workspace-csv-hint-notes {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  font-size: 0.72rem;
+  color: var(--hciot-text-muted);
+  list-style: disc;
+}
+
+.qa-workspace-csv-hint-notes li {
+  margin-bottom: 0.2rem;
+}
+
+.qa-workspace-csv-hint-notes strong {
+  color: var(--hciot-text);
+  font-family: 'SF Mono', 'Fira Code', monospace;
+}
+/* Upload status icons */
+.qa-workspace-upload-icon-spin    { color: #3b82f6; animation: spin 1s linear infinite; will-change: transform; }
+.qa-workspace-upload-icon-success { color: #22c55e; }
+.qa-workspace-upload-icon-error   { color: #ef4444; }

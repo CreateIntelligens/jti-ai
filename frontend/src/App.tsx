@@ -21,6 +21,7 @@ import { PROJECT_COLORS, getStoreIcon } from './utils/storeDisplay';
 import { getProfileRedirectPath, isAdminRole, isGeneralUserScope } from './utils/authRouting';
 import type { FileItem } from './types';
 import './styles/shared/index.css';
+import './styles/shared/animations.css';
 import './styles/app/layout.css';
 import './styles/app/forms.css';
 import './styles/app/components.css';
@@ -32,6 +33,8 @@ import './styles/app/panel.css';
 import './styles/app/buttons.css';
 import './styles/app/utility.css';
 import './styles/conversation-history.css';
+import './styles/conversation-history-detail.css';
+import './styles/conversation-history-light.css';
 
 type PanelId = 'admin' | 'apikeys' | 'prompt' | 'extkeys' | 'users' | null;
 

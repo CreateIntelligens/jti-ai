@@ -92,6 +92,7 @@
   border-top-color: var(--primary, #3b82f6);
   border-radius: 50%;
   animation: auth-guard-spin 1s linear infinite;
+  will-change: transform;
 }
 @keyframes auth-guard-spin { to { transform: rotate(360deg); } }
 .auth-guard-text {
@@ -329,7 +330,7 @@
 .msg-bubble.error { background: var(--red-100); color: var(--red-700); }
 .msg-bubble.is-loading { padding: .625rem .9375rem; }
 .msg-loading { display: flex; align-items: center; gap: .3125rem; padding: .3125rem 0; }
-.msg-loading span { width: .4375rem; height: .4375rem; border-radius: 50%; background: var(--text-3); animation: dot 1.2s ease-in-out infinite; }
+.msg-loading span { width: .4375rem; height: .4375rem; border-radius: 50%; background: var(--text-3); animation: dot 1.2s ease-in-out infinite; will-change: transform, opacity; }
 .msg-loading span:nth-child(2) { animation-delay: .15s; }
 .msg-loading span:nth-child(3) { animation-delay: .3s; }
 @keyframes dot { 0%,80%,100% { transform: scale(.7); opacity: .4; } 40% { transform: scale(1); opacity: 1; } }
