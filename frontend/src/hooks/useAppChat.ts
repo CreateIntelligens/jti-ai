@@ -109,7 +109,9 @@ export function useAppChat(isAdmin: boolean = false) {
   useEffect(() => {
     localStorage.setItem('projectFilter', projectFilter);
   }, [projectFilter]);
-  const [currentTargetId, setCurrentTargetId] = useState<string | null>(null);
+  const [currentTargetId, setCurrentTargetId] = useState<string | null>(
+    () => localStorage.getItem('lastKnowledgeTargetId') || localStorage.getItem('lastStore'),
+  );
   const [files, setFiles] = useState<FileItem[]>([]);
   const [filesLoading, setFilesLoading] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -270,6 +272,13 @@ export function useAppChat(isAdmin: boolean = false) {
   useEffect(() => {
     const nextTargets = buildKnowledgeTargets(filteredStores);
     if (currentTargetId && nextTargets.some((target) => target.id === currentTargetId)) {
+      return;
+    }
+    // Don't steal the selection back to the default while the restore path is
+    // still resolving a persisted target that exists in the full store list
+    // (it may be hidden by the current projectFilter). The init effect will
+    // switch to it; falling back here would override the user's last choice.
+    if (currentTargetId && findKnowledgeTarget(currentTargetId, stores)) {
       return;
     }
     if (nextTargets.length > 0) {
