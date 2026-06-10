@@ -2,6 +2,7 @@ import csv
 import hashlib
 import io
 import logging
+import threading
 from typing import Dict, Optional
 
 from app.services.rag.chunker import SemanticChunker
@@ -48,6 +49,15 @@ class BackfillService:
         self._doc_chunker: Optional[SemanticChunker] = None
         self._embedding_service = None
         self._lancedb_store = None
+        # Per-file locks so concurrent index calls for the same file serialize:
+        # without this, two callers both embed and both write, producing
+        # duplicate chunks and wasted embedding work.
+        self._file_locks: Dict[str, threading.Lock] = {}
+        self._file_locks_guard = threading.Lock()
+
+    def _file_lock(self, key: str) -> threading.Lock:
+        with self._file_locks_guard:
+            return self._file_locks.setdefault(key, threading.Lock())
 
     @property
     def chunker(self) -> SemanticChunker:
@@ -352,12 +362,44 @@ class BackfillService:
         full_source_type = _knowledge_source_type(source_type)
         fingerprint = self._compute_fingerprint(data)
 
-        if not force:
-            existing_fp = self.lancedb_store.get_file_fingerprint(filename, full_source_type, language)
-            if existing_fp == fingerprint:
-                logger.debug(f"[RAG] Skipping {filename} (fingerprint unchanged)")
-                return
-        
+        # Serialize per (file, source_type, language) so concurrent callers
+        # don't both embed and write the same file (the cause of duplicate
+        # chunks). The fingerprint re-check happens inside the lock, so a
+        # caller that waited sees the freshly-written fingerprint and skips.
+        lock_key = f"{full_source_type}::{language}::{filename}"
+        with self._file_lock(lock_key):
+            if not force:
+                existing_fp = self.lancedb_store.get_file_fingerprint(filename, full_source_type, language)
+                if existing_fp == fingerprint:
+                    logger.debug(f"[RAG] Skipping {filename} (fingerprint unchanged)")
+                    return
+
+            self._index_single_file_locked(
+                source_type=source_type,
+                full_source_type=full_source_type,
+                language=language,
+                filename=filename,
+                data=data,
+                metadata=metadata,
+                topic_info=topic_info,
+                force_text_chunking=force_text_chunking,
+                fingerprint=fingerprint,
+            )
+
+    def _index_single_file_locked(
+        self,
+        *,
+        source_type: str,
+        full_source_type: str,
+        language: str,
+        filename: str,
+        data: bytes,
+        metadata: Optional[Dict],
+        topic_info: Optional[Dict[str, str]],
+        force_text_chunking: bool,
+        fingerprint: str,
+    ):
+        """Embed + atomically replace a file's chunks. Caller holds the file lock."""
         try:
             filename_lower = filename.lower()
             text = self._extract_file_text(filename, data)
@@ -405,9 +447,11 @@ class BackfillService:
                 "metadata": base_metadata
             } for i, (txt, vec, img_id, url) in enumerate(zip(chunks_text, embeddings, image_ids, urls))]
                 
-            # Atomic Replace in current LanceDB table
-            self.lancedb_store.delete_by_file(filename, full_source_type, source_language=language)
-            self.lancedb_store.insert_chunks(records)
+            # Atomic delete-then-insert under the store lock so a concurrent
+            # writer can't interleave and double-write this file's chunks.
+            self.lancedb_store.replace_file_chunks(
+                filename, full_source_type, language, records
+            )
             
             logger.debug(f"[RAG] Indexed {filename} ({len(records)} chunks)")
         except Exception as e:

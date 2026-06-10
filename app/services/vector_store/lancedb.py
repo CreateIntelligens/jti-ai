@@ -15,7 +15,7 @@ class LanceDBStore:
         self.table_name = table_name
         self._db = None
         self._table = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
 
     def _get_db(self):
         """Lazy-connect to the database."""
@@ -137,6 +137,26 @@ class LanceDBStore:
         if source_language:
             where += f" AND source_language = '{source_language}'"
         tbl.delete(where)
+
+    def replace_file_chunks(
+        self,
+        file_id: str,
+        source_type: str,
+        source_language: str,
+        records: List[Dict[str, Any]],
+    ):
+        """Atomically replace a file's chunks (delete old + insert new) under a lock.
+
+        delete_by_file followed by insert_chunks is NOT atomic on its own: two
+        concurrent index calls for the same file can interleave (both delete,
+        both insert) and double-write. Backfill runs under executors, so this
+        race produced large numbers of duplicate chunks. Serializing the
+        delete+insert per store instance closes that window.
+        """
+        with self._lock:
+            self.delete_by_file(file_id, source_type, source_language=source_language)
+            if records:
+                self.insert_chunks(records)
 
     def get_file_chunks(self, file_id: str, source_type: str, source_language: str) -> List[Dict[str, Any]]:
         """Returns all chunks for a specific file."""

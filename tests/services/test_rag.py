@@ -93,8 +93,8 @@ class TestRAGPipeline(unittest.TestCase):
         mock_embedding_service.encode.return_value = np.random.rand(1, 1024)
         
         backfill.run_backfill("jti", "zh")
-        
-        mock_lancedb_store.insert_chunks.assert_called_once()
+
+        mock_lancedb_store.replace_file_chunks.assert_called_once()
 
     def test_general_backfill(self):
         backfill = BackfillService()
@@ -108,7 +108,7 @@ class TestRAGPipeline(unittest.TestCase):
         with patch("app.services.rag.backfill.get_knowledge_store", return_value=general_store):
             backfill.run_backfill("general", "store_123")
 
-        mock_lancedb_store.insert_chunks.assert_called_once()
+        mock_lancedb_store.replace_file_chunks.assert_called_once()
         general_store.list_files.assert_called_once_with("store_123", namespace="general")
         general_store.get_file_data.assert_called_once_with("store_123", "general_file.txt", namespace="general")
 
@@ -135,7 +135,7 @@ class TestRAGPipeline(unittest.TestCase):
                 },
             )
 
-        records = mock_lancedb_store.insert_chunks.call_args.args[0]
+        records = mock_lancedb_store.replace_file_chunks.call_args.args[3]
         self.assertTrue(records[0]["text"].startswith("【FAQ / Department Introductions】"))
 
     def test_hciot_backfill_skips_topic_store_lookup_when_labels_are_usable(self):
