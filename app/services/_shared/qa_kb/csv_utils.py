@@ -185,14 +185,34 @@ def _index_sort_value(raw: str) -> float:
         return float("inf")
 
 
-def _sort_and_renumber_by_index(rows: list[dict]) -> None:
+def _sort_by_index(rows: list[dict]) -> None:
     rows.sort(key=lambda row: _index_sort_value(row.get("index", "")))
+
+
+def _sort_and_renumber_by_index(rows: list[dict]) -> None:
+    _sort_by_index(rows)
     for position, row in enumerate(rows, start=1):
         row["index"] = str(position)
 
 
+def _has_preservable_indexes(rows: list[dict]) -> bool:
+    """True when every row carries a distinct numeric index.
+
+    Topics split across multiple CSV files (per-image `_IMG_` files) encode
+    their cross-file question order in these values, so rewriting them to a
+    per-file 1..N would lose the order chosen in the merged admin view.
+    """
+    values = [_index_sort_value(row.get("index", "")) for row in rows]
+    finite = [value for value in values if value != float("inf")]
+    return len(finite) == len(values) and len(set(finite)) == len(finite)
+
+
 def normalize_qa_csv_rows(file_bytes: bytes) -> bytes | None:
-    """Drop blank QA rows, sort by user index, and renumber 1..N."""
+    """Drop blank QA rows and sort by user index.
+
+    Distinct numeric indexes are kept as-is (they may span sibling `_IMG_`
+    files); blank/duplicate indexes fall back to renumbering 1..N.
+    """
     parsed = _parse_csv_rows(file_bytes)
     if parsed is None:
         return None
@@ -205,7 +225,10 @@ def normalize_qa_csv_rows(file_bytes: bytes) -> bytes | None:
         fieldnames = ["index", *fieldnames]
 
     meaningful_rows = [row for row in rows if _has_meaningful_qa_content(row)]
-    _sort_and_renumber_by_index(meaningful_rows)
+    if _has_preservable_indexes(meaningful_rows):
+        _sort_by_index(meaningful_rows)
+    else:
+        _sort_and_renumber_by_index(meaningful_rows)
 
     return _rows_to_csv_bytes(fieldnames, meaningful_rows)
 

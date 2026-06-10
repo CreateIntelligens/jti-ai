@@ -5,7 +5,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from app.services._shared.qa_kb.csv_utils import extract_questions_from_csv
+from app.services._shared.qa_kb.csv_utils import (
+    _dedupe_non_empty,
+    extract_questions_from_csv,
+    merge_csv_files,
+)
 
 if TYPE_CHECKING:
     from app.routers._shared.qa_kb_router import QaKbRouterConfig
@@ -68,16 +72,14 @@ def _sync_topic_questions_from_store(
     store = config.knowledge_store_factory()
     docs = store.get_topic_csv_files(language, topic_id)
 
-    seen: set[str] = set()
-    questions: list[str] = []
-    for doc in docs:
-        extracted = extract_questions_from_csv(doc.get("data") or b"")
-        if not extracted:
-            continue
-        for question in extracted:
-            if question not in seen:
-                seen.add(question)
-                questions.append(question)
+    # Order questions exactly like the merged admin view (global sort by the
+    # `index` column across all files). Concatenating per file would lose the
+    # cross-file order for topics split into per-image `_IMG_` CSVs.
+    merged_rows = merge_csv_files(
+        [doc.get("data") or b"" for doc in docs],
+        [doc.get("filename") or "" for doc in docs],
+    )
+    questions = _dedupe_non_empty(row.get("q") for row in merged_rows)
 
     topic_store = config.topic_store_factory(language)
     prefix, suffix = topic_id.split("/", 1)

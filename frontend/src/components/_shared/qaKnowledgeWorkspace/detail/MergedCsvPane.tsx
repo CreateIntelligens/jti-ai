@@ -32,13 +32,14 @@ interface MergedCsvPaneProps {
 const SAVE_CSV_HEADER = ['index', 'q', 'a', 'img', 'url'];
 const DOWNLOAD_CSV_HEADER = ['index', 'q', 'a', 'img', 'url', 'display'];
 
-// The sequence value persisted in the `index` column follows the row's
-// position in the (drag-ordered) list, so reordering rewrites a clean 1..N
-// sequence while preserving the user's chosen order.
-function toCsvString(rows: HciotMergedCsvRow[]): string {
+// The `index` column persists each row's position in the full (drag-ordered)
+// merged list — not its position within its own source file. Topics split
+// across per-image `_IMG_` files rely on these global values to reconstruct
+// the cross-file order on read and when syncing the topic's question list.
+function toCsvString(rows: HciotMergedCsvRow[], globalIndex: Map<HciotMergedCsvRow, number>): string {
   return buildCsvString(
     SAVE_CSV_HEADER,
-    rows.map((row, index) => [index + 1, row.q, row.a, row.img, row.url || '']),
+    rows.map((row, position) => [globalIndex.get(row) ?? position + 1, row.q, row.a, row.img, row.url || '']),
   );
 }
 
@@ -192,6 +193,7 @@ export default function MergedCsvPane({
 
       stage = 'save';
       const savedRows = preparedRows.filter(hasMeaningfulRowContent);
+      const globalIndex = new Map(savedRows.map((row, position) => [row, position + 1]));
       const grouped = new Map<string, HciotMergedCsvRow[]>();
 
       for (const row of savedRows) {
@@ -201,23 +203,25 @@ export default function MergedCsvPane({
         grouped.set(file, group);
       }
 
-      await Promise.all([
-        ...Array.from(grouped).map(([file, fileRows]) =>
-          api.updateKnowledgeFileContent(file, toCsvString(fileRows), language)
-        ),
-        ...sourceFiles.filter(file => !grouped.has(file)).map(file =>
-          api.deleteKnowledgeFile(file, language)
-        )
-      ]);
-
-      // Persist question visibility after the CSV saves: the content update
-      // re-extracts `questions`, so we send only hidden texts that still exist
-      // among the saved rows (matching the backend's text-keyed identity).
+      // Hidden texts are sent alongside the batch save: the backend re-extracts
+      // `questions` from the saved CSVs, so only texts that still exist among
+      // the saved rows survive (matching the backend's text-keyed identity).
       const survivingQuestions = new Set(
         savedRows.map(row => row.q.trim()).filter(text => text.length > 0),
       );
       const nextHidden = Array.from(hiddenSet).filter(text => survivingQuestions.has(text));
-      await api.updateTopic(topicId, { hidden_questions: nextHidden }, language);
+
+      // One request for the whole topic: the backend writes every file, runs
+      // the topic-question sync once, and applies visibility — instead of one
+      // round trip (plus a redundant full-topic sync) per source file.
+      await api.saveTopicMergedCsv(topicId, {
+        files: Array.from(grouped).map(([file, fileRows]) => ({
+          filename: file,
+          content: toCsvString(fileRows, globalIndex),
+        })),
+        delete_files: sourceFiles.filter(file => !grouped.has(file)),
+        hidden_questions: nextHidden,
+      }, language);
 
       setIsEditing(false);
       if (onRefreshWorkspace) {
