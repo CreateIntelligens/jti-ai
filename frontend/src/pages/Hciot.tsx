@@ -48,6 +48,8 @@ const TTS_POLL_INTERVAL_MS = 3000;
 const TTS_STALL_TIMEOUT_MS = 12000;
 const TTS_CHARACTER_STORAGE_KEY = 'hciot:tts-character';
 const WORKSPACE_STORAGE_KEY = 'hciot:workspace';
+const SELECTED_CATEGORY_STORAGE_KEY = 'hciot:selected-category';
+const SELECTED_TOPIC_STORAGE_KEY = 'hciot:selected-topic';
 const HCIOT_EXTERNAL_LINK_URL =
   (import.meta.env.VITE_HCIOT_EXTERNAL_LINK_URL as string | undefined)?.trim() || '';
 const HCIOT_EXTERNAL_LINK_LABEL = '語音管理';
@@ -86,15 +88,41 @@ function resolveTopicSelection(
     return EMPTY_TOPIC_SELECTION;
   }
 
-  const category =
-    categories.find((item) => item.id === current.categoryId) ||
-    categories[0];
-  const topicId =
-    current.topicId && category.topics.some((topic) => topic.id === current.topicId)
-      ? current.topicId
-      : category.topics[0]?.id || null;
+  const hasSavedCategory = localStorage.getItem(SELECTED_CATEGORY_STORAGE_KEY) !== null;
 
-  return { categoryId: category.id, topicId };
+  const categoryId = current.categoryId;
+  const topicId = current.topicId;
+
+  let matchedTopic: HciotTopic | null = null;
+  let matchedCategory: HciotCategory | null = null;
+
+  if (topicId) {
+    for (const cat of categories) {
+      const found = cat.topics.find((t) => t.id === topicId);
+      if (found) {
+        matchedTopic = found;
+        matchedCategory = cat;
+        break;
+      }
+    }
+  }
+
+  if (matchedTopic && matchedCategory) {
+    return {
+      categoryId: categoryId === null && hasSavedCategory ? null : matchedCategory.id,
+      topicId: topicId,
+    };
+  }
+
+  if (categoryId === null && hasSavedCategory) {
+    const allTopics = categories.flatMap((cat) => cat.topics);
+    const defaultTopicId = allTopics[0]?.id || null;
+    return { categoryId: null, topicId: defaultTopicId };
+  }
+
+  const category = categories.find((cat) => cat.id === categoryId) || categories[0];
+  const defaultTopicId = category.topics[0]?.id || null;
+  return { categoryId: category.id, topicId: defaultTopicId };
 }
 
 function sleep(ms: number): Promise<void> {
@@ -252,7 +280,14 @@ export default function Hciot() {
   const [workspace, setWorkspace] = useState<WorkspaceMode>(() => readStoredWorkspace());
   const [editingTurn, setEditingTurn] = useState<number | null>(null);
   const [editText, setEditText] = useState('');
-  const [topicSelection, setTopicSelection] = useState<TopicSelection>(EMPTY_TOPIC_SELECTION);
+  const [topicSelection, setTopicSelection] = useState<TopicSelection>(() => {
+    const savedCat = localStorage.getItem(SELECTED_CATEGORY_STORAGE_KEY);
+    const savedTopic = localStorage.getItem(SELECTED_TOPIC_STORAGE_KEY);
+    return {
+      categoryId: savedCat === '__all__' ? null : (savedCat || null),
+      topicId: savedTopic,
+    };
+  });
   const [categories, setCategories] = useState<HciotCategory[]>([]);
   const [ttsStateMap, setTtsStateMap] = useState<Record<string, TtsState>>({});
   const [ttsCharacters, setTtsCharacters] = useState<string[]>([]);
@@ -282,6 +317,19 @@ export default function Hciot() {
     isUnmountedRef.current = false;
     return () => { isUnmountedRef.current = true; };
   }, []);
+
+  useEffect(() => {
+    if (topicSelection.categoryId !== null) {
+      localStorage.setItem(SELECTED_CATEGORY_STORAGE_KEY, topicSelection.categoryId);
+    } else {
+      localStorage.setItem(SELECTED_CATEGORY_STORAGE_KEY, '__all__');
+    }
+    if (topicSelection.topicId !== null) {
+      localStorage.setItem(SELECTED_TOPIC_STORAGE_KEY, topicSelection.topicId);
+    } else {
+      localStorage.removeItem(SELECTED_TOPIC_STORAGE_KEY);
+    }
+  }, [topicSelection]);
 
   const setSelectedTopicId = useCallback((next: SetStateAction<string | null>) => {
     setTopicSelection((current) => ({

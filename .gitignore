@@ -97,6 +97,7 @@ data/lancedb/
 
 # Git worktrees
 .worktrees/
+.worktree/
 
 # DocumentDB tunnel secrets (do NOT commit private keys / certs)
 docker/tunnel/bastion_key
