@@ -13,7 +13,7 @@
 
 .qa-workspace-qa-dialog {
   width: min(64rem, 96vw);
-  height: min(37.5rem, 85vh);
+  height: min(48rem, 90vh);
   display: flex;
   flex-direction: column;
   border-radius: 0.875rem;
