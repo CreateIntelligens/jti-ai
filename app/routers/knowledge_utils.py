@@ -23,7 +23,7 @@ EDITABLE_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".yaml", ".yml", ".docx"}
 TEXT_PREVIEW_EXTENSIONS = EDITABLE_EXTENSIONS | {".log", ".py", ".js", ".html"}
 ALLOWED_UPLOAD_EXTENSIONS = {".csv", ".txt", ".md", ".docx", ".xlsx"}
 MAX_SINGLE_UPLOAD_SIZE_BYTES = 5 * 1024 * 1024
-MAX_TOTAL_UPLOAD_FILES = 100
+MAX_TOTAL_UPLOAD_FILES = 1000
 MAX_TOTAL_UPLOAD_SIZE_BYTES = 50 * 1024 * 1024
 UPLOAD_RATE_LIMIT = 10
 UPLOAD_RATE_WINDOW_SECONDS = 60
@@ -174,7 +174,7 @@ def validate_upload_limits(files: list[dict], new_file_name: str, new_file_bytes
 
     existing_file = next((item for item in files if _stored_file_matches_name(item, new_file_name)), None)
     if existing_file is None and len(files) >= MAX_TOTAL_UPLOAD_FILES:
-        raise HTTPException(status_code=400, detail="知識庫檔案數量已達上限 (100 個檔案)")
+        raise HTTPException(status_code=400, detail="知識庫檔案數量已達上限 (500 個檔案)")
 
     existing_size = sum(f.get("size", 0) for f in files)
     replaced_size = existing_file.get("size", 0) if existing_file else 0

@@ -2,10 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 
 import type { HciotLanguage } from '../../../../config/hciotTopics';
 import { toErrorMessage } from '../../../../utils/errors';
-import type { HciotQaPair } from '../../../../services/api/hciot';
+import type { HciotImage, HciotQaPair } from '../../../../services/api/hciot';
 import { createEmptyRow, type QARow } from './types';
 import type { ResolvedUploadTopic } from './types';
 import type { TopicLabels } from '../topicUtils';
+import {
+  extractUploadedImageId,
+  rollbackUploadedImages,
+  type DeleteImageHandler,
+  type UploadedImageResult,
+} from '../imageUpload';
 import DocumentToQaPreview from './DocumentToQaPreview';
 import DocumentToQaSourceForm from './DocumentToQaSourceForm';
 import DocumentToQaStatusView from './DocumentToQaStatusView';
@@ -43,6 +49,9 @@ interface DocumentToQaTabProps {
   /** When true, pasted text and uploaded docs are saved directly (chunked by
    * the RAG backfill) instead of going through AI Q&A extraction. */
   disableAiQaExtraction?: boolean;
+  availableImages: HciotImage[];
+  onUploadImage: (file: File, imageId?: string) => Promise<UploadedImageResult>;
+  onDeleteImage?: DeleteImageHandler;
 }
 
 type PendingAiSource = { kind: 'file'; file: File } | { kind: 'text'; text: string };
@@ -142,6 +151,9 @@ export default function DocumentToQaTab({
   onUploadComplete,
   api,
   disableAiQaExtraction = false,
+  availableImages,
+  onUploadImage,
+  onDeleteImage,
 }: DocumentToQaTabProps) {
   const isEn = language === 'en';
 
@@ -384,6 +396,40 @@ export default function DocumentToQaTab({
     }
   };
 
+  /** Upload images staged on preview rows, returning rows with `img` filled in.
+   * On failure, rolls back already-uploaded images and restores the original
+   * pending state so the user can retry; returns null. */
+  const uploadPendingRowImages = async (): Promise<QARow[] | null> => {
+    const preparedRows = [...qaPairs];
+    const uploadedImageIds: string[] = [];
+    for (let i = 0; i < preparedRows.length; i++) {
+      const row = preparedRows[i];
+      if (!row.pendingImageFile) continue;
+      try {
+        const imageId = extractUploadedImageId(await onUploadImage(row.pendingImageFile));
+        uploadedImageIds.push(imageId);
+        preparedRows[i] = {
+          ...row,
+          img: imageId,
+          pendingImageFile: undefined,
+          pendingImageName: undefined,
+          imgStatus: 'done',
+          imgError: undefined,
+        };
+      } catch (err) {
+        await rollbackUploadedImages(uploadedImageIds, onDeleteImage);
+        const message = toErrorMessage(err);
+        setQaPairs(qaPairs.map((original, idx) => (
+          idx === i ? { ...original, imgStatus: 'error', imgError: message } : original
+        )));
+        setError(message);
+        setStatus('preview');
+        return null;
+      }
+    }
+    return preparedRows;
+  };
+
   const handleImport = async () => {
     if (qaPairs.length === 0) {
       setError('問答列表不可為空。');
@@ -391,8 +437,11 @@ export default function DocumentToQaTab({
     }
     setError(null);
     setStatus('importing');
-    const hiddenQuestions = getHiddenQuestions(qaPairs);
-    const plainPairs = toPlainQaPairs(qaPairs);
+    const preparedRows = await uploadPendingRowImages();
+    if (!preparedRows) return;
+    setQaPairs(preparedRows);
+    const hiddenQuestions = getHiddenQuestions(preparedRows);
+    const plainPairs = toPlainQaPairs(preparedRows);
     try {
       if (jobId) {
         const res = await api.importQaExtractJob(jobId, language, plainPairs, hiddenQuestions);
@@ -404,7 +453,7 @@ export default function DocumentToQaTab({
           setStatus('preview');
           return;
         }
-        const csv = buildQaCsv(qaPairs);
+        const csv = buildQaCsv(preparedRows);
         const csvFile = new File([csv], `pasted-${Date.now()}.csv`, { type: 'text/csv' });
         const res = await onUploadFile(csvFile, resolvedTopic.fullTopicId, resolvedTopic.labels, hiddenQuestions);
         setStatus('success');
@@ -446,6 +495,8 @@ export default function DocumentToQaTab({
   if (status === 'preview') {
     return (
       <DocumentToQaPreview
+        language={language}
+        availableImages={availableImages}
         qaPairs={qaPairs}
         error={error}
         onChange={setQaPairs}

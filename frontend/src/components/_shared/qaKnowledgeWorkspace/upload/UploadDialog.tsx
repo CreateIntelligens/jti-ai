@@ -133,6 +133,9 @@ export default function UploadDialog({
             onUploadComplete={onUploadComplete}
             api={api}
             disableAiQaExtraction={disableAiQaExtraction}
+            availableImages={availableImages}
+            onUploadImage={onUploadImage}
+            onDeleteImage={onDeleteImage}
           />
         )}
 
