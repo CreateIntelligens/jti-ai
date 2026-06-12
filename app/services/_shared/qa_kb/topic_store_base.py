@@ -115,7 +115,41 @@ class QaKbTopicStoreBase:
         return result.matched_count > 0
 
     def delete_topic(self, topic_id: str) -> bool:
-        return self.collection.delete_one(self._topic_query(topic_id)).deleted_count > 0
+        return self.delete_topics([topic_id]) == 1
+
+    def delete_topics(self, topic_ids: list[str]) -> int:
+        """Delete several topics with a single order compaction at the end.
+
+        Callers deleting a whole category must use this instead of issuing
+        per-topic deletes in parallel — concurrent per-delete compactions can
+        interleave and overwrite each other's renumbering.
+        """
+        if not topic_ids:
+            return 0
+        result = self.collection.delete_many({"topic_id": {"$in": topic_ids}, **self._language_query()})
+        if result.deleted_count:
+            self._compact_topic_orders()
+        return result.deleted_count
+
+    def _compact_topic_orders(self) -> None:
+        """Renumber topics 0..N-1 so deletions leave no gaps in `order`.
+
+        Inserting before an existing topic bumps later topics' order; without
+        compaction those bumped values survive the inserted topic's deletion
+        and keep inflating across insert/delete cycles. Relative ordering is
+        preserved, so display order never changes. `updated_at` is left
+        untouched — renumbering is not a content edit.
+        """
+        docs = self.collection.find(self._language_query(), {"order": 1}).sort(
+            [("order", 1), ("topic_id", 1)]
+        )
+        operations = [
+            UpdateOne({"_id": doc["_id"]}, {"$set": {"order": index}})
+            for index, doc in enumerate(docs)
+            if doc.get("order") != index
+        ]
+        if operations:
+            self.collection.bulk_write(operations, ordered=False)
 
     def reorder_topics(self, topic_ids: list[str]) -> int:
         """Rewrite order for the given topics; untouched topics keep their order."""

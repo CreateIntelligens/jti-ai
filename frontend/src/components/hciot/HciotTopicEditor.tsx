@@ -126,7 +126,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
   const deleteCat = async (cat: HciotTopicCategory) => {
     await runSavingAction(
       async () => {
-        await Promise.all(cat.topics.map((topic) => api.deleteHciotTopic(topic.id, language)));
+        await api.deleteHciotTopics(cat.topics.map((topic) => topic.id), language);
         if (expandedCatId === cat.id) setExpandedCatId(null);
         await reload();
       },

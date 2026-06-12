@@ -1,5 +1,7 @@
 from unittest.mock import MagicMock
 
+from pymongo import UpdateOne
+
 from tests.support.app_test_support import install_app_import_mocks
 
 install_app_import_mocks()
@@ -146,3 +148,86 @@ def test_get_category_meta_returns_id_keyed_hidden_flags():
         "ortho": {"category_id": "ortho", "hidden": True},
         "faq": {"category_id": "faq", "hidden": False},
     }
+
+
+def test_delete_topic_compacts_remaining_orders():
+    collection = MagicMock()
+    collection.delete_many.return_value.deleted_count = 1
+    collection.find.return_value.sort.return_value = [
+        {"_id": "a", "topic_id": "faq/a", "order": 0},
+        {"_id": "b", "topic_id": "faq/b", "order": 2},
+        {"_id": "c", "topic_id": "faq/c", "order": 3},
+    ]
+    store = make_store(collection, "zh")
+
+    assert store.delete_topic("faq/x") is True
+
+    collection.find.assert_called_once_with({"language": "zh"}, {"order": 1})
+    operations = collection.bulk_write.call_args.args[0]
+    assert operations == [
+        UpdateOne({"_id": "b"}, {"$set": {"order": 1}}),
+        UpdateOne({"_id": "c"}, {"$set": {"order": 2}}),
+    ]
+
+
+def test_delete_topic_skips_compaction_when_orders_already_contiguous():
+    collection = MagicMock()
+    collection.delete_many.return_value.deleted_count = 1
+    collection.find.return_value.sort.return_value = [
+        {"_id": "a", "topic_id": "faq/a", "order": 0},
+        {"_id": "b", "topic_id": "faq/b", "order": 1},
+    ]
+    store = make_store(collection, "zh")
+
+    assert store.delete_topic("faq/x") is True
+
+    collection.bulk_write.assert_not_called()
+
+
+def test_delete_topic_missing_does_not_compact():
+    collection = MagicMock()
+    collection.delete_many.return_value.deleted_count = 0
+    store = make_store(collection, "zh")
+
+    assert store.delete_topic("faq/x") is False
+
+    collection.find.assert_not_called()
+    collection.bulk_write.assert_not_called()
+
+
+def test_delete_topics_deletes_in_one_call_and_compacts_once():
+    collection = MagicMock()
+    collection.delete_many.return_value.deleted_count = 2
+    collection.find.return_value.sort.return_value = [
+        {"_id": "a", "topic_id": "faq/a", "order": 3},
+    ]
+    store = make_store(collection, "zh")
+
+    assert store.delete_topics(["faq/x", "faq/y"]) == 2
+
+    collection.delete_many.assert_called_once_with(
+        {"topic_id": {"$in": ["faq/x", "faq/y"]}, "language": "zh"}
+    )
+    collection.find.assert_called_once_with({"language": "zh"}, {"order": 1})
+    operations = collection.bulk_write.call_args.args[0]
+    assert operations == [UpdateOne({"_id": "a"}, {"$set": {"order": 0}})]
+
+
+def test_delete_topics_without_match_skips_compaction():
+    collection = MagicMock()
+    collection.delete_many.return_value.deleted_count = 0
+    store = make_store(collection, "zh")
+
+    assert store.delete_topics(["faq/x"]) == 0
+
+    collection.find.assert_not_called()
+    collection.bulk_write.assert_not_called()
+
+
+def test_delete_topics_empty_list_is_noop():
+    collection = MagicMock()
+    store = make_store(collection, "zh")
+
+    assert store.delete_topics([]) == 0
+
+    collection.delete_many.assert_not_called()

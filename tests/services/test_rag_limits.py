@@ -4,6 +4,7 @@ from fastapi import HTTPException
 
 from app.routers.knowledge_utils import (
     MAX_SINGLE_UPLOAD_SIZE_BYTES,
+    MAX_TOTAL_UPLOAD_FILES,
     SimpleRateLimiter,
     validate_upload_limits,
 )
@@ -45,7 +46,7 @@ class TestRagLimitsAndPruning(unittest.TestCase):
         self.assertIn("單一檔案大小不可超過 5 MB", ctx.exception.detail)
 
     def test_total_file_count_limit(self):
-        files = [{"filename": f"file_{i}.txt", "size": 100} for i in range(100)]
+        files = [{"filename": f"file_{i}.txt", "size": 100} for i in range(MAX_TOTAL_UPLOAD_FILES)]
         with self.assertRaises(HTTPException) as ctx:
             validate_upload_limits(files, "new_file.txt", b"hello")
         self.assertEqual(ctx.exception.status_code, 400)

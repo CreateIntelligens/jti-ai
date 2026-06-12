@@ -312,6 +312,18 @@ export async function deleteHciotTopic(topicId: string, language: HciotLanguage 
   await fetchAdminJson<void>(buildTopicAdminPath(language, topicId), { method: 'DELETE' });
 }
 
+// Single request so the backend compacts topic orders exactly once;
+// parallel per-topic deletes would race each other's compaction.
+export async function deleteHciotTopics(
+  topicIds: string[],
+  language: HciotLanguage = 'zh',
+): Promise<{ deleted: number }> {
+  return fetchAdminJson<{ deleted: number }>(
+    `/topics/${normLang(language)}/delete-batch`,
+    jsonRequest('POST', { topic_ids: topicIds }),
+  );
+}
+
 export async function createHciotTopic(
   topicId: string,
   label: string,

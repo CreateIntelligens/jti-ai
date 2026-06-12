@@ -162,6 +162,10 @@ class ReorderTopicsRequest(BaseModel):
     topic_ids: list[str]
 
 
+class DeleteTopicsRequest(BaseModel):
+    topic_ids: list[str]
+
+
 @router.post("/{language}/", status_code=201)
 def create_topic(language: Lang, request: CreateTopicRequest):
     store = get_hciot_topic_store(language)
@@ -188,6 +192,18 @@ def reorder_topics(language: Lang, request: ReorderTopicsRequest):
     store = get_hciot_topic_store(language)
     updated = store.reorder_topics(request.topic_ids)
     return {"updated": updated}
+
+
+@router.post("/{language}/delete-batch")
+def delete_topics_batch(language: Lang, request: DeleteTopicsRequest):
+    """Delete several topics in one request with a single order compaction.
+
+    Category deletion in the admin UI goes through here; parallel per-topic
+    DELETE calls would each trigger compaction concurrently.
+    """
+    store = get_hciot_topic_store(language)
+    deleted = store.delete_topics(request.topic_ids)
+    return {"deleted": deleted}
 
 
 @router.put("/categories/{language}/{category_id}/visibility")

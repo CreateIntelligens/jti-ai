@@ -61,6 +61,15 @@ class FakeStore:
             for category_id, meta in root.category_meta_by_language.get(self.language, {}).items()
         }
 
+    def delete_topics(self, topic_ids: list[str]) -> int:
+        root = self._root
+        root.calls.append(("delete_topics", topic_ids, self.language))
+        deleted = 0
+        for topic_id in topic_ids:
+            if root.topics.pop((self.language, topic_id), None) is not None:
+                deleted += 1
+        return deleted
+
     def set_category_hidden(self, category_id: str, hidden: bool) -> bool:
         root = self._root
         root.calls.append(("set_category_hidden", category_id, hidden, self.language))
@@ -548,3 +557,16 @@ def test_update_category_visibility_writes_category_meta():
 
     assert result == {"category_id": "ortho", "hidden": True}
     assert ("set_category_hidden", "ortho", True, "zh") in store.calls
+
+
+def test_delete_topics_batch_delegates_to_store_in_one_call():
+    store = FakeStore()
+    store.bind("zh").upsert_topic("faq/a", {"labels": {"zh": "A", "en": ""}})
+    store.bind("zh").upsert_topic("faq/b", {"labels": {"zh": "B", "en": ""}})
+
+    request = topics_admin.DeleteTopicsRequest(topic_ids=["faq/a", "faq/b"])
+    with patch_topic_store(store):
+        result = topics_admin.delete_topics_batch("zh", request)
+
+    assert result == {"deleted": 2}
+    assert ("delete_topics", ["faq/a", "faq/b"], "zh") in store.calls

@@ -170,14 +170,18 @@ def validate_upload_limits(files: list[dict], new_file_name: str, new_file_bytes
 
     new_size = len(new_file_bytes)
     if new_size > MAX_SINGLE_UPLOAD_SIZE_BYTES:
-        raise HTTPException(status_code=400, detail="單一檔案大小不可超過 5 MB")
+        raise HTTPException(
+            status_code=400, detail=f"單一檔案大小不可超過 {MAX_SINGLE_UPLOAD_SIZE_BYTES // (1024 * 1024)} MB"
+        )
 
     existing_file = next((item for item in files if _stored_file_matches_name(item, new_file_name)), None)
     if existing_file is None and len(files) >= MAX_TOTAL_UPLOAD_FILES:
-        raise HTTPException(status_code=400, detail="知識庫檔案數量已達上限 (500 個檔案)")
+        raise HTTPException(status_code=400, detail=f"知識庫檔案數量已達上限 ({MAX_TOTAL_UPLOAD_FILES} 個檔案)")
 
     existing_size = sum(f.get("size", 0) for f in files)
     replaced_size = existing_file.get("size", 0) if existing_file else 0
     total_size = existing_size - replaced_size + new_size
     if total_size > MAX_TOTAL_UPLOAD_SIZE_BYTES:
-        raise HTTPException(status_code=400, detail="知識庫總容量已達上限 (50 MB)")
+        raise HTTPException(
+            status_code=400, detail=f"知識庫總容量已達上限 ({MAX_TOTAL_UPLOAD_SIZE_BYTES // (1024 * 1024)} MB)"
+        )
