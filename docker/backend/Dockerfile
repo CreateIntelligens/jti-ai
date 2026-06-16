@@ -74,4 +74,4 @@ COPY docker/backend/entrypoint.sh /usr/local/bin/backend-entrypoint.sh
 RUN chmod +x /usr/local/bin/backend-entrypoint.sh
 
 ENTRYPOINT ["/usr/local/bin/backend-entrypoint.sh"]
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8008", "--workers", "1"]
+# 不帶 CMD：entrypoint 依 $MODE 決定 uvicorn 參數（dev=--reload / prod=--workers 2）
