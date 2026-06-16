@@ -1,3 +1,4 @@
+import threading
 from unittest.mock import patch
 
 from tests.support.app_test_support import install_app_import_mocks
@@ -164,6 +165,58 @@ def test_public_topics_are_ordered_by_stored_order_field():
     assert [category["id"] for category in result["categories"]] == ["faq", "ortho"]
     # Within ortho: knee (order 1) before prp (order 2).
     assert [topic["id"] for topic in result["categories"][1]["topics"]] == ["ortho/knee", "ortho/prp"]
+
+
+def test_build_categories_reads_topic_tree_and_category_meta_concurrently():
+    class ConcurrentReadStore(FakeStore):
+        def __init__(self, language="zh", root=None):
+            super().__init__(language, root)
+            if root is None:
+                self.meta_started = threading.Event()
+                self.meta_finished = threading.Event()
+                self.release_meta = threading.Event()
+                self.reads_overlapped = False
+
+        def bind(self, language="zh"):
+            return ConcurrentReadStore(language, self._root)
+
+        def get_category_meta(self):
+            root = self._root
+            root.calls.append(("get_category_meta", self.language))
+            root.meta_started.set()
+            root.release_meta.wait(timeout=0.2)
+            root.meta_finished.set()
+            return {}
+
+        def list_categories(self):
+            root = self._root
+            root.meta_started.wait(timeout=0.2)
+            if root.meta_started.is_set() and not root.meta_finished.is_set():
+                root.reads_overlapped = True
+                root.release_meta.set()
+            return super().list_categories()
+
+    store = ConcurrentReadStore()
+    store.categories = [
+        {
+            "id": "faq",
+            "labels": {"zh": "常見問題", "en": "FAQ"},
+            "topics": [
+                {
+                    "id": "faq/general",
+                    "labels": {"zh": "一般問題", "en": "General"},
+                    "questions": {"zh": [], "en": []},
+                    "order": 0,
+                },
+            ],
+        }
+    ]
+
+    with patch_topic_store(store):
+        result = topics_admin.list_topics_slim("zh")
+
+    assert store.reads_overlapped is True
+    assert result["categories"][0]["id"] == "faq"
 
 
 def test_public_topics_query_route_is_not_registered():

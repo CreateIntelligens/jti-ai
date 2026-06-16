@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
@@ -73,6 +75,13 @@ def _topic_has_public_questions(topic: dict, language: Lang) -> bool:
     return any(question not in hidden_questions for question in questions)
 
 
+def _read_category_inputs(store) -> tuple[dict[str, dict], list[dict]]:
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        category_meta_future = executor.submit(store.get_category_meta)
+        categories_future = executor.submit(store.list_categories)
+        return category_meta_future.result(), categories_future.result()
+
+
 def _build_categories(language: Lang, filter_hidden: bool = True) -> list[dict]:
     """Build the single-language category tree consumed by the public endpoint.
 
@@ -81,9 +90,9 @@ def _build_categories(language: Lang, filter_hidden: bool = True) -> list[dict]:
     in the admin UI is what writes those values.
     """
     store = get_hciot_topic_store(language)
-    category_meta = store.get_category_meta()
+    category_meta, raw_categories = _read_category_inputs(store)
     categories: list[dict] = []
-    for cat in store.list_categories():
+    for cat in raw_categories:
         category_id = cat.get("id", "")
         category_hidden = bool(category_meta.get(category_id, {}).get("hidden", False))
         if filter_hidden and category_hidden:
