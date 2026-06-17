@@ -15,7 +15,7 @@ if [ "$#" -eq 0 ]; then
             # 預設單 worker：session 的 _pending lazy-write 為 process 內記憶體，多 worker 會跨 process
             # 失憶（/chat/start 與 /chat/message 打到不同 worker → 404）。待 session 狀態改為共享
             # (寫 Mongo / TTL) 後，可在 .env 設 UVICORN_WORKERS=2 恢復多 worker。
-            WORKERS="${UVICORN_WORKERS:-1}"
+            WORKERS="${UVICORN_WORKERS:-2}"
             echo "[entrypoint] MODE=prod → uvicorn --workers $WORKERS (port $PORT)" >&2
             set -- uvicorn app.main:app --host 0.0.0.0 --port "$PORT" --workers "$WORKERS"
             ;;
