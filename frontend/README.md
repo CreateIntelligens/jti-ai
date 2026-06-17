@@ -1,6 +1,6 @@
-# JTAI Frontend
+# AI360 KM Frontend
 
-React/Vite frontend for the JTAI multi-app chat platform. The frontend serves:
+React/Vite frontend for the AI360 KM multi-app chat platform. The frontend serves:
 
 - `/` general knowledge-base chat and admin panels
 - `/jti` JTI assistant, quiz, knowledge, prompt, and history UI

@@ -126,10 +126,12 @@ export default function App() {
     .split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
   const isRestricted = restrictedHosts.includes(window.location.hostname.toLowerCase());
 
-  const allowedPages = (import.meta.env.VITE_PUBLIC_ALLOWED_PAGES || 'jti')
+  const allowedPages = (import.meta.env.VITE_PUBLIC_ALLOWED_PAGES || 'home,hciot,jti')
     .split(',').map((s: string) => s.trim().toLowerCase()).filter(Boolean);
   const canShow = (p: string) => !isRestricted || allowedPages.includes(p);
-  const fallback = isRestricted ? `/${allowedPages[0] || 'jti'}` : '/';
+  const fallback = isRestricted
+    ? (allowedPages[0] === 'home' || !allowedPages[0] ? '/' : `/${allowedPages[0]}`)
+    : '/';
 
   return (
     <BrowserRouter>

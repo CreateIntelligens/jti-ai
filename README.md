@@ -1,6 +1,6 @@
-# JTAI - AI 對話與知識庫平台
+# ai360 km - AI 對話與知識庫平台
 
-JTAI 是一個以 FastAPI、React/Vite、Google Gemini 和 self-hosted RAG 組成的多應用對話平台。現行主要應用包含 JTI 活動助理、HCIoT 醫院衛教助理，以及可綁定知識庫的 OpenAI-compatible API。
+ai360 km 是一個以 FastAPI、React/Vite、Google Gemini 和 self-hosted RAG 組成的多應用對話平台。現行主要功能與應用包含可綁定知識庫的 OpenAI-compatible API、HCIoT 醫院衛教助理，以及 JTI 活動助理。
 
 系統主資料庫為 AWS DocumentDB（Atlas 作為啟動時備援），保存知識庫與 session/log 資料，使用 BAAI/bge-m3 產生本地 embedding，寫入 LanceDB 做向量檢索，再由 Gemini 產生最後回答。
 
@@ -121,7 +121,7 @@ docker compose up -d --build
 ## 專案結構
 
 ```text
-jtai/
+ai360-km/
 ├── app/
 │   ├── main.py                         # FastAPI app、lifespan、health、OpenAI-compatible API
 │   ├── deps.py                         # Gemini、prompt、session、TTS manager 初始化

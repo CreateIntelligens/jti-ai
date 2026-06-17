@@ -5,8 +5,8 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 PROJECT_ROOT = str(Path(__file__).resolve().parents[2])
-_TEST_LOG_DIR = "/tmp/jtai-test-logs"
-_TEST_TTS_CACHE_DIR = "/tmp/jtai-test-tts-cache"
+_TEST_LOG_DIR = "/tmp/ai360-km-test-logs"
+_TEST_TTS_CACHE_DIR = "/tmp/ai360-km-test-tts-cache"
 _MODULES_TO_RESET = (
     "app.deps",
     "app.services.jti.tts",

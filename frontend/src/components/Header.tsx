@@ -177,6 +177,7 @@ export default function Header({
               }}
               placeholder="前往應用"
               options={[
+                { value: '/', label: 'ai360 km 通用知識庫' },
                 { value: '/hciot', label: 'HCIoT 衛教助手' },
                 { value: '/jti', label: 'JTI 智慧助手' },
               ]}

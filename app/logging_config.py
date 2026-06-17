@@ -94,7 +94,7 @@ def configure_file_logging() -> None:
     """
     root = logging.getLogger()
 
-    if any(getattr(h, "_jtai_file_handler", False) for h in root.handlers):
+    if any(getattr(h, "_ai360_km_file_handler", False) for h in root.handlers):
         return
 
     for module in (*_MODULE_PREFIXES.keys(), _SHARED_MODULE):
@@ -110,5 +110,5 @@ def configure_file_logging() -> None:
                 # 退回 stderr，記一條 warning 方便定位，服務繼續活。
                 _warn_handler_skipped(path, exc)
                 continue
-            setattr(handler, "_jtai_file_handler", True)
+            setattr(handler, "_ai360_km_file_handler", True)
             root.addHandler(handler)

@@ -12,6 +12,6 @@
 #   3. 對應的「公鑰」需事先加入跳板機的 ~/.ssh/authorized_keys。
 #
 # 產生新金鑰（建議每台部署機各自產生、單獨可撤銷）：
-#   ssh-keygen -t ed25519 -f docker/tunnel/bastion_key -C "jtai-<host>-to-bastion" -N ""
+#   ssh-keygen -t ed25519 -f docker/tunnel/bastion_key -C "ai360-km-<host>-to-bastion" -N ""
 # 然後把 docker/tunnel/bastion_key.pub 內容加到跳板機 authorized_keys。
 -----END OPENSSH PRIVATE KEY-----

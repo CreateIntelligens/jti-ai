@@ -1,4 +1,4 @@
-"""JTAI FastAPI backend (RAG-based)."""
+"""ai360 km api FastAPI backend (RAG-based)."""
 
 from contextlib import asynccontextmanager
 import asyncio
@@ -156,7 +156,7 @@ async def lifespan(_: FastAPI):
     except Exception as e:
         logger.warning(f"[Shutdown] Embedding cleanup failed: {e}")
 
-    logger.info("👋 JTAI API shut down cleanly. Goodbye!")
+    logger.info("👋 ai360 km api shut down cleanly. Goodbye!")
 
 
 def _list_general_store_names() -> list[str]:
@@ -208,7 +208,7 @@ async def _run_rag_backfill(backfill):
 
 
 
-app = FastAPI(title="JTAI API", lifespan=lifespan)
+app = FastAPI(title="ai360 km api", lifespan=lifespan)
 
 @app.exception_handler(ClientError)
 async def gemini_client_error_handler(request: Request, exc: ClientError):
@@ -442,7 +442,7 @@ async def health_check():
 @app.get("/")
 def index():
     """API root."""
-    return {"message": "JTAI API", "docs": "/docs"}
+    return {"message": "ai360 km api", "docs": "/docs"}
 
 
 # ========== Include Routers ==========

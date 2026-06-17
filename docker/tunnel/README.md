@@ -28,7 +28,7 @@ cp /path/to/bastion_key docker/tunnel/bastion_key
 chmod 600 docker/tunnel/bastion_key
 
 # 方式 B：為這台機器產生專屬金鑰（建議，可單獨撤銷）
-ssh-keygen -t ed25519 -f docker/tunnel/bastion_key -C "jtai-$(hostname)-to-bastion" -N ""
+ssh-keygen -t ed25519 -f docker/tunnel/bastion_key -C "ai360-km-$(hostname)-to-bastion" -N ""
 # 再把 docker/tunnel/bastion_key.pub 加到跳板機的 ~/.ssh/authorized_keys
 ```
 
