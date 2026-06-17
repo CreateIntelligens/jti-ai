@@ -6,7 +6,8 @@ FROM alpine:3.20 AS runner
 RUN apk add --no-cache socat openssh-client autossh netcat-openbsd
 
 COPY docker/tunnel/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+COPY docker/tunnel/healthcheck.sh /healthcheck.sh
+RUN chmod +x /entrypoint.sh /healthcheck.sh
 
 # DocumentDB 連線埠（backend 連這個容器的 27017）
 EXPOSE 27017

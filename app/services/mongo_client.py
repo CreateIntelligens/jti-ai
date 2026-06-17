@@ -38,6 +38,13 @@ def is_using_fallback() -> bool:
 # 誤判會掉 Atlas 備援且需人工合資料，代價高；開機多等幾秒無感，故給寬。
 MONGODB_PROBE_TIMEOUT_MS = 10000
 
+# 執行中查詢逾時：tunnel 卡住（後端隧道斷但 port 仍 listen）時，若不設 socket
+# 逾時，查詢會無限 hang 拖垮整個服務。設積極逾時讓查詢「快速失敗」而非卡死。
+# serverSelectionTimeoutMS 只管「選到 server」，選到後的讀寫須靠 socketTimeoutMS。
+MONGODB_SERVER_SELECTION_TIMEOUT_MS = 5000
+MONGODB_CONNECT_TIMEOUT_MS = 5000
+MONGODB_SOCKET_TIMEOUT_MS = 10000
+
 
 def _remember_mongodb_uri(uri: str) -> str:
     global _resolved_uri
@@ -148,7 +155,12 @@ class MongoDBClient:
     def connect(self) -> None:
         """連接到 MongoDB"""
         try:
-            self._client = MongoClient(self.uri, serverSelectionTimeoutMS=5000)
+            self._client = MongoClient(
+                self.uri,
+                serverSelectionTimeoutMS=MONGODB_SERVER_SELECTION_TIMEOUT_MS,
+                connectTimeoutMS=MONGODB_CONNECT_TIMEOUT_MS,
+                socketTimeoutMS=MONGODB_SOCKET_TIMEOUT_MS,
+            )
             # 測試連接
             self._client.admin.command("ping")
             logger.info("Successfully connected to MongoDB")

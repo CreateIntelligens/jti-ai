@@ -19,10 +19,12 @@ services:
       - ./docker/tunnel/known_hosts:/known_hosts:ro
     expose:
       - "27017"
+    # 端到端探活（見 healthcheck.sh）：依模式真正驗證後端隧道可達，
+    # 取代舊版只看 localhost port listen 的健康假象（隧道卡住卻仍 healthy）。
     healthcheck:
-      test: ["CMD-SHELL", "nc -z localhost 27017 || exit 1"]
+      test: ["CMD", "/healthcheck.sh"]
       interval: 15s
-      timeout: 5s
+      timeout: 10s
       retries: 5
       start_period: 20s
     restart: unless-stopped

@@ -33,14 +33,19 @@ can_reach_docdb() {
     nc -z -w "${PROBE_TIMEOUT}" "${DOCDB_ENDPOINT}" "${DOCDB_PORT}" 2>/dev/null
 }
 
+# 持久化目前模式供 healthcheck.sh 判據（direct=VPC 內 socat / ssh=VPC 外 autossh）。
+MODE_FILE="/tmp/tunnel_mode"
+
 start_direct_proxy() {
     log "✅ 可直連（VPC 內）→ 使用 socat TCP 轉發，不經跳板"
+    echo "direct" > "${MODE_FILE}"
     exec socat -d "TCP-LISTEN:${LISTEN_PORT},fork,reuseaddr,bind=0.0.0.0" \
                   "TCP:${DOCDB_ENDPOINT}:${DOCDB_PORT}"
 }
 
 start_bastion_tunnel() {
     log "✗ 無法直連（VPC 外）→ 經跳板 ${BASTION_USER}@${BASTION_HOST} 建立 SSH tunnel"
+    echo "ssh" > "${MODE_FILE}"
     if [ ! -f "${BASTION_KEY}" ]; then
         echo "[db-tunnel] ❌ 找不到金鑰 ${BASTION_KEY}（VPC 外必須掛載 bastion_key）" >&2
         exit 1
