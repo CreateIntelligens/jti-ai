@@ -51,40 +51,73 @@ class TestMongoSessionManager(unittest.TestCase):
         doc.update(overrides)
         return doc
 
-    def test_create_session_is_lazy(self):
-        """測試建立 session 為 lazy：不立即落庫，僅暫存於 _pending。
+    def test_create_session_persists_immediately(self):
+        """測試建立 session 即落庫（多 worker 共享狀態，取代舊 _pending lazy-write）。
 
-        為避免開頁/重整即產生空 WELCOME session 積壓，create_session 不再
-        寫入 MongoDB，而是把 session 放進 _pending，待首則真實訊息經
-        update_session 才 flush 落庫。
+        舊設計用 process 內 _pending 暫存，記憶體不跨 worker 導致 prod 多 worker
+        失憶（/chat/start 與 /chat/message 打到不同 worker → 404）。改為建立即
+        upsert 進 MongoDB，並寫入動態 expires_at 由 TTL 回收空 session。
         """
         session = self.manager.create_session(language="zh")
 
         self.assertIsNotNone(session)
         self.assertEqual(session.language, "zh")
         self.assertEqual(session.step, SessionStep.WELCOME)
-        # 不應寫入 DB
-        self.mock_sessions.update_one.assert_not_called()
-        # 應暫存於 _pending，且可由 get_session 讀回（不查 DB）
-        self.assertIn(session.session_id, self.manager._pending)
-        fetched = self.manager.get_session(session.session_id)
-        self.assertIs(fetched, session)
-        self.mock_sessions.find_one.assert_not_called()
+        # 應立即 upsert 落庫
+        self.mock_sessions.update_one.assert_called_once()
+        call = self.mock_sessions.update_one.call_args
+        self.assertEqual(call.args[0], {"session_id": session.session_id})
+        self.assertTrue(call.kwargs.get("upsert"))
+        set_doc = call.args[1]["$set"]
+        self.assertIn("expires_at", set_doc)
+        self.assertIsInstance(set_doc["expires_at"], datetime)
+        self.assertGreater(set_doc["expires_at"], datetime.now())
+        # 不應殘留 _pending 機制
+        self.assertFalse(hasattr(self.manager, "_pending"))
 
-    def test_update_session_flushes_pending_with_expires_at(self):
-        """測試 update_session 會 flush pending session 並寫入動態 expires_at。"""
+    @patch("app.services.session.mongo_session_manager.get_mongo_db")
+    def test_session_is_readable_across_workers(self, mock_get_db):
+        """模擬跨 worker：A worker 建 session，B worker（不同實例、不共享記憶體）應讀得到。
+
+        這是防 404 失憶的核心保證——狀態必須經 MongoDB 共享，而非 process 記憶體。
+        """
+        # 共用同一個 mock collection 模擬「同一個 MongoDB、不同 process」
+        shared_db = MagicMock()
+        shared_sessions = MagicMock()
+        shared_db.__getitem__.return_value = shared_sessions
+        mock_get_db.return_value = shared_db
+
+        from app.services.session.mongo_session_manager import MongoSessionManager
+        worker_a = MongoSessionManager(db_name="jti_app")
+        worker_b = MongoSessionManager(db_name="jti_app")
+
+        # worker A 建 session（落庫）
+        session = worker_a.create_session(language="zh")
+        persisted_doc = shared_sessions.update_one.call_args.args[1]["$set"]
+        persisted_doc["session_id"] = session.session_id
+
+        # worker B 透過 DB 讀回（模擬 DB 已有該文件）
+        shared_sessions.find_one.return_value = persisted_doc
+        fetched = worker_b.get_session(session.session_id)
+
+        self.assertIsNotNone(fetched)
+        self.assertEqual(fetched.session_id, session.session_id)
+        shared_sessions.find_one.assert_called_once_with(
+            {"session_id": session.session_id}
+        )
+
+    def test_update_session_writes_expires_at(self):
+        """測試 update_session 寫入動態 expires_at。"""
         session = self.manager.create_session(language="zh")
+        self.mock_sessions.update_one.reset_mock()
         self.mock_sessions.update_one.return_value = MagicMock(matched_count=1)
 
         self.manager.update_session(session)
 
-        # 落庫後應從 _pending 移除
-        self.assertNotIn(session.session_id, self.manager._pending)
         self.mock_sessions.update_one.assert_called_once()
         set_doc = self.mock_sessions.update_one.call_args.args[1]["$set"]
         self.assertIn("expires_at", set_doc)
         self.assertIsInstance(set_doc["expires_at"], datetime)
-        # WELCOME 預設 3 天 TTL，過期時間應在未來
         self.assertGreater(set_doc["expires_at"], datetime.now())
 
     def test_get_session(self):

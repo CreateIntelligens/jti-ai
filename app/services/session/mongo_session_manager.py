@@ -162,28 +162,29 @@ class MongoSessionManager(SessionStateMixin):
     def __init__(self, db_name: str):
         self.db = get_mongo_db(db_name)
         self.sessions_collection = self.db["sessions"]
-        self._pending: Dict[str, Session] = {}  # lazy write 暫存，尚未寫入 MongoDB
 
     def create_session(self, language: str = "zh") -> Session:
-        """Create new session (lazy: 暫存於記憶體，待首則真實訊息才落庫).
+        """Create new session（建立即落庫，多 worker 共享狀態）.
 
-        為避免開頁/重整即產生大量空 WELCOME session 積壓於 MongoDB，
-        新建的 session 預設只放進 `_pending`，不立即寫入 DB。
-        等到第一次 `update_session`（通常是首則真實使用者訊息）才 flush 落庫，
-        屆時並依 step 寫入動態 `expires_at`（見 update_session / B 方案 TTL）。
-        單 worker 部署下 `_pending` 為 process 內共享，`get_session` 會先查它，
-        故 lazy 期間 /chat/message 仍可讀到尚未落庫的 session。
+        早期版本用 process 內 `_pending` 暫存做 lazy-write 以避免空 session 積壓，
+        但記憶體不跨 worker：prod 多 worker 下 /chat/start 與 /chat/message 打到
+        不同 worker 會讀不到 session（404 失憶）。改為建立即寫 MongoDB，所有 worker
+        經 DB 共享狀態；空 session 的積壓改由動態 TTL（compute_expires_at）短時回收。
         """
         session = Session(language=language)
-        self._pending[session.session_id] = session
-        logger.info(f"Created session (pending, not yet persisted): {session.session_id}")
+        self._upsert_session(session)
+        logger.info(f"Created session (persisted): {session.session_id}")
         return session
 
-    def get_session(self, session_id: str) -> Optional[Session]:
-        """取得 session，先查 pending 暫存再查 MongoDB"""
-        if session_id in self._pending:
-            return self._pending[session_id]
+    def _upsert_session(self, session: Session) -> None:
+        """以動態 expires_at 落庫 session（create / update 共用）。"""
+        doc = _session_doc_with_expiry(session, datetime.now())
+        self.sessions_collection.update_one(
+            {"session_id": session.session_id}, {"$set": doc}, upsert=True
+        )
 
+    def get_session(self, session_id: str) -> Optional[Session]:
+        """取得 session（一律查 MongoDB，跨 worker 共享）"""
         try:
             doc = self.sessions_collection.find_one({"session_id": session_id})
             if doc is None:
@@ -195,17 +196,14 @@ class MongoSessionManager(SessionStateMixin):
             return None
 
     def update_session(self, session: Session) -> Session:
-        """Update session in MongoDB（亦為 lazy session 的 flush 落庫點）.
+        """Update session in MongoDB.
 
         每次寫入都依 step 重算動態 expires_at，配合 sessions 集合的
         TTL 索引（expireAfterSeconds=0）讓過期文件被自動回收。
         """
         try:
             session.update_timestamp()
-            now = datetime.now()
-            doc = _session_doc_with_expiry(session, now)
-            self.sessions_collection.update_one({"session_id": session.session_id}, {"$set": doc}, upsert=True)
-            self._pending.pop(session.session_id, None)
+            self._upsert_session(session)
             logger.info(f"Updated session: {session.session_id}, step={session.step.value}")
             return session
         except Exception as e:
@@ -214,7 +212,6 @@ class MongoSessionManager(SessionStateMixin):
 
     def delete_session(self, session_id: str) -> bool:
         """刪除 session"""
-        self._pending.pop(session_id, None)
         try:
             result = self.sessions_collection.delete_one({"session_id": session_id})
 

@@ -25,12 +25,12 @@ class SessionStep(str, Enum):
 # 配合 sessions 集合上的 expireAfterSeconds=0 TTL 索引，MongoDB 會在
 # expires_at 到期後自動回收文件。
 #
-# 角色定位：純開頁、零對話的 session 已由 lazy 建立策略擋在 DB 外（不落庫），
-# 故此 TTL 主要兜底「有過對話但中途停擺」的 session：
-#   - WELCOME / DONE（未進行或已結束）：3 天回收
-#   - QUIZ / SCORING / RECOMMEND（測驗進行中）：7 天，保障中斷續答
-_SHORT_SESSION_TTL = timedelta(days=3)
-_ACTIVE_SESSION_TTL = timedelta(days=7)
+# 角色定位：session 建立即落庫（多 worker 共享狀態），TTL 負責回收。
+# 純開頁、零對話的空 session 也會落庫，但同樣 1 天內由 TTL 回收，不長期積壓。
+#   - WELCOME / DONE（未進行或已結束）：1 天回收
+#   - QUIZ / SCORING / RECOMMEND（測驗進行中）：1 天，保障中斷續答
+_SHORT_SESSION_TTL = timedelta(days=1)
+_ACTIVE_SESSION_TTL = timedelta(days=1)
 _TTL_BY_STEP: Dict[str, timedelta] = {
     SessionStep.WELCOME.value: _SHORT_SESSION_TTL,    # 未進行/僅開場
     SessionStep.DONE.value: _SHORT_SESSION_TTL,       # 流程已完成
