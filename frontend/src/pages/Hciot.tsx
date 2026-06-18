@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject, type SetStateAction } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ExternalLink, FileText, HeartPulse, History, Moon, RotateCcw, Settings, Sun, Menu, Volume2, Loader, ArrowLeft, LogOut } from 'lucide-react';
+import { ArrowLeft, BookOpen, ChevronDown, ExternalLink, FileText, HeartPulse, History, Loader, LogOut, Menu, Moon, RotateCcw, Settings, Sun, Volume2 } from 'lucide-react';
 import { fetchWithApiKey } from '../services/api';
 
 import HciotSelect from '../components/hciot/HciotSelect';
@@ -53,6 +53,8 @@ const SELECTED_TOPIC_STORAGE_KEY = 'hciot:selected-topic';
 const HCIOT_EXTERNAL_LINK_URL =
   (import.meta.env.VITE_HCIOT_EXTERNAL_LINK_URL as string | undefined)?.trim() || '';
 const HCIOT_EXTERNAL_LINK_LABEL = '語音管理';
+const HCIOT_MANUAL_URL = `${import.meta.env.BASE_URL}hciot-manual.html`;
+const HCIOT_MANUAL_LABEL = '操作手冊';
 const HCIOT_UI_TEXT = {
   appTitle: 'HCIoT 衛教助理',
   brandKicker: 'Hospital Education Interface',
@@ -297,6 +299,7 @@ export default function Hciot() {
   const [activeTtsMessageId, setActiveTtsMessageId] = useState<string | null>(null);
   const [previewingVoice, setPreviewingVoice] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showToolsMenu, setShowToolsMenu] = useState(false);
 
   const selectedCategoryId = topicSelection.categoryId;
   const selectedTopicId = topicSelection.topicId;
@@ -309,6 +312,7 @@ export default function Hciot() {
   const currentAudioRef = useRef<HTMLAudioElement | null>(null);
   const isUnmountedRef = useRef(false);
   const ttsEpochRef = useRef(0);
+  const toolsMenuRef = useRef<HTMLDivElement | null>(null);
 
   useScrollToBottom(messagesEndRef, [messages]);
   useAutoResize(inputRef, userInput);
@@ -317,6 +321,28 @@ export default function Hciot() {
     isUnmountedRef.current = false;
     return () => { isUnmountedRef.current = true; };
   }, []);
+
+  useEffect(() => {
+    if (!showToolsMenu) return;
+
+    const closeWhenOutside = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (toolsMenuRef.current?.contains(target)) return;
+      if (target instanceof Element && target.closest('.app-select-content')) return;
+      setShowToolsMenu(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowToolsMenu(false);
+    };
+
+    document.addEventListener('pointerdown', closeWhenOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeWhenOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [showToolsMenu]);
 
   useEffect(() => {
     if (topicSelection.categoryId !== null) {
@@ -876,57 +902,72 @@ export default function Hciot() {
               <span>檔案管理</span>
             </button>
           </div>
-          {HCIOT_EXTERNAL_LINK_URL && (
-            <a
-              className="hciot-external-pill"
-              href={HCIOT_EXTERNAL_LINK_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              title={HCIOT_EXTERNAL_LINK_LABEL}
-              aria-label={HCIOT_EXTERNAL_LINK_LABEL}
+          <div className="hciot-tools-menu" ref={toolsMenuRef}>
+            <button
+              type="button"
+              className={`hciot-tools-trigger hciot-icon-button text${showToolsMenu ? ' is-open' : ''}`}
+              onClick={() => setShowToolsMenu((prev) => !prev)}
+              title="管理"
+              aria-label="管理"
+              aria-haspopup="dialog"
+              aria-expanded={showToolsMenu}
             >
-              <span>{HCIOT_EXTERNAL_LINK_LABEL}</span>
-              <ExternalLink size={14} />
-            </a>
-          )}
+              <Menu size={16} />
+              <span>管理</span>
+              <ChevronDown size={14} className="hciot-tools-trigger-chevron" />
+            </button>
+            {showToolsMenu && (
+              <div className="hciot-tools-popover" role="dialog" aria-label="HCIoT 管理選單">
+                <a
+                  className="hciot-tools-item"
+                  href={HCIOT_MANUAL_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setShowToolsMenu(false)}
+                >
+                  <BookOpen size={16} />
+                  <span>{HCIOT_MANUAL_LABEL}</span>
+                  <ExternalLink size={13} className="hciot-tools-item-external" />
+                </a>
+                {HCIOT_EXTERNAL_LINK_URL && (
+                  <a
+                    className="hciot-tools-item"
+                    href={HCIOT_EXTERNAL_LINK_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setShowToolsMenu(false)}
+                  >
+                    <Volume2 size={16} />
+                    <span>{HCIOT_EXTERNAL_LINK_LABEL}</span>
+                    <ExternalLink size={13} className="hciot-tools-item-external" />
+                  </a>
+                )}
+                {ttsCharacters.length > 0 && (
+                  <div className="hciot-tools-voice-panel">
+                    <span className="hciot-tools-section-label">聲音</span>
+                    <div className="hciot-tools-voice-row">
+                      <HciotSelect
+                        className="hciot-voice-select"
+                        value={selectedTtsCharacter}
+                        onChange={setSelectedTtsCharacter}
+                        options={ttsCharacters.map((character) => ({ value: character, label: character }))}
+                      />
+                      <button
+                        type="button"
+                        className={`hciot-voice-preview-btn hciot-icon-button${previewingVoice ? ' is-playing' : ''}`}
+                        onClick={playVoicePreview}
+                        title="試聽選定聲音"
+                        aria-label="試聽選定聲音"
+                      >
+                        {previewingVoice ? <Loader size={14} className="animate-spin" /> : <Volume2 size={14} />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
           <span className="hciot-header-divider" aria-hidden="true" />
-          {ttsCharacters.length > 0 && (
-            <div className="hciot-voice-select-container" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
-              <label className="hciot-voice-select-wrap">
-                <span className="hciot-voice-select-label">
-                  聲音
-                </span>
-                <HciotSelect
-                  className="hciot-voice-select"
-                  value={selectedTtsCharacter}
-                  onChange={setSelectedTtsCharacter}
-                  options={ttsCharacters.map((character) => ({ value: character, label: character }))}
-                />
-              </label>
-              <button
-                type="button"
-                className={`hciot-voice-preview-btn hciot-icon-button${previewingVoice ? ' is-playing' : ''}`}
-                onClick={playVoicePreview}
-                title="試聽選定聲音"
-                aria-label="試聽選定聲音"
-                style={{
-                  height: '2.5rem',
-                  width: '2.5rem',
-                  borderRadius: '0.8rem',
-                  border: '0.0625rem solid var(--hciot-border)',
-                  background: previewingVoice ? 'color-mix(in srgb, var(--hciot-accent) 15%, transparent)' : 'rgba(148, 163, 184, 0.08)',
-                  color: previewingVoice ? 'var(--hciot-accent)' : 'var(--hciot-ink-soft)',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  transition: 'all 0.2s ease',
-                }}
-              >
-                {previewingVoice ? <Loader size={14} className="animate-spin" /> : <Volume2 size={14} />}
-              </button>
-            </div>
-          )}
           <button className="hciot-icon-button" onClick={() => setShowSettingsModal(true)} title={HCIOT_UI_TEXT.settingsTitle}>
             <Settings size={18} />
           </button>

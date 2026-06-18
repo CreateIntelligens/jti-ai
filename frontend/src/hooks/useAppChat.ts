@@ -152,10 +152,19 @@ export function useAppChat(isAdmin: boolean = false) {
       const [data, keyInfo] = await Promise.all([
         api.fetchStores(),
         isAdmin
-          ? api.getKeyInfos().catch(() => ({ count: 0, names: [] }))
+          ? api.getKeyInfos().catch((err) => {
+              // 請求失敗 → 側欄降級為「全部專案」。記下原因，才能跟「後端真的
+              // 回空 names」區分：失敗會印這條 warn，成功但空只印下面的 info。
+              console.warn('[refreshStores] getKeyInfos 失敗，側欄降級為「全部專案」:', err);
+              return { count: 0, names: [], failed: true };
+            })
           : Promise.resolve({ count: 0, names: [] }),
       ]);
       setStores(data);
+      if (isAdmin && keyInfo.names.length === 0 && !('failed' in keyInfo)) {
+        // 請求成功卻拿到空 names：後端沒設定多把 key，側欄顯示「全部專案」。
+        console.info('[refreshStores] 後端回空的 key 名稱清單，側欄顯示「全部專案」');
+      }
       setKeyNames(normalizeKeyLabels(keyInfo.names));
       return data;
     } catch (e) {

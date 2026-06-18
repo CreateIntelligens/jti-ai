@@ -92,6 +92,7 @@ data/*.sqlite
 data/knowledge/
 data/tts_cache/
 data/hciot/images/
+data/hciot/knowledge/
 data/lancedb/
 .hf_cache/
 

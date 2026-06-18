@@ -82,7 +82,6 @@
   pointer-events: none;
 }
 
-.hciot-header,
 .hciot-main {
   position: relative;
   z-index: 1;
@@ -90,6 +89,8 @@
 
 .hciot-header {
   display: flex;
+  position: relative;
+  z-index: 20;
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
@@ -188,6 +189,92 @@
   color: var(--hciot-accent-strong);
 }
 
+.hciot-tools-menu {
+  position: relative;
+}
+
+.hciot-tools-trigger {
+  gap: 0.4rem;
+}
+
+.hciot-tools-trigger.is-open {
+  border-color: color-mix(in srgb, var(--hciot-accent) 25%, transparent);
+  background: color-mix(in srgb, var(--hciot-accent) 10%, transparent);
+  color: var(--hciot-accent-strong);
+}
+
+.hciot-tools-trigger-chevron {
+  transition: transform 0.18s ease;
+}
+
+.hciot-tools-trigger.is-open .hciot-tools-trigger-chevron {
+  transform: rotate(180deg);
+}
+
+.hciot-tools-popover {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  z-index: 30;
+  display: grid;
+  width: min(21rem, calc(100vw - 2rem));
+  padding: 0.4rem;
+  border: 0.0625rem solid var(--hciot-border);
+  border-radius: 0.75rem;
+  background: var(--hciot-panel-strong);
+  box-shadow: 0 0.75rem 2rem rgba(15, 23, 42, 0.14);
+  gap: 0.2rem;
+}
+
+.hciot-tools-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 2.5rem;
+  padding: 0 0.7rem;
+  border-radius: 0.5rem;
+  color: var(--hciot-ink);
+  font-size: 0.88rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.hciot-tools-item:hover {
+  background: color-mix(in srgb, var(--hciot-accent) 10%, transparent);
+  color: var(--hciot-accent-strong);
+}
+
+.hciot-tools-item-external {
+  margin-left: auto;
+  color: var(--hciot-ink-soft);
+}
+
+.hciot-tools-section-label {
+  color: var(--hciot-ink-soft);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.hciot-tools-voice-panel {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.2rem;
+  padding: 0.7rem;
+  border-top: 0.0625rem solid var(--hciot-border);
+}
+
+.hciot-tools-voice-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hciot-tools-voice-row .hciot-voice-select {
+  flex: 1;
+  min-width: 0;
+}
+
 .hciot-voice-select-wrap {
   display: inline-flex;
   align-items: center;
@@ -254,45 +341,27 @@
   color: var(--hciot-accent);
 }
 
+.hciot-icon-button.hciot-voice-preview-btn {
+  width: 2.5rem;
+  border-color: var(--hciot-border);
+  border-radius: 0.8rem;
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--hciot-ink-soft);
+  cursor: pointer;
+}
+
+.hciot-icon-button.hciot-voice-preview-btn:hover,
+.hciot-icon-button.hciot-voice-preview-btn.is-playing {
+  background: color-mix(in srgb, var(--hciot-accent) 15%, transparent);
+  color: var(--hciot-accent);
+}
+
 .hciot-header-divider {
   width: 0.0625rem;
   height: 1.5rem;
   margin: 0 0.25rem;
   background: var(--hciot-border);
   align-self: center;
-}
-
-.hciot-external-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  height: 2.5rem;
-  padding: 0 0.85rem;
-  margin-left: 0.25rem;
-  border: 0.0625rem solid color-mix(in srgb, var(--hciot-accent) 25%, transparent);
-  border-radius: 0.8rem;
-  background: color-mix(in srgb, var(--hciot-accent) 8%, transparent);
-  color: var(--hciot-accent);
-  font-size: 0.88rem;
-  font-weight: 600;
-  text-decoration: none;
-  transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
-  box-sizing: border-box;
-}
-
-.hciot-external-pill svg {
-  transition: transform 0.2s ease;
-}
-
-.hciot-external-pill:hover {
-  border-color: var(--hciot-accent);
-  color: var(--hciot-accent-strong);
-  background: color-mix(in srgb, var(--hciot-accent) 15%, transparent);
-  box-shadow: 0 0.125rem 0.5rem color-mix(in srgb, var(--hciot-accent) 12%, transparent);
-}
-
-.hciot-external-pill:hover svg {
-  transform: translate(0.125rem, -0.125rem);
 }
 
 .hciot-main {
@@ -398,6 +467,17 @@
     flex-direction: column;
     align-items: flex-start;
     padding: 1rem 1.25rem;
+  }
+
+  .hciot-header-actions {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .hciot-tools-popover {
+    right: auto;
+    left: 0;
+    width: min(21rem, calc(100vw - 2.5rem));
   }
 
   .hciot-main {
