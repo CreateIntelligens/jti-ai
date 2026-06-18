@@ -6,7 +6,9 @@ there, so each store gets its own isolated topic set. General is single-language
 
 from __future__ import annotations
 
-from app.services._shared.qa_kb.topic_store_base import QaKbTopicStoreBase
+from typing import cast
+
+from app.services._shared.qa_kb.topic_store_base import Language, QaKbTopicStoreBase
 
 
 class GeneralTopicStore(QaKbTopicStoreBase):
@@ -14,6 +16,12 @@ class GeneralTopicStore(QaKbTopicStoreBase):
     COLLECTION_NAME = "general_topics"
     CATEGORY_COLLECTION_NAME = "general_categories"
     NAMESPACE = "general"
+
+    def __init__(self, store_name: str):
+        # General partitions topics by store_name, carried in the base's
+        # ``language`` slot. The base only uses it as a Mongo filter value,
+        # so any string is valid here despite the Language literal hint.
+        super().__init__(cast(Language, store_name))
 
 
 def get_general_topic_store(store_name: str) -> GeneralTopicStore:
