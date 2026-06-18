@@ -78,6 +78,12 @@ class StorePrompts(BaseModel):
     hciot_runtime_settings_by_prompt: Optional[Dict[str, Dict[str, Any]]] = None
     # HCIoT 人物設定多語版本（key = prompt_id, value = {"zh": "...", "en": "..."}）
     hciot_persona_by_prompt: Optional[Dict[str, Dict[str, str]]] = None
+    # --- Quiz settings per general store ---
+    quiz_enabled: bool = False
+    quiz_start_keywords: List[str] = Field(default_factory=list)
+    quiz_negative_keywords: List[str] = Field(default_factory=list)
+    quiz_copy: Dict[str, Dict[str, str]] = Field(default_factory=dict)
+
 
 
 class PromptManager:

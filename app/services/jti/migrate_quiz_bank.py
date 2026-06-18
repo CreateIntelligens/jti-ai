@@ -17,6 +17,8 @@ from typing import Any
 from app.services.jti.quiz_bank_store import DEFAULT_BANK_ID
 from app.services.jti.quiz_results_store import DEFAULT_SET_ID
 
+from app.services.quiz.config import JTI_STORE_NAME
+
 logger = logging.getLogger(__name__)
 
 QUIZ_BANK_PATHS = {
@@ -28,6 +30,52 @@ QUIZ_RESULTS_PATHS = {
     "zh": Path("data/quiz_results.json"),
     "en": Path("data/quiz_results_en.json"),
 }
+
+
+_backfill_done = False
+
+
+def _backfill_store_name(db) -> None:
+    """Backfill store_name=__jti__ for existing data and drop old unique indexes.
+
+    Idempotent: both migrate_quiz_bank() and migrate_quiz_results() run at startup
+    and each invoke this, so guard against doing the (otherwise no-op) full-collection
+    scans twice in a single process.
+    """
+    global _backfill_done
+    if db is None or _backfill_done:
+        return
+    _backfill_done = True
+
+    # 1. Backfill quiz_bank_metadata
+    meta_col = db["quiz_bank_metadata"]
+    meta_col.update_many({"store_name": {"$exists": False}}, {"$set": {"store_name": JTI_STORE_NAME}})
+
+    # Drop old index
+    try:
+        meta_col.drop_index("language_1_bank_id_1")
+        logger.info("[Startup] Dropped old quiz_bank_metadata index language_1_bank_id_1")
+    except Exception:
+        pass
+
+    # 2. Backfill quiz_bank_questions
+    q_col = db["quiz_bank_questions"]
+    q_col.update_many({"store_name": {"$exists": False}}, {"$set": {"store_name": JTI_STORE_NAME}})
+
+    # 3. Backfill quiz_results_metadata
+    res_meta_col = db["quiz_results_metadata"]
+    res_meta_col.update_many({"store_name": {"$exists": False}}, {"$set": {"store_name": JTI_STORE_NAME}})
+
+    # Drop old index
+    try:
+        res_meta_col.drop_index("uniq_language_set_id")
+        logger.info("[Startup] Dropped old quiz_results_metadata index uniq_language_set_id")
+    except Exception:
+        pass
+
+    # 4. Backfill quiz_results
+    res_col = db["quiz_results"]
+    res_col.update_many({"store_name": {"$exists": False}}, {"$set": {"store_name": JTI_STORE_NAME}})
 
 
 def _upgrade_legacy_data() -> None:
@@ -44,12 +92,16 @@ def _upgrade_legacy_data() -> None:
     if db is None:
         return
 
+    # Backfill store_name first
+    _backfill_store_name(db)
+
     # --- Metadata ---
     meta_col = db["quiz_bank_metadata"]
     legacy_meta = list(meta_col.find({"bank_id": {"$exists": False}}))
     for doc in legacy_meta:
         lang = doc.get("language")
-        existing_default = meta_col.find_one({"language": lang, "bank_id": DEFAULT_BANK_ID})
+        store_name = doc.get("store_name", JTI_STORE_NAME)
+        existing_default = meta_col.find_one({"store_name": store_name, "language": lang, "bank_id": DEFAULT_BANK_ID})
         if existing_default:
             meta_col.delete_one({"_id": doc["_id"]})
             logger.info("[Startup] Removed legacy metadata for %s", lang)
@@ -71,8 +123,9 @@ def _upgrade_legacy_data() -> None:
     for doc in legacy_questions:
         lang = doc.get("language")
         q_id = doc.get("id")
+        store_name = doc.get("store_name", JTI_STORE_NAME)
         # Check if a proper default-bank question with this id already exists
-        existing = q_col.find_one({"language": lang, "bank_id": DEFAULT_BANK_ID, "id": q_id})
+        existing = q_col.find_one({"store_name": store_name, "language": lang, "bank_id": DEFAULT_BANK_ID, "id": q_id})
         if existing:
             # Delete the legacy duplicate
             q_col.delete_one({"_id": doc["_id"]})
@@ -156,12 +209,14 @@ def _default_quiz_results_are_outdated(
 
 def migrate_quiz_bank() -> None:
     """Seed quiz bank from JSON → MongoDB and sync stale default banks."""
-    from app.services.jti.quiz_bank_store import get_quiz_bank_store
-
-    # First, upgrade any legacy data
+    # First, upgrade any legacy data (which also does backfill & drops old indexes)
     _upgrade_legacy_data()
 
+    from app.services.jti.quiz_bank_store import get_quiz_bank_store
     store = get_quiz_bank_store()
+    
+    # Trigger new unique index creation in case it didn't run properly
+    store._ensure_indexes()
 
     for lang, path in QUIZ_BANK_PATHS.items():
         if not path.exists():
@@ -209,12 +264,16 @@ def _upgrade_legacy_quiz_results() -> None:
     if db is None:
         return
 
+    # Backfill store_name first
+    _backfill_store_name(db)
+
     col = db["quiz_results"]
     legacy_docs = list(col.find({"set_id": {"$exists": False}}))
     for doc in legacy_docs:
         lang = doc.get("language")
         quiz_id = doc.get("quiz_id")
-        existing = col.find_one({"language": lang, "set_id": DEFAULT_SET_ID, "quiz_id": quiz_id})
+        store_name = doc.get("store_name", JTI_STORE_NAME)
+        existing = col.find_one({"store_name": store_name, "language": lang, "set_id": DEFAULT_SET_ID, "quiz_id": quiz_id})
         if existing:
             col.delete_one({"_id": doc["_id"]})
         else:
@@ -230,9 +289,10 @@ def _upgrade_legacy_quiz_results() -> None:
     for lang in ["zh", "en"]:
         now = datetime.now(timezone.utc)
         meta_col.update_one(
-            {"language": lang, "set_id": DEFAULT_SET_ID},
+            {"store_name": JTI_STORE_NAME, "language": lang, "set_id": DEFAULT_SET_ID},
             {
                 "$setOnInsert": {
+                    "store_name": JTI_STORE_NAME,
                     "language": lang,
                     "set_id": DEFAULT_SET_ID,
                     "name": _default_quiz_results_set_payload(lang)["name"],
@@ -248,12 +308,14 @@ def _upgrade_legacy_quiz_results() -> None:
 
 def migrate_quiz_results() -> None:
     """Seed quiz results from JSON → MongoDB and sync stale default sets."""
-    from app.services.jti.quiz_results_store import get_quiz_results_store
-
     # First, upgrade any legacy data
     _upgrade_legacy_quiz_results()
 
+    from app.services.jti.quiz_results_store import get_quiz_results_store
     store = get_quiz_results_store()
+    
+    # Trigger new unique index creation
+    store._ensure_indexes()
 
     for lang, path in QUIZ_RESULTS_PATHS.items():
         if not path.exists():

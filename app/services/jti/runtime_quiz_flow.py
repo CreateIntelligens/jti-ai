@@ -23,31 +23,55 @@ from app.services.jti.response_assembly import (
     extract_option_texts,
 )
 from app.tools.jti.quiz import get_total_questions
-from app.tools.jti.tool_executor import tool_executor
+from app.tools.jti.tool_executor import ToolExecutor
+from app.services.quiz.config import QuizFlowConfig, JTI_STORE_NAME
 
 logger = logging.getLogger(__name__)
+
+
+# Global JTI Flow Configuration
+JTI_FLOW_CONFIG = QuizFlowConfig(
+    session_manager_getter=deps.get_jti_session_manager,
+    conversation_logger_getter=deps.get_jti_conversation_logger,
+    tts_manager_getter=deps.get_jti_tts_job_manager,
+    agent=main_agent,
+    store_name=JTI_STORE_NAME,
+    mode="jti",
+)
 
 
 async def execute_quiz_start(
     session_id: str,
     user_message: str = "[API] quiz_start",
+    config: Optional[QuizFlowConfig] = None,
 ) -> ChatResponse:
     """Start a quiz for both direct API and keyword-triggered chat flow."""
-    session_manager = deps.get_jti_session_manager()
-    conversation_logger = deps.get_jti_conversation_logger()
+    cfg = config or JTI_FLOW_CONFIG
+    session_manager = cfg.session_manager_getter()
+    conversation_logger = cfg.conversation_logger_getter()
+    mode = cfg.mode
+    store_name = cfg.store_name
+
     session = session_manager.get_session(session_id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    lang = session.language
+
     if session.step.value == "DONE":
-        if session.language == "en":
-            response_message = (
-                "You've already completed the quiz! Please refresh the page to start a new session."
-            )
-        else:
-            response_message = (
-                "你已經完成過測驗囉！這次對話只能測驗一次。如果想重新測驗，請重新整理頁面開始新的對話。"
-            )
+        response_message = None
+        if cfg.copy_templates:
+            response_message = cfg.copy_templates.get("already_done", {}).get(lang)
+
+        if not response_message:
+            if lang == "en":
+                response_message = (
+                    "You've already completed the quiz! Please refresh the page to start a new session."
+                )
+            else:
+                response_message = (
+                    "你已經完成過測驗囉！這次對話只能測驗一次。如果想重新測驗，請重新整理頁面開始新的對話。"
+                )
 
         log_result = conversation_logger.log_conversation(
             session_id=session_id,
@@ -55,10 +79,10 @@ async def execute_quiz_start(
             agent_response=response_message,
             tool_calls=[],
             session_state=build_session_state(session),
-            mode="jti",
+            mode=mode,
         )
         final_turn_number = log_result[1] if log_result else None
-        response_fields = build_jti_response_fields(response_message, session.language)
+        response_fields = build_jti_response_fields(response_message, lang, config=cfg)
         return ChatResponse(
             **response_fields,
             session=session.model_dump(),
@@ -66,13 +90,14 @@ async def execute_quiz_start(
             turn_number=final_turn_number,
         )
 
-    tool_result = await tool_executor.execute("start_quiz", {"session_id": session_id})
+    executor = ToolExecutor(cfg)
+    tool_result = await executor.execute("start_quiz", {"session_id": session_id})
     updated_session = session_manager.get_session(session_id)
 
     if not tool_result.get("success"):
         error_message = tool_result.get("error", "start_quiz failed")
         fallback_lang = updated_session.language if updated_session else session.language
-        response_fields = build_jti_response_fields(error_message, fallback_lang)
+        response_fields = build_jti_response_fields(error_message, fallback_lang, config=cfg)
         return ChatResponse(
             **response_fields,
             session=updated_session.model_dump() if updated_session else session.model_dump(),
@@ -84,8 +109,14 @@ async def execute_quiz_start(
     q = tool_result.get("current_question") or (
         updated_session.current_question if updated_session else None
     )
-    opening = QUIZ_OPENING.get(lang, QUIZ_OPENING["zh"])
-    response_fields = build_jti_quiz_question_fields(q, 1, lang, prefix=opening)
+
+    opening = None
+    if cfg.copy_templates:
+        opening = cfg.copy_templates.get("opening", {}).get(lang)
+    if not opening:
+        opening = QUIZ_OPENING.get(lang, QUIZ_OPENING["zh"])
+
+    response_fields = build_jti_quiz_question_fields(q, 1, lang, prefix=opening, config=cfg)
 
     log_result = conversation_logger.log_conversation(
         session_id=session_id,
@@ -93,7 +124,7 @@ async def execute_quiz_start(
         agent_response=response_fields["message"],
         tool_calls=[{"tool": "start_quiz", "args": {"session_id": session_id}, "result": tool_result}],
         session_state=build_session_state(updated_session or session),
-        mode="jti",
+        mode=mode,
     )
     final_turn_number = log_result[1] if log_result else None
 
@@ -106,28 +137,41 @@ async def execute_quiz_start(
     )
 
 
-async def handle_quiz_message(session, request) -> Optional[ChatResponse]:
-    """Handle active JTI quiz answers. Return None to continue non-quiz flow."""
+async def handle_quiz_message(
+    session,
+    request,
+    config: Optional[QuizFlowConfig] = None,
+) -> Optional[ChatResponse]:
+    """Handle active quiz answers. Return None to continue non-quiz flow."""
     if session.step.value != "QUIZ" or not session.current_question:
         return None
 
-    agent = main_agent
-    session_manager = deps.get_jti_session_manager()
-    conversation_logger = deps.get_jti_conversation_logger()
-    tts_manager = deps.get_jti_tts_job_manager()
+    cfg = config or JTI_FLOW_CONFIG
+    agent = cfg.agent
+    session_manager = cfg.session_manager_getter()
+    conversation_logger = cfg.conversation_logger_getter()
 
     def with_tts(response: ChatResponse, language: str) -> ChatResponse:
-        return attach_tts_message_id(response, language, tts_manager)
+        if cfg.tts_manager_getter:
+            tts_manager = cfg.tts_manager_getter()
+            if tts_manager:
+                return attach_tts_message_id(response, language, tts_manager)
+        return response
 
     q = session.current_question
-    total_questions = get_total_questions(session.language)
+    total_questions = get_total_questions(session.language, store_name=cfg.store_name)
     current_q_num = len(session.answers) + 1
 
-    if request.message.strip() == "中斷":
+    # Support custom abort keywords if specified
+    abort_msg = "中斷"
+    is_abort = request.message.strip() == abort_msg
+
+    if is_abort:
         pause_response = ChatResponse(**(await _pause_quiz_and_respond(
             session_id=request.session_id,
             log_user_message=request.message,
             session=session,
+            config=cfg,
         )))
         return with_tts(pause_response, session.language)
 
@@ -141,11 +185,13 @@ async def handle_quiz_message(session, request) -> Optional[ChatResponse]:
             session_id=request.session_id,
             log_user_message=request.message,
             session=session,
+            config=cfg,
         )))
         return with_tts(pause_response, session.language)
 
+    executor = ToolExecutor(cfg)
     if user_choice:
-        tool_result = await tool_executor.execute("submit_answer", {
+        tool_result = await executor.execute("submit_answer", {
             "session_id": request.session_id,
             "user_choice": user_choice,
         })
@@ -165,8 +211,10 @@ async def handle_quiz_message(session, request) -> Optional[ChatResponse]:
                 response_message,
                 updated_session.language,
                 tts_source=tool_result.get("tts_text") or response_message,
+                config=cfg,
             )
-            agent.remove_session(request.session_id)
+            if agent:
+                agent.remove_session(request.session_id)
             updated_session.chat_history.append({"role": "assistant", "content": response_message})
             session_manager.update_session(updated_session)
         else:
@@ -175,6 +223,7 @@ async def handle_quiz_message(session, request) -> Optional[ChatResponse]:
                 next_q,
                 q_num,
                 updated_session.language,
+                config=cfg,
             )
             response_message = response_fields["message"]
 
@@ -184,7 +233,7 @@ async def handle_quiz_message(session, request) -> Optional[ChatResponse]:
             agent_response=response_message,
             tool_calls=tool_calls,
             session_state=build_session_state(updated_session),
-            mode="jti",
+            mode=cfg.mode,
         )
         final_turn_number = log_result[1] if log_result else None
         logger.info(f"QUIZ 作答成功: {request.message} -> {user_choice}")
@@ -200,12 +249,18 @@ async def handle_quiz_message(session, request) -> Optional[ChatResponse]:
         )
         return with_tts(response_payload, updated_session.language)
 
-    hint = "Please choose one of the options!" if session.language == "en" else "請從選項中選一個喜歡的答案喔！"
+    hint = None
+    if cfg.copy_templates:
+        hint = cfg.copy_templates.get("choose_option", {}).get(session.language)
+    if not hint:
+        hint = "Please choose one of the options!" if session.language == "en" else "請從選項中選一個喜歡的答案喔！"
+
     response_fields = build_jti_quiz_question_fields(
         q,
         current_q_num,
         session.language,
         prefix=hint,
+        config=cfg,
     )
     response_message = response_fields["message"]
 
@@ -220,7 +275,7 @@ async def handle_quiz_message(session, request) -> Optional[ChatResponse]:
         agent_response=response_message,
         tool_calls=[],
         session_state=build_session_state(session),
-        mode="jti",
+        mode=cfg.mode,
     )
     final_turn_number = log_result[1] if log_result else None
 

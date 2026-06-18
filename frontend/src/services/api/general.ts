@@ -8,6 +8,7 @@ import type {
   KnowledgeFileContent,
 } from '../../types';
 import { API_BASE, fetchAsAdmin, fetchWithApiKey, fetchWithUserGeminiKey, handleResponse, STORAGE_KEYS, STORAGE_ACTIVE, normLang, buildUrl } from './base';
+import { createQuizBankApi, type QuizBankApi } from './_shared/quizBank';
 
 // ========== Stores & Files ==========
 
@@ -414,6 +415,33 @@ export async function getReindexStatus(sourceType: RagSourceType): Promise<Reind
     method: 'GET',
   });
   return handleResponse<ReindexStatusResponse>(response);
+}
+
+// ========== General Store Quiz APIs ==========
+
+export interface StoreQuizConfig {
+  quiz_enabled: boolean;
+  quiz_start_keywords: string[];
+  quiz_negative_keywords: string[];
+  quiz_copy?: Record<string, any> | null;
+}
+
+export async function getStoreQuizConfig(storeName: string): Promise<StoreQuizConfig> {
+  const response = await fetchWithApiKey(`${API_BASE}/stores/${storeName}/quiz-config`);
+  return handleResponse<StoreQuizConfig>(response);
+}
+
+export async function updateStoreQuizConfig(storeName: string, config: StoreQuizConfig): Promise<void> {
+  const response = await fetchWithApiKey(`${API_BASE}/stores/${storeName}/quiz-config`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(config),
+  });
+  await handleResponse<void>(response);
+}
+
+export function getGeneralQuizApi(storeName: string): QuizBankApi {
+  return createQuizBankApi(`${API_BASE}/general/quiz-bank/${storeName}`);
 }
 
 export default reindexRag;

@@ -1,5 +1,5 @@
 import { API_BASE, fetchAsAdmin, handleResponse, normLang, buildUrl } from './base';
-import { downloadBlob } from '../../utils/download';
+import { createQuizBankApi } from './_shared/quizBank';
 
 // ========== JTI Types ==========
 
@@ -149,160 +149,111 @@ export async function deleteJtiKnowledgeFile(fileName: string, language: string 
 
 // ========== JTI 題庫管理 ==========
 
-export interface QuizQuestionOption {
-  id: string;
-  text: string;
-  score: Record<string, number>;
-}
+import type {
+  QuizQuestionOption,
+  QuizQuestion,
+  QuizBank,
+  QuizBankMetadata,
+  QuizResult,
+  QuizSet,
+  QuizBankStats,
+  QuizBankApi,
+} from './_shared/quizBank';
 
-export interface QuizQuestion {
-  id: string;
-  text: string;
-  weight: number;
-  options: QuizQuestionOption[];
-}
+export type {
+  QuizQuestionOption,
+  QuizQuestion,
+  QuizBank,
+  QuizBankMetadata,
+  QuizResult,
+  QuizSet,
+  QuizBankStats,
+  QuizBankApi,
+};
 
-export interface QuizBank {
-  bank_id: string;
-  name: string;
-  language: string;
-  is_active: boolean;
-  is_default: boolean;
-  question_count: number;
-  quiz_id?: string;
-  title?: string;
-  description?: string;
-}
-
-export interface QuizBankMetadata {
-  bank_id: string;
-  name: string;
-  quiz_id: string;
-  title: string;
-  description: string;
-  total_questions: number;
-  dimensions: string[];
-  tie_breaker_priority: string[];
-  selection_rules: {
-    total: number;
-  };
-  is_active: boolean;
-  is_default: boolean;
-}
-
-export interface QuizResult {
-  quiz_id: string;
-  title: string;
-  color_name: string;
-  recommended_colors: string[];
-  description: string;
-}
-
-export interface QuizSet {
-  set_id: string;
-  name: string;
-  language: string;
-  is_active: boolean;
-  is_default: boolean;
-  quiz_count: number;
-}
-
-export interface QuizBankStats {
-  total_questions: number;
-  categories: Record<string, number>;
-  dimensions: string[];
-  selection_rules: Record<string, unknown>;
-}
+export const jtiQuizApi = createQuizBankApi(`${JTI_ADMIN_BASE}/quiz-bank`);
 
 export async function listQuizBanks(language: string = 'zh'): Promise<{ banks: QuizBank[]; total: number; max: number }> {
-  return apiCall('GET', '/quiz-bank/banks/', language);
+  return jtiQuizApi.listQuizBanks(language);
 }
 
 export async function createQuizBank(language: string, name: string): Promise<QuizBank> {
-  return apiCall('POST', '/quiz-bank/banks/', language, { name });
+  return jtiQuizApi.createQuizBank(language, name);
 }
 
 export async function deleteQuizBank(language: string, bankId: string): Promise<void> {
-  return apiCall('DELETE', `/quiz-bank/banks/${encodeURIComponent(bankId)}`, language);
+  return jtiQuizApi.deleteQuizBank(language, bankId);
 }
 
 export async function activateQuizBank(language: string, bankId: string): Promise<void> {
-  return apiCall('POST', `/quiz-bank/banks/${encodeURIComponent(bankId)}/activate`, language);
+  return jtiQuizApi.activateQuizBank(language, bankId);
 }
 
 export async function listQuizQuestions(language: string = 'zh', bankId?: string): Promise<{ questions: QuizQuestion[]; total: number }> {
-  return apiCall('GET', '/quiz-bank/questions/', language, undefined, bankId ? { bank_id: bankId } : {});
+  return jtiQuizApi.listQuizQuestions(language, bankId);
 }
 
 export async function getQuizQuestion(language: string, id: string, bankId?: string): Promise<QuizQuestion> {
-  return apiCall('GET', `/quiz-bank/questions/${encodeURIComponent(id)}`, language, undefined, bankId ? { bank_id: bankId } : {});
+  return jtiQuizApi.getQuizQuestion(language, id, bankId);
 }
 
 export async function createQuizQuestion(language: string, question: QuizQuestion, bankId?: string): Promise<QuizQuestion> {
-  return apiCall('POST', '/quiz-bank/questions/', language, question, bankId ? { bank_id: bankId } : {});
+  return jtiQuizApi.createQuizQuestion(language, question, bankId);
 }
 
 export async function updateQuizQuestion(language: string, id: string, data: Partial<QuizQuestion>, bankId?: string): Promise<QuizQuestion> {
-  return apiCall('PUT', `/quiz-bank/questions/${encodeURIComponent(id)}`, language, data, bankId ? { bank_id: bankId } : {});
+  return jtiQuizApi.updateQuizQuestion(language, id, data, bankId);
 }
 
 export async function deleteQuizQuestion(language: string, id: string, bankId?: string): Promise<void> {
-  return apiCall('DELETE', `/quiz-bank/questions/${encodeURIComponent(id)}`, language, undefined, bankId ? { bank_id: bankId } : {});
+  return jtiQuizApi.deleteQuizQuestion(language, id, bankId);
 }
 
 export async function getQuizBankMetadata(language: string = 'zh', bankId: string = 'default'): Promise<QuizBankMetadata> {
-  return apiCall('GET', `/quiz-bank/banks/${encodeURIComponent(bankId)}`, language);
+  return jtiQuizApi.getQuizBankMetadata(language, bankId);
 }
 
 export async function updateQuizBankMetadata(language: string, data: Partial<QuizBankMetadata>, bankId: string = 'default'): Promise<QuizBankMetadata> {
-  return apiCall('PATCH', `/quiz-bank/banks/${encodeURIComponent(bankId)}`, language, data);
+  return jtiQuizApi.updateQuizBankMetadata(language, data, bankId);
 }
 
 export async function listQuizSets(language: string = 'zh'): Promise<{ sets: QuizSet[]; total: number; max: number }> {
-  return apiCall('GET', '/quiz-bank/quiz-results/sets/', language);
+  return jtiQuizApi.listQuizSets(language);
 }
 
 export async function createQuizSet(language: string, name: string): Promise<QuizSet> {
-  return apiCall('POST', '/quiz-bank/quiz-results/sets/', language, { name });
+  return jtiQuizApi.createQuizSet(language, name);
 }
 
 export async function deleteQuizSet(language: string, setId: string): Promise<void> {
-  return apiCall('DELETE', `/quiz-bank/quiz-results/sets/${encodeURIComponent(setId)}`, language);
+  return jtiQuizApi.deleteQuizSet(language, setId);
 }
 
 export async function activateQuizSet(language: string, setId: string): Promise<void> {
-  return apiCall('POST', `/quiz-bank/quiz-results/sets/${encodeURIComponent(setId)}/activate`, language);
+  return jtiQuizApi.activateQuizSet(language, setId);
 }
 
 export async function listQuizResults(language: string = 'zh', setId?: string): Promise<{ results: QuizResult[]; total: number }> {
-  return apiCall('GET', '/quiz-bank/quiz-results/', language, undefined, setId ? { set_id: setId } : {});
+  return jtiQuizApi.listQuizResults(language, setId);
 }
 
 export async function updateQuizResult(language: string, quizId: string, data: Partial<QuizResult>, setId?: string): Promise<QuizResult> {
-  return apiCall('PUT', `/quiz-bank/quiz-results/${encodeURIComponent(quizId)}`, language, data, setId ? { set_id: setId } : {});
+  return jtiQuizApi.updateQuizResult(language, quizId, data, setId);
 }
 
 export async function exportQuizResultsCsv(language: string): Promise<void> {
-  const response = await fetchAsAdmin(jtiUrl('/quiz-bank/transfer/export', language, { type: 'results' }));
-  if (!response.ok) throw new Error('Export failed');
-  downloadBlob(await response.blob(), `quiz_results_${language}.csv`);
+  return jtiQuizApi.exportQuizResultsCsv(language);
 }
 
 export async function getQuizBankStats(language: string = 'zh', bankId?: string): Promise<QuizBankStats> {
-  return apiCall('GET', '/quiz-bank/stats/', language, undefined, bankId ? { bank_id: bankId } : {});
+  return jtiQuizApi.getQuizBankStats(language, bankId);
 }
 
 export async function importQuizBank(language: string, bankId: string, file: File, replace = false): Promise<{ count: number; message: string }> {
-  const extra: Record<string, string> = { bank_id: bankId, type: 'questions' };
-  if (replace) extra.replace = 'true';
-  const formData = new FormData();
-  formData.append('file', file);
-  const response = await fetchAsAdmin(jtiUrl('/quiz-bank/transfer/import', language, extra), { method: 'POST', body: formData });
-  return handleResponse(response);
+  return jtiQuizApi.importQuizBank(language, bankId, file, replace);
 }
 
 export async function exportQuizBankCsv(language: string, bankId: string): Promise<void> {
-  const response = await fetchAsAdmin(jtiUrl('/quiz-bank/transfer/export', language, { bank_id: bankId, type: 'questions' }));
-  if (!response.ok) throw new Error('Export failed');
-  downloadBlob(await response.blob(), `quiz_bank_${bankId}_${language}.csv`);
+  return jtiQuizApi.exportQuizBankCsv(language, bankId);
 }
+

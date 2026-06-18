@@ -2,8 +2,8 @@
 MongoDB-backed quiz bank storage with multi-set support.
 
 Stores quiz questions and metadata in collections:
-- quiz_bank_questions: individual question documents (keyed by language + bank_id + id)
-- quiz_bank_metadata: quiz configuration per bank (keyed by language + bank_id)
+- quiz_bank_questions: individual question documents (keyed by store_name + language + bank_id + id)
+- quiz_bank_metadata: quiz configuration per bank (keyed by store_name + language + bank_id)
 
 Max 3 banks per language.
 """
@@ -18,6 +18,7 @@ from typing import Any, Optional
 from pymongo import ReturnDocument
 
 from app.services.mongo_client import get_mongo_db
+from app.services.quiz.config import JTI_STORE_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -38,44 +39,86 @@ class QuizBankStore:
         self._ensure_indexes()
 
     def _ensure_indexes(self) -> None:
-        """確保 (language, bank_id) 唯一,避免重複 default bank。"""
+        """確保 (store_name, language, bank_id) 唯一,避免重複 default bank。"""
         try:
             self.metadata.create_index(
-                [("language", 1), ("bank_id", 1)],
+                [("store_name", 1), ("language", 1), ("bank_id", 1)],
                 unique=True,
-                name="language_1_bank_id_1",
+                name="store_name_1_language_1_bank_id_1",
             )
         except Exception as exc:  # noqa: BLE001 — 啟動期僅記錄,不阻斷
             logger.warning(
-                "[QuizBank] 建立 (language, bank_id) unique index 失敗: %s", exc
+                "[QuizBank] 建立 (store_name, language, bank_id) unique index 失敗: %s", exc
             )
 
     # ===================== Bank Management =====================
 
-    def list_banks(self, language: str) -> list[dict]:
+    def _active_bank_sort(self):
+        return [("is_default", 1), ("created_at", -1)]
+
+    def _active_bank_query(self, language: str, store_name: str) -> dict[str, Any]:
+        return {"store_name": store_name, "language": language, "is_active": True}
+
+    def _repair_multiple_active_banks(self, language: str, store_name: str) -> dict | None:
+        active_banks = list(
+            self.metadata.find(
+                self._active_bank_query(language, store_name),
+                {"_id": 0},
+            ).sort(self._active_bank_sort())
+        )
+        if not active_banks:
+            return None
+
+        selected = active_banks[0]
+        selected_bank_id = selected.get("bank_id")
+        if len(active_banks) > 1 and selected_bank_id:
+            logger.warning(
+                "[QuizBank] %s %s 有 %d 筆 is_active 題庫(預期 1 筆);"
+                "暫以 '%s' 為準並自動收斂 active 狀態。",
+                store_name,
+                language,
+                len(active_banks),
+                selected_bank_id,
+            )
+            self.metadata.update_many(
+                {
+                    **self._active_bank_query(language, store_name),
+                    "bank_id": {"$ne": selected_bank_id},
+                },
+                {"$set": {"is_active": False}},
+            )
+        return selected
+
+    def list_banks(self, language: str, store_name: str = JTI_STORE_NAME) -> list[dict]:
         """List all banks for a language."""
+        self._repair_multiple_active_banks(language, store_name)
         cursor = self.metadata.find(
-            {"language": language},
+            {"store_name": store_name, "language": language},
             {"_id": 0},
         ).sort("created_at", 1)
         banks = list(cursor)
         # Add question count per bank
         for bank in banks:
             bank["question_count"] = self.questions.count_documents(
-                {"language": language, "bank_id": bank.get("bank_id")}
+                {"store_name": store_name, "language": language, "bank_id": bank.get("bank_id")}
             )
         return banks
 
-    def create_bank(self, language: str, name: str) -> dict:
+    def create_bank(self, language: str, name: str, store_name: str = JTI_STORE_NAME, clone_default: bool = True) -> dict:
         """Create a new bank by cloning the default bank when available."""
-        count = self.metadata.count_documents({"language": language})
+        count = self.metadata.count_documents({"store_name": store_name, "language": language})
         if count >= MAX_BANKS:
             raise ValueError(f"Maximum {MAX_BANKS} banks per language")
 
         now = datetime.now(timezone.utc)
         bank_id = str(uuid.uuid4())[:8]
-        default_meta = self.get_metadata(language, DEFAULT_BANK_ID) or {}
+
+        default_meta = {}
+        if clone_default:
+            default_meta = self.get_metadata(language, DEFAULT_BANK_ID, store_name=store_name) or {}
+
         doc = {
+            "store_name": store_name,
             "language": language,
             "bank_id": bank_id,
             "name": name,
@@ -88,106 +131,91 @@ class QuizBankStore:
                 ["analyst", "diplomat", "guardian", "explorer"],
             ),
             "selection_rules": default_meta.get("selection_rules", {"total": 4}),
-            "is_active": False,
-            "is_default": False,
+            "is_active": not clone_default,
+            "is_default": not clone_default,
             "created_at": now,
             "updated_at": now,
         }
         self.metadata.insert_one(doc)
 
-        default_questions = list(
-            self.questions.find({"language": language, "bank_id": DEFAULT_BANK_ID})
-        )
-        for question in default_questions:
-            question.pop("_id", None)
-            question["language"] = language
-            question["bank_id"] = bank_id
-            question["created_at"] = now
-            question["updated_at"] = now
-        if default_questions:
-            self.questions.insert_many(default_questions)
+        default_questions = []
+        if clone_default:
+            default_questions = list(
+                self.questions.find({"store_name": store_name, "language": language, "bank_id": DEFAULT_BANK_ID})
+            )
+            for question in default_questions:
+                question.pop("_id", None)
+                question["store_name"] = store_name
+                question["language"] = language
+                question["bank_id"] = bank_id
+                question["created_at"] = now
+                question["updated_at"] = now
+            if default_questions:
+                self.questions.insert_many(default_questions)
 
         doc.pop("_id", None)
         doc["question_count"] = len(default_questions)
         return doc
 
-    def delete_bank(self, language: str, bank_id: str) -> bool:
+    def delete_bank(self, language: str, bank_id: str, store_name: str = JTI_STORE_NAME) -> bool:
         """Delete a bank and its questions. Cannot delete default bank."""
-        meta = self.metadata.find_one({"language": language, "bank_id": bank_id})
+        meta = self.metadata.find_one({"store_name": store_name, "language": language, "bank_id": bank_id})
         if not meta:
             return False
         if meta.get("is_default"):
             raise ValueError("Cannot delete the default bank")
 
         was_active = meta.get("is_active", False)
-        self.questions.delete_many({"language": language, "bank_id": bank_id})
-        self.metadata.delete_one({"language": language, "bank_id": bank_id})
+        self.questions.delete_many({"store_name": store_name, "language": language, "bank_id": bank_id})
+        self.metadata.delete_one({"store_name": store_name, "language": language, "bank_id": bank_id})
 
         # If deleted bank was active, activate the default
         if was_active:
             self.metadata.update_one(
-                {"language": language, "bank_id": DEFAULT_BANK_ID},
+                {"store_name": store_name, "language": language, "bank_id": DEFAULT_BANK_ID},
                 {"$set": {"is_active": True}},
             )
         return True
 
-    def set_active_bank(self, language: str, bank_id: str) -> bool:
+    def set_active_bank(self, language: str, bank_id: str, store_name: str = JTI_STORE_NAME) -> bool:
         """Set a bank as active, deactivate others."""
-        meta = self.metadata.find_one({"language": language, "bank_id": bank_id})
+        meta = self.metadata.find_one({"store_name": store_name, "language": language, "bank_id": bank_id})
         if not meta:
             return False
         self.metadata.update_many(
-            {"language": language},
+            {"store_name": store_name, "language": language},
             {"$set": {"is_active": False}},
         )
         self.metadata.update_one(
-            {"language": language, "bank_id": bank_id},
+            {"store_name": store_name, "language": language, "bank_id": bank_id},
             {"$set": {"is_active": True}},
         )
         return True
 
     # ===================== Metadata CRUD =====================
 
-    def get_metadata(self, language: str, bank_id: str | None = None) -> dict | None:
-        """Get quiz bank metadata. If bank_id is None, returns the active bank.
-
-        若同語言出現多筆 is_active=True(髒資料),以確定性順序挑選:
-        自訂 bank 優先,其次最新建立,避免 find_one 不確定回傳。
-        """
+    def get_metadata(self, language: str, bank_id: str | None = None, store_name: str = JTI_STORE_NAME) -> dict | None:
+        """Get quiz bank metadata. If bank_id is None, returns the active bank."""
         if bank_id:
             doc = self.metadata.find_one(
-                {"language": language, "bank_id": bank_id}, {"_id": 0}
+                {"store_name": store_name, "language": language, "bank_id": bank_id}, {"_id": 0}
             )
             return doc
 
-        active_banks = list(
-            self.metadata.find(
-                {"language": language, "is_active": True}, {"_id": 0}
-            ).sort([("is_default", 1), ("created_at", -1)])
-        )
-        if not active_banks:
-            return None
-        if len(active_banks) > 1:
-            logger.warning(
-                "[QuizBank] %s 有 %d 筆 is_active 題庫(預期 1 筆);"
-                "暫以 '%s' 為準。請收斂 active 狀態。",
-                language,
-                len(active_banks),
-                active_banks[0].get("bank_id"),
-            )
-        return active_banks[0]
+        return self._repair_multiple_active_banks(language, store_name)
 
-    def upsert_metadata(self, language: str, bank_id: str, data: dict) -> dict:
+    def upsert_metadata(self, language: str, bank_id: str, data: dict, store_name: str = JTI_STORE_NAME) -> dict:
         """Upsert quiz bank metadata."""
         now = datetime.now(timezone.utc)
         update_data = {
-            k: v for k, v in data.items() if k not in ("_id", "language", "bank_id")
+            k: v for k, v in data.items() if k not in ("_id", "store_name", "language", "bank_id")
         }
+        update_data["store_name"] = store_name
         update_data["language"] = language
         update_data["bank_id"] = bank_id
         update_data["updated_at"] = now
         doc = self.metadata.find_one_and_update(
-            {"language": language, "bank_id": bank_id},
+            {"store_name": store_name, "language": language, "bank_id": bank_id},
             {"$set": update_data, "$setOnInsert": {"created_at": now}},
             upsert=True,
             return_document=ReturnDocument.AFTER,
@@ -197,29 +225,30 @@ class QuizBankStore:
 
     # ===================== Question CRUD =====================
 
-    def list_questions(self, language: str, bank_id: str | None = None) -> list[dict]:
+    def list_questions(self, language: str, bank_id: str | None = None, store_name: str = JTI_STORE_NAME) -> list[dict]:
         """List questions for a bank. If bank_id is None, uses active bank."""
         if not bank_id:
-            meta = self.get_metadata(language)
+            meta = self.get_metadata(language, store_name=store_name)
             bank_id = meta["bank_id"] if meta else DEFAULT_BANK_ID
 
-        query: dict[str, Any] = {"language": language, "bank_id": bank_id}
+        query: dict[str, Any] = {"store_name": store_name, "language": language, "bank_id": bank_id}
         cursor = self.questions.find(
-            query, {"_id": 0, "language": 0, "bank_id": 0}
+            query, {"_id": 0, "store_name": 0, "language": 0, "bank_id": 0}
         ).sort("id", 1)
         return list(cursor)
 
-    def get_question(self, language: str, bank_id: str, question_id: str) -> dict | None:
+    def get_question(self, language: str, bank_id: str, question_id: str, store_name: str = JTI_STORE_NAME) -> dict | None:
         doc = self.questions.find_one(
-            {"language": language, "bank_id": bank_id, "id": question_id},
-            {"_id": 0, "language": 0, "bank_id": 0},
+            {"store_name": store_name, "language": language, "bank_id": bank_id, "id": question_id},
+            {"_id": 0, "store_name": 0, "language": 0, "bank_id": 0},
         )
         return doc
 
-    def create_question(self, language: str, bank_id: str, question: dict) -> dict:
+    def create_question(self, language: str, bank_id: str, question: dict, store_name: str = JTI_STORE_NAME) -> dict:
         now = datetime.now(timezone.utc)
         doc = {
             **question,
+            "store_name": store_name,
             "language": language,
             "bank_id": bank_id,
             "created_at": now,
@@ -227,38 +256,40 @@ class QuizBankStore:
         }
         self.questions.insert_one(doc)
         doc.pop("_id", None)
+        doc.pop("store_name", None)
         doc.pop("language", None)
         doc.pop("bank_id", None)
         return doc
 
     def update_question(
-        self, language: str, bank_id: str, question_id: str, question: dict
+        self, language: str, bank_id: str, question_id: str, question: dict, store_name: str = JTI_STORE_NAME
     ) -> dict | None:
         now = datetime.now(timezone.utc)
         update_data = {
-            k: v for k, v in question.items() if k not in ("_id", "language", "bank_id")
+            k: v for k, v in question.items() if k not in ("_id", "store_name", "language", "bank_id")
         }
         update_data["updated_at"] = now
 
         doc = self.questions.find_one_and_update(
-            {"language": language, "bank_id": bank_id, "id": question_id},
+            {"store_name": store_name, "language": language, "bank_id": bank_id, "id": question_id},
             {"$set": update_data},
             return_document=ReturnDocument.AFTER,
         )
         if not doc:
             return None
         doc.pop("_id", None)
+        doc.pop("store_name", None)
         doc.pop("language", None)
         doc.pop("bank_id", None)
         return doc
 
-    def delete_question(self, language: str, bank_id: str, question_id: str) -> bool:
+    def delete_question(self, language: str, bank_id: str, question_id: str, store_name: str = JTI_STORE_NAME) -> bool:
         result = self.questions.delete_one(
-            {"language": language, "bank_id": bank_id, "id": question_id}
+            {"store_name": store_name, "language": language, "bank_id": bank_id, "id": question_id}
         )
         return result.deleted_count > 0
 
-    def bulk_upsert_questions(self, language: str, bank_id: str, questions: list[dict]) -> int:
+    def bulk_upsert_questions(self, language: str, bank_id: str, questions: list[dict], store_name: str = JTI_STORE_NAME) -> int:
         """Bulk upsert questions into a bank."""
         if not questions:
             return 0
@@ -266,9 +297,9 @@ class QuizBankStore:
         count = 0
         for q in questions:
             self.questions.update_one(
-                {"language": language, "bank_id": bank_id, "id": q["id"]},
+                {"store_name": store_name, "language": language, "bank_id": bank_id, "id": q["id"]},
                 {
-                    "$set": {**q, "language": language, "bank_id": bank_id, "updated_at": now},
+                    "$set": {**q, "store_name": store_name, "language": language, "bank_id": bank_id, "updated_at": now},
                     "$setOnInsert": {"created_at": now},
                 },
                 upsert=True,
@@ -276,21 +307,21 @@ class QuizBankStore:
             count += 1
         return count
 
-    def replace_all_questions(self, language: str, bank_id: str, questions: list[dict]) -> int:
+    def replace_all_questions(self, language: str, bank_id: str, questions: list[dict], store_name: str = JTI_STORE_NAME) -> int:
         """Replace all questions in a bank (delete then insert)."""
-        self.questions.delete_many({"language": language, "bank_id": bank_id})
-        return self.bulk_upsert_questions(language, bank_id, questions)
+        self.questions.delete_many({"store_name": store_name, "language": language, "bank_id": bank_id})
+        return self.bulk_upsert_questions(language, bank_id, questions, store_name=store_name)
 
     # ===================== Full Bank Export =====================
 
-    def get_full_bank(self, language: str) -> dict | None:
+    def get_full_bank(self, language: str, store_name: str = JTI_STORE_NAME) -> dict | None:
         """Reassemble active bank's metadata + questions for quiz.py."""
-        meta = self.get_metadata(language)
+        meta = self.get_metadata(language, store_name=store_name)
         if not meta:
             return None
 
         bank_id = meta.get("bank_id", DEFAULT_BANK_ID)
-        questions = self.list_questions(language, bank_id)
+        questions = self.list_questions(language, bank_id, store_name=store_name)
         clean_questions = []
         for q in questions:
             clean_q = {

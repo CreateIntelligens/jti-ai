@@ -16,6 +16,38 @@ class SessionModelTests(unittest.TestCase):
 
 
 class QuizResultFlowTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        import sys
+        import importlib
+
+        # Unconditionally delete all app modules to force clean imports of everything
+        to_del = [m for m in list(sys.modules.keys()) if m.startswith("app.") or m == "app"]
+        for m in to_del:
+            del sys.modules[m]
+
+        # Dynamically import models to get fresh class definitions matching the reloaded modules
+        session_mod = importlib.import_module("app.models.session")
+        self.Session = session_mod.Session
+        self.SessionStep = session_mod.SessionStep
+
+        sm_factory = importlib.import_module("app.services.session.session_manager_factory")
+        if hasattr(sm_factory, "_singletons"):
+            sm_factory._singletons.clear()
+
+        global session_manager, tool_executor
+        session_manager = sm_factory.get_jti_session_manager()
+        
+        tool_exec_mod = importlib.import_module("app.tools.jti.tool_executor")
+        tool_executor = tool_exec_mod.tool_executor
+
+        # Clear module-level caches in quiz and quiz_results tools
+        quiz_mod = importlib.import_module("app.tools.jti.quiz")
+        if hasattr(quiz_mod, "quiz_data_cache"):
+            quiz_mod.quiz_data_cache.clear()
+        results_mod = importlib.import_module("app.tools.jti.quiz_results")
+        if hasattr(results_mod, "_quiz_results_cache"):
+            results_mod._quiz_results_cache.clear()
+
     async def test_calculate_quiz_result_after_scoring(self):
         session = session_manager.create_session()
         session_manager.start_scoring(session.session_id)
@@ -29,7 +61,7 @@ class QuizResultFlowTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(result.get("quiz_id"), "analyst")
 
         updated = session_manager.get_session(session.session_id)
-        self.assertEqual(updated.step, SessionStep.DONE)
+        self.assertEqual(updated.step, self.SessionStep.DONE)
         self.assertEqual(updated.quiz_result_id, "analyst")
 
     async def test_calculate_quiz_result_uses_session_language(self):

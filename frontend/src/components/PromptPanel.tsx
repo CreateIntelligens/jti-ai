@@ -6,6 +6,7 @@ import { useEscapeKey } from '../hooks/useEscapeKey';
 import { useOverlayPressClose } from '../hooks/useOverlayPressClose';
 import { toErrorMessage } from '../utils/errors';
 import { confirmDiscard } from '../utils/confirmDiscard';
+import QuizManagementTab from './quiz/QuizManagementTab';
 
 interface PromptPanelProps {
   isOpen: boolean;
@@ -201,7 +202,7 @@ export default function PromptPanel({
   onRestartChat,
   onShowStatus,
 }: PromptPanelProps) {
-  const [promptTab, setPromptTab] = useState<'system' | 'model'>('system');
+  const [promptTab, setPromptTab] = useState<'system' | 'model' | 'quiz'>('system');
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [activePromptId, setActivePromptId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -211,6 +212,10 @@ export default function PromptPanel({
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [maxPrompts, setMaxPrompts] = useState(3);
+
+  const [quizConfig, setQuizConfig] = useState<api.StoreQuizConfig | null>(null);
+  const [quizConfigLoading, setQuizConfigLoading] = useState(false);
+  const [savingQuizConfig, setSavingQuizConfig] = useState(false);
 
   const [availableModels, setAvailableModels] = useState<api.ModelInfo[]>([]);
   const [modelsLoading, setModelsLoading] = useState(false);
@@ -253,6 +258,38 @@ export default function PromptPanel({
     void loadModels();
     return () => { cancelled = true; };
   }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && currentStore && promptTab === 'quiz') {
+      void loadQuizConfig();
+    }
+  }, [isOpen, currentStore, promptTab]);
+
+  async function loadQuizConfig() {
+    if (!currentStore) return;
+    setQuizConfigLoading(true);
+    try {
+      const config = await api.getStoreQuizConfig(currentStore);
+      setQuizConfig(config);
+    } catch (e) {
+      console.error('Failed to load store quiz config:', e);
+    } finally {
+      setQuizConfigLoading(false);
+    }
+  }
+
+  async function handleSaveQuizConfig() {
+    if (!currentStore || !quizConfig) return;
+    setSavingQuizConfig(true);
+    try {
+      await api.updateStoreQuizConfig(currentStore, quizConfig);
+      onShowStatus?.('✅ Quiz 設定已更新');
+    } catch (e) {
+      alert('更新 Quiz 設定失敗: ' + toErrorMessage(e));
+    } finally {
+      setSavingQuizConfig(false);
+    }
+  }
 
   const editingPrompt = prompts.find((p) => p.id === editingId) || null;
   const previewingPrompt = prompts.find((p) => p.id === previewingId) || null;
@@ -471,7 +508,7 @@ export default function PromptPanel({
               </div>
 
               <div className="prompt-tab-row">
-                {([['system', '系統 Prompt'], ['model', '模型設定']] as const).map(
+                {([['system', '系統 Prompt'], ['model', '模型設定'], ['quiz', '選擇題 Quiz']] as const).map(
                   ([id, label]) => (
                     <button
                       key={id}
@@ -710,6 +747,95 @@ export default function PromptPanel({
                       }
                     />
                   </div>
+                </div>
+              )}
+
+              {promptTab === 'quiz' && (
+                <div className="rp-stack-lg">
+                  {quizConfigLoading ? (
+                    <div className="rp-loading">載入中...</div>
+                  ) : quizConfig ? (
+                    <>
+                      <div className="field">
+                        <label className="checkbox-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={quizConfig.quiz_enabled}
+                            onChange={(e) =>
+                              setQuizConfig({
+                                ...quizConfig,
+                                quiz_enabled: e.target.checked,
+                              })
+                            }
+                          />
+                          <span style={{ fontWeight: '500' }}>啟用選擇題 Quiz</span>
+                        </label>
+                        <span className="field-hint">
+                          啟用後，使用者可以透過特定的關鍵字啟動選擇題測驗。
+                        </span>
+                      </div>
+
+                      <div className="field">
+                        <label style={{ fontWeight: '500' }}>啟動關鍵字 (以半角逗號分隔)</label>
+                        <input
+                          className="input-base"
+                          placeholder="例如：測驗,開始測驗,quiz"
+                          value={quizConfig.quiz_start_keywords.join(',')}
+                          onChange={(e) =>
+                            setQuizConfig({
+                              ...quizConfig,
+                              quiz_start_keywords: e.target.value
+                                .split(',')
+                                .map((s) => s.trim())
+                                .filter(Boolean),
+                            })
+                          }
+                        />
+                        <span className="field-hint">當使用者輸入包含這些字時，將會自動觸發測驗。</span>
+                      </div>
+
+                      <div className="field">
+                        <label style={{ fontWeight: '500' }}>拒絕關鍵字 (以半角逗號分隔)</label>
+                        <input
+                          className="input-base"
+                          placeholder="例如：不要,不要測驗,取消"
+                          value={quizConfig.quiz_negative_keywords.join(',')}
+                          onChange={(e) =>
+                            setQuizConfig({
+                              ...quizConfig,
+                              quiz_negative_keywords: e.target.value
+                                .split(',')
+                                .map((s) => s.trim())
+                                .filter(Boolean),
+                            })
+                          }
+                        />
+                        <span className="field-hint">當使用者輸入包含這些字時，測驗引導會取消。</span>
+                      </div>
+
+                      <button
+                        className="btn btn-primary"
+                        onClick={handleSaveQuizConfig}
+                        disabled={savingQuizConfig}
+                        style={{ alignSelf: 'flex-start' }}
+                      >
+                        {savingQuizConfig ? '儲存中...' : '儲存 Quiz 設定'}
+                      </button>
+
+                      {quizConfig.quiz_enabled && (
+                        <div className="quiz-bank-settings-section" style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid var(--border-color, #e5e7eb)' }}>
+                          <div className="rp-section-title" style={{ marginBottom: '1rem' }}>測驗題庫與結果管理</div>
+                          <QuizManagementTab
+                            language="zh"
+                            api={api.getGeneralQuizApi(currentStore)}
+                            appContext="general"
+                          />
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="rp-error">無法載入設定</div>
+                  )}
                 </div>
               )}
             </>

@@ -13,8 +13,9 @@ from typing import Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from app.auth import verify_authenticated
-from app.routers.general.stores import resolve_store_config
+from app.auth import verify_authenticated, verify_auth
+from app.routers.general.stores import resolve_store_config, _authorize_store_access
+from fastapi import Request
 import app.deps as deps
 
 SYSTEM_DEFAULT_PROMPT_ID = "system_default"
@@ -273,3 +274,57 @@ def get_active_store_prompt(store_name: str):
         return {"message": "尚未設定啟用的 Prompt", "prompt": None}
 
     return {"prompt": prompt.model_dump()}
+
+
+class QuizConfigModel(BaseModel):
+    quiz_enabled: Optional[bool] = None
+    quiz_start_keywords: Optional[list[str]] = None
+    quiz_negative_keywords: Optional[list[str]] = None
+    quiz_copy: Optional[dict[str, dict[str, str]]] = None
+
+
+@router.get("/{store_name:path}/quiz-config")
+def get_quiz_config(
+    store_name: str,
+    request: Request,
+    auth: dict = Depends(verify_auth),
+):
+    """取得 Store 的 Quiz 設定"""
+    _authorize_store_access(store_name, request, auth)
+    if not deps.prompt_manager:
+        raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
+
+    store_prompts = deps.prompt_manager.get_store_prompts(store_name)
+    return {
+        "quiz_enabled": store_prompts.quiz_enabled,
+        "quiz_start_keywords": store_prompts.quiz_start_keywords,
+        "quiz_negative_keywords": store_prompts.quiz_negative_keywords,
+        "quiz_copy": store_prompts.quiz_copy,
+    }
+
+
+@router.put("/{store_name:path}/quiz-config")
+def update_quiz_config(
+    store_name: str,
+    request_data: QuizConfigModel,
+    request: Request,
+    auth: dict = Depends(verify_auth),
+):
+    """更新 Store 的 Quiz 設定"""
+    _authorize_store_access(store_name, request, auth)
+    if not deps.prompt_manager:
+        raise HTTPException(status_code=500, detail="Prompt Manager 未初始化")
+
+    store_prompts = deps.prompt_manager.get_store_prompts(store_name)
+
+    if request_data.quiz_enabled is not None:
+        store_prompts.quiz_enabled = request_data.quiz_enabled
+    if request_data.quiz_start_keywords is not None:
+        store_prompts.quiz_start_keywords = request_data.quiz_start_keywords
+    if request_data.quiz_negative_keywords is not None:
+        store_prompts.quiz_negative_keywords = request_data.quiz_negative_keywords
+    if request_data.quiz_copy is not None:
+        store_prompts.quiz_copy = request_data.quiz_copy
+
+    deps.prompt_manager.save_store_prompts(store_prompts)
+    return {"message": "Quiz 設定已更新"}

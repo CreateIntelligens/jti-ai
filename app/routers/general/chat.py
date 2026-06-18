@@ -306,6 +306,62 @@ async def send_message(req: ChatMessageRequest, request: Request, auth: dict = D
             managed_app=config.managed_app if config else None,
             managed_language=config.managed_language if config else None,
         )
+    else:
+        store_name = session.metadata.get("store_name")
+
+    # ========== QUIZ Interception ==========
+    store_prompts = deps.prompt_manager.get_store_prompts(store_name) if deps.prompt_manager else None
+    if store_prompts and store_prompts.quiz_enabled:
+        from app.services.general.quiz_flow import build_general_quiz_config
+        from app.services.jti.runtime_quiz_flow import handle_quiz_message, execute_quiz_start
+        from app.services.jti.quiz_helpers import is_quiz_start_intent
+
+        quiz_cfg = build_general_quiz_config(
+            store_name=store_name,
+            copy=store_prompts.quiz_copy,
+            keywords=store_prompts.quiz_start_keywords,
+        )
+
+        quiz_response = await handle_quiz_message(session, req, config=quiz_cfg)
+        if quiz_response:
+            return {
+                "answer": quiz_response.message,
+                "session_id": session.session_id,
+                "turn_number": quiz_response.turn_number,
+                "citations": [],
+                "options": quiz_response.options,
+                "quiz_result_id": quiz_response.quiz_result_id,
+            }
+
+        kwargs = {}
+        if store_prompts.quiz_start_keywords:
+            kwargs["start_keywords"] = store_prompts.quiz_start_keywords
+        if store_prompts.quiz_negative_keywords:
+            kwargs["negative_keywords"] = store_prompts.quiz_negative_keywords
+
+        should_start_quiz = is_quiz_start_intent(req.message, **kwargs)
+
+        if should_start_quiz and session.step.value in ("DONE", "WELCOME"):
+            from app.models.session import SessionStep
+            if session.step.value == "DONE":
+                session.step = SessionStep.WELCOME
+                session_manager.update_session(session)
+
+            if req.turn_number:
+                try:
+                    _get_conversation_logger().delete_turns_from(session.session_id, req.turn_number)
+                except Exception:
+                    pass
+
+            quiz_start_res = await execute_quiz_start(session.session_id, user_message=req.message, config=quiz_cfg)
+            return {
+                "answer": quiz_start_res.message,
+                "session_id": session.session_id,
+                "turn_number": quiz_start_res.turn_number,
+                "citations": [],
+                "options": quiz_start_res.options,
+                "quiz_result_id": quiz_start_res.quiz_result_id,
+            }
 
     if req.turn_number is not None:
         keep_turns = max(req.turn_number - 1, 0)

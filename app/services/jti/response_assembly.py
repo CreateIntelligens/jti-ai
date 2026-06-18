@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Any, Optional
 
-from app.services.jti.tts import to_jti_tts_text
+from app.services.quiz.config import QuizFlowConfig
 
 QUIZ_OPENING = {
     "zh": "簡單四個問題，幫你找到命定保護殼，如果中途想離開，請輸入「中斷」，即可回到問答模式，讓我們開始測驗吧！",
@@ -59,12 +59,20 @@ def build_jti_response_fields(
     language: str,
     *,
     tts_source: Optional[str] = None,
+    config: Optional[QuizFlowConfig] = None,
 ) -> dict[str, Optional[str]]:
     """Build the shared message/TTS field pair for a JTI response."""
     raw_tts = message if tts_source is None else tts_source
+    
+    if config and config.tts_fn:
+        tts_text = config.tts_fn(raw_tts, language)
+    else:
+        from app.services.jti.tts import to_jti_tts_text
+        tts_text = to_jti_tts_text(raw_tts, language)
+        
     return {
         "message": message,
-        "tts_text": to_jti_tts_text(raw_tts, language),
+        "tts_text": tts_text,
     }
 
 
@@ -74,6 +82,7 @@ def build_jti_quiz_question_fields(
     language: str,
     *,
     prefix: Optional[str] = None,
+    config: Optional[QuizFlowConfig] = None,
 ) -> dict[str, Optional[str]]:
     """Build message/TTS fields for a quiz question response."""
     question_text = build_quiz_question_text(question, question_number, language)
@@ -82,4 +91,4 @@ def build_jti_quiz_question_fields(
     message_body = f"{question_text}\n{options_text}"
     message = f"{prefix}\n\n{message_body}" if prefix else message_body
     tts_source = f"{prefix} {question_text}" if prefix else question_text
-    return build_jti_response_fields(message, language, tts_source=tts_source)
+    return build_jti_response_fields(message, language, tts_source=tts_source, config=config)

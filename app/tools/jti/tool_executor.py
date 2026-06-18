@@ -16,18 +16,16 @@ from app.tools.jti.quiz import (
     complete_selected_questions,
 )
 from app.tools.jti.quiz_results import calculate_quiz_result as calc_quiz_result
+from app.services.quiz.config import QuizFlowConfig, JTI_STORE_NAME
 
 logger = logging.getLogger(__name__)
-
-
-def _get_session_manager():
-    return deps.get_jti_session_manager()
 
 
 class ToolExecutor:
     """Tool 執行器"""
 
-    def __init__(self):
+    def __init__(self, config: Optional[QuizFlowConfig] = None):
+        self.config = config or JTI_CONFIG
         self.tool_map = {
             "quiz_response": self._execute_quiz_response,
             "start_quiz": self._execute_start_quiz,
@@ -69,8 +67,8 @@ class ToolExecutor:
     def _truncate_text(text: str, limit: int = 200) -> str:
         return text[:limit] if len(text) > limit else text
 
-    @staticmethod
     def _build_quiz_result_message(
+        self,
         language: str,
         quiz_id: Optional[str],
         quiz_info: Optional[Dict[str, Any]],
@@ -132,7 +130,7 @@ class ToolExecutor:
 
     async def _execute_quiz_response(self, args: Dict) -> Dict:
         """統一處理測驗互動（開始測驗 或 回答題目）"""
-        session_manager = _get_session_manager()
+        session_manager = self.config.session_manager_getter()
         session_id = args.get("session_id")
         action = args.get("action")
         user_choice = args.get("user_choice", "")
@@ -177,7 +175,7 @@ class ToolExecutor:
 
     async def _execute_start_quiz(self, args: Dict) -> Dict:
         """開始測驗"""
-        session_manager = _get_session_manager()
+        session_manager = self.config.session_manager_getter()
         session_id = args.get("session_id")
 
         if not session_id:
@@ -186,8 +184,9 @@ class ToolExecutor:
         # 取得 session 語言設定
         session = session_manager.get_session(session_id)
         language = session.language if session else "zh"
+        store_name = self.config.store_name
 
-        total_questions = get_total_questions(language)
+        total_questions = get_total_questions(language, store_name=store_name)
 
         # rollback 重新生成時沿用既有抽題序列；全新開始測驗則重新抽題
         if (
@@ -198,7 +197,7 @@ class ToolExecutor:
         ):
             selected_questions = session.selected_questions
         else:
-            selected_questions = generate_random_quiz(language)
+            selected_questions = generate_random_quiz(language, store_name=store_name)
 
         # 重置測驗狀態並保存選中的題目
         session = session_manager.start_quiz(session_id, selected_questions)
@@ -225,7 +224,7 @@ class ToolExecutor:
 
     async def _execute_get_question(self, args: Dict) -> Dict:
         """取得當前題目"""
-        session_manager = _get_session_manager()
+        session_manager = self.config.session_manager_getter()
         session_id = args.get("session_id")
 
         if not session_id:
@@ -242,7 +241,8 @@ class ToolExecutor:
         else:
             question = None
 
-        total = get_total_questions(session.language)
+        store_name = self.config.store_name
+        total = get_total_questions(session.language, store_name=store_name)
 
         if question is None:
             # 已經完成所有題目
@@ -261,7 +261,7 @@ class ToolExecutor:
 
     async def _execute_submit_answer(self, args: Dict) -> Dict:
         """提交答案"""
-        session_manager = _get_session_manager()
+        session_manager = self.config.session_manager_getter()
         session_id = args.get("session_id")
 
         # 檢查是否來自 LLM（有 user_choice）還是內部呼叫（有 question_id + option_id）
@@ -298,7 +298,8 @@ class ToolExecutor:
             return {"error": "Session not found or invalid state"}
 
         # 檢查是否完成測驗
-        total_questions = get_total_questions(session.language)
+        store_name = self.config.store_name
+        total_questions = get_total_questions(session.language, store_name=store_name)
         is_complete = session.is_quiz_complete(total_questions)
 
         logger.info(f"Answer submitted: Q{question_id}={option_id}, answered={len(session.answers)}/{total_questions}, complete={is_complete}")
@@ -331,6 +332,7 @@ class ToolExecutor:
                 completed_questions = complete_selected_questions(
                     session.selected_questions,
                     language=session.language,
+                    store_name=store_name,
                 )
                 if len(completed_questions) > len(session.selected_questions):
                     session.selected_questions = completed_questions
@@ -426,7 +428,7 @@ Format:
 
     async def _execute_calculate_quiz_result(self, args: Dict) -> Dict:
         """計算測驗結果"""
-        session_manager = _get_session_manager()
+        session_manager = self.config.session_manager_getter()
         session_id = args.get("session_id")
 
         if not session_id:
@@ -441,7 +443,8 @@ Format:
         session_manager.start_scoring(session_id)
 
         # 計算測驗結果
-        result = calc_quiz_result(session.answers, language=session.language)
+        store_name = self.config.store_name
+        result = calc_quiz_result(session.answers, language=session.language, store_name=store_name)
         quiz_id = result.get("quiz_id")
         quiz_scores = result.get("quiz_scores", {})
         quiz_info = result.get("result")
@@ -467,5 +470,14 @@ Format:
             "tts_text": message,
         }
 
-# 全域實例
-tool_executor = ToolExecutor()
+
+# 全域實例 (JTI Config)
+JTI_CONFIG = QuizFlowConfig(
+    session_manager_getter=deps.get_jti_session_manager,
+    conversation_logger_getter=deps.get_jti_conversation_logger,
+    tts_manager_getter=deps.get_jti_tts_job_manager,
+    store_name=JTI_STORE_NAME,
+    mode="jti",
+)
+
+tool_executor = ToolExecutor(JTI_CONFIG)

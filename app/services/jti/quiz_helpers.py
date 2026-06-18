@@ -5,7 +5,7 @@ Quiz helper functions extracted from app/routers/jti.py
 import os
 import re
 import logging
-from typing import Any
+from typing import Any, Optional
 
 import app.deps as deps
 from app.models_config import QUIZ_HELPER_MODEL, fallback_chain
@@ -13,9 +13,9 @@ from app.services.jti.response_assembly import (
     build_jti_response_fields,
     format_option_texts,
 )
-from app.services.jti.main_agent import main_agent
 from app.services.gemini_service import gemini_with_fallback, gemini_with_retry, run_sync
 from app.services.gemini_clients import get_default_client
+from app.services.quiz.config import QuizFlowConfig
 
 logger = logging.getLogger(__name__)
 
@@ -33,22 +33,14 @@ QUIZ_NEGATIVE_KEYWORDS = (
 )
 
 
-def is_quiz_start_intent(message: str) -> bool:
+def is_quiz_start_intent(message: str, start_keywords=QUIZ_START_KEYWORDS, negative_keywords=QUIZ_NEGATIVE_KEYWORDS) -> bool:
     """Detect quiz-start intent: has any start keyword and no rejection keyword."""
     msg = (message or "").lower()
-    has_start = any(kw in msg for kw in QUIZ_START_KEYWORDS)
+    has_start = any(kw in msg for kw in start_keywords)
     if not has_start:
         return False
-    has_reject = any(kw in msg for kw in QUIZ_NEGATIVE_KEYWORDS)
+    has_reject = any(kw in msg for kw in negative_keywords)
     return not has_reject
-
-
-def _get_session_manager():
-    return deps.get_jti_session_manager()
-
-
-def _get_conversation_logger():
-    return deps.get_jti_conversation_logger()
 
 
 def build_session_state(session) -> dict:
@@ -63,65 +55,89 @@ def build_session_state(session) -> dict:
     }
 
 
-def _get_or_rebuild_session(session_id: str):
+def _get_or_rebuild_session(session_id: str, config: Optional[QuizFlowConfig] = None):
     """取得 session，若已過期則嘗試從 conversation logs 重建"""
-    session_manager = _get_session_manager()
-    conversation_logger = _get_conversation_logger()
+    from app.services.jti.runtime_quiz_flow import JTI_FLOW_CONFIG
+    cfg = config or JTI_FLOW_CONFIG
+
+    session_manager = cfg.session_manager_getter()
+    conversation_logger = cfg.conversation_logger_getter()
+    agent = cfg.agent
+    mode = cfg.mode
+
     session = session_manager.get_session(session_id)
     if session:
         return session
 
     # 嘗試從 conversation logs 重建
     logs = conversation_logger.get_session_logs(session_id)
-    jti_logs = [l for l in logs if l.get("mode") == "jti"]
-    if not jti_logs:
+    filtered_logs = [l for l in logs if l.get("mode") == mode]
+    if not filtered_logs:
         return None
 
-    session = session_manager.rebuild_session_from_logs(session_id, jti_logs)
-    if session:
-        logger.info(f"Rebuilt expired JTI session from {len(jti_logs)} logs: {session_id[:8]}...")
+    session = session_manager.rebuild_session_from_logs(session_id, filtered_logs)
+    if session and agent:
+        logger.info(f"Rebuilt expired {mode} session from {len(filtered_logs)} logs: {session_id[:8]}...")
         # 清除記憶體中的舊 LLM chat session（下次呼叫時會從 chat_history 自動重建）
-        main_agent.remove_session(session_id)
+        agent.remove_session(session_id)
     return session
+
 
 async def _pause_quiz_and_respond(
     session_id: str,
     log_user_message: str,
     session: Any,
-    turn_number_hint: int | None = None
+    turn_number_hint: int | None = None,
+    config: Optional[QuizFlowConfig] = None,
 ):
     """暫停測驗並回應（returns dict, caller wraps in ChatResponse）"""
-    session_manager = _get_session_manager()
-    conversation_logger = _get_conversation_logger()
+    from app.services.jti.runtime_quiz_flow import JTI_FLOW_CONFIG
+    cfg = config or JTI_FLOW_CONFIG
+
+    session_manager = cfg.session_manager_getter()
+    conversation_logger = cfg.conversation_logger_getter()
+    agent = cfg.agent
+    mode = cfg.mode
+
     updated_session = session_manager.pause_quiz(session_id)
 
     # 用固定文案，不走 AI（避免 AI 從 chat history 撈出測驗中被忽略的問題來回答）
     lang = updated_session.language if updated_session else (session.language if session else "zh")
-    if lang == "en":
-        response_message = "Sure! The quiz is paused. You can start a new quiz anytime by saying 'start quiz'."
-    else:
-        response_message = "好的，測驗先暫停囉。想重新測驗的話跟我說「開始測驗」就好，或是你也可以問我其他問題。"
+    
+    response_message = None
+    if cfg.copy_templates:
+        response_message = cfg.copy_templates.get("paused", {}).get(lang)
+        
+    if not response_message:
+        if lang == "en":
+            response_message = "Sure! The quiz is paused. You can start a new quiz anytime by saying 'start quiz'."
+        else:
+            response_message = "好的，測驗先暫停囉。想重新測驗的話跟我說「開始測驗」就好，或是你也可以問我其他問題。"
 
     # 同步到 chat history（讓 AI 恢復時知道測驗已暫停）
-    main_agent._sync_history_to_db(session_id, log_user_message, response_message)
+    if agent:
+        agent._sync_history_to_db(session_id, log_user_message, response_message)
 
     if turn_number_hint:
         conversation_logger.delete_turns_from(session_id, turn_number_hint)
 
     effective_session = updated_session or session
+    
+    response_fields = build_jti_response_fields(response_message, lang, config=cfg)
+    
     log_result = conversation_logger.log_conversation(
         session_id=session_id,
         user_message=log_user_message,
         agent_response=response_message,
         tool_calls=[],
         session_state=build_session_state(effective_session),
-        mode="jti",
+        mode=mode,
     )
 
     final_turn_number = log_result[1] if log_result else None
 
     return {
-        **build_jti_response_fields(response_message, lang),
+        **response_fields,
         "session": effective_session.model_dump(),
         "tool_calls": [],
         "turn_number": final_turn_number,
@@ -132,7 +148,6 @@ def _match_exact_label(msg_upper: str, labels: list[str]) -> str | None:
     """快速判斷：明確的 A-E"""
     if msg_upper in labels:
         return msg_upper
-    # 只把「獨立字母」當作答案；避免像 "pause" 這種字串含有 A 而誤判為選 A
     label_hits = [
         label
         for label in labels
