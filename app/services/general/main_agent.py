@@ -199,7 +199,10 @@ class MainAgent(BaseAgent):
         }
         if system_instruction:
             session.metadata["system_instruction"] = system_instruction
-        # Keep /start lazy; the first real message flushes metadata with the session.
+        # create_session 已建立即落庫（多 worker 共享狀態），但落庫發生在上面設定 metadata
+        # 之前 → 須再 update 一次把 metadata 寫進 DB，否則 /message 從 DB 讀回的 session
+        # metadata 為空，使 managed store 退化成 general_knowledge（RAG 查空、prompt 失效）。
+        sm.update_session(session)
         return session
 
     def _get_system_instruction(self, session: Session) -> str:

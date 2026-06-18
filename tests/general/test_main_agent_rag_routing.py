@@ -112,3 +112,37 @@ def test_managed_english_store_creates_english_session(monkeypatch):
     assert session.language == "en"
     assert agent._get_session_state(session).startswith("<Internal State Info")
     assert agent._get_question_label(session.language) == "User question:"
+
+
+def test_create_session_persists_metadata_to_db(monkeypatch):
+    """create_session 設好 metadata 後必須落庫，否則 /message 從 DB 讀回 metadata 為空。
+
+    回歸守門：session 改為「建立即落庫」後，落庫發生在設定 metadata 之前；若不再
+    update_session 一次，managed store 的 store_name/managed_app/managed_language 不會
+    進 DB，使 /message 退化成 general_knowledge → RAG 查空、prompt 失效。
+    """
+    import app.services.general.main_agent as general_agent_mod
+
+    fake_manager = FakeSessionManager()
+    monkeypatch.setattr(
+        general_agent_mod.deps,
+        "get_general_chat_session_manager",
+        lambda: fake_manager,
+    )
+    agent = MainAgent()
+
+    agent.create_session(
+        store_name="__jti__",
+        managed_app="jti",
+        managed_language="zh",
+    )
+
+    # update_session 必須被呼叫，且帶著完整 metadata（managed 判據齊全）。
+    persisted = fake_manager.updated
+    assert persisted is not None, "create_session 必須 update_session 把 metadata 落庫"
+    assert persisted.metadata["store_name"] == "__jti__"
+    assert persisted.metadata["managed_app"] == "jti"
+    assert persisted.metadata["managed_language"] == "zh"
+    # 落庫的這份 session 解析得出 managed 路由（不會退化成 general_knowledge）。
+    assert agent._get_rag_source_type_for_session(persisted) == ["jti_knowledge"]
+    assert agent._get_rag_search_language_for_session(persisted) == "zh"
