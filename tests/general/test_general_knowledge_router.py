@@ -108,7 +108,16 @@ knowledge_utils.sync_to_rag = lambda *a, **k: None
 knowledge_utils.delete_from_rag = lambda *a, **k: None
 import app.routers._shared.qa_kb_upload as qa_kb_upload  # noqa: E402
 
-qa_kb_upload.sync_to_rag = lambda *a, **k: None
+# Records (source_type, language, filename) for each RAG sync triggered by upload,
+# so we can assert general indexes chunks keyed by store_name (the `language` slot).
+rag_sync_calls: list[tuple] = []
+
+
+def _record_sync(source_type, language, filename, *_a, **_k):
+    rag_sync_calls.append((source_type, language, filename))
+
+
+qa_kb_upload.sync_to_rag = _record_sync
 qa_kb_upload.delete_from_rag = lambda *a, **k: None
 
 client = TestClient(app)
@@ -132,6 +141,7 @@ def _admin_auth():
     ks_mod._knowledge_store = None
     for coll in fake_db.values():
         coll.docs.clear()
+    rag_sync_calls.clear()
     # Reset the shared upload rate limiter so this test neither trips it nor
     # leaks request history into sibling upload tests (shared module global).
     knowledge_utils.upload_rate_limiter.requests.clear()
@@ -169,3 +179,25 @@ def test_upload_list_delete_roundtrip_and_isolation():
     assert d.status_code == 200, d.text
     r3 = client.get("/api/general-admin/knowledge/files/", params={"language": "store-x"})
     assert "faq.csv" not in [f["filename"] for f in r3.json()["files"]]
+
+
+def test_rag_sync_keyed_by_store_name():
+    """General indexes chunks into RAG keyed by store_name (carried in the
+    `language` slot) under source_type 'general' — the contract that keeps
+    retrieval isolated per store, matching how general chat retrieves
+    (source_type='general_knowledge', language=store_name)."""
+    csv = b"q,a\nWhat is X,X is a thing\n"
+    r = client.post(
+        "/api/general-admin/knowledge/upload/",
+        params={"language": "store-x"},
+        files={"file": ("x.csv", csv, "text/csv")},
+    )
+    assert r.status_code == 200, r.text
+
+    assert rag_sync_calls, "upload did not trigger a RAG sync"
+    source_types = {c[0] for c in rag_sync_calls}
+    languages = {c[1] for c in rag_sync_calls}
+    assert source_types == {"general"}
+    assert languages == {"store-x"}  # store_name occupies the language slot
+    # A different store would index under its own key, never store-x's.
+    assert "store-y" not in languages
