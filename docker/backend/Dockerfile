@@ -19,16 +19,19 @@ WORKDIR /build
 # ---- 重 & 穩定相依（ML/RAG）：版本鎖死、極少變動 ----
 # 獨立成一層，放在 requirements.txt 之前。
 # 之後只改輕量套件時，這層命中 cache，跳過長時間的 wheel 編譯。
+COPY <<EOF backend-heavy-requirements.txt
+torch==2.5.1
+transformers==4.46.3
+accelerate==0.34.2
+sentence-transformers==3.3.1
+FlagEmbedding==1.3.5
+numpy==2.4.6
+pandas==3.0.3
+tf-keras==2.21.0
+EOF
+
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip wheel --wheel-dir=/wheels \
-        torch==2.5.1 \
-        transformers==4.46.3 \
-        accelerate==0.34.2 \
-        sentence-transformers==3.3.1 \
-        FlagEmbedding==1.3.5 \
-        numpy==2.4.6 \
-        pandas==3.0.3 \
-        tf-keras==2.21.0
+    pip wheel --wheel-dir=/wheels -r backend-heavy-requirements.txt
 
 # ---- 輕 & 易變相依：改動頻繁，放在重相依之後 ----
 COPY requirements.txt .
@@ -43,10 +46,16 @@ ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 COPY --from=builder /wheels /wheels
-# 安裝 builder 編好的全部 wheel（含重相依與 requirements.txt 的輕相依）。
-# 不綁 -r requirements.txt，避免重相依移出 requirements 後在此漏裝。
-RUN pip install --no-index --find-links=/wheels --prefix=/install /wheels/*.whl \
-    && rm -rf /wheels
+COPY --from=builder /build/backend-heavy-requirements.txt /tmp/backend-heavy-requirements.txt
+COPY --from=builder /build/requirements.txt /tmp/requirements.txt
+# /wheels may contain multiple versions of the same transitive package when
+# cached layers were built at different times. Install requirement roots from
+# the local wheelhouse so pip resolves one compatible candidate instead of
+# treating every wheel file as an explicit install target.
+RUN pip install --no-index --find-links=/wheels --prefix=/install \
+        -r /tmp/backend-heavy-requirements.txt \
+        -r /tmp/requirements.txt \
+    && rm -rf /wheels /tmp/backend-heavy-requirements.txt /tmp/requirements.txt
 
 # ---------- Stage 3: runner ----------
 # 最終 runtime：無 compiler、非 root、只帶執行期所需 lib
