@@ -130,6 +130,13 @@ class TestGeneralTopicStore(unittest.TestCase):
     def setUp(self):
         fake_topics_collection.docs.clear()
         fake_categories_collection.docs.clear()
+        # Patch get_mongo_db on the base module directly (sibling test modules
+        # rebind its imported reference); restore on cleanup to avoid leaking
+        # our fake db into other test modules.
+        import app.services._shared.qa_kb.topic_store_base as tb_base
+        orig = tb_base.get_mongo_db
+        tb_base.get_mongo_db = lambda *_a, **_k: fake_db
+        self.addCleanup(setattr, tb_base, "get_mongo_db", orig)
 
     def test_topics_isolated_by_store_name(self):
         """Verify per-store isolation: store_name passed in language parameter slot."""

@@ -108,6 +108,14 @@ GeneralKnowledgeStore = knowledge_store_module.GeneralKnowledgeStore
 class TestGeneralKnowledgeStore(unittest.TestCase):
     def setUp(self):
         fake_collection.docs.clear()
+        # Patch get_mongo_db on the base module directly: sibling test modules
+        # reload it and rebind its imported reference to a fresh mock, so just
+        # setting sys.modules' mock is not enough. Restore on cleanup so this
+        # test does not leak its fake db into sibling test modules.
+        import app.services._shared.qa_kb.knowledge_store_base as kb_base
+        orig = kb_base.get_mongo_db
+        kb_base.get_mongo_db = lambda *_a, **_k: fake_db
+        self.addCleanup(setattr, kb_base, "get_mongo_db", orig)
         self.store = GeneralKnowledgeStore()
 
     def test_files_isolated_by_store_name(self):
