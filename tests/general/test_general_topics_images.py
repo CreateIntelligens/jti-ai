@@ -203,6 +203,10 @@ def test_image_upload_get_delete_isolated():
     got = client.get("/api/general/stores/store-i/images/logo")
     assert got.status_code == 200
     assert got.content == b"\x89PNG\r\n"
+    # Defense-in-depth against stored XSS: never sniff, sandboxed CSP.
+    assert got.headers["x-content-type-options"] == "nosniff"
+    assert "sandbox" in got.headers["content-security-policy"]
+    assert got.headers["content-type"].startswith("image/png")
 
     # Isolation: a different store has no such image.
     miss = client.get("/api/general/stores/store-j/images/logo")
@@ -214,3 +218,19 @@ def test_image_upload_get_delete_isolated():
     d = client.delete("/api/general-admin/stores/store-i/images/logo")
     assert d.status_code == 200
     assert client.get("/api/general/stores/store-i/images/logo").status_code == 404
+
+
+def test_non_allowlisted_content_type_served_as_attachment():
+    """A malicious upload claiming an executable MIME (e.g. text/html or SVG)
+    must be served as an opaque, non-rendering download — not with its declared
+    type — to prevent stored XSS."""
+    client.post(
+        "/api/general-admin/stores/store-x/images",
+        files={"file": ("evil.svg", b"<svg onload=alert(1)>", "image/svg+xml")},
+        data={"image_id": "evil"},
+    )
+    got = client.get("/api/general/stores/store-x/images/evil")
+    assert got.status_code == 200
+    assert got.headers["content-type"].startswith("application/octet-stream")
+    assert got.headers["content-disposition"] == "attachment"
+    assert got.headers["x-content-type-options"] == "nosniff"
