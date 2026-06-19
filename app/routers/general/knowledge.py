@@ -32,6 +32,12 @@ def _other_language(store_name: str) -> str:
     return store_name
 
 
+# INVARIANT: general store names are lowercase by construction
+# (`store_{uuid4().hex}` — see StoreRegistry._new_store_name). The knowledge
+# store base lowercases the store_name key (`_normalize_language`) while the
+# topic store and RAG use it raw; these only agree because the key is already
+# lowercase. If store naming ever allows mixed case, normalize store_name at
+# this boundary so all three layers key identically.
 def _make_config() -> QaKbRouterConfig:
     return QaKbRouterConfig(
         tag="General Knowledge",
