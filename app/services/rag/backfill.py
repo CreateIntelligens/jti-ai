@@ -9,6 +9,7 @@ from app.services.rag.chunker import SemanticChunker
 from app.services.embedding.service import get_embedding_service
 from app.services.vector_store.lancedb import get_lancedb_store
 from app.services.knowledge_store import get_knowledge_store
+from app.services.general.knowledge_store import get_general_knowledge_store
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.hciot.topic_store import get_hciot_topic_store
 from app.services.jti.knowledge_store import get_jti_knowledge_store
@@ -242,16 +243,40 @@ class BackfillService:
     def _fetch_general_file_data(store, store_name: str, filename: str) -> bytes | None:
         return store.get_file_data(store_name, filename, namespace=_GENERAL_NAMESPACE)
 
+    @staticmethod
+    def _general_file_lists(store_name: str):
+        """List general files from both coexisting stores, new (per-store QA
+        workspace) first then the legacy single-file store, deduped by filename."""
+        new_store = get_general_knowledge_store()
+        old_store = get_knowledge_store()
+        seen: set[str] = set()
+        merged: list[dict] = []
+        for meta in new_store.list_files(store_name):
+            name = meta.get("filename") or meta.get("name", "")
+            if name and name not in seen:
+                seen.add(name)
+                merged.append({**meta, "_source": "new"})
+        for meta in old_store.list_files(store_name, namespace=_GENERAL_NAMESPACE):
+            name = meta.get("filename") or meta.get("name", "")
+            if name and name not in seen:
+                seen.add(name)
+                merged.append({**meta, "_source": "old"})
+        return new_store, old_store, merged
+
     def _get_files_and_data(self, source_type: str, language: str):
         """Yields source files and file metadata from the correct MongoDB store.
         general partitions by store_name (passed as `language`) under the shared
         knowledge store's "general" namespace; jti/hciot partition by zh/en."""
         if source_type == "general":
-            store = get_knowledge_store()
-            yield from self._iter_store_files(
-                store.list_files(language, namespace=_GENERAL_NAMESPACE),
-                lambda filename: self._fetch_general_file_data(store, language, filename),
-            )
+            new_store, old_store, files = self._general_file_lists(language)
+
+            def fetch_general(filename: str) -> bytes | None:
+                doc = new_store.get_file(language, filename)
+                if doc and doc.get("data"):
+                    return doc.get("data")
+                return self._fetch_general_file_data(old_store, language, filename)
+
+            yield from self._iter_store_files(files, fetch_general)
             return
 
         if source_type == "hciot":
