@@ -42,7 +42,7 @@ def _make_config() -> QaKbRouterConfig:
     return QaKbRouterConfig(
         tag="General Knowledge",
         app="general",
-        knowledge_store_factory=lambda: get_general_knowledge_store(),
+        knowledge_store_factory=get_general_knowledge_store,
         topic_store_factory=lambda store_name: get_general_topic_store(store_name or ""),
         rag_source_type="general",
         invalidate_cache=_invalidate_cache,

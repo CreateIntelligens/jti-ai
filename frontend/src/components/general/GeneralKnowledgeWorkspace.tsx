@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import * as gapi from '../../services/api/general';
 import QaKnowledgeWorkspace, {
   type QaWorkspaceApiClient,
@@ -72,9 +73,12 @@ export default function GeneralKnowledgeWorkspace({
   storeName,
   onTopicsChanged,
 }: GeneralKnowledgeWorkspaceProps) {
+  // Rebuild the bound API client only when the store changes — avoids
+  // recreating all its closures on every render.
+  const api = useMemo(() => makeApi(storeName), [storeName]);
   const config: QaWorkspaceConfig = {
     sourceType: 'general',
-    api: makeApi(storeName),
+    api,
     text: (_language, zh) => zh,
     disableAiQaExtraction: true,
   };
