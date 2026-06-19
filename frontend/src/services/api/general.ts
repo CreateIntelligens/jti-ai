@@ -9,6 +9,8 @@ import type {
 } from '../../types';
 import { API_BASE, fetchAsAdmin, fetchWithApiKey, fetchWithUserGeminiKey, handleResponse, STORAGE_KEYS, STORAGE_ACTIVE, normLang, buildUrl } from './base';
 import { createQuizBankApi, type QuizBankApi } from './_shared/quizBank';
+import { createQaKnowledgeApi } from './_shared/qaKnowledge';
+import type { HciotTopicCategory, HciotImage } from './hciot';
 
 // ========== Stores & Files ==========
 
@@ -445,3 +447,191 @@ export function getGeneralQuizApi(storeName: string): QuizBankApi {
 }
 
 export default reindexRag;
+
+// ========== General per-store QA Knowledge Workspace ==========
+// Mirrors the HCIoT knowledge/topics/images surface but keyed by store_name
+// (carried in the `language` query param via an identity normalizer, since
+// general is single-language and store_name must pass through unchanged).
+
+const GENERAL_ADMIN_BASE = `${API_BASE}/general-admin`;
+const GENERAL_API_BASE = `${API_BASE}/general`;
+const GENERAL_JSON_HEADERS = { 'Content-Type': 'application/json' };
+
+// Reuse the shared QA knowledge client; identity normalizer keeps store_name intact.
+const generalQaKnowledgeApi = createQaKnowledgeApi(
+  `${GENERAL_ADMIN_BASE}/knowledge`,
+  (storeName) => storeName,
+);
+
+function generalJsonRequest(method: 'POST' | 'PUT' | 'DELETE', body?: unknown): RequestInit {
+  return {
+    method,
+    headers: GENERAL_JSON_HEADERS,
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+  };
+}
+
+// ----- Knowledge files / CSV (delegated to the shared client) -----
+
+export function listGeneralKnowledgeFiles(storeName: string) {
+  return generalQaKnowledgeApi.listKnowledgeFiles(storeName);
+}
+
+export function getGeneralKnowledgeFileContent(filename: string, storeName: string) {
+  return generalQaKnowledgeApi.getKnowledgeFileContent(filename, storeName);
+}
+
+export function downloadGeneralKnowledgeFile(filename: string, storeName: string) {
+  return generalQaKnowledgeApi.downloadKnowledgeFile(filename, storeName);
+}
+
+export function updateGeneralKnowledgeFileContent(filename: string, content: string, storeName: string) {
+  return generalQaKnowledgeApi.updateKnowledgeFileContent(filename, content, storeName);
+}
+
+export function deleteGeneralKnowledgeFile(filename: string, storeName: string) {
+  return generalQaKnowledgeApi.deleteKnowledgeFile(filename, storeName);
+}
+
+export function updateGeneralKnowledgeFileMetadata(
+  filename: string,
+  metadata: { topic_id?: string | null; category_label?: string | null; topic_label?: string | null },
+  storeName: string,
+) {
+  return generalQaKnowledgeApi.updateKnowledgeFileMetadata(filename, metadata, storeName);
+}
+
+export function uploadGeneralKnowledgeFileWithTopic(opts: {
+  storeName: string;
+  file: File;
+  categoryId?: string;
+  topicId?: string;
+  categoryLabel?: string;
+  topicLabel?: string;
+  hiddenQuestions?: string[];
+}) {
+  const { storeName, ...rest } = opts;
+  return generalQaKnowledgeApi.uploadKnowledgeFileWithTopic({ ...rest, language: storeName });
+}
+
+export function getGeneralTopicMergedCsv(topicId: string, storeName: string) {
+  return generalQaKnowledgeApi.getTopicMergedCsv(topicId, storeName);
+}
+
+export function saveGeneralTopicMergedCsv(
+  topicId: string,
+  payload: { files: Array<{ filename: string; content: string }>; delete_files?: string[]; hidden_questions?: string[] },
+  storeName: string,
+) {
+  return generalQaKnowledgeApi.saveTopicMergedCsv(topicId, payload, storeName);
+}
+
+export function parseGeneralQaCsvText(text: string) {
+  return generalQaKnowledgeApi.parseQaCsvText(text);
+}
+
+// ----- Topics (HCIoT-shaped category tree, keyed by store_name) -----
+
+async function generalAdminJson<T>(path: string, options?: RequestInit): Promise<T> {
+  const response = await fetchAsAdmin(`${GENERAL_ADMIN_BASE}${path}`, options);
+  return handleResponse<T>(response);
+}
+
+async function generalApiJson<T>(path: string): Promise<T> {
+  const response = await fetchAsAdmin(`${GENERAL_API_BASE}${path}`);
+  return handleResponse<T>(response);
+}
+
+export function listGeneralTopicsAdmin(storeName: string): Promise<{ categories: HciotTopicCategory[] }> {
+  return generalApiJson<{ categories: HciotTopicCategory[] }>(
+    `/stores/${encodeURIComponent(storeName)}/topics/all`,
+  );
+}
+
+export function createGeneralTopic(
+  storeName: string,
+  topicId: string,
+  label: string,
+  categoryLabel: string,
+  questions: string[] = [],
+): Promise<Record<string, unknown>> {
+  return generalAdminJson<Record<string, unknown>>(
+    `/stores/${encodeURIComponent(storeName)}/topics/`,
+    generalJsonRequest('POST', {
+      topic_id: topicId,
+      labels: label,
+      category_labels: categoryLabel,
+      questions,
+    }),
+  );
+}
+
+export function updateGeneralTopic(
+  storeName: string,
+  topicId: string,
+  data: { labels?: string; category_labels?: string; questions?: string[]; hidden_questions?: string[]; hidden?: boolean },
+): Promise<Record<string, unknown>> {
+  // topic_id may contain "/", so it is not URI-encoded (matches HCIoT).
+  return generalAdminJson<Record<string, unknown>>(
+    `/stores/${encodeURIComponent(storeName)}/topics/${topicId}`,
+    generalJsonRequest('PUT', data),
+  );
+}
+
+export function reorderGeneralTopics(storeName: string, topicIds: string[]): Promise<{ updated: number }> {
+  return generalAdminJson<{ updated: number }>(
+    `/stores/${encodeURIComponent(storeName)}/topics/reorder`,
+    generalJsonRequest('PUT', { topic_ids: topicIds }),
+  );
+}
+
+export function setGeneralCategoryHidden(
+  storeName: string,
+  categoryId: string,
+  hidden: boolean,
+): Promise<{ category_id: string; hidden: boolean }> {
+  return generalAdminJson<{ category_id: string; hidden: boolean }>(
+    `/stores/${encodeURIComponent(storeName)}/topics/categories/${encodeURIComponent(categoryId)}/visibility`,
+    generalJsonRequest('PUT', { hidden }),
+  );
+}
+
+// ----- Images (per-store) -----
+
+export function listGeneralImages(storeName: string): Promise<{ images: HciotImage[] }> {
+  return generalAdminJson<{ images: HciotImage[] }>(
+    `/stores/${encodeURIComponent(storeName)}/images`,
+  );
+}
+
+export async function uploadGeneralImage(storeName: string, file: File, imageId?: string): Promise<HciotImage> {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('image_id', imageId || file.name.replace(/\.[^.]+$/, ''));
+  return generalAdminJson<HciotImage>(`/stores/${encodeURIComponent(storeName)}/images`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export async function deleteGeneralImage(storeName: string, imageId: string): Promise<void> {
+  await generalAdminJson<void>(
+    `/stores/${encodeURIComponent(storeName)}/images/${encodeURIComponent(imageId)}`,
+    { method: 'DELETE' },
+  );
+}
+
+// ----- Per-store RAG reindex -----
+
+export async function reindexGeneralStore(storeName: string): Promise<ReindexRagResponse> {
+  return generalAdminJson<ReindexRagResponse>(
+    `/knowledge/reindex?language=${encodeURIComponent(storeName)}`,
+    { method: 'POST' },
+  );
+}
+
+export async function getGeneralStoreReindexStatus(storeName: string): Promise<ReindexStatusResponse> {
+  return generalAdminJson<ReindexStatusResponse>(
+    `/knowledge/reindex-status?language=${encodeURIComponent(storeName)}`,
+  );
+}

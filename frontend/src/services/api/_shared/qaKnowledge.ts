@@ -128,7 +128,12 @@ function appendOptionalFormValue(formData: FormData, key: string, value: string 
   }
 }
 
-export function createQaKnowledgeApi(basePath: string): QaKnowledgeApi {
+export function createQaKnowledgeApi(
+  basePath: string,
+  // How the `language` query param is normalized. HCIoT/JTI collapse to zh/en;
+  // general passes its dynamic store_name through unchanged (identity).
+  normalizeLanguage: (language: string) => string = normLang,
+): QaKnowledgeApi {
   const fetchJson = async <T>(
     path: string,
     options?: RequestInit,
@@ -141,7 +146,7 @@ export function createQaKnowledgeApi(basePath: string): QaKnowledgeApi {
   return {
     listKnowledgeFiles(language: string = 'zh') {
       return fetchJson<{ files: QaKnowledgeFile[] }>('/files/', undefined, {
-        language: normLang(language),
+        language: normalizeLanguage(language),
       });
     },
 
@@ -149,14 +154,14 @@ export function createQaKnowledgeApi(basePath: string): QaKnowledgeApi {
       return fetchJson<QaKnowledgeFileContent>(
         `/files/${encodeURIComponent(filename)}/content`,
         undefined,
-        { language: normLang(language) },
+        { language: normalizeLanguage(language) },
       );
     },
 
     downloadKnowledgeFile(filename: string, language: string = 'zh') {
       window.open(
         buildUrl(`${basePath}/files/${encodeURIComponent(filename)}/download`, {
-          language: normLang(language),
+          language: normalizeLanguage(language),
         }),
         '_blank',
       );
@@ -166,7 +171,7 @@ export function createQaKnowledgeApi(basePath: string): QaKnowledgeApi {
       return fetchJson<ContentUpdateResponse>(
         `/files/${encodeURIComponent(filename)}/content`,
         jsonRequest('PUT', { content }),
-        { language: normLang(language) },
+        { language: normalizeLanguage(language) },
       );
     },
 
@@ -174,7 +179,7 @@ export function createQaKnowledgeApi(basePath: string): QaKnowledgeApi {
       await fetchJson<void>(`/files/${encodeURIComponent(fileName)}`, {
         method: 'DELETE',
       }, {
-        language: normLang(language),
+        language: normalizeLanguage(language),
       });
     },
 
@@ -182,7 +187,7 @@ export function createQaKnowledgeApi(basePath: string): QaKnowledgeApi {
       return fetchJson<QaKnowledgeFile & { topic_synced: boolean }>(
         `/files/${encodeURIComponent(filename)}/metadata`,
         jsonRequest('PUT', metadata),
-        { language: normLang(language) },
+        { language: normalizeLanguage(language) },
       );
     },
 
@@ -201,14 +206,14 @@ export function createQaKnowledgeApi(basePath: string): QaKnowledgeApi {
         method: 'POST',
         body: formData,
       }, {
-        language: normLang(opts.language),
+        language: normalizeLanguage(opts.language),
       });
     },
 
     getTopicMergedCsv(topicId: string, language: string = 'zh') {
       return fetchJson<QaMergedCsvResponse>('/topic-csv-merged', undefined, {
         topic_id: topicId,
-        language: normLang(language),
+        language: normalizeLanguage(language),
       });
     },
 
@@ -216,7 +221,7 @@ export function createQaKnowledgeApi(basePath: string): QaKnowledgeApi {
       return fetchJson<{ message: string; topic_synced: boolean }>(
         '/topic-csv-merged',
         jsonRequest('PUT', payload),
-        { topic_id: topicId, language: normLang(language) },
+        { topic_id: topicId, language: normalizeLanguage(language) },
       );
     },
 
@@ -231,7 +236,7 @@ export function createQaKnowledgeApi(basePath: string): QaKnowledgeApi {
       formData.append('topic_id', topicId);
       formData.append('category_label', categoryLabel);
       formData.append('topic_label', topicLabel);
-      formData.append('language', normLang(language));
+      formData.append('language', normalizeLanguage(language));
 
       return fetchJson<{ job_id: string; status: string }>('/qa-extract', {
         method: 'POST',
@@ -262,7 +267,7 @@ export function createQaKnowledgeApi(basePath: string): QaKnowledgeApi {
             ...(hiddenQuestions !== undefined ? { hidden_questions: hiddenQuestions } : {}),
           }),
         },
-        { language: normLang(language) },
+        { language: normalizeLanguage(language) },
       );
     },
   };
