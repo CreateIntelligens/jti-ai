@@ -177,19 +177,26 @@ def _admin_auth():
 def test_topic_crud_isolated_by_store():
     r = client.post(
         "/api/general-admin/stores/store-t/topics/",
-        json={"id": "greet", "label": "Greetings", "questions": ["hi"]},
+        json={
+            "topic_id": "faq/greet",
+            "labels": "Greetings",
+            "category_labels": "FAQ",
+            "questions": ["hi"],
+        },
     )
     assert r.status_code in (200, 201), r.text
 
-    r = client.get("/api/general/stores/store-t/topics")
-    assert "greet" in [t["id"] for t in r.json()]
+    # Response shape matches HCIoT: {categories: [{id, label, topics: [...]}]}.
+    cats = client.get("/api/general/stores/store-t/topics").json()["categories"]
+    topic_ids = [t["id"] for c in cats for t in c["topics"]]
+    assert "faq/greet" in topic_ids
 
-    r2 = client.get("/api/general/stores/store-u/topics")
-    assert "greet" not in [t["id"] for t in r2.json()]
+    # Isolation: a different store sees no categories.
+    assert client.get("/api/general/stores/store-u/topics").json()["categories"] == []
 
-    d = client.delete("/api/general-admin/stores/store-t/topics/greet")
+    d = client.delete("/api/general-admin/stores/store-t/topics/faq/greet")
     assert d.status_code == 200, d.text
-    assert client.get("/api/general/stores/store-t/topics").json() == []
+    assert client.get("/api/general/stores/store-t/topics").json()["categories"] == []
 
 
 def test_image_upload_get_delete_isolated():
