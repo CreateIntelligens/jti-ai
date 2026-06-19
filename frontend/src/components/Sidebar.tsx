@@ -17,6 +17,7 @@ interface SidebarProps {
   onCreateStore: (name: string, keyIndex: number) => Promise<void>;
   onOpenFile?: (file: FileItem) => void;
   canManageKnowledge?: boolean;
+  onOpenKnowledgeWorkspace?: () => void;
 }
 
 interface ProjectGroup {
@@ -60,6 +61,7 @@ export default function Sidebar({
   onUploadFile,
   onDeleteFile,
   onCreateStore,
+  onOpenKnowledgeWorkspace,
   onOpenFile,
   canManageKnowledge = true,
 }: SidebarProps) {
@@ -287,6 +289,15 @@ export default function Sidebar({
             >
               {uploading ? '上傳中...' : (<>拖曳或<span>選擇</span>上傳</>)}
             </div>
+          )}
+          {canManageKnowledge && !isManagedKnowledgeStore(activeStore) && onOpenKnowledgeWorkspace && (
+            <button
+              type="button"
+              className="knowledge-workspace-btn"
+              onClick={onOpenKnowledgeWorkspace}
+            >
+              管理知識庫工作區
+            </button>
           )}
           {canManageKnowledge && (
             <input className="file-input-hidden" ref={fileInputRef} type="file" onChange={handleFileSelect} aria-label="選擇文件" />

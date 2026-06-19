@@ -12,6 +12,7 @@ import ExtKeysPanel from './components/ExtKeysPanel';
 import UsersPanel from './components/UsersPanel';
 import ConversationHistoryModal from './components/ConversationHistoryModal';
 import FilePreviewModal from './components/FilePreviewModal';
+import GeneralKnowledgeWorkspace from './components/general/GeneralKnowledgeWorkspace';
 import Jti from './pages/Jti';
 import Hciot from './pages/Hciot';
 import Login from './pages/Login';
@@ -191,6 +192,7 @@ function HomeShell() {
     files, filesLoading,
     messages, setMessages,
     loading,
+    initializing,
     sessionId, setSessionId,
     theme, toggleTheme,
     toggleSidebar, showStatus,
@@ -206,6 +208,7 @@ function HomeShell() {
   const closePanel = () => setPanel(null);
 
   const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
+  const [knowledgeWorkspaceOpen, setKnowledgeWorkspaceOpen] = useState(false);
 
   // Derive store display info for chat area
   const activeStore = currentTarget?.kind === 'store'
@@ -253,22 +256,42 @@ function HomeShell() {
             onCreateStore={handleCreateStore}
             onOpenFile={(f) => setPreviewFile(f)}
             canManageKnowledge={isAdmin}
+            onOpenKnowledgeWorkspace={
+              isAdmin && currentStore ? () => setKnowledgeWorkspaceOpen(true) : undefined
+            }
           />
-          <ChatArea
-            messages={messages}
-            onSendMessage={handleSendMessage}
-            disabled={!currentStore}
-            loading={loading}
-            onRegenerate={handleRegenerate}
-            onEditAndResend={handleEditAndResend}
-            currentStoreName={currentStoreName}
-            currentStoreIcon={currentStoreIcon}
-            currentProjectName={currentProjectName}
-            currentProjectColor={currentProjectColor}
-            onOpenPromptPanel={() => openPanel('prompt')}
-            onRestartChat={handleRestartChat}
-            onCreateStore={isAdmin ? () => openPanel('admin') : undefined}
-          />
+          {knowledgeWorkspaceOpen && isAdmin && currentStore ? (
+            <main className="app-main">
+              <button
+                type="button"
+                className="knowledge-workspace-close"
+                onClick={() => setKnowledgeWorkspaceOpen(false)}
+              >
+                ← 返回對話
+              </button>
+              <GeneralKnowledgeWorkspace
+                active={knowledgeWorkspaceOpen}
+                storeName={currentStore}
+                onTopicsChanged={() => { void handleRefreshKnowledge(); }}
+              />
+            </main>
+          ) : (
+            <ChatArea
+              messages={messages}
+              onSendMessage={handleSendMessage}
+              disabled={!currentStore || initializing}
+              loading={loading}
+              onRegenerate={handleRegenerate}
+              onEditAndResend={handleEditAndResend}
+              currentStoreName={currentStoreName}
+              currentStoreIcon={currentStoreIcon}
+              currentProjectName={currentProjectName}
+              currentProjectColor={currentProjectColor}
+              onOpenPromptPanel={() => openPanel('prompt')}
+              onRestartChat={handleRestartChat}
+              onCreateStore={isAdmin ? () => openPanel('admin') : undefined}
+            />
+          )}
         </div>
       </div>
 
