@@ -113,9 +113,13 @@ def list_topics_slim(store_name: str):
     return {"categories": _build_categories(store_name, filter_hidden=True)}
 
 
-@public_router.get("/stores/{store_name}/topics/all")
+@router.get("/stores/{store_name}/topics/all")
 def list_topics_all(store_name: str):
-    """Unfiltered listing for admin — includes hidden questions/flags."""
+    """Unfiltered listing for admin — includes hidden questions/flags.
+
+    Served only under the authed /api/general-admin mount: this exposes hidden
+    topics/questions, so it must require KB admin access (unlike the public
+    /topics slim listing which filters hidden content)."""
     return {"categories": _build_categories(store_name, filter_hidden=False)}
 
 

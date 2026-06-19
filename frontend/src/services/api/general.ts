@@ -454,7 +454,6 @@ export default reindexRag;
 // general is single-language and store_name must pass through unchanged).
 
 const GENERAL_ADMIN_BASE = `${API_BASE}/general-admin`;
-const GENERAL_API_BASE = `${API_BASE}/general`;
 const GENERAL_JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 // Reuse the shared QA knowledge client; identity normalizer keeps store_name intact.
@@ -537,13 +536,10 @@ async function generalAdminJson<T>(path: string, options?: RequestInit): Promise
   return handleResponse<T>(response);
 }
 
-async function generalApiJson<T>(path: string): Promise<T> {
-  const response = await fetchAsAdmin(`${GENERAL_API_BASE}${path}`);
-  return handleResponse<T>(response);
-}
-
 export function listGeneralTopicsAdmin(storeName: string): Promise<{ categories: HciotTopicCategory[] }> {
-  return generalApiJson<{ categories: HciotTopicCategory[] }>(
+  // Unfiltered listing (includes hidden topics/questions) — served only under
+  // the authed admin mount.
+  return generalAdminJson<{ categories: HciotTopicCategory[] }>(
     `/stores/${encodeURIComponent(storeName)}/topics/all`,
   );
 }

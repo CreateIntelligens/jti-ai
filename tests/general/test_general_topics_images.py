@@ -199,6 +199,18 @@ def test_topic_crud_isolated_by_store():
     assert client.get("/api/general/stores/store-t/topics").json()["categories"] == []
 
 
+def test_topics_all_is_admin_only_not_public():
+    """The unfiltered `/topics/all` listing exposes hidden topics/questions, so
+    it must be mounted ONLY under the authed /api/general-admin prefix — never
+    under the public /api/general prefix (regression guard for an IDOR where it
+    was mistakenly registered on the public router)."""
+    routes = {getattr(r, "path", "") for r in app.routes}
+    assert "/api/general-admin/stores/{store_name}/topics/all" in routes
+    assert "/api/general/stores/{store_name}/topics/all" not in routes
+    # The slim listing stays public.
+    assert "/api/general/stores/{store_name}/topics" in routes
+
+
 def test_image_upload_get_delete_isolated():
     up = client.post(
         "/api/general-admin/stores/store-i/images",
