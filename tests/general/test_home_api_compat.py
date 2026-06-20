@@ -10,11 +10,38 @@ from tests.support.app_test_support import get_test_app, override_admin_auth
 
 app = get_test_app()
 
+import sys
+
+from tests.support.fake_mongo import FakeCollection
+
+
+class FakeDb(dict):
+    def __getitem__(self, item):
+        if item not in self:
+            self[item] = FakeCollection()
+        return super().__getitem__(item)
+
+
+fake_db = FakeDb()
+
 
 @pytest.fixture(autouse=True)
 def override_auth_for_compat():
     cleanup = override_admin_auth(app)
+    # Point the shared mongo mock at our fake db FOR THIS TEST ONLY, and restore
+    # it on teardown — leaving it set leaks into sibling test modules that share
+    # the same `app` and mongo_client mock (e.g. test_users_api,
+    # test_main_agent_rag_routing).
+    mongo_mock = sys.modules.get("app.services.mongo_client")
+    orig_return = mongo_mock.get_mongo_db.return_value if mongo_mock else None
+    if mongo_mock:
+        mongo_mock.get_mongo_db.return_value = fake_db
+    from app.services.session import session_manager_factory
+    session_manager_factory._singletons.clear()
     yield
+    if mongo_mock:
+        mongo_mock.get_mongo_db.return_value = orig_return
+    session_manager_factory._singletons.clear()
     cleanup()
 
 
@@ -128,7 +155,7 @@ class FakeKnowledgeStore:
 def test_home_can_load_knowledge_store_list():
     from app.routers.general import stores as store_routes
 
-    key_indexes = {"jti": 2, "hciot": 3}
+    key_indexes = {"jti": 2, "hciot": 3, "esg": 4}
     original_resolver = store_routes.app_key_map.resolve_key_index_for_app
     store_routes.app_key_map.resolve_key_index_for_app = lambda app: key_indexes.get(app, -1)
     client = TestClient(app)
@@ -145,11 +172,13 @@ def test_home_can_load_knowledge_store_list():
         "__jti__en",
         "__hciot__",
         "__hciot__en",
+        "__esg__",
+        "__esg__en",
     ]
     assert stores[0]["managed_app"] == "jti"
     assert stores[0]["managed_language"] == "zh"
     assert all("file_count" in store for store in stores)
-    assert [store["key_index"] for store in stores] == [2, 2, 3, 3]
+    assert [store["key_index"] for store in stores] == [2, 2, 3, 3, 4, 4]
 
 
 def test_managed_store_key_resolution_warns_and_falls_back(monkeypatch, caplog):
@@ -637,6 +666,24 @@ def test_user_key_name_scope_survives_key_order_changes(monkeypatch):
         response = client.get("/api/stores", headers={"Origin": "http://testserver"})
         assert response.status_code == 200
         assert response.json() == [
+            {
+                "name": "__esg__",
+                "display_name": "ESG 中文",
+                "file_count": 0,
+                "created_at": None,
+                "managed_app": "esg",
+                "managed_language": "zh",
+                "key_index": 0,
+            },
+            {
+                "name": "__esg__en",
+                "display_name": "ESG English",
+                "file_count": 0,
+                "created_at": None,
+                "managed_app": "esg",
+                "managed_language": "en",
+                "key_index": 0,
+            },
             {
                 "name": "store_hotai",
                 "display_name": "和泰汽車",
