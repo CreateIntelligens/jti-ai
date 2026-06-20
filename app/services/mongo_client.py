@@ -240,18 +240,24 @@ class MongoDBClient:
             logger.warning(f"Index creation for 'knowledge_files': {e}")
 
         # ===== quiz_bank_questions 集合 =====
+        # Unique keys MUST include store_name: quiz banks are multi-store
+        # (JTI uses __jti__, general stores use hashed ids). A key without
+        # store_name makes two stores collide on the same bank_id/id.
         quiz_bank_questions = db["quiz_bank_questions"]
         try:
             for idx_name in list(quiz_bank_questions.index_information().keys()):
-                if idx_name != "_id_" and "bank_id" not in idx_name:
+                # Drop legacy uniques that lack store_name (e.g. the old
+                # language_1_bank_id_1_id_1). Keep store_name-scoped indexes.
+                if idx_name != "_id_" and "store_name" not in idx_name:
                     try:
                         quiz_bank_questions.drop_index(idx_name)
                     except Exception:
                         pass
             quiz_bank_questions.create_index(
-                [("language", 1), ("bank_id", 1), ("id", 1)], unique=True
+                [("store_name", 1), ("language", 1), ("bank_id", 1), ("id", 1)],
+                unique=True,
             )
-            quiz_bank_questions.create_index([("language", 1), ("bank_id", 1)])
+            quiz_bank_questions.create_index([("store_name", 1), ("language", 1), ("bank_id", 1)])
             collections_ready.append("quiz_bank_questions")
         except Exception as e:
             logger.warning(f"Index creation for 'quiz_bank_questions': {e}")
@@ -260,13 +266,13 @@ class MongoDBClient:
         quiz_bank_metadata = db["quiz_bank_metadata"]
         try:
             for idx_name in list(quiz_bank_metadata.index_information().keys()):
-                if idx_name != "_id_" and "bank_id" not in idx_name:
+                if idx_name != "_id_" and "store_name" not in idx_name:
                     try:
                         quiz_bank_metadata.drop_index(idx_name)
                     except Exception:
                         pass
             quiz_bank_metadata.create_index(
-                [("language", 1), ("bank_id", 1)], unique=True
+                [("store_name", 1), ("language", 1), ("bank_id", 1)], unique=True
             )
             quiz_bank_metadata.create_index("language")
             collections_ready.append("quiz_bank_metadata")
@@ -276,16 +282,15 @@ class MongoDBClient:
         # ===== quiz_results 集合 =====
         quiz_results_col = db["quiz_results"]
         try:
-            try:
-                quiz_results_col.drop_index("language_1_color_id_1")
-            except Exception:
-                pass
-            try:
-                quiz_results_col.drop_index("language_1_quiz_id_1")
-            except Exception:
-                pass
+            for idx_name in list(quiz_results_col.index_information().keys()):
+                if idx_name != "_id_" and "store_name" not in idx_name and "language" in idx_name:
+                    try:
+                        quiz_results_col.drop_index(idx_name)
+                    except Exception:
+                        pass
             quiz_results_col.create_index(
-                [("language", 1), ("set_id", 1), ("quiz_id", 1)], unique=True
+                [("store_name", 1), ("language", 1), ("set_id", 1), ("quiz_id", 1)],
+                unique=True,
             )
             quiz_results_col.create_index("language")
             collections_ready.append("quiz_results")

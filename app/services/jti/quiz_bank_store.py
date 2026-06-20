@@ -39,7 +39,14 @@ class QuizBankStore:
         self._ensure_indexes()
 
     def _ensure_indexes(self) -> None:
-        """確保 (store_name, language, bank_id) 唯一,避免重複 default bank。"""
+        """確保 metadata / questions 的 unique index 含 store_name。
+
+        Multi-store 改造前的舊 unique index 只用 (language, bank_id[, id]),
+        缺 store_name → 第二個 store 用相同 bank_id/題號就會跨 store 撞鍵。
+        這裡先 drop 殘留的舊 unique index,再建含 store_name 的正確版本。
+        """
+        # metadata: 移除舊的 (language, bank_id) unique,改 (store_name, language, bank_id)。
+        self._drop_legacy_index(self.metadata, "language_1_bank_id_1")
         try:
             self.metadata.create_index(
                 [("store_name", 1), ("language", 1), ("bank_id", 1)],
@@ -50,6 +57,29 @@ class QuizBankStore:
             logger.warning(
                 "[QuizBank] 建立 (store_name, language, bank_id) unique index 失敗: %s", exc
             )
+
+        # questions: 移除舊的 (language, bank_id, id) unique,改含 store_name。
+        self._drop_legacy_index(self.questions, "language_1_bank_id_1_id_1")
+        try:
+            self.questions.create_index(
+                [("store_name", 1), ("language", 1), ("bank_id", 1), ("id", 1)],
+                unique=True,
+                name="store_name_1_language_1_bank_id_1_id_1",
+            )
+        except Exception as exc:  # noqa: BLE001 — 啟動期僅記錄,不阻斷
+            logger.warning(
+                "[QuizBank] 建立 questions unique index 失敗: %s", exc
+            )
+
+    @staticmethod
+    def _drop_legacy_index(collection, index_name: str) -> None:
+        """Drop a legacy index if it exists (idempotent, safe on fresh DBs)."""
+        try:
+            if index_name in collection.index_information():
+                collection.drop_index(index_name)
+                logger.info("[QuizBank] 已移除殘留舊 index: %s", index_name)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("[QuizBank] 移除舊 index %s 失敗: %s", index_name, exc)
 
     # ===================== Bank Management =====================
 

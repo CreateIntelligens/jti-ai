@@ -37,7 +37,11 @@ class QuizResultsStore:
         self._ensure_indexes()
 
     def _ensure_indexes(self) -> None:
-        """確保 (store_name, language, set_id) 唯一,避免重複 default set。"""
+        """確保 metadata / results 的 unique index 含 store_name。
+
+        舊版 unique index 缺 store_name → 第二個 store 用相同 set_id/quiz_id
+        會跨 store 撞鍵。先 drop 殘留舊 index,再建含 store_name 的版本。
+        """
         try:
             self.metadata.create_index(
                 [("store_name", 1), ("language", 1), ("set_id", 1)],
@@ -48,6 +52,29 @@ class QuizResultsStore:
             logger.warning(
                 "[QuizResults] 建立 (store_name, language, set_id) unique index 失敗: %s", exc
             )
+
+        # results: 移除舊的 (language, set_id, quiz_id) unique,改含 store_name。
+        self._drop_legacy_index(self.collection, "language_1_set_id_1_quiz_id_1")
+        try:
+            self.collection.create_index(
+                [("store_name", 1), ("language", 1), ("set_id", 1), ("quiz_id", 1)],
+                unique=True,
+                name="uniq_store_name_language_set_id_quiz_id",
+            )
+        except Exception as exc:  # noqa: BLE001 — 啟動期僅記錄,不阻斷
+            logger.warning(
+                "[QuizResults] 建立 results unique index 失敗: %s", exc
+            )
+
+    @staticmethod
+    def _drop_legacy_index(collection, index_name: str) -> None:
+        """Drop a legacy index if it exists (idempotent, safe on fresh DBs)."""
+        try:
+            if index_name in collection.index_information():
+                collection.drop_index(index_name)
+                logger.info("[QuizResults] 已移除殘留舊 index: %s", index_name)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("[QuizResults] 移除舊 index %s 失敗: %s", index_name, exc)
 
     # ===================== Set Management =====================
 
