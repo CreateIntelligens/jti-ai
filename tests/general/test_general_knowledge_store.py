@@ -1,89 +1,9 @@
 import sys
 import unittest
 import importlib
-from unittest.mock import MagicMock
 
 from tests.support.app_test_support import install_app_import_mocks
-
-
-class FakeInsertResult:
-    inserted_id = "fake-id"
-
-
-class FakeDeleteResult:
-    def __init__(self, deleted_count: int):
-        self.deleted_count = deleted_count
-
-
-class FakeCursor(list):
-    def sort(self, key: str, direction: int):
-        reverse = direction < 0
-        return FakeCursor(sorted(self, key=lambda item: item.get(key, ""), reverse=reverse))
-
-
-class FakeCollection:
-    def __init__(self):
-        self.docs: list[dict] = []
-
-    @staticmethod
-    def _matches(doc: dict, query: dict) -> bool:
-        return all(doc.get(key) == value for key, value in query.items())
-
-    @staticmethod
-    def _project(doc: dict, projection: dict | None) -> dict:
-        if not projection:
-            return dict(doc)
-
-        include_keys = [key for key, value in projection.items() if value]
-        if include_keys:
-            return {key: doc.get(key) for key in include_keys if key in doc}
-
-        result = dict(doc)
-        for key, value in projection.items():
-            if value == 0:
-                result.pop(key, None)
-        return result
-
-    def find_one(self, query: dict, projection: dict | None = None):
-        for doc in self.docs:
-            if self._matches(doc, query):
-                return self._project(doc, projection)
-        return None
-
-    def insert_one(self, doc: dict):
-        self.docs.append(dict(doc))
-        return FakeInsertResult()
-
-    def find(self, query: dict, projection: dict | None = None):
-        return FakeCursor(
-            [self._project(doc, projection) for doc in self.docs if self._matches(doc, query)]
-        )
-
-    def find_one_and_update(self, query: dict, update: dict, return_document=None):
-        for index, doc in enumerate(self.docs):
-            if self._matches(doc, query):
-                updated = dict(doc)
-                for key, value in update.get("$set", {}).items():
-                    updated[key] = value
-                self.docs[index] = updated
-                return dict(updated)
-        return None
-
-    def delete_one(self, query: dict):
-        for index, doc in enumerate(self.docs):
-            if self._matches(doc, query):
-                self.docs.pop(index)
-                return FakeDeleteResult(1)
-        return FakeDeleteResult(0)
-
-    def count_documents(self, query: dict, limit: int | None = None):
-        count = 0
-        for doc in self.docs:
-            if self._matches(doc, query):
-                count += 1
-                if limit and count >= limit:
-                    return count
-        return count
+from tests.support.fake_mongo import FakeCollection
 
 
 fake_collection = FakeCollection()

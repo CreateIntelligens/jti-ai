@@ -269,12 +269,18 @@ class BackfillService:
         knowledge store's "general" namespace; jti/hciot partition by zh/en."""
         if source_type == "general":
             new_store, old_store, files = self._general_file_lists(language)
+            # Each file knows which store it came from (`_source`), so fetch from
+            # that store directly instead of probing the new store for every file.
+            source_by_name = {
+                (meta.get("filename") or meta.get("name", "")): meta.get("_source")
+                for meta in files
+            }
 
             def fetch_general(filename: str) -> bytes | None:
+                if source_by_name.get(filename) == "old":
+                    return self._fetch_general_file_data(old_store, language, filename)
                 doc = new_store.get_file(language, filename)
-                if doc and doc.get("data"):
-                    return doc.get("data")
-                return self._fetch_general_file_data(old_store, language, filename)
+                return doc.get("data") if doc else None
 
             yield from self._iter_store_files(files, fetch_general)
             return

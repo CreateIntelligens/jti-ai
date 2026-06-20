@@ -9,78 +9,12 @@ to no-ops so the test stays focused on routing + store CRUD.
 
 import importlib
 import sys
-from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
 
 from tests.support.app_test_support import install_app_import_mocks
-
-
-class FakeCursor(list):
-    def sort(self, key, direction):
-        reverse = direction < 0
-        return FakeCursor(sorted(self, key=lambda item: item.get(key, ""), reverse=reverse))
-
-
-class FakeCollection:
-    def __init__(self):
-        self.docs: list[dict] = []
-
-    def create_index(self, *args, **kwargs):
-        pass
-
-    @staticmethod
-    def _matches(doc, query):
-        return all(doc.get(k) == v for k, v in query.items())
-
-    @staticmethod
-    def _project(doc, projection):
-        if not projection:
-            return dict(doc)
-        include = [k for k, v in projection.items() if v]
-        if include:
-            return {k: doc.get(k) for k in include if k in doc}
-        result = dict(doc)
-        for k, v in projection.items():
-            if v == 0:
-                result.pop(k, None)
-        return result
-
-    def find_one(self, query, projection=None):
-        for doc in self.docs:
-            if self._matches(doc, query):
-                return self._project(doc, projection)
-        return None
-
-    def find(self, query, projection=None):
-        return FakeCursor(
-            [self._project(d, projection) for d in self.docs if self._matches(d, query)]
-        )
-
-    def count_documents(self, query, limit=0):
-        n = sum(1 for d in self.docs if self._matches(d, query))
-        return min(n, limit) if limit else n
-
-    def insert_one(self, doc):
-        self.docs.append(dict(doc))
-        return MagicMock(inserted_id="fake-id")
-
-    def delete_one(self, query):
-        for i, doc in enumerate(self.docs):
-            if self._matches(doc, query):
-                self.docs.pop(i)
-                return MagicMock(deleted_count=1)
-        return MagicMock(deleted_count=0)
-
-    def update_one(self, query, update, upsert=False):
-        for doc in self.docs:
-            if self._matches(doc, query):
-                doc.update(update.get("$set", {}))
-                return MagicMock(matched_count=1)
-        if upsert:
-            self.docs.append({**update.get("$setOnInsert", {}), **update.get("$set", {})})
-        return MagicMock(matched_count=0)
+from tests.support.fake_mongo import FakeCollection
 
 
 fake_db = {
