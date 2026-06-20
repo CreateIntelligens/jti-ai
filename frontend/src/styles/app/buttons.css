@@ -7,9 +7,10 @@
 .app-shell .btn,
 .rp-overlay .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: .375rem;
-  padding: .4375rem .875rem; border-radius: var(--r-md);
+  height: 2.5rem; padding: 0 .875rem; border-radius: var(--r-md);
   font-size: .8125rem; font-family: var(--font); font-weight: 500;
   cursor: pointer; border: none; transition: all var(--trans); white-space: nowrap;
+  box-sizing: border-box;
 }
 .app-shell .btn-primary,
 .rp-overlay .btn-primary { background: var(--primary); color: #fff; }
@@ -26,7 +27,7 @@
 .app-shell .btn-danger:hover,
 .rp-overlay .btn-danger:hover { background: var(--red-100); }
 .app-shell .btn-sm,
-.rp-overlay .btn-sm { padding: .3125rem .625rem; font-size: .75rem; }
+.rp-overlay .btn-sm { height: 2rem; padding: 0 .625rem; font-size: .75rem; }
 
 /* ── Inline Message Edit ── */
 .app-shell .message-edit-area,

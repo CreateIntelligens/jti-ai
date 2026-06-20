@@ -117,6 +117,9 @@ export function useAppChat(isAdmin: boolean = false) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  // True until the entry-time init() (refreshStores + startChat) settles. Used
+  // to gate input so an early send isn't wiped by the init's setMessages([]).
+  const [initializing, setInitializing] = useState(true);
   const { theme, toggleTheme } = useTheme();
   const currentTargetIdRef = useRef<string | null>(null);
   const filesRequestIdRef = useRef(0);
@@ -263,12 +266,15 @@ export function useAppChat(isAdmin: boolean = false) {
 
   useEffect(() => {
     const init = async () => {
-      const storeList = await refreshStores();
-      const lastTargetId = localStorage.getItem('lastKnowledgeTargetId') || localStorage.getItem('lastStore');
-      const targetId = resolvePersistedKnowledgeTargetId(storeList, lastTargetId);
-      if (targetId) {
-        await handleStoreChange(targetId, storeList);
-        return;
+      try {
+        const storeList = await refreshStores();
+        const lastTargetId = localStorage.getItem('lastKnowledgeTargetId') || localStorage.getItem('lastStore');
+        const targetId = resolvePersistedKnowledgeTargetId(storeList, lastTargetId);
+        if (targetId) {
+          await handleStoreChange(targetId, storeList);
+        }
+      } finally {
+        setInitializing(false);
       }
     };
     void init();
@@ -384,6 +390,12 @@ export function useAppChat(isAdmin: boolean = false) {
 
   const handleSendMessage = async (text: string) => {
     if (!currentStore) return;
+    // Gate sends until init settles, otherwise this message is wiped by the
+    // init's setMessages([]) / setSessionId(null) and the chat appears to reset.
+    if (initializing) {
+      showStatus('正在載入，請稍候…');
+      return;
+    }
     setMessages((prev) => [
       ...prev,
       { role: 'user', text },
@@ -521,6 +533,7 @@ export function useAppChat(isAdmin: boolean = false) {
     filesLoading,
     messages, setMessages,
     loading,
+    initializing,
     sessionId, setSessionId,
     isManagedStore,
     theme, toggleTheme,

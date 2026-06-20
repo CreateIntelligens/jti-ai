@@ -100,7 +100,7 @@ export default function AdminPanel({
                 />
               )}
               <button
-                className="btn btn-primary btn-sm"
+                className="btn btn-primary"
                 onClick={handleCreate}
                 disabled={creating || !newStoreName.trim()}
               >

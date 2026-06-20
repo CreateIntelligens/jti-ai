@@ -1,0 +1,370 @@
+{
+  "quiz_sets": {
+    "esg_quiz": {
+      "name": "SET ESG Quiz",
+      "description": "10-question SET ESG sustainability quiz",
+      "questions": [
+        {
+          "id": "q1",
+          "dimension": "correct",
+          "text": "After switching studio lights to LED, how much did SET save per year?",
+          "explanation": "NT$1.62 million — enough to buy over 30,000 cups of bubble tea!",
+          "options": [
+            {
+              "id": "a",
+              "text": "NT$300,000",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "NT$1.62 million",
+              "score": {
+                "correct": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "NT$5 million",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "d",
+              "text": "NT$800,000",
+              "score": {
+                "correct": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "q2",
+          "dimension": "correct",
+          "text": "Of the UN's 17 Sustainable Development Goals (SDGs), how many does SET champion?",
+          "explanation": "SET champions 9 of the 17 UN SDGs!",
+          "options": [
+            {
+              "id": "a",
+              "text": "2 goals",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "6 goals",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "c",
+              "text": "17 goals",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "d",
+              "text": "9 goals",
+              "score": {
+                "correct": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "q3",
+          "dimension": "correct",
+          "text": "By banning disposable tableware and plastic bags, how many waste items were kept out of the environment?",
+          "explanation": "218,000 items! Every plastic bag refused means less burden on our planet.",
+          "options": [
+            {
+              "id": "a",
+              "text": "20,000 items",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "80,000 items",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "c",
+              "text": "218,000 items",
+              "score": {
+                "correct": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "500,000 items",
+              "score": {
+                "correct": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "q4",
+          "dimension": "correct",
+          "text": "SET's outstanding governance has earned it the top rank for which award, for multiple consecutive years?",
+          "explanation": "SET has topped the 'Consumer Ideal Brand' rankings year after year!",
+          "options": [
+            {
+              "id": "a",
+              "text": "Grammy Award",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "Consumer Ideal Brand Award",
+              "score": {
+                "correct": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "Runaway Bell Award",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "d",
+              "text": "Best Talker Award",
+              "score": {
+                "correct": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "q5",
+          "dimension": "correct",
+          "text": "What is SET's guiding goal for staying ahead in the era of technological transformation?",
+          "explanation": "AI FIRST! Technology leads the way in media transformation.",
+          "options": [
+            {
+              "id": "a",
+              "text": "AI NO.1",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "AI everyone",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "c",
+              "text": "AI FIRST",
+              "score": {
+                "correct": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "AI SET",
+              "score": {
+                "correct": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "q6",
+          "dimension": "correct",
+          "text": "Which of the following SET programs has won a Golden Bell Award?",
+          "explanation": "All of the above! SET's Golden Bell Award-winning lineup speaks for itself.",
+          "options": [
+            {
+              "id": "a",
+              "text": "TWRECORDTV",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "MR.PLAYER",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "c",
+              "text": "Super Nightclub",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "d",
+              "text": "All of the above",
+              "score": {
+                "correct": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "q7",
+          "dimension": "correct",
+          "text": "SET employees accumulated how many laps around Taiwan through their annual walking campaign?",
+          "explanation": "Approx. 200 laps! 240 million steps per year — and 34.3 tonnes of CO₂ saved. A win for both health and sustainability!",
+          "options": [
+            {
+              "id": "a",
+              "text": "Approx. 50 laps",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "Approx. 100 laps",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "c",
+              "text": "Approx. 200 laps",
+              "score": {
+                "correct": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "Approx. 500 laps",
+              "score": {
+                "correct": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "q8",
+          "dimension": "correct",
+          "text": "Which of the following is a SET production focused on biodiversity?",
+          "explanation": "All of the above! SET's international conservation productions — Asian Cat Renaissance, Art in the Warzone, and My Animal Classmates — all document endangered species.",
+          "options": [
+            {
+              "id": "a",
+              "text": "Art in the Warzone",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "My Animal Classmates",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "c",
+              "text": "Asian Cat Renaissance",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "d",
+              "text": "All of the above",
+              "score": {
+                "correct": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "q9",
+          "dimension": "correct",
+          "text": "Which SET program is Taiwan's first cross-border reality show promoting banquet culture worldwide, with sustainable zero food-waste/wastewater practices?",
+          "explanation": "A Banquet for the World took Taiwan's heartfelt banquet culture to the Sydney Opera House and Times Square, with no single-use tableware and zero food-waste/wastewater throughout.",
+          "options": [
+            {
+              "id": "a",
+              "text": "The Vanishing Borders",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "A Banquet for the World",
+              "score": {
+                "correct": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "The Shape of the World",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "d",
+              "text": "Love Thy Neighbor Laundromat",
+              "score": {
+                "correct": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "q10",
+          "dimension": "correct",
+          "text": "Which of the following best represents SET's core value of corporate governance through media responsibility?",
+          "explanation": "Media responsibility is the soul of governance! From warzone reporting to cultural documentation, SET uses content to convey truth, goodness, and beauty — inspiring society to see a better possibility.",
+          "options": [
+            {
+              "id": "a",
+              "text": "Maximizing ratings & commercial profit",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "Broadcasting entertainment variety shows only",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "c",
+              "text": "Producing humanitarian reporting that fulfills media's social responsibility",
+              "score": {
+                "correct": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "Focusing only on financial statements & shareholder returns",
+              "score": {
+                "correct": 0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

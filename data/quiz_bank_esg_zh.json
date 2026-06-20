@@ -1,0 +1,370 @@
+{
+  "quiz_sets": {
+    "esg_quiz": {
+      "name": "三立 ESG 永續問答",
+      "description": "10 題三立 ESG 永續知識問答",
+      "questions": [
+        {
+          "id": "q1",
+          "dimension": "correct",
+          "text": "三立把攝影棚燈具汰換成 LED，一年省下多少電費？",
+          "explanation": "162 萬元，足以購買超過 3 萬杯珍珠奶茶！",
+          "options": [
+            {
+              "id": "a",
+              "text": "NT$30 萬元",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "NT$162 萬元",
+              "score": {
+                "correct": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "NT$500 萬元",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "d",
+              "text": "NT$80 萬元",
+              "score": {
+                "correct": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "q2",
+          "dimension": "correct",
+          "text": "聯合國所提出 17 項 2030 永續發展目標 SDGs，三立集團倡議幾項？",
+          "explanation": "三立倡議 9 項 SDGs 永續發展目標！",
+          "options": [
+            {
+              "id": "a",
+              "text": "2 項",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "6 項",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "c",
+              "text": "17 項",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "d",
+              "text": "9 項",
+              "score": {
+                "correct": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "q3",
+          "dimension": "correct",
+          "text": "三立員工餐廳推動禁塑，一年減少多少件廢棄物進入環境？",
+          "explanation": "21.8 萬件！少一個塑膠袋，地球就少一點負擔。",
+          "options": [
+            {
+              "id": "a",
+              "text": "2 萬件",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "8 萬件",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "c",
+              "text": "21.8 萬件",
+              "score": {
+                "correct": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "50 萬件",
+              "score": {
+                "correct": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "q4",
+          "dimension": "correct",
+          "text": "三立以卓越治理奠定永續基石，蟬聯多年什麼獎項的第一名？",
+          "explanation": "蟬聯「消費者理想品牌」第一名！",
+          "options": [
+            {
+              "id": "a",
+              "text": "葛萊美獎",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "「消費者理想品牌」獎",
+              "score": {
+                "correct": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "走鐘獎",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "d",
+              "text": "你最會講",
+              "score": {
+                "correct": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "q5",
+          "dimension": "correct",
+          "text": "三立面對科技轉型，以什麼為公司與時俱進目標？",
+          "explanation": "AI FIRST！以科技領航，引領媒體轉型。",
+          "options": [
+            {
+              "id": "a",
+              "text": "AI NO.1",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "AI everyone",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "c",
+              "text": "AI FIRST",
+              "score": {
+                "correct": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "AI SET",
+              "score": {
+                "correct": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "q6",
+          "dimension": "correct",
+          "text": "三立有哪一個節目得過金鐘獎？",
+          "explanation": "以上皆是！三立金鐘得獎節目眾多，實力有目共睹。",
+          "options": [
+            {
+              "id": "a",
+              "text": "上山下海過一夜",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "綜藝玩很大",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "c",
+              "text": "超級夜總會",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "d",
+              "text": "以上皆是",
+              "score": {
+                "correct": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "q7",
+          "dimension": "correct",
+          "text": "三立員工健走活動，全年累積步數相當於繞台灣幾圈？",
+          "explanation": "約 200 圈！全年累積 2.4 億步，同時減碳 34.3 噸，健康與永續雙贏！",
+          "options": [
+            {
+              "id": "a",
+              "text": "約 50 圈",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "約 100 圈",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "c",
+              "text": "約 200 圈",
+              "score": {
+                "correct": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "約 500 圈",
+              "score": {
+                "correct": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "q8",
+          "dimension": "correct",
+          "text": "以下哪一個節目是三立推出的生物多樣性節目？",
+          "explanation": "以上皆是！三立製作《亞洲貓科大復興》、《戰地阿特》及《我的動物同學》等國際級保育作品，記錄瀕危物種。",
+          "options": [
+            {
+              "id": "a",
+              "text": "戰地阿特",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "我的動物同學",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "c",
+              "text": "亞洲貓科大復興",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "d",
+              "text": "以上皆是",
+              "score": {
+                "correct": 1
+              }
+            }
+          ]
+        },
+        {
+          "id": "q9",
+          "dimension": "correct",
+          "text": "以下哪個節目，是三立製作全台首創跨國實境，將台灣辦桌文化推廣世界，且例行永續廚餘廢水不落地？",
+          "explanation": "《請世界吃桌》前進雪梨歌劇院、紐約時報廣場，把最具台灣人情味的辦桌文化搬上國際舞台，且全程響應禁用一次性餐具及廢水廚餘不落地。",
+          "options": [
+            {
+              "id": "a",
+              "text": "消失的國界",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "請世界吃桌",
+              "score": {
+                "correct": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "世界的形狀",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "d",
+              "text": "愛鄰洗衣店",
+              "score": {
+                "correct": 0
+              }
+            }
+          ]
+        },
+        {
+          "id": "q10",
+          "dimension": "correct",
+          "text": "三立秉持媒體責任，以下哪項最能代表企業治理的核心價值？",
+          "explanation": "媒體責任是治理的靈魂！從戰地報導到文化紀錄，三立用內容傳遞真善美，讓社會看見更好的可能。",
+          "options": [
+            {
+              "id": "a",
+              "text": "追求最高收視率與商業利潤",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "b",
+              "text": "僅播出娛樂性綜藝節目",
+              "score": {
+                "correct": 0
+              }
+            },
+            {
+              "id": "c",
+              "text": "製播具人道關懷的報導，善盡媒體社會責任",
+              "score": {
+                "correct": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "只關注財務報表與股東利益",
+              "score": {
+                "correct": 0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
