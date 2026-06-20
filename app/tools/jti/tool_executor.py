@@ -199,6 +199,14 @@ class ToolExecutor:
         else:
             selected_questions = generate_random_quiz(language, store_name=store_name)
 
+        # 題庫為空（未匯入 / store_name 解析錯誤）時不可硬取 [0]，否則丟出
+        # IndexError。回傳清楚的錯誤讓上層優雅處理。
+        if not selected_questions:
+            logger.warning(
+                "start_quiz: no questions for store_name=%r language=%r", store_name, language
+            )
+            return {"error": "此知識庫尚未設定測驗題目"}
+
         # 重置測驗狀態並保存選中的題目
         session = session_manager.start_quiz(session_id, selected_questions)
 
