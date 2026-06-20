@@ -28,6 +28,7 @@ class TestMigrateQuizBank(unittest.TestCase):
             ],
         }
         self.existing_meta = {
+            "name": "預設題庫",
             "title": self.seed_data["title"],
             "description": self.seed_data["description"],
             "total_questions": self.seed_data["total_questions"],

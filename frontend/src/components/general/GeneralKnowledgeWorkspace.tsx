@@ -5,6 +5,10 @@ import QaKnowledgeWorkspace, {
   type QaWorkspaceConfig,
 } from '../_shared/qaKnowledgeWorkspace/QaKnowledgeWorkspace';
 // Shared QA workspace styles (originally authored under hciot/, app-wide CSS).
+import '../../styles/hciot/layout.css';
+import '../../styles/hciot/workspace.css';
+import '../../styles/hciot/workspace-table.css';
+import '../../styles/hciot/workspace-images.css';
 import '../../styles/hciot/workspace-upload.css';
 import '../../styles/hciot/workspace-upload-images.css';
 import '../../styles/hciot/workspace-upload-enhancements.css';

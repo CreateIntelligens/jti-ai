@@ -41,6 +41,8 @@ def _reset_modules() -> None:
         module = sys.modules.get(module_name)
         if module is not None:
             importlib.reload(module)
+    from app.services.session import session_manager_factory
+    session_manager_factory._singletons.clear()
 
 
 def install_app_import_mocks() -> None:

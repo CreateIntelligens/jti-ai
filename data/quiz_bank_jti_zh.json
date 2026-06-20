@@ -1,0 +1,484 @@
+{
+  "quiz_sets": {
+    "jti_quiz": {
+      "description": "透過幾個簡單的問題，找出最適合你的人格類型",
+      "dimensions": [
+        "analyst",
+        "diplomat",
+        "guardian",
+        "explorer"
+      ],
+      "is_default": true,
+      "name": "預設題庫",
+      "selection_rules": {
+        "total": 4
+      },
+      "tie_breaker_priority": [
+        "analyst",
+        "diplomat",
+        "guardian",
+        "explorer"
+      ],
+      "title": "生活品味人格探索",
+      "total_questions": 4,
+      "quiz_copy": {
+        "opening": {
+          "zh": "簡單四個問題，幫你找到命定保護殼，如果中途想離開，請輸入「中斷」，即可回到問答模式，讓我們開始測驗吧！",
+          "en": "Just four questions to find your perfect phone case! If you want to leave midway, type pause to return to chat. Let's begin!"
+        },
+        "already_done": {
+          "zh": "你已經作答過囉！想再玩一次請重新整理頁面開始新的對話。",
+          "en": "You've already answered! Refresh the page to start a new session."
+        }
+      },
+      "results": {
+        "analyst": {
+          "title": "讓生活極大化",
+          "color_name": "分析家",
+          "recommended_colors": ["銀灰色", "黑色"],
+          "description": "依循計畫 讓生活極大化 你總能挑選最值得一試的體驗 在你的安排下，每段旅程都恰到好處 每一步計劃，都讓生活精彩極大化"
+        },
+        "diplomat": {
+          "title": "懂生活 更懂享受",
+          "color_name": "外交家",
+          "recommended_colors": ["香檳金", "玫瑰金"],
+          "description": "懂生活 更懂享受 你善於社交，樂於享受與人交流 將生活的美好片刻，化為愉悅的共享時光 因為在你心中，你我才是最美的風景"
+        },
+        "guardian": {
+          "title": "品味經典 彰顯非凡格局",
+          "color_name": "守護者",
+          "recommended_colors": ["深灰色", "海水藍"],
+          "description": "品味經典 彰顯非凡格局 你擁有強大的責任感，總是值得依靠 對於經典品味更擁有獨到見解 以條理與深度打造出令人仰望的生活格局"
+        },
+        "explorer": {
+          "title": "渴望冒險 探索每一刻驚喜",
+          "color_name": "探險家",
+          "recommended_colors": ["叢林綠", "珊瑚紅"],
+          "description": "渴望冒險 探索每一刻驚喜 你總是勇於嘗試新鮮刺激的挑戰 更散發著引領他人探索未知的魅力 在生活中，發掘屬於自己的驚喜與樂趣"
+        }
+      },
+      "questions": [
+        {
+          "id": "q1",
+          "options": [
+            {
+              "id": "a",
+              "text": "先列清單：交通、時間、備案，效率最大化",
+              "score": {
+                "analyst": 1
+              }
+            },
+            {
+              "id": "b",
+              "text": "揪朋友一起：吃喝聊走拍照，重點是一起玩",
+              "score": {
+                "diplomat": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "選一個熟悉且品質穩的地方：舒服、安心、剛剛好",
+              "score": {
+                "guardian": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "當天才決定：看到哪裡有趣就去哪裡，越未知越好",
+              "score": {
+                "explorer": 1
+              }
+            }
+          ],
+          "text": "週末突然多出一整天，你會怎麼安排？",
+          "weight": 1
+        },
+        {
+          "id": "q10",
+          "options": [
+            {
+              "id": "a",
+              "text": "先學原理＋拆步驟，做出可複製的方法",
+              "score": {
+                "analyst": 1
+              }
+            },
+            {
+              "id": "b",
+              "text": "找人一起學：互相鼓勵、過程更好玩",
+              "score": {
+                "diplomat": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "選穩健路線：從基礎打底，慢慢練到很扎實",
+              "score": {
+                "guardian": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "直接跳進去：先做再說，邊玩邊學最快",
+              "score": {
+                "explorer": 1
+              }
+            }
+          ],
+          "text": "如果要挑戰一件新事，你比較像哪種？",
+          "weight": 1
+        },
+        {
+          "id": "q11",
+          "options": [
+            {
+              "id": "a",
+              "text": "分類＋清單＋備用方案：缺什麼一眼就知道",
+              "score": {
+                "analyst": 1
+              }
+            },
+            {
+              "id": "b",
+              "text": "行李要留空間：路上遇到喜歡的就一起帶回來分享",
+              "score": {
+                "diplomat": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "必帶「品質穩」的經典品：用得安心、拍起來也好看",
+              "score": {
+                "guardian": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "輕裝上陣：帶最少、路上補給，行動自由最重要",
+              "score": {
+                "explorer": 1
+              }
+            }
+          ],
+          "text": "你整理行李的方式最像？",
+          "weight": 1
+        },
+        {
+          "id": "q12",
+          "options": [
+            {
+              "id": "a",
+              "text": "做完該做的＋還多完成一點：高效又有掌控感",
+              "score": {
+                "analyst": 1
+              }
+            },
+            {
+              "id": "b",
+              "text": "跟喜歡的人一起：吃好、聊好、心情好",
+              "score": {
+                "diplomat": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "簡單但有質感：穩穩的、優雅的、舒服的",
+              "score": {
+                "guardian": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "充滿新鮮刺激：嘗試、探索、最後還有驚喜收尾",
+              "score": {
+                "explorer": 1
+              }
+            }
+          ],
+          "text": "你心目中的「理想一天」比較接近？",
+          "weight": 1
+        },
+        {
+          "id": "q2",
+          "options": [
+            {
+              "id": "a",
+              "text": "行程密度與路線最佳化：每段都恰到好處",
+              "score": {
+                "analyst": 1
+              }
+            },
+            {
+              "id": "b",
+              "text": "一起出發的人：好不好玩取決於同伴與互動",
+              "score": {
+                "diplomat": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "住宿與整體質感：經典、舒適、值得信賴",
+              "score": {
+                "guardian": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "新鮮感：沒做過的事、沒去過的點、越特別越好",
+              "score": {
+                "explorer": 1
+              }
+            }
+          ],
+          "text": "你挑選一趟旅行的「第一優先」是？",
+          "weight": 1
+        },
+        {
+          "id": "q3",
+          "options": [
+            {
+              "id": "a",
+              "text": "快速重排：把可行方案列出來、選最優解",
+              "score": {
+                "analyst": 1
+              }
+            },
+            {
+              "id": "b",
+              "text": "先確認大家心情：別掃興，我來讓氣氛回來",
+              "score": {
+                "diplomat": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "穩住大局：選風險最小、大家最安心的方案",
+              "score": {
+                "guardian": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "太好了！順勢開新副本：改去更刺激的地方",
+              "score": {
+                "explorer": 1
+              }
+            }
+          ],
+          "text": "朋友臨時改計畫（時間/地點都變了），你第一反應？",
+          "weight": 1
+        },
+        {
+          "id": "q4",
+          "options": [
+            {
+              "id": "a",
+              "text": "行程規劃師：時間控、路線控、預算控",
+              "score": {
+                "analyst": 1
+              }
+            },
+            {
+              "id": "b",
+              "text": "氣氛王：拍照、帶話題、把大家湊在一起",
+              "score": {
+                "diplomat": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "定海神針：照顧細節、確保每個人都舒服",
+              "score": {
+                "guardian": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "開路先鋒：找新點、試新店、帶大家衝第一",
+              "score": {
+                "explorer": 1
+              }
+            }
+          ],
+          "text": "你在團體出遊時最常扮演的角色是？",
+          "weight": 1
+        },
+        {
+          "id": "q5",
+          "options": [
+            {
+              "id": "a",
+              "text": "先做功課：地圖、評價、動線、替代路線都看過",
+              "score": {
+                "analyst": 1
+              }
+            },
+            {
+              "id": "b",
+              "text": "先找當地人/朋友推薦：順便聊天認識新朋友",
+              "score": {
+                "diplomat": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "優先走「口碑經典」路線：安全、不踩雷、品質穩",
+              "score": {
+                "guardian": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "隨機探索：小巷、未知景點、走到哪算哪",
+              "score": {
+                "explorer": 1
+              }
+            }
+          ],
+          "text": "面對陌生城市，你會怎麼走？",
+          "weight": 1
+        },
+        {
+          "id": "q6",
+          "options": [
+            {
+              "id": "a",
+              "text": "生活有系統：收納、習慣、節奏都能被優化",
+              "score": {
+                "analyst": 1
+              }
+            },
+            {
+              "id": "b",
+              "text": "有人一起：再平常也能變成值得分享的時刻",
+              "score": {
+                "diplomat": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "經典質感：耐看、耐用、越用越有味道",
+              "score": {
+                "guardian": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "有驚喜：偶爾打破規則，讓日常突然很好玩",
+              "score": {
+                "explorer": 1
+              }
+            }
+          ],
+          "text": "你最在意的「生活儀式感」長什麼樣？",
+          "weight": 1
+        },
+        {
+          "id": "q7",
+          "options": [
+            {
+              "id": "a",
+              "text": "看評分＋菜單＋距離＋排隊時間，算出最划算",
+              "score": {
+                "analyst": 1
+              }
+            },
+            {
+              "id": "b",
+              "text": "先看氛圍：適合聊天、拍照、大家坐得開心",
+              "score": {
+                "diplomat": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "先看品牌與口碑：穩、好、值得反覆回訪",
+              "score": {
+                "guardian": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "選沒吃過的：新菜系、怪有趣、越特別越好",
+              "score": {
+                "explorer": 1
+              }
+            }
+          ],
+          "text": "你選餐廳最像哪一種？",
+          "weight": 1
+        },
+        {
+          "id": "q8",
+          "options": [
+            {
+              "id": "a",
+              "text": "比規格、比評價、比CP值，買一次就要買對",
+              "score": {
+                "analyst": 1
+              }
+            },
+            {
+              "id": "b",
+              "text": "看會不會讓生活更有趣、能跟朋友一起分享",
+              "score": {
+                "diplomat": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "看材質、工藝、耐用度：經典就是不用多說",
+              "score": {
+                "guardian": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "看能不能帶來新體驗：好玩比完美更重要",
+              "score": {
+                "explorer": 1
+              }
+            }
+          ],
+          "text": "你買東西的「決策模式」是？",
+          "weight": 1
+        },
+        {
+          "id": "q9",
+          "options": [
+            {
+              "id": "a",
+              "text": "一切都順：流程順、節奏順、每個人都玩到重點",
+              "score": {
+                "analyst": 1
+              }
+            },
+            {
+              "id": "b",
+              "text": "大家笑成一團：聊到停不下來，情緒被點亮",
+              "score": {
+                "diplomat": 1
+              }
+            },
+            {
+              "id": "c",
+              "text": "被信任與依靠：有人需要你、你讓局面更穩",
+              "score": {
+                "guardian": 1
+              }
+            },
+            {
+              "id": "d",
+              "text": "出現意外驚喜：臨時加碼、突發任務、越來越嗨",
+              "score": {
+                "explorer": 1
+              }
+            }
+          ],
+          "text": "一場聚會，你最享受的瞬間是？",
+          "weight": 1
+        }
+      ]
+    }
+  }
+}

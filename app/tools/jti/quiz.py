@@ -19,8 +19,8 @@ logger = logging.getLogger(__name__)
 
 # 載入題庫（支援中英文）
 QUIZ_BANK_PATHS = {
-    "zh": Path("data/quiz_bank_color_zh.json"),
-    "en": Path("data/quiz_bank_color_en.json"),
+    "zh": Path("data/quiz_bank_jti_zh.json"),
+    "en": Path("data/quiz_bank_jti_en.json"),
 }
 quiz_data_cache = {}
 
@@ -45,7 +45,8 @@ def load_quiz_bank(language: str = "zh", store_name: str = JTI_STORE_NAME):
         if store_name == JTI_STORE_NAME:
             path = QUIZ_BANK_PATHS.get(language, QUIZ_BANK_PATHS["zh"])
             with open(path, "r", encoding="utf-8") as f:
-                quiz_data_cache[cache_key] = json.load(f)
+                raw_data = json.load(f)
+                quiz_data_cache[cache_key] = next(iter(raw_data["quiz_sets"].values()))
         else:
             # If not __jti__, and mongodb has no data, return empty template bank
             quiz_data_cache[cache_key] = {

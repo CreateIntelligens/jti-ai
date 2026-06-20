@@ -18,6 +18,7 @@ const DEFAULT_SCOPE = '';
 const APP_SCOPE_OPTIONS = [
   { value: 'hciot', label: 'HCIoT' },
   { value: 'jti', label: 'JTI' },
+  { value: 'esg', label: 'ESG' },
 ];
 
 function errorMessage(error: unknown, fallback: string): string {

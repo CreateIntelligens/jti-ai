@@ -16,21 +16,18 @@ from typing import Any
 
 from app.services.jti.quiz_bank_store import DEFAULT_BANK_ID
 from app.services.jti.quiz_results_store import DEFAULT_SET_ID
-
+from app.services.db_names import CONTROL_PLANE_DB_NAME
 from app.services.quiz.config import JTI_STORE_NAME
 
 logger = logging.getLogger(__name__)
 
-QUIZ_BANK_PATHS = {
-    "zh": Path("data/quiz_bank_color_zh.json"),
-    "en": Path("data/quiz_bank_color_en.json"),
-}
-
-QUIZ_RESULTS_PATHS = {
-    "zh": Path("data/quiz_results.json"),
-    "en": Path("data/quiz_results_en.json"),
-}
-
+QUIZ_SEED_TABLE = [
+    # (managed_app, store_name, language, json_path)
+    ("jti", "__jti__",   "zh", "data/quiz_bank_jti_zh.json"),
+    ("jti", "__jti__en", "en", "data/quiz_bank_jti_en.json"),
+    ("esg", "__esg__",   "zh", "data/quiz_bank_esg_zh.json"),
+    ("esg", "__esg__en", "en", "data/quiz_bank_esg_en.json"),
+]
 
 _backfill_done = False
 
@@ -139,6 +136,20 @@ def _upgrade_legacy_data() -> None:
         logger.info("[Startup] Processed %d legacy questions", len(legacy_questions))
 
 
+def _load_bank(path: str | Path) -> dict[str, Any]:
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    return next(iter(data["quiz_sets"].values()))
+
+
+# DB/system fields excluded when comparing stored docs against JSON seed content.
+_INTERNAL_DOC_FIELDS = ("created_at", "updated_at", "store_name", "language", "bank_id", "set_id", "quiz_id")
+
+
+def _strip_internal_fields(doc: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in doc.items() if k not in _INTERNAL_DOC_FIELDS}
+
+
 def _default_bank_seed_payload(data: dict[str, Any]) -> dict[str, Any]:
     """Default bank 的「內容」欄位 (JSON 同步用)。
 
@@ -146,8 +157,8 @@ def _default_bank_seed_payload(data: dict[str, Any]) -> dict[str, Any]:
     之後 JSON 同步只更新內容欄位,避免覆寫使用者已啟用的自訂 bank。
     """
     return {
-        "name": "預設題庫",
-        "title": data.get("title", ""),
+        "name": data.get("name", "預設題庫"),
+        "title": data.get("title", data.get("name", "")),
         "description": data.get("description", ""),
         "total_questions": data.get("total_questions", 4),
         "dimensions": data.get("dimensions", []),
@@ -167,6 +178,7 @@ def _default_bank_is_outdated(
 
     expected_meta = _default_bank_seed_payload(seed_data)
     for key in (
+        "name",
         "title",
         "description",
         "total_questions",
@@ -178,7 +190,9 @@ def _default_bank_is_outdated(
             return True
 
     expected_questions = seed_data.get("questions", [])
-    return existing_questions != expected_questions
+    clean_existing = [_strip_internal_fields(q) for q in existing_questions]
+    clean_expected = [_strip_internal_fields(q) for q in expected_questions]
+    return clean_existing != clean_expected
 
 
 def _default_quiz_results_set_payload(language: str) -> dict[str, Any]:
@@ -204,49 +218,137 @@ def _default_quiz_results_are_outdated(
         if existing_meta.get(key) != expected_meta.get(key):
             return True
 
-    return existing_results != seed_data
+    clean_existing = {qid: _strip_internal_fields(doc) for qid, doc in existing_results.items()}
+    clean_seed = {qid: _strip_internal_fields(doc) for qid, doc in seed_data.items()}
+    return clean_existing != clean_seed
+
+
+def migrate_esg_legacy_data() -> None:
+    """Migrate legacy ESG dynamic store data to new fixed app stores (__esg__ / __esg__en)."""
+    from app.services.mongo_client import get_mongo_db
+
+    db_control = get_mongo_db(CONTROL_PLANE_DB_NAME)
+    db_jti = get_mongo_db("jti_app")
+    db_general = get_mongo_db("general_app")
+
+    if db_control is None or db_jti is None or db_general is None:
+        return
+
+    mapping = {
+        "store_95028fc06029": "__esg__",    # ESG_ZH
+        "store_b66923e91295": "__esg__en",  # ESG_EN
+    }
+
+    # 1. system_config.knowledge_stores (store registry)
+    col_stores = db_control["knowledge_stores"]
+    for old_name, new_name in mapping.items():
+        old_doc = col_stores.find_one({"name": old_name})
+        if old_doc:
+            new_doc = col_stores.find_one({"name": new_name})
+            if not new_doc:
+                col_stores.update_one({"name": old_name}, {"$set": {"name": new_name, "managed_app": "esg"}})
+                logger.info("[Migration] Renamed knowledge store %s -> %s", old_name, new_name)
+            else:
+                col_stores.delete_one({"name": old_name})
+                logger.info("[Migration] Deleted obsolete legacy knowledge store %s", old_name)
+
+    # Helper for safe rename to prevent duplicate key errors
+    def safe_rename(collection, filter_keys, old_store, new_store):
+        cursor = collection.find({**filter_keys, "store_name": old_store})
+        for doc in cursor:
+            target_filter = {k: doc[k] for k in filter_keys}
+            target_filter["store_name"] = new_store
+            existing = collection.find_one(target_filter)
+            if existing:
+                collection.delete_one({"_id": doc["_id"]})
+            else:
+                collection.update_one({"_id": doc["_id"]}, {"$set": {"store_name": new_store}})
+
+    # 2. system_config.prompts
+    col_prompts = db_control["prompts"]
+    for old_name, new_name in mapping.items():
+        safe_rename(col_prompts, {}, old_name, new_name)
+
+    # 3. jti_app.quiz_bank_metadata / quiz_bank_questions
+    col_bank_meta = db_jti["quiz_bank_metadata"]
+    col_bank_qs = db_jti["quiz_bank_questions"]
+    for old_name, new_name in mapping.items():
+        safe_rename(col_bank_meta, {"language": {"$exists": True}, "bank_id": {"$exists": True}}, old_name, new_name)
+        safe_rename(col_bank_qs, {"language": {"$exists": True}, "bank_id": {"$exists": True}, "id": {"$exists": True}}, old_name, new_name)
+
+    # 4. jti_app.quiz_results_metadata / quiz_results
+    col_res_meta = db_jti["quiz_results_metadata"]
+    col_res = db_jti["quiz_results"]
+    for old_name, new_name in mapping.items():
+        safe_rename(col_res_meta, {"language": {"$exists": True}, "set_id": {"$exists": True}}, old_name, new_name)
+        safe_rename(col_res, {"language": {"$exists": True}, "set_id": {"$exists": True}, "quiz_id": {"$exists": True}}, old_name, new_name)
+
+    # 5. general_app.conversations
+    col_convs = db_general["conversations"]
+    for old_name, new_name in mapping.items():
+        col_convs.update_many({"store_name": old_name}, {"$set": {"store_name": new_name}})
 
 
 def migrate_quiz_bank() -> None:
     """Seed quiz bank from JSON → MongoDB and sync stale default banks."""
-    # First, upgrade any legacy data (which also does backfill & drops old indexes)
+    # Run legacy ESG data migration first
+    migrate_esg_legacy_data()
+
+    # Upgrade any JTI legacy data
     _upgrade_legacy_data()
 
     from app.services.jti.quiz_bank_store import get_quiz_bank_store
     store = get_quiz_bank_store()
-    
-    # Trigger new unique index creation in case it didn't run properly
     store._ensure_indexes()
 
-    for lang, path in QUIZ_BANK_PATHS.items():
+    import app.deps as deps
+
+    for _app, store_name, lang, json_path in QUIZ_SEED_TABLE:
+        path = Path(json_path)
         if not path.exists():
-            logger.info("[Startup] Quiz bank JSON not found for %s: %s", lang, path)
+            logger.info("[Startup] Quiz bank JSON not found: %s", path)
             continue
 
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        existing_meta = store.get_metadata(lang, bank_id=DEFAULT_BANK_ID)
-        existing_questions = store.list_questions(lang, DEFAULT_BANK_ID)
-
-        # 判斷需在 upsert 前完成,避免 JSON 同步覆寫使用者已啟用的自訂 bank。
-        has_active_bank = store.get_metadata(lang) is not None
-
-        if not _default_bank_is_outdated(existing_meta, existing_questions, data):
-            logger.debug("Quiz bank (%s) up to date, skipping", lang)
+        try:
+            bank = _load_bank(path)
+        except Exception as exc:
+            logger.warning("[Startup] Failed to load quiz bank %s: %s", path, exc)
             continue
 
-        # Upsert metadata with multi-set fields (內容同步,不含 is_active)。
-        store.upsert_metadata(lang, DEFAULT_BANK_ID, _default_bank_seed_payload(data))
+        existing_meta = store.get_metadata(lang, bank_id=DEFAULT_BANK_ID, store_name=store_name)
+        existing_questions = store.list_questions(lang, DEFAULT_BANK_ID, store_name=store_name)
 
-        if not has_active_bank:
-            store.set_active_bank(lang, DEFAULT_BANK_ID)
-            logger.info("[Startup] Activated default quiz bank (%s) on first seed", lang)
+        has_active_bank = store.get_metadata(lang, store_name=store_name) is not None
 
-        # Replace all questions so stale extras are removed during sync.
-        questions = data.get("questions", [])
-        count = store.replace_all_questions(lang, DEFAULT_BANK_ID, questions)
-        logger.info("[Startup] Synced quiz bank (%s): %d questions", lang, count)
+        if _default_bank_is_outdated(existing_meta, existing_questions, bank):
+            store.upsert_metadata(lang, DEFAULT_BANK_ID, _default_bank_seed_payload(bank), store_name=store_name)
+
+            if not has_active_bank:
+                store.set_active_bank(lang, DEFAULT_BANK_ID, store_name=store_name)
+                logger.info("[Startup] Activated default quiz bank (%s) on first seed", store_name)
+
+            questions = bank.get("questions", [])
+            count = store.replace_all_questions(lang, DEFAULT_BANK_ID, questions, store_name=store_name)
+            logger.info("[Startup] Synced quiz bank (%s, %s): %d questions", store_name, lang, count)
+        else:
+            logger.debug("Quiz bank (%s, %s) up to date, skipping", store_name, lang)
+
+        # Seed prompts (quiz_copy and enable quiz)
+        pm = deps.prompt_manager
+        if pm:
+            try:
+                sp = pm.get_store_prompts(store_name)
+                sp.quiz_enabled = True
+                if "測驗" not in sp.quiz_start_keywords:
+                    sp.quiz_start_keywords = list(sp.quiz_start_keywords) + ["測驗", "quiz", "問答"]
+
+                quiz_copy = bank.get("quiz_copy")
+                if quiz_copy:
+                    sp.quiz_copy = quiz_copy
+
+                pm.save_store_prompts(sp)
+            except Exception as exc:
+                logger.warning("[Startup] Failed to seed prompts for %s: %s", store_name, exc)
 
 
 def _upgrade_legacy_quiz_results() -> None:
@@ -308,29 +410,37 @@ def _upgrade_legacy_quiz_results() -> None:
 
 def migrate_quiz_results() -> None:
     """Seed quiz results from JSON → MongoDB and sync stale default sets."""
-    # First, upgrade any legacy data
+    # First, upgrade any JTI legacy results
     _upgrade_legacy_quiz_results()
 
     from app.services.jti.quiz_results_store import get_quiz_results_store
     store = get_quiz_results_store()
-    
-    # Trigger new unique index creation
     store._ensure_indexes()
 
-    for lang, path in QUIZ_RESULTS_PATHS.items():
+    for _app, store_name, lang, json_path in QUIZ_SEED_TABLE:
+        path = Path(json_path)
         if not path.exists():
-            logger.info("[Startup] Quiz results JSON not found for %s: %s", lang, path)
+            logger.info("[Startup] Quiz results JSON not found: %s", path)
             continue
 
-        with open(path, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        existing_meta = store.get_set_metadata(lang, DEFAULT_SET_ID)
-        existing_results = store.get_all_results(lang, set_id=DEFAULT_SET_ID)
-        if not _default_quiz_results_are_outdated(existing_meta, existing_results, data, lang):
-            logger.debug("Quiz results (%s) up to date, skipping", lang)
+        try:
+            bank = _load_bank(path)
+        except Exception as exc:
+            logger.warning("[Startup] Failed to load quiz bank for results %s: %s", path, exc)
             continue
 
-        store.upsert_set_metadata(lang, DEFAULT_SET_ID, _default_quiz_results_set_payload(lang))
-        count = store.replace_all_results(lang, data, set_id=DEFAULT_SET_ID)
-        logger.info("[Startup] Synced quiz results (%s): %d entries", lang, count)
+        results_data = bank.get("results")
+        if not results_data:
+            logger.debug("No results in quiz bank (%s, %s), skipping results seed", store_name, lang)
+            continue
+
+        existing_meta = store.get_set_metadata(lang, DEFAULT_SET_ID, store_name=store_name)
+        existing_results = store.get_all_results(lang, set_id=DEFAULT_SET_ID, store_name=store_name)
+
+        if not _default_quiz_results_are_outdated(existing_meta, existing_results, results_data, lang):
+            logger.debug("Quiz results (%s, %s) up to date, skipping", store_name, lang)
+            continue
+
+        store.upsert_set_metadata(lang, DEFAULT_SET_ID, _default_quiz_results_set_payload(lang), store_name=store_name)
+        count = store.replace_all_results(lang, results_data, set_id=DEFAULT_SET_ID, store_name=store_name)
+        logger.info("[Startup] Synced quiz results (%s, %s): %d entries", store_name, lang, count)

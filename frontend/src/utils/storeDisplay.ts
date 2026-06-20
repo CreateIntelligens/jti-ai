@@ -11,6 +11,7 @@ export function getStoreIcon(app: string): string {
   const normalizedApp = app.trim().toLowerCase();
   if (normalizedApp === 'jti') return '🏢';
   if (normalizedApp === 'hciot') return '🏥';
+  if (normalizedApp === 'esg') return '🌱';
   return '📁';
 }
 

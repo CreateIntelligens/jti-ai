@@ -11,7 +11,7 @@ export function isSuperAdmin(role?: string | null): boolean {
 export function isGeneralUserScope(profile: Pick<UserProfile, 'scope' | 'store_name' | 'role'>): boolean {
   if (isAdminRole(profile.role)) return false;
   if (profile.store_name) return true;
-  if (profile.scope === 'general') return true;
+  if (profile.scope === 'general' || profile.scope === 'esg') return true;
   return Boolean(profile.scope?.startsWith('key_name:'));
 }
 

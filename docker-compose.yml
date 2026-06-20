@@ -49,6 +49,7 @@ services:
       - ./.env:/app/.env
       - ./data:/app/data
       - ./logs:/app/logs
+      - ./docker:/app/docker:ro
       - ./.hf_cache:/home/appuser/.cache/huggingface
       # DocumentDB TLS CA（連 DocumentDB 時 MONGODB_URI 以 tlsCAFile 指向此路徑）
       - ./global-bundle.pem:/app/global-bundle.pem:ro

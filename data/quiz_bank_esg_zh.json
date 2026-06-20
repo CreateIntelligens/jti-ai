@@ -3,6 +3,32 @@
     "esg_quiz": {
       "name": "三立 ESG 永續問答",
       "description": "10 題三立 ESG 永續知識問答",
+      "total_questions": 1,
+      "dimensions": [
+        "correct"
+      ],
+      "tie_breaker_priority": [
+        "correct"
+      ],
+      "selection_rules": {
+        "total": 1
+      },
+      "quiz_copy": {
+        "opening": {
+          "zh": "來測測你對三立永續的了解吧！請選出正確答案：",
+          "en": "Test your knowledge of SET's sustainability journey! Pick the correct answer:"
+        },
+        "already_done": {
+          "zh": "你已經作答過囉！想再玩一次請重新整理頁面開始新的對話。",
+          "en": "You've already answered! Refresh the page to start a new session."
+        }
+      },
+      "results": {
+        "correct": {
+          "title": "ESG 永續達人",
+          "description": "恭喜完成三立 ESG 永續問答！你對三立的永續足跡相當了解，一起共創台灣的美好永續。"
+        }
+      },
       "questions": [
         {
           "id": "q1",

@@ -209,6 +209,8 @@ MANAGED_STORES: tuple[ManagedStoreConfig, ...] = (
     ManagedStoreConfig("__jti__en", "JTI English", "jti", "en"),
     ManagedStoreConfig("__hciot__", "HCIoT 中文", "hciot", "zh"),
     ManagedStoreConfig("__hciot__en", "HCIoT English", "hciot", "en"),
+    ManagedStoreConfig("__esg__", "ESG 中文", "esg", "zh", key_name="和泰汽車"),
+    ManagedStoreConfig("__esg__en", "ESG English", "esg", "en", key_name="和泰汽車"),
 )
 
 _STORE_ALIASES: dict[str, str] = {
@@ -222,6 +224,11 @@ _STORE_ALIASES: dict[str, str] = {
     "hciot_zh": "__hciot__",
     "hciot-en": "__hciot__en",
     "hciot_en": "__hciot__en",
+    "esg": "__esg__",
+    "esg-zh": "__esg__",
+    "esg_zh": "__esg__",
+    "esg-en": "__esg__en",
+    "esg_en": "__esg__en",
 }
 
 
@@ -312,6 +319,9 @@ def _validate_key_index(key_index: int, owner_key_hash: str | None) -> int:
 def _knowledge_store_for(config: ManagedStoreConfig):
     if config.managed_app == "hciot":
         return get_hciot_knowledge_store()
+    if config.managed_app == "esg":
+        from app.services.knowledge_store import get_namespaced_knowledge_store
+        return get_namespaced_knowledge_store("esg")
     return get_jti_knowledge_store()
 
 
@@ -427,11 +437,17 @@ def _list_key_name_scoped_store_payloads(
     owner_key_hash: str | None,
     key_name: str,
 ) -> list[dict[str, Any]]:
-    return [
+    managed = [
+        _managed_store_payload(config)
+        for config in MANAGED_STORES
+        if store_config_matches_scope(config, f"key_name:{key_name}")
+    ]
+    dynamic = [
         _dynamic_store_payload(store)
         for store in get_store_registry().list_stores(owner_key_hash)
         if _dynamic_store_matches_scope(store, f"key_name:{key_name}")
     ]
+    return managed + dynamic
 
 
 def _list_app_scoped_store_payloads(owner_key_hash: str | None, app: str) -> list[dict[str, Any]]:
