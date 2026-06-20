@@ -43,9 +43,15 @@ class FakeCollection:
 
     @staticmethod
     def _matches(doc, query):
+        import re
+
         for k, v in query.items():
             if isinstance(v, dict) and "$in" in v:
                 if doc.get(k) not in v["$in"]:
+                    return False
+            elif isinstance(v, dict) and "$regex" in v:
+                flags = re.IGNORECASE if "i" in v.get("$options", "") else 0
+                if not re.search(v["$regex"], str(doc.get(k) or ""), flags):
                     return False
             elif doc.get(k) != v:
                 return False
@@ -144,6 +150,7 @@ fake_db = {
     "general_topics": FakeCollection(),
     "general_categories": FakeCollection(),
     "general_images": FakeCollection(),
+    "general_knowledge_files": FakeCollection(),
 }
 
 install_app_import_mocks()
@@ -160,17 +167,23 @@ def _admin_auth():
     app.dependency_overrides[verify_auth] = lambda: {"role": "super_admin", "store_name": None}
     _get_db = lambda *_a, **_k: fake_db  # noqa: E731
     import app.services._shared.qa_kb.topic_store_base as tb_base
+    import app.services._shared.qa_kb.knowledge_store_base as kb_base
     import app.services.general.image_store as img_mod
-    _orig_tb, _orig_img = tb_base.get_mongo_db, img_mod.get_mongo_db
+    import app.services.general.knowledge_store as ks_mod
+    _orig_tb, _orig_kb, _orig_img = tb_base.get_mongo_db, kb_base.get_mongo_db, img_mod.get_mongo_db
     tb_base.get_mongo_db = _get_db
+    kb_base.get_mongo_db = _get_db
     img_mod.get_mongo_db = _get_db
     img_mod._image_store = None
+    ks_mod._knowledge_store = None
     for coll in fake_db.values():
         coll.docs.clear()
     yield
     tb_base.get_mongo_db = _orig_tb
+    kb_base.get_mongo_db = _orig_kb
     img_mod.get_mongo_db = _orig_img
     img_mod._image_store = None
+    ks_mod._knowledge_store = None
     app.dependency_overrides.pop(verify_auth, None)
 
 
@@ -253,3 +266,43 @@ def test_non_allowlisted_content_type_served_as_attachment():
     assert got.headers["content-type"].startswith("application/octet-stream")
     assert got.headers["content-disposition"] == "attachment"
     assert got.headers["x-content-type-options"] == "nosniff"
+
+
+def test_csv_sync_stores_questions_flat_for_single_language():
+    """Regression: syncing a topic's questions from a validated QA CSV must
+    store them so general (single-language, store_name in the `language` slot)
+    can read them back. Previously the shared sync wrote {lang: q, other: []}
+    where other == lang, collapsing to {lang: []} and wiping every question."""
+    from app.routers.general.knowledge import _make_config
+    from app.routers._shared.qa_kb_sync import _sync_topic_questions_from_store
+    from app.services.general.knowledge_store import get_general_knowledge_store
+    from app.services.general.topic_store import get_general_topic_store
+
+    store_name = "store-sync"
+    topic_id = "faq/greet"
+    # Seed a validated QA CSV for the topic under the general knowledge store.
+    get_general_knowledge_store().insert_file(
+        store_name,
+        "greet.csv",
+        b"index,q,a\n1,Hi there,Hello!\n2,Bye,Goodbye\n",
+        content_type="text/csv",
+        topic_id=topic_id,
+        category_label="FAQ",
+        topic_label="Greet",
+    )
+
+    synced = _sync_topic_questions_from_store(
+        _make_config(),
+        language=store_name,
+        topic_id=topic_id,
+        topic_label="Greet",
+        category_label="FAQ",
+        hidden_questions=None,
+    )
+    assert synced is True
+
+    topic = get_general_topic_store(store_name).get_topic(topic_id)
+    assert topic is not None
+    # Questions stored as a flat list (not a partition dict), and not wiped.
+    assert topic["questions"] == ["Hi there", "Bye"]
+    assert not isinstance(topic["questions"], dict)

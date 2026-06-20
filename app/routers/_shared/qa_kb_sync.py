@@ -21,13 +21,14 @@ def _get_topic_hidden_questions(topic: dict | None, language: str) -> list[str]:
     """Retrieve hidden questions for a specific language from a topic dictionary."""
     if not topic:
         return []
-    hidden_by_language = topic.get("hidden_questions")
-    if not isinstance(hidden_by_language, dict):
+    hidden = topic.get("hidden_questions")
+    # Single-language stores (general) store a flat list; multi-language stores
+    # (hciot/jti) store a {zh, en} partition dict.
+    if isinstance(hidden, dict):
+        hidden = hidden.get(language)
+    if not isinstance(hidden, list):
         return []
-    lang_hidden = hidden_by_language.get(language)
-    if not isinstance(lang_hidden, list):
-        return []
-    return [item for item in lang_hidden if isinstance(item, str)]
+    return [item for item in hidden if isinstance(item, str)]
 
 
 def _existing_topic_questions(config: QaKbRouterConfig, language: str, topic_id: str | None) -> set[str]:
@@ -93,37 +94,48 @@ def _sync_topic_questions_from_store(
         return [q for q in existing_hidden if q in current_questions]
 
     existing = topic_store.get_topic(topic_id)
+    other_lang = config.other_language(language)
+    # Single-language stores (e.g. general, where `language` carries store_name)
+    # report `other_language(language) == language`. There bilingual partition
+    # dicts would collapse to a single key and lose data, so write flat values
+    # the single-language read path expects. Multi-language stores (hciot/jti)
+    # keep the {zh, en} partition.
+    single_language = other_lang == language
+
+    def _partition(value, empty):
+        return value if single_language else {language: value, other_lang: empty}
+
     if existing:
         if not questions and not store.has_non_csv_files(language, topic_id):
             topic_store.delete_topic(topic_id)
             logger.info("[QA KB] Deleted empty topic %s", topic_id)
         else:
-            topic_store.update_topic(topic_id, {
-                f"questions.{language}": questions,
-                f"hidden_questions.{language}": _resolve_hidden(existing),
-            })
+            if single_language:
+                update = {
+                    "questions": questions,
+                    "hidden_questions": _resolve_hidden(existing),
+                }
+            else:
+                update = {
+                    f"questions.{language}": questions,
+                    f"hidden_questions.{language}": _resolve_hidden(existing),
+                }
+            topic_store.update_topic(topic_id, update)
             logger.info("[QA KB] Synced %d questions -> %s", len(questions), topic_id)
         return True
 
     if not questions:
         return False
 
-    other_lang = config.other_language(language)
     topic_label_resolved = (topic_label or "").strip() or suffix
     category_label_resolved = (category_label or "").strip() or prefix
     topic_store.upsert_topic(
         topic_id,
         {
-            "labels": {
-                language: topic_label_resolved,
-                other_lang: "",
-            },
-            "category_labels": {
-                language: category_label_resolved,
-                other_lang: "",
-            },
-            "questions": {language: questions, other_lang: []},
-            "hidden_questions": {language: _resolve_hidden(None), other_lang: []},
+            "labels": _partition(topic_label_resolved, ""),
+            "category_labels": _partition(category_label_resolved, ""),
+            "questions": _partition(questions, []),
+            "hidden_questions": _partition(_resolve_hidden(None), []),
         },
     )
     logger.info("[QA KB] Synced %d questions -> %s", len(questions), topic_id)
