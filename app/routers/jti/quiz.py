@@ -7,23 +7,16 @@ import logging
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
-import app.deps as deps
 from app.auth import verify_auth
-from app.models.session import SessionStep
-from app.schemas.chat import ChatResponse
-from app.services.jti.quiz_helpers import (
-    _get_or_rebuild_session,
-    _pause_quiz_and_respond,
-)
-from app.services.jti.runtime_quiz_flow import execute_quiz_start
+from app.services.general.managed_quiz import ManagedQuizService
+from app.services.jti.quiz_flow import JTI_QUIZ_CONFIG
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["JTI Quiz"], dependencies=[Depends(verify_auth)])
 
 
-def _get_session_manager():
-    return deps.get_jti_session_manager()
+quiz_service = ManagedQuizService(JTI_QUIZ_CONFIG)
 
 
 class QuizActionRequest(BaseModel):
@@ -34,12 +27,7 @@ class QuizActionRequest(BaseModel):
 async def quiz_start(request: QuizActionRequest):
     """直接開始測驗（不依賴自然語言判斷）"""
     try:
-        session_manager = _get_session_manager()
-        s = session_manager.get_session(request.session_id)
-        if s and s.step.value == "DONE":
-            s.step = SessionStep.WELCOME
-            session_manager.update_session(s)
-        return await execute_quiz_start(request.session_id)
+        return await quiz_service.start(request.session_id)
     except HTTPException:
         raise
     except Exception as e:
@@ -51,15 +39,7 @@ async def quiz_start(request: QuizActionRequest):
 async def quiz_pause(request: QuizActionRequest):
     """直接暫停測驗（不依賴自然語言判斷）"""
     try:
-        session = _get_or_rebuild_session(request.session_id)
-        if not session:
-            raise HTTPException(status_code=404, detail="Session not found")
-
-        return ChatResponse(**(await _pause_quiz_and_respond(
-            session_id=request.session_id,
-            log_user_message="[API] quiz_pause",
-            session=session,
-        )))
+        return await quiz_service.pause(request.session_id)
 
     except HTTPException:
         raise

@@ -59,20 +59,33 @@ def test_tts_job_manager_passes_text_through_unchanged(tmp_path, monkeypatch):
     assert captured["started"] is True
 
 
-def test_app_tts_modules_bind_expected_managers(tmp_path, monkeypatch):
+def test_general_tts_factory_binds_expected_managers(tmp_path, monkeypatch):
     tts_jobs = _reload_tts_jobs(tmp_path, monkeypatch)
-    jti_tts = _reload_module("app.services.jti.tts", tmp_path, monkeypatch)
-    hciot_tts = _reload_module("app.services.hciot.tts", tmp_path, monkeypatch)
+    general_tts = _reload_module("app.services.general.tts", tmp_path, monkeypatch)
+    monkeypatch.setenv("JTI_TTS_CHARACTER", "hayley,backup")
+    monkeypatch.setenv("HCIOT_TTS_CHARACTER", "healthy2,backup")
+
+    def get_jti_manager():
+        return general_tts.get_tts_job_manager(
+            "jti", "JTI_TTS_CHARACTER", "hayley"
+        )
+
+    def get_hciot_manager():
+        return general_tts.get_tts_job_manager(
+            "hciot", "HCIOT_TTS_CHARACTER", "healthy2"
+        )
 
     _assert_manager_binding(
-        jti_tts.get_jti_tts_job_manager(),
+        get_jti_manager(),
         tts_jobs,
         "jti",
-        jti_tts.get_jti_tts_job_manager,
+        get_jti_manager,
     )
+    assert get_jti_manager().character == "hayley"
     _assert_manager_binding(
-        hciot_tts.get_hciot_tts_job_manager(),
+        get_hciot_manager(),
         tts_jobs,
         "hciot",
-        hciot_tts.get_hciot_tts_job_manager,
+        get_hciot_manager,
     )
+    assert get_hciot_manager().character == "healthy2"

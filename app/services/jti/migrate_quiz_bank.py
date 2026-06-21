@@ -240,17 +240,16 @@ def migrate_esg_legacy_data() -> None:
     }
 
     # 1. system_config.knowledge_stores (store registry)
+    # __esg__/__esg__en are fixed managed stores defined in MANAGED_STORES, so
+    # they must NOT also exist as dynamic registry docs — a duplicate doc makes
+    # the store list show each ESG store twice. Drop the legacy hash registration
+    # entirely (its data is migrated to the fixed store below); also clean up any
+    # stray registry doc that previously got renamed to the fixed name.
     col_stores = db_control["knowledge_stores"]
     for old_name, new_name in mapping.items():
-        old_doc = col_stores.find_one({"name": old_name})
-        if old_doc:
-            new_doc = col_stores.find_one({"name": new_name})
-            if not new_doc:
-                col_stores.update_one({"name": old_name}, {"$set": {"name": new_name, "managed_app": "esg"}})
-                logger.info("[Migration] Renamed knowledge store %s -> %s", old_name, new_name)
-            else:
-                col_stores.delete_one({"name": old_name})
-                logger.info("[Migration] Deleted obsolete legacy knowledge store %s", old_name)
+        removed = col_stores.delete_many({"name": {"$in": [old_name, new_name]}}).deleted_count
+        if removed:
+            logger.info("[Migration] Removed %d legacy ESG registry doc(s) for %s", removed, new_name)
 
     # Helper for safe rename to prevent duplicate key errors
     def safe_rename(collection, filter_keys, old_store, new_store):

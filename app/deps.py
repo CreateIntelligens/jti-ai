@@ -9,11 +9,12 @@ import logging
 
 from .api_keys import APIKeyManager
 from .users import UserManager
-from .services.hciot.tts import get_hciot_tts_job_manager
-from .services.jti.tts import get_jti_tts_job_manager
+from .services.general.tts import get_managed_tts_job_manager
 from .services.session.session_manager_factory import (
     get_general_chat_session_manager,
     get_general_conversation_logger,
+    get_esg_conversation_logger,
+    get_esg_session_manager,
     get_hciot_conversation_logger,
     get_hciot_session_manager,
     get_jti_conversation_logger,
@@ -26,6 +27,14 @@ logger = logging.getLogger(__name__)
 prompt_manager = None  # PromptManager
 api_key_manager: APIKeyManager | None = None
 user_manager: UserManager | None = None
+
+
+def get_jti_tts_job_manager():
+    return get_managed_tts_job_manager("jti")
+
+
+def get_hciot_tts_job_manager():
+    return get_managed_tts_job_manager("hciot")
 
 
 def init_managers():
@@ -51,6 +60,8 @@ def init_managers():
         get_hciot_session_manager()
         get_hciot_conversation_logger()
         get_hciot_tts_job_manager()
+        get_esg_session_manager()
+        get_esg_conversation_logger()
 
         # === Module-specific startup hooks ===
         from .services.jti.startup import jti_startup

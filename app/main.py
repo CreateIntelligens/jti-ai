@@ -27,6 +27,8 @@ _FIXED_RAG_BACKFILL_JOBS = (
     ("jti", "en"),
     ("hciot", "zh"),
     ("hciot", "en"),
+    ("esg", "zh"),
+    ("esg", "en"),
 )
 
 # Status code color mapping
@@ -126,6 +128,13 @@ from .routers.general import knowledge as general_knowledge
 from .routers.general import topics_admin as general_topics, images as general_images
 from .routers.hciot import chat as hciot_chat, prompts as hciot_prompts, knowledge as hciot_knowledge, qa_extract as hciot_qa_extract, images as hciot_images
 from .routers.hciot import topics_admin as hciot_topics_admin
+from .routers.esg import (
+    chat as esg_chat,
+    knowledge as esg_knowledge,
+    prompts as esg_prompts,
+    quiz as esg_quiz,
+    quiz_bank as esg_quiz_bank,
+)
 from .routers.admin_rag import router as admin_rag_router
 from .routers.auth_routes import router as auth_router
 from .services.mongo_client import get_mongo_client
@@ -471,6 +480,18 @@ app.include_router(hciot_prompts.router, prefix="/api/hciot-admin/prompts")
 app.include_router(hciot_prompts.router, prefix="/api/hciot/prompts", include_in_schema=False)
 app.include_router(hciot_knowledge.router, prefix="/api/hciot-admin/knowledge")
 app.include_router(hciot_knowledge.router, prefix="/api/hciot/knowledge", include_in_schema=False)
+app.include_router(esg_chat.runtime_router)
+app.include_router(esg_chat.compat_history_router)
+app.include_router(esg_chat.admin_history_router)
+app.include_router(esg_chat.compat_history_admin_router)
+app.include_router(esg_chat.admin_history_admin_router)
+app.include_router(esg_quiz.router, prefix="/api/esg")
+app.include_router(esg_prompts.router, prefix="/api/esg-admin/prompts")
+app.include_router(esg_prompts.router, prefix="/api/esg/prompts", include_in_schema=False)
+app.include_router(esg_knowledge.router, prefix="/api/esg-admin/knowledge")
+app.include_router(esg_knowledge.router, prefix="/api/esg/knowledge", include_in_schema=False)
+app.include_router(esg_quiz_bank.router, prefix="/api/esg-admin/quiz-bank")
+app.include_router(esg_quiz_bank.router, prefix="/api/esg/quiz-bank", include_in_schema=False)
 app.include_router(hciot_qa_extract.router, prefix="/api/hciot-admin/knowledge")
 app.include_router(hciot_qa_extract.router, prefix="/api/hciot/knowledge", include_in_schema=False)
 app.include_router(hciot_images.router, prefix="/api/hciot")

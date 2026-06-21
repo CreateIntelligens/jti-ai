@@ -3,10 +3,8 @@ HCIoT chat API - session management, messages, and conversation history.
 """
 
 import logging
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
-
-_TZ_TAIPEI = timezone(timedelta(hours=8))
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
@@ -25,7 +23,7 @@ from app.schemas.chat import (
 )
 from app.services.hciot.main_agent import main_agent
 from app.services.hciot.runtime_settings import get_available_tts_characters
-from app.services.hciot.tts import to_hciot_tts_text
+from app.services.tts_text import prepare_tts_text
 from app.utils import (
     build_date_query,
     build_history_summary_response,
@@ -39,6 +37,7 @@ from app.utils import (
     simplified_conversation_sessions,
 )
 
+_TZ_TAIPEI = timezone(timedelta(hours=8))
 
 _OPENING_MESSAGE: dict[str, str] = {
     "zh": "您好，歡迎來到元復醫院。\n我是元復醫院的智慧AI小元。\n如果您想了解門診資訊、衛教或醫療相關問題，都可以詢問我。\n很高興為您服務。",
@@ -75,6 +74,7 @@ admin_history_admin_router = APIRouter(
 )
 router = runtime_router
 
+
 def _get_session_manager():
     return deps.get_hciot_session_manager()
 
@@ -86,13 +86,14 @@ def _get_conversation_logger():
 def _get_tts_manager():
     return deps.get_hciot_tts_job_manager()
 
+
 @runtime_router.get("/tts/characters")
 async def get_tts_characters():
     """Return available TTS character voices."""
     return {"characters": get_available_tts_characters()}
 
 
-register_tts_endpoints(runtime_router, _get_tts_manager, text_formatter=to_hciot_tts_text)
+register_tts_endpoints(runtime_router, _get_tts_manager, text_formatter=prepare_tts_text)
 
 
 @runtime_router.post("/chat/start", response_model=CreateSessionResponse)
@@ -136,7 +137,11 @@ async def chat(request: ChatRequest):
         # Handle turn rollback if requested
         if request.turn_number is not None:
             conversation_logger.delete_turns_from(request.session_id, request.turn_number)
-            logs = [l for l in conversation_logger.get_session_logs(request.session_id) if l.get("mode") == "hciot"]
+            logs = [
+                log
+                for log in conversation_logger.get_session_logs(request.session_id)
+                if log.get("mode") == "hciot"
+            ]
             if logs:
                 session = session_manager.rebuild_session_from_logs(request.session_id, logs)
                 if not session:

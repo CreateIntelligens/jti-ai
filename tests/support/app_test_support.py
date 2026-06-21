@@ -9,12 +9,11 @@ _TEST_LOG_DIR = "/tmp/ai360-km-test-logs"
 _TEST_TTS_CACHE_DIR = "/tmp/ai360-km-test-tts-cache"
 _MODULES_TO_RESET = (
     "app.deps",
-    "app.services.jti.tts",
-    "app.services.hciot.tts",
+    "app.services.general.tts",
     "app.services.jti.main_agent",
     "app.services.hciot.main_agent",
-    "app.services.jti.quiz_helpers",
-    "app.services.jti.runtime_quiz_flow",
+    "app.services.general.quiz_helpers",
+    "app.services.general.quiz_runtime",
     "app.tools.jti.tool_executor",
     "app.routers.jti.chat",
     "app.routers.hciot.chat",

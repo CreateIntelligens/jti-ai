@@ -1,38 +1,38 @@
-"""Tests for shared JTI response assembly helpers."""
+"""Tests for shared managed-app quiz response assembly helpers."""
 
 import unittest
 
-from app.services.jti.response_assembly import (
-    build_jti_quiz_question_fields,
-    build_jti_response_fields,
+from app.services.general.quiz_response import (
+    build_quiz_question_fields,
+    build_quiz_response_fields,
     extract_option_texts,
 )
-from app.services.jti.tts import to_jti_tts_text
+from app.services.tts_text import prepare_tts_text
 
 
 class TestJtiResponseAssembly(unittest.TestCase):
-    def test_build_jti_response_fields_formats_message_for_tts(self):
+    def test_build_quiz_response_fields_formats_message_for_tts(self):
         message = "請撥1922。"
 
         self.assertEqual(
-            build_jti_response_fields(message, "zh"),
+            build_quiz_response_fields(message, "zh"),
             {
                 "message": message,
-                "tts_text": to_jti_tts_text(message, "zh"),
+                "tts_text": prepare_tts_text(message, "zh"),
             },
         )
 
-    def test_build_jti_response_fields_uses_explicit_tts_source(self):
-        fields = build_jti_response_fields(
+    def test_build_quiz_response_fields_uses_explicit_tts_source(self):
+        fields = build_quiz_response_fields(
             "畫面顯示文字",
             "zh",
             tts_source="請撥1925。",
         )
 
         self.assertEqual(fields["message"], "畫面顯示文字")
-        self.assertEqual(fields["tts_text"], to_jti_tts_text("請撥1925。", "zh"))
+        self.assertEqual(fields["tts_text"], prepare_tts_text("請撥1925。", "zh"))
 
-    def test_build_jti_quiz_question_fields_include_options_only_in_message(self):
+    def test_build_quiz_question_fields_include_options_only_in_message(self):
         question = {
             "text": "你喜歡哪種旅行？",
             "options": [
@@ -41,7 +41,7 @@ class TestJtiResponseAssembly(unittest.TestCase):
             ],
         }
 
-        fields = build_jti_quiz_question_fields(
+        fields = build_quiz_question_fields(
             question,
             2,
             "zh",
@@ -54,7 +54,7 @@ class TestJtiResponseAssembly(unittest.TestCase):
         )
         self.assertEqual(
             fields["tts_text"],
-            to_jti_tts_text("請從選項中選一個喜歡的答案喔！ 第2題：你喜歡哪種旅行？", "zh"),
+            prepare_tts_text("請從選項中選一個喜歡的答案喔！ 第2題：你喜歡哪種旅行？", "zh"),
         )
 
     def test_extract_option_texts_returns_labeled_options(self):

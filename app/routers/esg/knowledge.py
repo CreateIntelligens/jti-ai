@@ -1,5 +1,16 @@
-"""
-JTI 知識庫管理 API
+"""ESG knowledge management API — simple file knowledge base (no topics).
+
+ESG is a fixed managed app (like JTI/HCIoT) but its knowledge base is a plain
+file store: upload / list / read / edit / delete CSV (and other) files, indexed
+into RAG. It deliberately has no topic / quick-question / image management.
+
+Storage: NamespacedKnowledgeStore("esg") — files are keyed by language (zh/en,
+the managed_language) under namespace "esg". RAG is written under source_type
+"esg" + the same language, matching how the ESG chat session retrieves
+(source_type "esg_knowledge", language = managed_language).
+
+Mounted at /api/esg-admin/knowledge so the existing managed-knowledge frontend
+(Sidebar file list, shared with JTI/HCIoT) reaches it via the same URL shape.
 """
 
 import logging
@@ -23,13 +34,18 @@ from app.routers.knowledge_utils import (
     sync_to_rag,
     write_docx_text,
 )
-from app.services.jti.knowledge_store import get_jti_knowledge_store
+from app.services.knowledge_store import get_namespaced_knowledge_store
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["JTI Knowledge"], dependencies=[Depends(require_kb_access("jti"))])
+ESG_NAMESPACE = "esg"
+SOURCE_TYPE = "esg"
 
-SOURCE_TYPE = "jti"
+router = APIRouter(tags=["ESG Knowledge"], dependencies=[Depends(require_kb_access("esg"))])
+
+
+def get_esg_knowledge_store():
+    return get_namespaced_knowledge_store(ESG_NAMESPACE)
 
 
 # ========== 列出檔案 ==========
@@ -38,7 +54,7 @@ SOURCE_TYPE = "jti"
 @router.get("/files/")
 def list_knowledge_files(language: str = "zh"):
     """列出知識庫中的檔案"""
-    store = get_jti_knowledge_store()
+    store = get_esg_knowledge_store()
     files = store.list_files(language)
     return {"files": files, "language": language}
 
@@ -50,7 +66,7 @@ def list_knowledge_files(language: str = "zh"):
 def get_file_content(filename: str, language: str = "zh"):
     """讀取檔案內容（僅支援文字檔）"""
     safe_name = safe_filename(filename)
-    store = get_jti_knowledge_store()
+    store = get_esg_knowledge_store()
     doc = store.get_file(language, safe_name)
     if not doc:
         raise HTTPException(status_code=404, detail="檔案不存在")
@@ -91,7 +107,7 @@ def get_file_content(filename: str, language: str = "zh"):
 def download_file(filename: str, language: str = "zh"):
     """下載知識庫檔案"""
     safe_name = safe_filename(filename)
-    store = get_jti_knowledge_store()
+    store = get_esg_knowledge_store()
     doc = store.get_file(language, safe_name)
     if not doc:
         raise HTTPException(status_code=404, detail="檔案不存在")
@@ -124,7 +140,7 @@ async def update_file_content(
     if ext not in EDITABLE_EXTENSIONS:
         raise HTTPException(status_code=400, detail="此檔案格式不支援線上編輯")
 
-    store = get_jti_knowledge_store()
+    store = get_esg_knowledge_store()
     doc = store.get_file(language, safe_name)
     if not doc:
         raise HTTPException(status_code=404, detail="檔案不存在")
@@ -165,7 +181,7 @@ async def upload_knowledge_file(
     editable = ext in EDITABLE_EXTENSIONS
     content_type = file.content_type or mimetypes.guess_type(safe_name)[0] or "application/octet-stream"
 
-    store = get_jti_knowledge_store()
+    store = get_esg_knowledge_store()
     saved = store.insert_file(
         language=language,
         filename=safe_name,
@@ -194,7 +210,7 @@ async def delete_knowledge_file(
 ):
     """刪除檔案"""
     safe_name = safe_filename(filename)
-    store = get_jti_knowledge_store()
+    store = get_esg_knowledge_store()
     deleted = store.delete_file(language, safe_name)
     if not deleted:
         raise HTTPException(status_code=404, detail="檔案不存在")

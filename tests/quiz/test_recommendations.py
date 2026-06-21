@@ -1,10 +1,14 @@
 import unittest
+from typing import Any
 
-from app.models.session import Session, SessionStep
-from app.services.session.session_manager_factory import get_jti_session_manager
+from app.models.session import Session
 
-session_manager = get_jti_session_manager()
-from app.tools.jti.tool_executor import tool_executor
+# Module-level globals rebound in QuizResultFlowTests.setUp. Do NOT eagerly build
+# a real session manager or import tool_executor at module-import time — doing so
+# creates real (non-mocked) singletons before other suites install their test
+# mocks, which made HCIoT routes vanish (404) when this module imported first.
+session_manager: Any = None
+tool_executor: Any = None
 
 
 class SessionModelTests(unittest.TestCase):
@@ -20,9 +24,18 @@ class QuizResultFlowTests(unittest.IsolatedAsyncioTestCase):
         import sys
         import importlib
 
+        # Snapshot app.* modules so tearDown can restore them. The forced reload
+        # below is what aligns this test's session_manager and tool_executor to a
+        # single fresh instance, but without restoration it leaks half-initialised
+        # modules into later tests in the same process (cascading HCIoT failures).
+        self._app_module_snapshot = {
+            name: mod
+            for name, mod in sys.modules.items()
+            if name == "app" or name.startswith("app.")
+        }
+
         # Unconditionally delete all app modules to force clean imports of everything
-        to_del = [m for m in list(sys.modules.keys()) if m.startswith("app.") or m == "app"]
-        for m in to_del:
+        for m in list(self._app_module_snapshot):
             del sys.modules[m]
 
         # Dynamically import models to get fresh class definitions matching the reloaded modules
@@ -47,6 +60,18 @@ class QuizResultFlowTests(unittest.IsolatedAsyncioTestCase):
         results_mod = importlib.import_module("app.tools.jti.quiz_results")
         if hasattr(results_mod, "_quiz_results_cache"):
             results_mod._quiz_results_cache.clear()
+
+    def tearDown(self):
+        # Restore the pre-test app.* modules so this test's forced reload does not
+        # leak rebuilt/half-initialised modules into later tests in the process.
+        import sys
+
+        for name in [
+            n for n in sys.modules
+            if n == "app" or n.startswith("app.")
+        ]:
+            del sys.modules[name]
+        sys.modules.update(self._app_module_snapshot)
 
     async def test_calculate_quiz_result_after_scoring(self):
         session = session_manager.create_session()

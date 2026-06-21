@@ -1,14 +1,15 @@
-"""JTI response text assembly helpers.
+"""Shared managed-app quiz response text assembly helpers.
 
-Centralizes quiz display text and TTS payload generation so JTI routes and
-services share one formatting path.
+Centralizes quiz display text and TTS payload generation so managed-app routes
+and services share one formatting path.
 """
 
 from __future__ import annotations
 
-from typing import Any, Optional
+from typing import Any
 
 from app.services.quiz.config import QuizFlowConfig
+from app.services.tts_text import prepare_tts_text
 
 QUIZ_OPENING = {
     "zh": "簡單四個問題，幫你找到命定保護殼，如果中途想離開，請輸入「中斷」，即可回到問答模式，讓我們開始測驗吧！",
@@ -31,7 +32,7 @@ def format_option_texts(options: list[dict[str, Any]]) -> str:
     return "\n".join(label_option_texts(options))
 
 
-def extract_option_texts(question: Optional[dict[str, Any]]) -> Optional[list[str]]:
+def extract_option_texts(question: dict[str, Any] | None) -> list[str] | None:
     """Extract labelled option list (e.g. ['A. 簡約', 'B. 可愛']) from a question."""
     if not isinstance(question, dict):
         return None
@@ -43,7 +44,7 @@ def extract_option_texts(question: Optional[dict[str, Any]]) -> Optional[list[st
 
 
 def build_quiz_question_text(
-    question: Optional[dict[str, Any]],
+    question: dict[str, Any] | None,
     question_number: int,
     language: str,
 ) -> str:
@@ -54,36 +55,42 @@ def build_quiz_question_text(
     return f"第{question_number}題：{text}"
 
 
-def build_jti_response_fields(
+def build_quiz_response_fields(
     message: str,
     language: str,
     *,
-    tts_source: Optional[str] = None,
-    config: Optional[QuizFlowConfig] = None,
-) -> dict[str, Optional[str]]:
-    """Build the shared message/TTS field pair for a JTI response."""
+    tts_source: str | None = None,
+    config: QuizFlowConfig | None = None,
+) -> dict[str, str | None]:
+    """Build the shared message/TTS field pair for a quiz response."""
     raw_tts = message if tts_source is None else tts_source
-    
-    if config and config.tts_fn:
-        tts_text = config.tts_fn(raw_tts, language)
-    else:
-        from app.services.jti.tts import to_jti_tts_text
-        tts_text = to_jti_tts_text(raw_tts, language)
-        
+    formatter = config.tts_fn if config and config.tts_fn else prepare_tts_text
+
     return {
         "message": message,
-        "tts_text": tts_text,
+        "tts_text": formatter(raw_tts, language),
     }
 
 
-def build_jti_quiz_question_fields(
-    question: Optional[dict[str, Any]],
+def resolve_quiz_copy(
+    config: QuizFlowConfig,
+    key: str,
+    language: str,
+    default: str,
+) -> str:
+    """Resolve localized quiz copy, falling back when no override is configured."""
+    configured = config.copy_templates.get(key, {}).get(language)
+    return configured or default
+
+
+def build_quiz_question_fields(
+    question: dict[str, Any] | None,
     question_number: int,
     language: str,
     *,
-    prefix: Optional[str] = None,
-    config: Optional[QuizFlowConfig] = None,
-) -> dict[str, Optional[str]]:
+    prefix: str | None = None,
+    config: QuizFlowConfig | None = None,
+) -> dict[str, str | None]:
     """Build message/TTS fields for a quiz question response."""
     question_text = build_quiz_question_text(question, question_number, language)
     options = question.get("options", []) if isinstance(question, dict) else []
@@ -91,4 +98,4 @@ def build_jti_quiz_question_fields(
     message_body = f"{question_text}\n{options_text}"
     message = f"{prefix}\n\n{message_body}" if prefix else message_body
     tts_source = f"{prefix} {question_text}" if prefix else question_text
-    return build_jti_response_fields(message, language, tts_source=tts_source, config=config)
+    return build_quiz_response_fields(message, language, tts_source=tts_source, config=config)

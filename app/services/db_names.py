@@ -11,6 +11,7 @@
 # 數據面：各應用專屬資料庫
 JTI_DB_NAME = "jti_app"
 HCIOT_DB_NAME = "hciot_app"
+ESG_DB_NAME = "esg_app"
 GENERAL_DB_NAME = "general_app"
 
 # 控制面：全系統管理資料庫（登入帳號、提示詞、金鑰、知識庫註冊表）。

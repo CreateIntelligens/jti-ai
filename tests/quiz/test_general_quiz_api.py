@@ -38,8 +38,8 @@ class TestGeneralQuizApi(unittest.TestCase):
             "app.services.jti.quiz_bank_store",
             "app.services.jti.quiz_results_store",
             "app.tools.jti.tool_executor",
-            "app.services.jti.runtime_quiz_flow",
-            "app.services.jti.quiz_helpers",
+            "app.services.general.quiz_runtime",
+            "app.services.general.quiz_helpers",
             "app.routers.general.chat",
         ]:
             if mod in sys.modules:
@@ -114,7 +114,7 @@ class TestGeneralQuizApi(unittest.TestCase):
     @patch("app.deps.prompt_manager")
     @patch("app.routers.general.chat._get_session_manager")
     @patch("app.routers.general.chat.main_agent")
-    @patch("app.services.jti.runtime_quiz_flow.ToolExecutor")
+    @patch("app.services.general.quiz_runtime.ToolExecutor")
     def test_general_chat_message_triggers_quiz_start(
         self, mock_executor_cls, mock_agent, mock_get_session_mgr, mock_prompt_manager
     ):
@@ -132,10 +132,16 @@ class TestGeneralQuizApi(unittest.TestCase):
         mock_session.language = "zh"
         mock_session.session_id = "test-session"
         mock_session.metadata = {"store_name": "test_store"}
+        mock_session.model_dump.return_value = {
+            "session_id": "test-session",
+            "language": "zh",
+            "step": "WELCOME",
+        }
 
         mock_session_mgr = MagicMock()
         mock_session_mgr.get_session.return_value = mock_session
         mock_get_session_mgr.return_value = mock_session_mgr
+        mock_conversation_logger = MagicMock()
 
         # Mock ToolExecutor response
         mock_executor = MagicMock()
@@ -152,14 +158,24 @@ class TestGeneralQuizApi(unittest.TestCase):
         # Mock main_agent session creation if needed
         mock_agent.create_session.return_value = mock_session
 
-        response = self.client.post(
-            "/api/chat/message",
-            json={
-                "message": "我要測驗",
-                "session_id": "test-session"
-            },
-            headers={"Origin": "http://testserver"},
-        )
+        with (
+            patch(
+                "app.services.general.quiz_flow.deps.get_general_chat_session_manager",
+                return_value=mock_session_mgr,
+            ),
+            patch(
+                "app.services.general.quiz_flow.deps.get_general_conversation_logger",
+                return_value=mock_conversation_logger,
+            ),
+        ):
+            response = self.client.post(
+                "/api/chat/message",
+                json={
+                    "message": "我要測驗",
+                    "session_id": "test-session"
+                },
+                headers={"Origin": "http://testserver"},
+            )
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
@@ -169,4 +185,3 @@ class TestGeneralQuizApi(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

@@ -12,7 +12,7 @@ from app.services.rag.backfill import get_backfill_service
 logger = logging.getLogger(__name__)
 
 LANGUAGES = ["zh", "en"]
-SOURCE_TYPES = ["hciot", "jti"]
+SOURCE_TYPES = ["hciot", "jti", "esg"]
 
 router = APIRouter(prefix="/api/admin/rag")
 
@@ -28,7 +28,7 @@ def _expand_source_types(source_type: str) -> list[str]:
         return SOURCE_TYPES.copy()
     if normalized in SOURCE_TYPES:
         return [normalized]
-    raise HTTPException(status_code=400, detail="source_type must be one of: hciot, jti, all")
+    raise HTTPException(status_code=400, detail="source_type must be one of: hciot, jti, esg, all")
 
 
 def _require_status_access(auth: dict, source_types: list[str]) -> None:

@@ -9,7 +9,7 @@ export interface Store {
   key_name?: string | null;
 }
 
-export type AppTarget = 'jti' | 'hciot' | 'general';
+export type AppTarget = 'jti' | 'hciot' | 'esg' | 'general';
 export type KnowledgeLanguage = 'zh' | 'en';
 
 export type KnowledgeTarget =

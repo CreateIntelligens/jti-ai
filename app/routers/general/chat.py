@@ -313,8 +313,8 @@ async def send_message(req: ChatMessageRequest, request: Request, auth: dict = D
     store_prompts = deps.prompt_manager.get_store_prompts(store_name) if deps.prompt_manager else None
     if store_prompts and store_prompts.quiz_enabled:
         from app.services.general.quiz_flow import build_general_quiz_config
-        from app.services.jti.runtime_quiz_flow import handle_quiz_message, execute_quiz_start
-        from app.services.jti.quiz_helpers import is_quiz_start_intent
+        from app.services.general.quiz_runtime import handle_quiz_message, execute_quiz_start
+        from app.services.general.quiz_helpers import is_quiz_start_intent
 
         quiz_cfg = build_general_quiz_config(
             store_name=store_name,

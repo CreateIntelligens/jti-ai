@@ -92,15 +92,20 @@ export async function updateStoreFileContent(
 // ========== Knowledge Management ==========
 
 
+// Admin knowledge route prefix per managed app. Each fixed app (jti/hciot/esg)
+// has its own `/api/<app>-admin/knowledge` mount; an unmapped app would 404
+// rather than silently fall back to another app's knowledge base.
+function managedAdminPrefix(appTarget: AppTarget): string {
+  return `${appTarget}-admin`;
+}
+
 function knowledgeFileUrl(filename: string, suffix: string, appTarget: AppTarget, language: string): string {
-  const prefix = appTarget === 'jti' ? 'jti-admin' : 'hciot-admin';
-  const path = `${API_BASE}/${prefix}/knowledge/files/${encodeURIComponent(filename)}${suffix}`;
+  const path = `${API_BASE}/${managedAdminPrefix(appTarget)}/knowledge/files/${encodeURIComponent(filename)}${suffix}`;
   return buildUrl(path, { language: normLang(language) });
 }
 
 export async function listManagedKnowledgeFiles(appTarget: AppTarget, language: string = 'zh'): Promise<{ files: KnowledgeFile[] }> {
-  const prefix = appTarget === 'jti' ? 'jti-admin' : 'hciot-admin';
-  const url = buildUrl(`${API_BASE}/${prefix}/knowledge/files/`, { language: normLang(language) });
+  const url = buildUrl(`${API_BASE}/${managedAdminPrefix(appTarget)}/knowledge/files/`, { language: normLang(language) });
   const response = await fetchAsAdmin(url);
   return handleResponse<{ files: KnowledgeFile[] }>(response);
 }
@@ -131,8 +136,7 @@ export async function updateManagedKnowledgeFileContent(
 export async function uploadManagedKnowledgeFile(appTarget: AppTarget, language: string, file: File): Promise<any> {
   const formData = new FormData();
   formData.append('file', file);
-  const prefix = appTarget === 'jti' ? 'jti-admin' : 'hciot-admin';
-  const url = buildUrl(`${API_BASE}/${prefix}/knowledge/upload/`, { language: normLang(language) });
+  const url = buildUrl(`${API_BASE}/${managedAdminPrefix(appTarget)}/knowledge/upload/`, { language: normLang(language) });
   const response = await fetchAsAdmin(url, {
     method: 'POST',
     body: formData,

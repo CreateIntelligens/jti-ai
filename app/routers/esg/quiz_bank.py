@@ -1,4 +1,4 @@
-"""JTI quiz-bank URL compatibility adapter over General handlers."""
+"""ESG quiz-bank URL adapter over General handlers."""
 
 from __future__ import annotations
 
@@ -6,8 +6,7 @@ from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 
 from app.auth import verify_auth
 from app.routers.general import quiz_bank as general_quiz_bank
-from app.services.quiz.config import JTI_STORE_NAME
-
+from app.services.quiz.config import ESG_STORE_NAME
 
 CreateBankRequest = general_quiz_bank.CreateBankRequest
 CreateQuestionRequest = general_quiz_bank.CreateQuestionRequest
@@ -17,7 +16,7 @@ UpdateQuestionRequest = general_quiz_bank.UpdateQuestionRequest
 UpdateQuizResultRequest = general_quiz_bank.UpdateQuizResultRequest
 DEFAULT_BANK_ID = general_quiz_bank.DEFAULT_BANK_ID
 
-router = APIRouter(tags=["JTI Quiz Bank"])
+router = APIRouter(tags=["ESG Quiz Bank"])
 
 
 @router.get("/banks/")
@@ -26,12 +25,7 @@ def list_banks(
     language: str = Query("zh"),
     auth: dict = Depends(verify_auth),
 ):
-    return general_quiz_bank.list_banks(
-        JTI_STORE_NAME,
-        request,
-        language,
-        auth,
-    )
+    return general_quiz_bank.list_banks(ESG_STORE_NAME, request, language, auth)
 
 
 @router.post("/banks/", status_code=201)
@@ -42,7 +36,7 @@ def create_bank(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.create_bank(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         request_data,
         request,
         language,
@@ -58,7 +52,7 @@ def get_bank(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.get_bank(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         bank_id,
         request,
         language,
@@ -75,7 +69,7 @@ def update_bank(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.update_bank(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         bank_id,
         request_data,
         request,
@@ -92,7 +86,7 @@ def delete_bank(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.delete_bank(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         bank_id,
         request,
         language,
@@ -108,7 +102,7 @@ def activate_bank(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.activate_bank(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         bank_id,
         request,
         language,
@@ -124,7 +118,7 @@ def list_questions(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.list_questions(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         request,
         language,
         bank_id,
@@ -141,7 +135,7 @@ def get_question(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.get_question(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         question_id,
         request,
         language,
@@ -159,7 +153,7 @@ def create_question(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.create_question(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         request_data,
         request,
         language,
@@ -178,7 +172,7 @@ def update_question(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.update_question(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         question_id,
         request_data,
         request,
@@ -197,7 +191,7 @@ def delete_question(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.delete_question(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         question_id,
         request,
         language,
@@ -213,7 +207,7 @@ def list_quiz_sets(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.list_quiz_sets(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         request,
         language,
         auth,
@@ -228,7 +222,7 @@ def create_quiz_set(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.create_quiz_set(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         request_data,
         request,
         language,
@@ -244,7 +238,7 @@ def delete_quiz_set(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.delete_quiz_set(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         set_id,
         request,
         language,
@@ -260,7 +254,7 @@ def activate_quiz_set(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.activate_quiz_set(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         set_id,
         request,
         language,
@@ -276,7 +270,7 @@ def list_quiz_results(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.list_quiz_results(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         request,
         language,
         set_id,
@@ -294,7 +288,7 @@ def update_quiz_result(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.update_quiz_result(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         quiz_id,
         request_data,
         request,
@@ -312,7 +306,7 @@ def get_stats(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.get_stats(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         request,
         language,
         bank_id,
@@ -331,7 +325,7 @@ async def import_data(
     auth: dict = Depends(verify_auth),
 ):
     return await general_quiz_bank.import_data(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         request,
         file,
         type,
@@ -351,7 +345,7 @@ def export_data(
     auth: dict = Depends(verify_auth),
 ):
     return general_quiz_bank.export_data(
-        JTI_STORE_NAME,
+        ESG_STORE_NAME,
         request,
         type,
         language,

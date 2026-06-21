@@ -9,7 +9,7 @@ import os
 import logging
 from typing import Any
 
-from app.services.db_names import JTI_DB_NAME, HCIOT_DB_NAME, GENERAL_DB_NAME
+from app.services.db_names import ESG_DB_NAME, GENERAL_DB_NAME, HCIOT_DB_NAME, JTI_DB_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +93,32 @@ def get_hciot_conversation_logger():
         mongo_factory=lambda: MongoConversationLogger(db_name=HCIOT_DB_NAME),
         fallback_factory=ConversationLogger,
         label=f"ConversationLogger for HCIoT (db={HCIOT_DB_NAME})",
+    )
+
+
+def get_esg_session_manager():
+    """取得 ESG 專用 SessionManager (esg_app database)。"""
+    from .mongo_session_manager import MongoSessionManager
+    from .session_manager import SessionManager
+
+    return _get_or_create(
+        "esg_session_manager",
+        mongo_factory=lambda: MongoSessionManager(db_name=ESG_DB_NAME),
+        fallback_factory=SessionManager,
+        label=f"SessionManager for ESG (db={ESG_DB_NAME})",
+    )
+
+
+def get_esg_conversation_logger():
+    """取得 ESG 專用 ConversationLogger (esg_app database)。"""
+    from app.services.logging.conversation_logger import ConversationLogger
+    from app.services.logging.mongo_conversation_logger import MongoConversationLogger
+
+    return _get_or_create(
+        "esg_conversation_logger",
+        mongo_factory=lambda: MongoConversationLogger(db_name=ESG_DB_NAME),
+        fallback_factory=ConversationLogger,
+        label=f"ConversationLogger for ESG (db={ESG_DB_NAME})",
     )
 
 

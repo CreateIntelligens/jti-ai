@@ -293,6 +293,18 @@ class BackfillService:
             )
             return
 
+        if source_type == "esg":
+            # ESG is a fixed managed app with a simple file knowledge base under
+            # namespace "esg", partitioned by language (zh/en) like hciot/jti.
+            from app.services.knowledge_store import get_namespaced_knowledge_store
+
+            store = get_namespaced_knowledge_store("esg")
+            yield from self._iter_store_files(
+                store.list_files(language),
+                lambda filename: self._fetch_hciot_file_data(store, language, filename),
+            )
+            return
+
         store = get_jti_knowledge_store()
         yield from self._iter_store_files(
             store.list_files(language),

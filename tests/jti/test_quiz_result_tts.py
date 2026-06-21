@@ -7,7 +7,7 @@ from tests.support.app_test_support import get_test_app, override_admin_auth
 
 app = get_test_app()
 from app.models.session import Session, SessionStep
-from app.services.jti.tts import to_jti_tts_text
+from app.services.tts_text import prepare_tts_text
 
 
 class TestJtiQuizResultTts(unittest.TestCase):
@@ -46,16 +46,18 @@ class TestJtiQuizResultTts(unittest.TestCase):
             "tts_text": "你是探險家。渴望冒險 探索每一刻驚喜，你總是勇於嘗試新鮮刺激的挑戰。",
             "quiz_result": {"quiz_id": "explorer"},
         }
+        executor = MagicMock()
+        executor.execute = AsyncMock(return_value=tool_result)
         with (
-            patch("app.routers.jti.chat._get_or_rebuild_session", return_value=initial_session),
-            patch("app.services.jti.runtime_quiz_flow._judge_user_choice", new=AsyncMock(return_value="a")),
-            patch("app.services.jti.runtime_quiz_flow.get_total_questions", return_value=1),
+            patch("app.services.general.managed_chat._get_or_rebuild_session", return_value=initial_session),
+            patch("app.services.general.quiz_runtime._judge_user_choice", new=AsyncMock(return_value="a")),
+            patch("app.services.general.quiz_runtime.get_total_questions", return_value=1),
             patch("app.services.session.session_manager.SessionManager.get_session", return_value=completed_session),
             patch("app.services.session.session_manager.SessionManager.update_session", return_value=completed_session),
             patch("app.services.logging.conversation_logger.ConversationLogger.log_conversation", return_value=("log", 1)),
-            patch("app.services.jti.runtime_quiz_flow.main_agent.remove_session"),
-            patch("app.services.jti.runtime_quiz_flow.attach_tts_message_id", side_effect=lambda response, language, manager: response),
-            patch("app.services.jti.runtime_quiz_flow.tool_executor.execute", new=AsyncMock(return_value=tool_result)),
+            patch("app.services.jti.quiz_flow.main_agent.remove_session"),
+            patch("app.services.general.quiz_runtime.attach_tts_message_id", side_effect=lambda response, language, manager: response),
+            patch("app.services.general.quiz_runtime.ToolExecutor", return_value=executor),
         ):
             response = self.client.post(
                 "/api/jti/chat/message",
@@ -66,7 +68,7 @@ class TestJtiQuizResultTts(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["message"], tool_result["message"])
-        self.assertEqual(payload["tts_text"], to_jti_tts_text(tool_result["tts_text"], "zh"))
+        self.assertEqual(payload["tts_text"], prepare_tts_text(tool_result["tts_text"], "zh"))
 
     def test_completed_quiz_falls_back_to_message_when_tool_tts_text_empty(self):
         initial_session = Session(
@@ -96,16 +98,18 @@ class TestJtiQuizResultTts(unittest.TestCase):
             "tts_text": "",
             "quiz_result": {"quiz_id": "explorer"},
         }
+        executor = MagicMock()
+        executor.execute = AsyncMock(return_value=tool_result)
         with (
-            patch("app.routers.jti.chat._get_or_rebuild_session", return_value=initial_session),
-            patch("app.services.jti.runtime_quiz_flow._judge_user_choice", new=AsyncMock(return_value="a")),
-            patch("app.services.jti.runtime_quiz_flow.get_total_questions", return_value=1),
+            patch("app.services.general.managed_chat._get_or_rebuild_session", return_value=initial_session),
+            patch("app.services.general.quiz_runtime._judge_user_choice", new=AsyncMock(return_value="a")),
+            patch("app.services.general.quiz_runtime.get_total_questions", return_value=1),
             patch("app.services.session.session_manager.SessionManager.get_session", return_value=completed_session),
             patch("app.services.session.session_manager.SessionManager.update_session", return_value=completed_session),
             patch("app.services.logging.conversation_logger.ConversationLogger.log_conversation", return_value=("log", 1)),
-            patch("app.services.jti.runtime_quiz_flow.main_agent.remove_session"),
-            patch("app.services.jti.runtime_quiz_flow.attach_tts_message_id", side_effect=lambda response, language, manager: response),
-            patch("app.services.jti.runtime_quiz_flow.tool_executor.execute", new=AsyncMock(return_value=tool_result)),
+            patch("app.services.jti.quiz_flow.main_agent.remove_session"),
+            patch("app.services.general.quiz_runtime.attach_tts_message_id", side_effect=lambda response, language, manager: response),
+            patch("app.services.general.quiz_runtime.ToolExecutor", return_value=executor),
         ):
             response = self.client.post(
                 "/api/jti/chat/message",
@@ -116,7 +120,7 @@ class TestJtiQuizResultTts(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["message"], tool_result["message"])
-        self.assertEqual(payload["tts_text"], to_jti_tts_text(tool_result["message"], "zh"))
+        self.assertEqual(payload["tts_text"], prepare_tts_text(tool_result["message"], "zh"))
 
 
 if __name__ == "__main__":

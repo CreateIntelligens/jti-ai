@@ -27,7 +27,7 @@ from app.services.hciot.runtime_settings import (
     load_runtime_settings_from_prompt_manager,
 )
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
-from app.services.hciot.tts import to_hciot_tts_text
+from app.services.tts_text import prepare_tts_text
 logger = logging.getLogger(__name__)
 
 
@@ -186,7 +186,7 @@ class MainAgent(BaseAgent):
         return {
             "image_id": extra_meta.get("image_id"),
             "url": extra_meta.get("url"),
-            "tts_text": to_hciot_tts_text(response_text, session.language),
+            "tts_text": prepare_tts_text(response_text, session.language),
         }
 
     def _get_chat_fallback_message(self, language: str) -> str:
