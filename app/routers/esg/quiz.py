@@ -5,13 +5,13 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
-from app.auth import verify_auth
+from app.auth import require_app_access
 from app.services.esg.quiz_flow import ESG_QUIZ_CONFIG
 from app.services.general.managed_quiz import ManagedQuizService
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["ESG Quiz"], dependencies=[Depends(verify_auth)])
+router = APIRouter(tags=["ESG Quiz"], dependencies=[Depends(require_app_access("esg"))])
 quiz_service = ManagedQuizService(ESG_QUIZ_CONFIG)
 
 

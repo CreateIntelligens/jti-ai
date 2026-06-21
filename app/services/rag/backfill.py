@@ -38,11 +38,14 @@ class BackfillService:
     # Sources with an authoritative MongoDB-backed store to rebuild from, safe
     # to prune against. `general` is included: its raw files live in the shared
     # knowledge store under namespace="general", keyed by store_name (passed as
-    # `language`), so it backfills/reembeds exactly like jti/hciot. Embedding is
-    # a local model, so reembedding on every boot is free — there is no Mongo
-    # vector mirror to restore from. Anything not listed here has no source-file
-    # registry and must not be backfilled (it would mis-prune and wipe data).
-    _BACKFILL_SOURCES = ("jti", "hciot", "general")
+    # `language`), so it backfills/reembeds exactly like jti/hciot. `esg` is a
+    # fixed managed app whose files live in the shared knowledge store under
+    # namespace="esg", partitioned by zh/en like jti/hciot — so its registry is
+    # authoritative and pruning is safe. Embedding is a local model, so
+    # reembedding on every boot is free — there is no Mongo vector mirror to
+    # restore from. Anything not listed here has no source-file registry and
+    # must not be backfilled (it would mis-prune and wipe data).
+    _BACKFILL_SOURCES = ("jti", "hciot", "general", "esg")
     _TEST_ORPHAN_PREFIXES = ("test_", "qa_", "QA254-")
 
     def __init__(self):

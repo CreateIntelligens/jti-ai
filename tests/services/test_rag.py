@@ -98,19 +98,50 @@ class TestRAGPipeline(unittest.TestCase):
 
     def test_general_backfill(self):
         backfill = BackfillService()
-        general_store = MagicMock()
-        general_store.list_files.return_value = [
+        new_store = MagicMock()
+        old_store = MagicMock()
+
+        new_store.list_files.return_value = [
             {"filename": "general_file.txt", "display_name": "General File"}
         ]
-        general_store.get_file_data.return_value = b"general store text data"
+        new_store.get_file.return_value = {"data": b"general store text data"}
+
+        old_store.list_files.return_value = []
+
         mock_embedding_service.encode.return_value = np.random.rand(1, 1024)
 
-        with patch("app.services.rag.backfill.get_knowledge_store", return_value=general_store):
+        with patch("app.services.rag.backfill.get_knowledge_store", return_value=old_store), \
+             patch("app.services.rag.backfill.get_general_knowledge_store", return_value=new_store):
             backfill.run_backfill("general", "store_123")
 
         mock_lancedb_store.replace_file_chunks.assert_called_once()
-        general_store.list_files.assert_called_once_with("store_123", namespace="general")
-        general_store.get_file_data.assert_called_once_with("store_123", "general_file.txt", namespace="general")
+        new_store.list_files.assert_called_once_with("store_123")
+        old_store.list_files.assert_called_once_with("store_123", namespace="general")
+        new_store.get_file.assert_called_once_with("store_123", "general_file.txt")
+
+    def test_esg_backfill(self):
+        backfill = BackfillService()
+        esg_store = MagicMock()
+        esg_store.list_files.return_value = [
+            {"filename": "KIOSK_QA_中文.csv", "display_name": "ESG QA"}
+        ]
+        esg_store.get_file.return_value = {"data": "q,a\nLED?,162 萬元".encode("utf-8")}
+
+        mock_embedding_service.encode.return_value = np.random.rand(1, 1024)
+
+        with patch(
+            "app.services.knowledge_store.get_namespaced_knowledge_store",
+            return_value=esg_store,
+        ):
+            backfill.run_backfill("esg", "zh")
+
+        mock_lancedb_store.replace_file_chunks.assert_called_once()
+        # ESG must write under the esg_knowledge namespace so retrieval (which
+        # routes managed_app="esg" → "esg_knowledge") can find it.
+        self.assertEqual(
+            mock_lancedb_store.replace_file_chunks.call_args.args[1], "esg_knowledge"
+        )
+        esg_store.list_files.assert_called_once_with("zh")
 
     def test_hciot_english_backfill_uses_topic_store_labels_for_prefix(self):
         backfill = BackfillService()

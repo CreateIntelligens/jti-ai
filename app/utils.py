@@ -263,3 +263,35 @@ def group_conversations_as_summary(conversations: list) -> list:
     session_list = list(sessions.values())
     session_list.sort(key=lambda x: x["first_message_time"] or "", reverse=True)
     return session_list
+
+
+class LazyProxy:
+    """A lazy proxy that dynamically resolves a module or attribute on access.
+
+    This avoids circular import cycles and stale cached references across hot-reloads.
+    """
+
+    def __init__(self, module_name: str, target_name: Optional[str] = None):
+        object.__setattr__(self, "_module_name", module_name)
+        object.__setattr__(self, "_target_name", target_name)
+
+    def _get_target(self):
+        import sys
+        import importlib
+
+        module_name = object.__getattribute__(self, "_module_name")
+        target_name = object.__getattribute__(self, "_target_name")
+        module = sys.modules.get(module_name) or importlib.import_module(module_name)
+        if target_name:
+            return getattr(module, target_name)
+        return module
+
+    def __getattr__(self, name: str):
+        return getattr(self._get_target(), name)
+
+    def __setattr__(self, name: str, value):
+        setattr(self._get_target(), name, value)
+
+    def __delattr__(self, name: str):
+        delattr(self._get_target(), name)
+

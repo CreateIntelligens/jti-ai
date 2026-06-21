@@ -7,13 +7,13 @@ import logging
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 
-from app.auth import verify_auth
+from app.auth import require_app_access
 from app.services.general.managed_quiz import ManagedQuizService
 from app.services.jti.quiz_flow import JTI_QUIZ_CONFIG
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["JTI Quiz"], dependencies=[Depends(verify_auth)])
+router = APIRouter(tags=["JTI Quiz"], dependencies=[Depends(require_app_access("jti"))])
 
 
 quiz_service = ManagedQuizService(JTI_QUIZ_CONFIG)

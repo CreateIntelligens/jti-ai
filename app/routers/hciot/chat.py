@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
 import app.deps as deps
-from app.auth import require_history_access, verify_admin, verify_auth
+from app.auth import require_app_access, require_history_access, verify_admin
 from app.routers.tts_utils import attach_tts_message_id, register_tts_endpoints
 from app.schemas.chat import (
     ChatRequest,
@@ -47,7 +47,7 @@ _OPENING_MESSAGE: dict[str, str] = {
 logger = logging.getLogger(__name__)
 
 
-runtime_router = APIRouter(prefix="/api/hciot", tags=["HCIoT Chat"], dependencies=[Depends(verify_auth)])
+runtime_router = APIRouter(prefix="/api/hciot", tags=["HCIoT Chat"], dependencies=[Depends(require_app_access("hciot"))])
 # 讀取/匯出對話歷史：放寬到已登入使用者（user 只能看自己綁定的 app）。
 compat_history_router = APIRouter(
     prefix="/api/hciot",

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 
-from app.auth import verify_auth
+from app.auth import require_app_access, verify_auth
 from app.routers.general import quiz_bank as general_quiz_bank
 from app.services.quiz.config import JTI_STORE_NAME
 
@@ -17,7 +17,7 @@ UpdateQuestionRequest = general_quiz_bank.UpdateQuestionRequest
 UpdateQuizResultRequest = general_quiz_bank.UpdateQuizResultRequest
 DEFAULT_BANK_ID = general_quiz_bank.DEFAULT_BANK_ID
 
-router = APIRouter(tags=["JTI Quiz Bank"])
+router = APIRouter(tags=["JTI Quiz Bank"], dependencies=[Depends(require_app_access("jti"))])
 
 
 @router.get("/banks/")

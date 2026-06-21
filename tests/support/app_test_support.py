@@ -12,6 +12,7 @@ _MODULES_TO_RESET = (
     "app.services.general.tts",
     "app.services.jti.main_agent",
     "app.services.hciot.main_agent",
+    "app.services.general.main_agent",
     "app.services.general.quiz_helpers",
     "app.services.general.quiz_runtime",
     "app.tools.jti.tool_executor",
@@ -20,6 +21,9 @@ _MODULES_TO_RESET = (
     "app.routers.general.stores",
     "app.routers.general.chat",
     "app.routers.hciot.qa_extract",
+    "app.services.session.mongo_session_manager",
+    "app.services.logging.mongo_conversation_logger",
+    "app.services.session.session_manager_factory",
     "app.main",
 )
 

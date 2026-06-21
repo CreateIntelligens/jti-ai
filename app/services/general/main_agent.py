@@ -16,9 +16,9 @@ from typing import Any
 
 from google.genai import types
 
-import app.deps as deps
 from app.models.session import Session
 from app.models_config import DEFAULT_RAG_MODEL
+from app.utils import LazyProxy
 from app.services.agent_utils import build_search_knowledge_decl, normalize_language
 from app.services.base_agent import BaseAgent
 from app.services.general.agent_prompts import (
@@ -49,6 +49,9 @@ _SEARCH_KNOWLEDGE_DECL = build_search_knowledge_decl(
 )
 
 _RAG_TOOL = types.Tool(function_declarations=[_SEARCH_KNOWLEDGE_DECL])
+
+
+deps = LazyProxy("app.deps")
 
 
 def _get_session_manager():

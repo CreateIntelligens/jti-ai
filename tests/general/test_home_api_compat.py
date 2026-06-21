@@ -7,8 +7,31 @@ import pytest
 from fastapi.testclient import TestClient
 
 from tests.support.app_test_support import get_test_app, override_admin_auth
+_cached_app = None
 
-app = get_test_app()
+
+def _get_app():
+    # Rebuilt lazily on first access after the autouse fixture resets the cache,
+    # so each test gets a fresh app with the module-reset machinery applied.
+    global _cached_app
+    if _cached_app is None:
+        _cached_app = get_test_app()
+    return _cached_app
+
+
+class AppProxy:
+    # Only attribute reads (app.routes, app.dependency_overrides[...]) and the
+    # ASGI __call__ (TestClient(app)) are exercised — no attribute is assigned
+    # through the proxy, so __setattr__/__delattr__ are intentionally omitted.
+    def __getattr__(self, name):
+        return getattr(_get_app(), name)
+
+    async def __call__(self, scope, receive, send):
+        await _get_app()(scope, receive, send)
+
+
+app = AppProxy()
+
 
 import sys
 
@@ -27,6 +50,8 @@ fake_db = FakeDb()
 
 @pytest.fixture(autouse=True)
 def override_auth_for_compat():
+    global _cached_app
+    _cached_app = None
     cleanup = override_admin_auth(app)
     # Point the shared mongo mock at our fake db FOR THIS TEST ONLY, and restore
     # it on teardown — leaving it set leaks into sibling test modules that share
@@ -39,6 +64,7 @@ def override_auth_for_compat():
     from app.services.session import session_manager_factory
     session_manager_factory._singletons.clear()
     yield
+    _cached_app = None
     if mongo_mock:
         mongo_mock.get_mongo_db.return_value = orig_return
     session_manager_factory._singletons.clear()
@@ -651,6 +677,11 @@ def test_user_key_name_scope_survives_key_order_changes(monkeypatch):
         "resolve_key_index_by_name",
         lambda name: {"和泰汽車": 0, "POC1": 1, "POC2": 2}.get(name, -1),
     )
+    # file_count for managed stores reads the real namespaced knowledge store
+    # (Mongo-backed, module-level singleton cache). This test only asserts store
+    # identity/order, so pin file listings to empty — otherwise the count leaks
+    # real seed data (e.g. the ESG KB) and varies with test ordering.
+    monkeypatch.setattr(store_routes, "_list_store_files", lambda config: [])
 
     scope = f"key_name:{quote('和泰汽車')}"
     original_verify_auth = app.dependency_overrides.get(verify_auth)
@@ -807,18 +838,27 @@ def test_resolve_request_store_scope_authorization():
     original_verify_auth = app.dependency_overrides.get(verify_auth)
 
     try:
-        # Case 1: User with specific store_name set (can only chat with their assigned store)
+        # Case 1: User bound to a specific store is pinned to it.
         set_user_auth(store_name="__hciot__")
 
+        # 1a: no requested store → bind back to the assigned store (200).
         res1 = client.post(
             "/api/chat/start",
-            json={"store_name": "__jti__", "model": "gemini-test"},
+            json={"model": "gemini-test"},
             headers={"Origin": "http://testserver"},
         )
         assert res1.status_code == 200
         sid1 = res1.json()["session_id"]
         session1 = deps.get_general_chat_session_manager().get_session(sid1)
         assert session1.metadata["store_name"] == "__hciot__"
+
+        # 1b: requesting a DIFFERENT store is rejected, not silently rebound.
+        res1b = client.post(
+            "/api/chat/start",
+            json={"store_name": "__jti__", "model": "gemini-test"},
+            headers={"Origin": "http://testserver"},
+        )
+        assert res1b.status_code == 403
 
         set_user_auth(store_name="__jti__", scope="hciot")
         app_mismatch = client.post(

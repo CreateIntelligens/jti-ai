@@ -1,7 +1,9 @@
 from typing import Optional
 from app.services.quiz.config import QuizFlowConfig
-import app.deps as deps
 from app.services.general.main_agent import main_agent
+from app.utils import LazyProxy
+
+deps = LazyProxy("app.deps")
 
 
 def _no_op_tts(text: str, language: str) -> Optional[str]:

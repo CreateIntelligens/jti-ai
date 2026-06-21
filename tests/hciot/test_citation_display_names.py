@@ -53,7 +53,7 @@ async def _fake_concurrent_result(user_message, language, session_id=None):
     return "PRP 是使用自體血液的治療方式", None
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_hciot_chat_injects_session_state_into_prompt(monkeypatch):
     agent = MainAgent()
     captured = {}

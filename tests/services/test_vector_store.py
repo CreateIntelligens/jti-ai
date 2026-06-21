@@ -7,10 +7,9 @@ import sys
 # Ensure app is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-# Mock lancedb and pandas before imports
+# Mock lancedb before imports
 mock_lancedb = MagicMock()
 sys.modules['lancedb'] = mock_lancedb
-sys.modules['pandas'] = MagicMock()
 
 import app.services.vector_store.lancedb as lancedb_module
 from app.services.vector_store.lancedb import LanceDBStore

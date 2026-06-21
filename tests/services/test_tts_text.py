@@ -6,6 +6,14 @@ from app.services.tts_text import prepare_tts_text
 
 
 class TestTtsText(unittest.TestCase):
+    def setUp(self):
+        from unittest.mock import patch
+        self.patcher = patch("app.services.tts_text._NORMALIZE_API_URL", "")
+        self.patcher.start()
+
+    def tearDown(self):
+        self.patcher.stop()
+
     def test_jti_tts_text_converts_digits_for_chinese(self):
         result = prepare_tts_text("2024年有130人", "zh")
         self.assertIsNotNone(result)

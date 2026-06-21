@@ -28,6 +28,7 @@ from app.schemas.chat import (
 )
 from app.models_config import DEFAULT_RAG_MODEL
 from app.utils import (
+    LazyProxy,
     build_date_query,
     build_history_summary_response,
     export_sessions_by_ids,
@@ -35,13 +36,16 @@ from app.utils import (
     normalize_history_pagination,
     simplified_conversation_sessions,
 )
-import app.deps as deps
+
+deps = LazyProxy("app.deps")
+main_agent = LazyProxy("app.services.general.main_agent", "main_agent")
+
 from app.services.general.agent_prompts import (
     DEFAULT_MAX_RESPONSE_CHARS,
     DEFAULT_RESPONSE_RULE_SECTIONS,
     build_system_instruction,
 )
-from app.services.general.main_agent import main_agent
+
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +93,14 @@ def _resolve_request_store(
             auth_scope = auth.get("scope")
             if auth_scope and not store_config_matches_scope(config, auth_scope):
                 raise HTTPException(status_code=403, detail="Access denied")
+            # A key bound to a store may only chat with that store. Reject (rather
+            # than silently rebind) when the request asks for a different store —
+            # silent rebind would mask a frontend sending the wrong store and is
+            # inconsistent with the 403 the dedicated app endpoints already give.
+            if req.store_name:
+                requested = resolve_or_404(req.store_name)
+                if requested.name != config.name:
+                    raise HTTPException(status_code=403, detail="Access denied")
             return config.name
 
         auth_scope = auth.get("scope")

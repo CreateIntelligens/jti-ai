@@ -231,6 +231,27 @@ def require_history_access(app: str):
     return checker
 
 
+def require_app_access(app: str):
+    """產生 app 專屬端點的存取 dependency。
+
+    super_admin/admin 可跨 app；role=user（sk-xxx key 或 JWT）只能存取自己綁定
+    app 的端點——jti 的 key 不能打 hciot/esg 的對話端點，反之亦然。
+
+    判斷沿用 can_access_history 的歸屬邏輯（admin 放行；user 以
+    _resolve_user_app 反查綁定 app 必須等於此 app）。
+    """
+
+    def checker(auth: dict = Depends(verify_auth)) -> dict:
+        if not can_access_history(auth, app):
+            raise HTTPException(
+                status_code=403,
+                detail=f"This API key is not authorized for the {app} app",
+            )
+        return auth
+
+    return checker
+
+
 def require_role(*allowed: str):
     """產生一個 FastAPI dependency,要求 verify_auth 的 role 在 allowed 內。
 

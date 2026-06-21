@@ -85,7 +85,16 @@ def test_topics_all_is_admin_only_not_public():
     it must be mounted ONLY under the authed /api/general-admin prefix — never
     under the public /api/general prefix (regression guard for an IDOR where it
     was mistakenly registered on the public router)."""
-    routes = {getattr(r, "path", "") for r in app.routes}
+    def get_paths(routes_list):
+        paths = set()
+        for r in routes_list:
+            if type(r).__name__ == '_IncludedRouter':
+                paths.update(get_paths(r.effective_candidates()))
+            elif hasattr(r, 'path'):
+                paths.add(r.path)
+        return paths
+
+    routes = get_paths(app.routes)
     assert "/api/general-admin/stores/{store_name}/topics/all" in routes
     assert "/api/general/stores/{store_name}/topics/all" not in routes
     # The slim listing stays public.

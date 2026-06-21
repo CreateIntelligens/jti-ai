@@ -1,5 +1,7 @@
 import os
+import shutil
 import subprocess
+import uuid
 from pathlib import Path
 
 
@@ -13,27 +15,34 @@ def _write_executable(path: Path, content: str) -> None:
 
 
 def _run_entrypoint(tmp_path: Path, env: dict[str, str] | None = None, args: list[str] | None = None):
-    fake_bin = tmp_path / "bin"
+    # Use a world-readable /tmp dir rather than the pytest tmp_path fixture: the
+    # entrypoint runs via `sh` and needs the fake-bin dir on PATH to be traversable
+    # even when tmp_path is created mode 0o700.
+    fake_bin = Path(f"/tmp/fake_bin_{uuid.uuid4().hex}")
     fake_bin.mkdir()
-    _write_executable(fake_bin / "uvicorn", "#!/bin/sh\nprintf '%s\\n' \"$@\"\n")
-    _write_executable(fake_bin / "custom-cmd", "#!/bin/sh\nprintf 'custom:%s\\n' \"$@\"\n")
+    fake_bin.chmod(0o755)
+    try:
+        _write_executable(fake_bin / "uvicorn", "#!/bin/sh\nprintf '%s\\n' \"$@\"\n")
+        _write_executable(fake_bin / "custom-cmd", "#!/bin/sh\nprintf 'custom:%s\\n' \"$@\"\n")
 
-    run_env = os.environ.copy()
-    run_env.pop("MODE", None)
-    run_env.pop("PORT", None)
-    run_env.pop("BACKEND_PORT", None)
-    run_env["PATH"] = f"{fake_bin}:{run_env['PATH']}"
-    if env:
-        run_env.update(env)
+        run_env = os.environ.copy()
+        run_env.pop("MODE", None)
+        run_env.pop("PORT", None)
+        run_env.pop("BACKEND_PORT", None)
+        run_env["PATH"] = f"{fake_bin}:{run_env['PATH']}"
+        if env:
+            run_env.update(env)
 
-    return subprocess.run(
-        ["sh", str(ENTRYPOINT), *(args or [])],
-        cwd=ROOT,
-        env=run_env,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
+        return subprocess.run(
+            ["sh", str(ENTRYPOINT), *(args or [])],
+            cwd=ROOT,
+            env=run_env,
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    finally:
+        shutil.rmtree(fake_bin, ignore_errors=True)
 
 
 def test_dev_mode_uses_reload(tmp_path: Path):

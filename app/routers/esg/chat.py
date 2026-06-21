@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
 import app.deps as deps
-from app.auth import require_history_access, verify_admin, verify_auth
+from app.auth import require_app_access, require_history_access, verify_admin
 from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
@@ -50,7 +50,7 @@ logger = logging.getLogger(__name__)
 runtime_router = APIRouter(
     prefix="/api/esg",
     tags=["ESG Chat"],
-    dependencies=[Depends(verify_auth)],
+    dependencies=[Depends(require_app_access(_MODE))],
 )
 compat_history_router = APIRouter(
     prefix="/api/esg",
