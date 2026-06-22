@@ -1,6 +1,7 @@
-import { useState, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  CircleAlert,
   Database,
   DatabaseBackup,
   DatabaseZap,
@@ -21,6 +22,7 @@ import reindexRag from '../services/api/general';
 import * as api from '../services/api';
 import { useLogoutRedirect } from '../hooks/useLogoutRedirect';
 import { isAdminRole, isSuperAdmin } from '../utils/authRouting';
+import { fetchAppUpdateNotice, getAppUpdateNotice, type AppUpdateNotice } from '../utils/appVersion';
 import AppSelect from './AppSelect';
 
 interface HeaderProps {
@@ -38,6 +40,7 @@ interface HeaderProps {
   userProfile?: api.UserProfile | null;
   onOpenUsersPanel?: () => void;
   onLogout?: () => void;
+  updateNotice?: AppUpdateNotice | null;
 }
 
 export default function Header({
@@ -55,8 +58,13 @@ export default function Header({
   userProfile,
   onOpenUsersPanel,
   onLogout,
+  updateNotice,
 }: HeaderProps) {
   const navigate = useNavigate();
+  const isUpdateNoticeControlled = updateNotice !== undefined;
+  const [runtimeUpdateNotice, setRuntimeUpdateNotice] = useState<AppUpdateNotice | null>(() => (
+    isUpdateNoticeControlled ? null : getAppUpdateNotice()
+  ));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isReindexing, setIsReindexing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -65,6 +73,23 @@ export default function Header({
   const isAdmin = isAdminRole(userProfile?.role);
   const isSuper = isSuperAdmin(userProfile?.role);
   const handleLogoutClick = useLogoutRedirect(onLogout);
+  const visibleUpdateNotice = isUpdateNoticeControlled ? updateNotice : runtimeUpdateNotice;
+  const updateNoticeLabel = visibleUpdateNotice
+    ? `新版本可用：目前 ${visibleUpdateNotice.currentVersion}，最新 ${visibleUpdateNotice.latestVersion}`
+    : '';
+
+  useEffect(() => {
+    if (isUpdateNoticeControlled) return undefined;
+
+    let active = true;
+    void fetchAppUpdateNotice().then((notice) => {
+      if (active) setRuntimeUpdateNotice(notice);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [isUpdateNoticeControlled]);
 
   const openPanel = (openFn: () => void) => {
     openFn();
@@ -163,6 +188,16 @@ export default function Header({
         <div className="app-logo">
           AI360 <span>Knowledge</span>
         </div>
+        {visibleUpdateNotice && (
+          <span
+            className="version-update-indicator"
+            role="status"
+            aria-label={updateNoticeLabel}
+            title={updateNoticeLabel}
+          >
+            <CircleAlert />
+          </span>
+        )}
         {status && <div className="status-badge">{status}</div>}
       </div>
 

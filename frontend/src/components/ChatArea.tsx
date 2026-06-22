@@ -297,7 +297,7 @@ export default function ChatArea({
             onClick={handleSubmit}
             disabled={disabled || !input.trim() || loading}
           >
-            <Send size={15} />
+            <Send />
           </button>
         </div>
         <div className="input-hint">Enter 傳送 · Shift+Enter 換行</div>
