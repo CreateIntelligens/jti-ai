@@ -90,6 +90,8 @@ desktop.ini
 data/*.db
 data/*.sqlite
 data/knowledge/
+data/lancedb/
+data/tts_cache/
 data/shared/tts_cache/
 data/hciot/images/
 data/hciot/knowledge/
