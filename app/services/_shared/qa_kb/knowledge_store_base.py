@@ -149,6 +149,20 @@ class QaKbKnowledgeStoreBase:
         doc["data"] = self._to_bytes(doc.get("data"))
         return doc
 
+    def list_files_with_data(self, language: str, **kwargs: Any) -> list[dict[str, Any]]:
+        """Like list_files, but each entry also carries decoded ``data`` bytes.
+
+        One query for the whole language partition instead of list_files + a
+        per-file get_file_data round-trip each. Backfill uses this so a restart
+        is one DB read, not N (the dominant cost over a remote/tunnelled Mongo)."""
+        cursor = self.collection.find(self._query(language)).sort("filename", 1)
+        items: list[dict[str, Any]] = []
+        for doc in cursor:
+            meta = self._metadata_from_doc(doc)
+            meta["data"] = self._to_bytes(doc.get("data"))
+            items.append(meta)
+        return items
+
     def _resolve_filename(self, language: str, filename: str) -> str:
         base_name = self._safe_filename(filename)
         path = Path(base_name)

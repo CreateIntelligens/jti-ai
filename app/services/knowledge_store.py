@@ -169,6 +169,20 @@ class KnowledgeStore:
             return None
         return self._to_bytes(doc.get("data"))
 
+    def list_files_with_data(self, language: str, namespace: str, **kwargs: Any) -> list[dict[str, Any]]:
+        """Like list_files, but each entry also carries decoded ``data`` bytes.
+
+        One query for the whole (language, namespace) partition instead of
+        list_files + a per-file get_file_data round-trip. Backfill uses this so a
+        restart is one DB read, not N (the dominant cost over a tunnelled Mongo)."""
+        docs = self.collection.find(self._query(language, namespace=namespace)).sort("filename", 1)
+        items: list[dict[str, Any]] = []
+        for doc in docs:
+            meta = self._metadata_from_doc(doc)
+            meta["data"] = self._to_bytes(doc.get("data"))
+            items.append(meta)
+        return items
+
     def save_file(
         self,
         language: str,
@@ -294,6 +308,9 @@ class NamespacedKnowledgeStore:
 
     def get_file_data(self, language: str, filename: str) -> Optional[bytes]:
         return self.store.get_file_data(language, filename, namespace=self.namespace)
+
+    def list_files_with_data(self, language: str, **kwargs: Any) -> list[dict[str, Any]]:
+        return self.store.list_files_with_data(language, namespace=self.namespace, **kwargs)
 
     def save_file(
         self,

@@ -221,79 +221,52 @@ class BackfillService:
         return filename.lower().endswith(_SUPPORTED_KNOWLEDGE_EXTENSIONS)
 
     @staticmethod
-    def _iter_store_files(files, fetch_data):
-        for file_info in files:
+    def _iter_files_with_data(files_with_data):
+        """Yield (filename, display_name, data, file_info) from pre-fetched dicts.
+
+        Each entry already carries its ``data`` (from a single batch query), so
+        no per-file fetch round-trip happens here."""
+        for file_info in files_with_data:
             filename = file_info.get("filename") or file_info.get("name", "")
             if not BackfillService._is_supported_knowledge_file(filename):
                 continue
-
-            data = fetch_data(filename)
+            data = file_info.get("data")
             if data:
                 yield filename, file_info.get("display_name", filename), data, file_info
 
     @staticmethod
-    def _fetch_hciot_file_data(store, language: str, filename: str) -> bytes | None:
-        doc = store.get_file(language, filename)
-        if not doc:
-            return None
-        return doc.get("data")
-
-    @staticmethod
-    def _fetch_jti_file_data(store, language: str, filename: str) -> bytes | None:
-        return store.get_file_data(language, filename)
-
-    @staticmethod
-    def _fetch_general_file_data(store, store_name: str, filename: str) -> bytes | None:
-        return store.get_file_data(store_name, filename, namespace=_GENERAL_NAMESPACE)
-
-    @staticmethod
-    def _general_file_lists(store_name: str):
-        """List general files from both coexisting stores, new (per-store QA
-        workspace) first then the legacy single-file store, deduped by filename."""
+    def _general_files_with_data(store_name: str) -> list[dict]:
+        """Batch-fetch general files (metadata + data) from both coexisting
+        stores, new (per-store QA workspace) first then the legacy single-file
+        store, deduped by filename. One query per store instead of a per-file
+        get_file round-trip each."""
         new_store = get_general_knowledge_store()
         old_store = get_knowledge_store()
         seen: set[str] = set()
         merged: list[dict] = []
-        for meta in new_store.list_files(store_name):
+        for meta in new_store.list_files_with_data(store_name):
             name = meta.get("filename") or meta.get("name", "")
             if name and name not in seen:
                 seen.add(name)
-                merged.append({**meta, "_source": "new"})
-        for meta in old_store.list_files(store_name, namespace=_GENERAL_NAMESPACE):
+                merged.append(meta)
+        for meta in old_store.list_files_with_data(store_name, namespace=_GENERAL_NAMESPACE):
             name = meta.get("filename") or meta.get("name", "")
             if name and name not in seen:
                 seen.add(name)
-                merged.append({**meta, "_source": "old"})
-        return new_store, old_store, merged
+                merged.append(meta)
+        return merged
 
     def _get_files_and_data(self, source_type: str, language: str):
         """Yields source files and file metadata from the correct MongoDB store.
         general partitions by store_name (passed as `language`) under the shared
         knowledge store's "general" namespace; jti/hciot partition by zh/en."""
         if source_type == "general":
-            new_store, old_store, files = self._general_file_lists(language)
-            # Each file knows which store it came from (`_source`), so fetch from
-            # that store directly instead of probing the new store for every file.
-            source_by_name = {
-                (meta.get("filename") or meta.get("name", "")): meta.get("_source")
-                for meta in files
-            }
-
-            def fetch_general(filename: str) -> bytes | None:
-                if source_by_name.get(filename) == "old":
-                    return self._fetch_general_file_data(old_store, language, filename)
-                doc = new_store.get_file(language, filename)
-                return doc.get("data") if doc else None
-
-            yield from self._iter_store_files(files, fetch_general)
+            yield from self._iter_files_with_data(self._general_files_with_data(language))
             return
 
         if source_type == "hciot":
             store = get_hciot_knowledge_store()
-            yield from self._iter_store_files(
-                store.list_files(language),
-                lambda filename: self._fetch_hciot_file_data(store, language, filename),
-            )
+            yield from self._iter_files_with_data(store.list_files_with_data(language))
             return
 
         if source_type == "esg":
@@ -302,17 +275,11 @@ class BackfillService:
             from app.services.knowledge_store import get_namespaced_knowledge_store
 
             store = get_namespaced_knowledge_store("esg")
-            yield from self._iter_store_files(
-                store.list_files(language),
-                lambda filename: self._fetch_hciot_file_data(store, language, filename),
-            )
+            yield from self._iter_files_with_data(store.list_files_with_data(language))
             return
 
         store = get_jti_knowledge_store()
-        yield from self._iter_store_files(
-            store.list_files(language),
-            lambda filename: self._fetch_jti_file_data(store, language, filename),
-        )
+        yield from self._iter_files_with_data(store.list_files_with_data(language))
 
     def run_backfill(self, source_type: str, language: str, force: bool = False):
         """Runs incremental backfill for a specific source and language.
@@ -335,6 +302,14 @@ class BackfillService:
 
         logger.debug(f"[Backfill] Scanning {len(items)} files in {source_type}/{language}...")
 
+        # Batch-fetch existing fingerprints once so unchanged files skip via an
+        # in-memory check rather than a per-file LanceDB query (the dominant
+        # cost when most files are unchanged on restart).
+        known_fingerprints = None
+        if not force:
+            full_source_type = _knowledge_source_type(source_type)
+            known_fingerprints = self.lancedb_store.get_all_fingerprints(full_source_type, language)
+
         for filename, display_name, data, file_info in items:
             self.index_single_file(
                 source_type=source_type,
@@ -344,6 +319,7 @@ class BackfillService:
                 metadata={"display_name": display_name},
                 force=force,
                 topic_info=BackfillService._extract_topic_info(file_info),
+                known_fingerprints=known_fingerprints,
             )
 
         live_file_ids = {filename for filename, *_ in items}
@@ -402,11 +378,24 @@ class BackfillService:
         force: bool = False,
         topic_info: Optional[Dict[str, str]] = None,
         force_text_chunking: bool = False,
+        known_fingerprints: Optional[Dict[str, str]] = None,
     ):
         """Indexes a single file into the local RAG store. Skips if content is unchanged unless force=True.
-        Pass topic_info if already fetched (e.g. from list_files) to avoid an extra Mongo query."""
+        Pass topic_info if already fetched (e.g. from list_files) to avoid an extra Mongo query.
+        Pass known_fingerprints ({file_id: fingerprint}, e.g. from get_all_fingerprints) to
+        let backfill skip unchanged files via an in-memory check instead of a per-file LanceDB query."""
         full_source_type = _knowledge_source_type(source_type)
         fingerprint = self._compute_fingerprint(data)
+
+        # Fast pre-check (outside the lock): if a batch-fetched fingerprint map
+        # already shows this file unchanged, skip without touching LanceDB. This
+        # turns N per-file fingerprint queries into one batch query per backfill.
+        # The authoritative re-check still happens inside the lock below, so a
+        # stale/missing entry here only costs a lock+query, never correctness.
+        if not force and known_fingerprints is not None:
+            if known_fingerprints.get(filename) == fingerprint:
+                logger.debug(f"[RAG] Skipping {filename} (fingerprint unchanged, batch)")
+                return
 
         # Serialize per (file, source_type, language) so concurrent callers
         # don't both embed and write the same file (the cause of duplicate

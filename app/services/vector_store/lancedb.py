@@ -127,6 +127,33 @@ class LanceDBStore:
             logger.warning(f"LanceDB fingerprint check failed: {e}")
             return None
 
+    def get_all_fingerprints(self, source_type: str, source_language: str) -> dict[str, str]:
+        """Returns {file_id: fingerprint} for every file indexed under a source/language.
+
+        One query for the whole partition, vs get_file_fingerprint's per-file lookup.
+        Lets backfill pre-check skips in memory instead of N round-trips to LanceDB.
+        """
+        tbl = self.table
+        if tbl is None:
+            return {}
+        try:
+            where = f"source_type = '{source_type}' AND source_language = '{source_language}'"
+            rows = (
+                tbl.search()
+                .where(where)
+                .select(["file_id", "file_fingerprint"])
+                .limit(100000)
+                .to_list()
+            )
+            return {
+                r["file_id"]: r["file_fingerprint"]
+                for r in rows
+                if r.get("file_id") and r.get("file_fingerprint")
+            }
+        except Exception as e:
+            logger.warning(f"LanceDB get_all_fingerprints failed: {e}")
+            return {}
+
     def delete_by_file(self, file_id: str, source_type: str, source_language: str | None = None):
         """Deletes all entries associated with a specific file."""
         tbl = self.table

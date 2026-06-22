@@ -49,5 +49,38 @@ class TestVectorStore(unittest.TestCase):
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["text"], "hello")
 
+    def test_get_all_fingerprints_returns_mapping(self):
+        """Batch fingerprint fetch returns {file_id: fingerprint} for a source/lang."""
+        mock_db = MagicMock()
+        mock_lancedb.connect.return_value = mock_db
+        mock_db.list_tables.return_value.tables = ["knowledge"]
+        mock_table = MagicMock()
+        mock_db.open_table.return_value = mock_table
+
+        store = LanceDBStore(uri="memory://", table_name="knowledge")
+
+        mock_query = MagicMock()
+        mock_table.search.return_value = mock_query
+        mock_query.where.return_value = mock_query
+        mock_query.select.return_value = mock_query
+        mock_query.limit.return_value = mock_query
+        # Multiple chunks per file share the same file_fingerprint; result is deduped per file_id.
+        mock_query.to_list.return_value = [
+            {"file_id": "f1", "file_fingerprint": "aaa"},
+            {"file_id": "f1", "file_fingerprint": "aaa"},
+            {"file_id": "f2", "file_fingerprint": "bbb"},
+        ]
+
+        fps = store.get_all_fingerprints("knowledge_general__store__", "zh")
+        self.assertEqual(fps, {"f1": "aaa", "f2": "bbb"})
+
+    def test_get_all_fingerprints_empty_when_no_table(self):
+        """No table → empty mapping, never raises."""
+        mock_db = MagicMock()
+        mock_lancedb.connect.return_value = mock_db
+        mock_db.list_tables.return_value.tables = []  # table absent
+        store = LanceDBStore(uri="memory://", table_name="knowledge")
+        self.assertEqual(store.get_all_fingerprints("knowledge_jti", "en"), {})
+
 if __name__ == '__main__':
     unittest.main()

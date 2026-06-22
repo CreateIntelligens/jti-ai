@@ -152,6 +152,32 @@ class TestHciotKnowledgeStore(unittest.TestCase):
         assert fetched is not None
         self.assertEqual(fetched["topic_id"], "general-medicine/diet")
 
+    def test_list_files_with_data_returns_metadata_and_bytes_in_one_pass(self):
+        """Batch fetch yields every file's metadata AND data, avoiding N per-file reads."""
+        self.store.insert_file(
+            language="zh", filename="a.csv", data=b"aaa", display_name="A",
+            content_type="text/csv", editable=True, topic_id="t/x",
+        )
+        self.store.insert_file(
+            language="zh", filename="b.csv", data=b"bbbb", display_name="B",
+            content_type="text/csv", editable=True,
+        )
+        # Different language must not leak in.
+        self.store.insert_file(
+            language="en", filename="c.csv", data=b"ccccc", display_name="C",
+            content_type="text/csv", editable=True,
+        )
+
+        items = self.store.list_files_with_data("zh")
+        by_name = {it["filename"]: it for it in items}
+
+        self.assertEqual(set(by_name), {"a.csv", "b.csv"})
+        self.assertEqual(by_name["a.csv"]["data"], b"aaa")
+        self.assertEqual(by_name["b.csv"]["data"], b"bbbb")
+        # Carries the same metadata list_files exposes (needed by backfill topic_info).
+        self.assertEqual(by_name["a.csv"]["topic_id"], "t/x")
+        self.assertEqual(by_name["a.csv"]["display_name"], "A")
+
 
 if __name__ == "__main__":
     unittest.main()

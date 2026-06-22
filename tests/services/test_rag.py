@@ -36,10 +36,14 @@ class TestRAGPipeline(unittest.TestCase):
 
         mock_lancedb_store.get_file_fingerprint.side_effect = None
         mock_lancedb_store.get_file_fingerprint.return_value = None
+        mock_lancedb_store.get_all_fingerprints.side_effect = None
+        mock_lancedb_store.get_all_fingerprints.return_value = {}
         mock_lancedb_store.search.side_effect = None
         mock_lancedb_store.search.return_value = []
         mock_knowledge_store.list_files.side_effect = None
         mock_knowledge_store.list_files.return_value = []
+        mock_knowledge_store.list_files_with_data.side_effect = None
+        mock_knowledge_store.list_files_with_data.return_value = []
         mock_knowledge_store.get_file_data.side_effect = None
         mock_knowledge_store.get_file_data.return_value = None
 
@@ -86,12 +90,44 @@ class TestRAGPipeline(unittest.TestCase):
 
     def test_backfill_service(self):
         backfill = BackfillService()
-        mock_knowledge_store.list_files.return_value = [
-            {"filename": "test.txt", "display_name": "Test File"}
+        mock_knowledge_store.list_files_with_data.return_value = [
+            {"filename": "test.txt", "display_name": "Test File", "data": b"some sample text data"}
         ]
-        mock_knowledge_store.get_file_data.return_value = b"some sample text data"
         mock_embedding_service.encode.return_value = np.random.rand(1, 1024)
-        
+
+        backfill.run_backfill("jti", "zh")
+
+        mock_lancedb_store.replace_file_chunks.assert_called_once()
+
+    def test_backfill_batch_fingerprint_skip(self):
+        """A file whose batch fingerprint matches is skipped without re-embedding."""
+        backfill = BackfillService()
+        data = b"some sample text data"
+        fingerprint = backfill._compute_fingerprint(data)
+        mock_knowledge_store.list_files_with_data.return_value = [
+            {"filename": "test.txt", "display_name": "Test File", "data": data}
+        ]
+        # Batch map already has this file at the same fingerprint → unchanged.
+        mock_lancedb_store.get_all_fingerprints.return_value = {"test.txt": fingerprint}
+        mock_embedding_service.encode.return_value = np.random.rand(1, 1024)
+
+        backfill.run_backfill("jti", "zh")
+
+        # Skipped before the lock: no per-file fingerprint query, no embed, no write.
+        mock_lancedb_store.replace_file_chunks.assert_not_called()
+        mock_lancedb_store.get_file_fingerprint.assert_not_called()
+        mock_embedding_service.encode.assert_not_called()
+
+    def test_backfill_batch_fingerprint_changed_reindexes(self):
+        """A file whose batch fingerprint differs is re-indexed (not skipped)."""
+        backfill = BackfillService()
+        mock_knowledge_store.list_files_with_data.return_value = [
+            {"filename": "test.txt", "display_name": "Test File", "data": b"new content"}
+        ]
+        # Batch map has a stale fingerprint for this file → changed.
+        mock_lancedb_store.get_all_fingerprints.return_value = {"test.txt": "stale-fp"}
+        mock_embedding_service.encode.return_value = np.random.rand(1, 1024)
+
         backfill.run_backfill("jti", "zh")
 
         mock_lancedb_store.replace_file_chunks.assert_called_once()
@@ -101,12 +137,10 @@ class TestRAGPipeline(unittest.TestCase):
         new_store = MagicMock()
         old_store = MagicMock()
 
-        new_store.list_files.return_value = [
-            {"filename": "general_file.txt", "display_name": "General File"}
+        new_store.list_files_with_data.return_value = [
+            {"filename": "general_file.txt", "display_name": "General File", "data": b"general store text data"}
         ]
-        new_store.get_file.return_value = {"data": b"general store text data"}
-
-        old_store.list_files.return_value = []
+        old_store.list_files_with_data.return_value = []
 
         mock_embedding_service.encode.return_value = np.random.rand(1, 1024)
 
@@ -115,17 +149,15 @@ class TestRAGPipeline(unittest.TestCase):
             backfill.run_backfill("general", "store_123")
 
         mock_lancedb_store.replace_file_chunks.assert_called_once()
-        new_store.list_files.assert_called_once_with("store_123")
-        old_store.list_files.assert_called_once_with("store_123", namespace="general")
-        new_store.get_file.assert_called_once_with("store_123", "general_file.txt")
+        new_store.list_files_with_data.assert_called_once_with("store_123")
+        old_store.list_files_with_data.assert_called_once_with("store_123", namespace="general")
 
     def test_esg_backfill(self):
         backfill = BackfillService()
         esg_store = MagicMock()
-        esg_store.list_files.return_value = [
-            {"filename": "KIOSK_QA_中文.csv", "display_name": "ESG QA"}
+        esg_store.list_files_with_data.return_value = [
+            {"filename": "KIOSK_QA_中文.csv", "display_name": "ESG QA", "data": "q,a\nLED?,162 萬元".encode("utf-8")}
         ]
-        esg_store.get_file.return_value = {"data": "q,a\nLED?,162 萬元".encode("utf-8")}
 
         mock_embedding_service.encode.return_value = np.random.rand(1, 1024)
 
@@ -141,7 +173,7 @@ class TestRAGPipeline(unittest.TestCase):
         self.assertEqual(
             mock_lancedb_store.replace_file_chunks.call_args.args[1], "esg_knowledge"
         )
-        esg_store.list_files.assert_called_once_with("zh")
+        esg_store.list_files_with_data.assert_called_once_with("zh")
 
     def test_hciot_english_backfill_uses_topic_store_labels_for_prefix(self):
         backfill = BackfillService()
