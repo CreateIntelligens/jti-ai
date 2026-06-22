@@ -12,10 +12,10 @@ import {
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 
-import type { HciotTopicCategory } from '../../../../services/api/hciot';
+import type { QaAdminCategory } from '../../../../config/qaTopics';
 import { moveItem } from '../topicUtils';
 
-type EditableCategory = HciotTopicCategory;
+type EditableCategory = QaAdminCategory;
 
 interface VisibilityChanges {
   categoryHidden: Array<{ categoryId: string; hidden: boolean }>;
@@ -24,10 +24,10 @@ interface VisibilityChanges {
 
 interface VisibilityOrderModalProps {
   open: boolean;
-  categories: HciotTopicCategory[];
+  categories: QaAdminCategory[];
   saving: boolean;
   onClose: () => void;
-  onSave: (categories: HciotTopicCategory[], changes: VisibilityChanges) => Promise<void> | void;
+  onSave: (categories: QaAdminCategory[], changes: VisibilityChanges) => Promise<void> | void;
 }
 
 function categoryDragId(categoryId: string): string {
@@ -72,7 +72,7 @@ export function getVisibilityOrderCollisionIds(
   return droppableIds;
 }
 
-function cloneCategories(categories: HciotTopicCategory[]): EditableCategory[] {
+function cloneCategories(categories: QaAdminCategory[]): EditableCategory[] {
   return categories.map((category) => ({
     ...category,
     hidden: Boolean(category.hidden),
@@ -84,8 +84,8 @@ function cloneCategories(categories: HciotTopicCategory[]): EditableCategory[] {
 }
 
 function collectChanges(
-  originalCategories: HciotTopicCategory[],
-  categories: HciotTopicCategory[],
+  originalCategories: QaAdminCategory[],
+  categories: QaAdminCategory[],
 ): VisibilityChanges {
   const originalCategoryHidden = new Map(
     originalCategories.map((category) => [category.id, Boolean(category.hidden)]),

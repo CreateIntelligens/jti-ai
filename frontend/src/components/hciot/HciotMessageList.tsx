@@ -65,8 +65,8 @@ export default function HciotMessageList({
   activeTtsMessageId = null,
 }: HciotMessageListProps) {
   return (
-    <div className="hciot-messages-area">
-      <div className="hciot-message-thread">
+    <div className="qa-messages-area">
+      <div className="qa-message-thread">
         {messages.map((msg, idx) => {
           const isEditingMessage =
             editingTurn !== null && editingTurn === msg.turnNumber && msg.type === 'user';
@@ -75,12 +75,12 @@ export default function HciotMessageList({
             msg.type === 'assistant' && idx > 0 && Boolean(msg.ttsMessageId || msg.ttsText || msg.text);
           const ttsState = canPlayTts ? getTtsState(msg.ttsMessageId) : undefined;
           const isPlaying = Boolean(canPlayTts && msg.ttsMessageId && activeTtsMessageId === msg.ttsMessageId);
-          const audioButtonClassName = `hciot-audio-btn${ttsState ? ` ${ttsState}` : ''}${isPlaying ? ' playing' : ''}`;
+          const audioButtonClassName = `qa-audio-btn${ttsState ? ` ${ttsState}` : ''}${isPlaying ? ' playing' : ''}`;
 
           const renderAudioIcon = () => {
             if (isPlaying) {
               return (
-                <span className="hciot-audio-playing-waveform" aria-hidden="true">
+                <span className="qa-audio-playing-waveform" aria-hidden="true">
                   <span></span>
                   <span></span>
                   <span></span>
@@ -100,29 +100,29 @@ export default function HciotMessageList({
           return (
             <div
               key={`${msg.timestamp}-${idx}`}
-              className={`hciot-message ${msg.type}`}
+              className={`qa-message ${msg.type}`}
               style={{ animationDelay: `${idx * 0.04}s` }}
             >
-              <div className="hciot-message-meta">
-                <span className="hciot-message-role">{getMessageRoleLabel(msg.type)}</span>
+              <div className="qa-message-meta">
+                <span className="qa-message-role">{getMessageRoleLabel(msg.type)}</span>
               </div>
 
-              <div className="hciot-message-row">
-                <div className="hciot-message-bubble">
+              <div className="qa-message-row">
+                <div className="qa-message-bubble">
                   {isEditingMessage ? (
-                    <div className="hciot-message-edit">
+                    <div className="qa-message-edit">
                       <textarea
                         ref={editTextareaRef}
-                        className="hciot-message-edit-textarea"
+                        className="qa-message-edit-textarea"
                         value={editText}
                         onChange={(e) => setEditText(e.target.value)}
                         onKeyDown={(e) => handleEditKeyDown(e, msg.turnNumber!)}
                         rows={Math.min(editText.split('\n').length + 1, 6)}
                       />
-                      <div className="hciot-message-actions-row">
+                      <div className="qa-message-actions-row">
                         <button
                           type="button"
-                          className="hciot-message-action primary"
+                          className="qa-message-action primary"
                           onClick={() => msg.turnNumber && handleEditAndResend(msg.turnNumber, editText.trim())}
                           disabled={!editText.trim()}
                         >
@@ -130,7 +130,7 @@ export default function HciotMessageList({
                         </button>
                         <button
                           type="button"
-                          className="hciot-message-action"
+                          className="qa-message-action"
                           onClick={() => setEditingTurn(null)}
                         >
                           Cancel
@@ -139,17 +139,17 @@ export default function HciotMessageList({
                     </div>
                   ) : (
                     <>
-                      <div className="hciot-message-text">{msg.text}</div>
+                      <div className="qa-message-text">{msg.text}</div>
                       {msg.imageId ? <HciotImageAttachment imageId={msg.imageId} /> : null}
                       {msg.citations && msg.citations.length > 0 ? (
                         <CitationsList citations={msg.citations} messageIndex={idx} />
                       ) : null}
                       {canShowTools ? (
-                        <div className="hciot-message-tools">
+                        <div className="qa-message-tools">
                           {msg.type === 'user' ? (
                             <button
                               type="button"
-                              className="hciot-inline-action hciot-inline-action-icon"
+                              className="qa-inline-action qa-inline-action-icon"
                               onClick={() => {
                                 setEditingTurn(msg.turnNumber!);
                                 setEditText(msg.text);
@@ -163,7 +163,7 @@ export default function HciotMessageList({
                           {msg.type === 'assistant' ? (
                             <button
                               type="button"
-                              className="hciot-inline-action hciot-inline-action-icon"
+                              className="qa-inline-action qa-inline-action-icon"
                               onClick={() => handleRegenerate(msg.turnNumber!)}
                               title="重新生成"
                               aria-label="重新生成回覆"
@@ -192,12 +192,12 @@ export default function HciotMessageList({
         })}
 
         {isTyping ? (
-          <div className="hciot-message assistant typing">
-            <div className="hciot-message-meta">
-              <span className="hciot-message-role">Guide</span>
+          <div className="qa-message assistant typing">
+            <div className="qa-message-meta">
+              <span className="qa-message-role">Guide</span>
             </div>
-            <div className="hciot-message-bubble">
-              <div className="hciot-typing-dots">
+            <div className="qa-message-bubble">
+              <div className="qa-typing-dots">
                 <span></span>
                 <span></span>
                 <span></span>

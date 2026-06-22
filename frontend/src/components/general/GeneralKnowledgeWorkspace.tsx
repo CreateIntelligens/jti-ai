@@ -5,15 +5,15 @@ import QaKnowledgeWorkspace, {
   type QaWorkspaceConfig,
 } from '../_shared/qaKnowledgeWorkspace/QaKnowledgeWorkspace';
 // Shared QA workspace styles (originally authored under hciot/, app-wide CSS).
-import '../../styles/hciot/layout.css';
-import '../../styles/hciot/workspace.css';
-import '../../styles/hciot/workspace-table.css';
-import '../../styles/hciot/workspace-images.css';
-import '../../styles/hciot/workspace-upload.css';
-import '../../styles/hciot/workspace-upload-images.css';
-import '../../styles/hciot/workspace-upload-enhancements.css';
-import '../../styles/hciot/workspace-upload-preview.css';
-import '../../styles/hciot/workspace-upload-edit.css';
+import '../../styles/qaWorkspace/layout.css';
+import '../../styles/qaWorkspace/workspace.css';
+import '../../styles/qaWorkspace/workspace-table.css';
+import '../../styles/qaWorkspace/workspace-images.css';
+import '../../styles/qaWorkspace/workspace-upload.css';
+import '../../styles/qaWorkspace/workspace-upload-images.css';
+import '../../styles/qaWorkspace/workspace-upload-enhancements.css';
+import '../../styles/qaWorkspace/workspace-upload-preview.css';
+import '../../styles/qaWorkspace/workspace-upload-edit.css';
 
 interface GeneralKnowledgeWorkspaceProps {
   active: boolean;
@@ -77,15 +77,17 @@ export default function GeneralKnowledgeWorkspace({
   storeName,
   onTopicsChanged,
 }: GeneralKnowledgeWorkspaceProps) {
-  // Rebuild the bound API client only when the store changes — avoids
-  // recreating all its closures on every render.
+  // Rebuild the bound API client and workspace config only when the store
+  // changes — avoids recreating closures (including resolveImageUrl) on every render.
   const api = useMemo(() => makeApi(storeName), [storeName]);
-  const config: QaWorkspaceConfig = {
+
+  const config = useMemo<QaWorkspaceConfig>(() => ({
     sourceType: 'general',
     api,
     text: (_language, zh) => zh,
     disableAiQaExtraction: true,
-  };
+    resolveImageUrl: (imageId) => gapi.getGeneralImageUrl(storeName, imageId),
+  }), [api, storeName]);
   return (
     <QaKnowledgeWorkspace
       active={active}

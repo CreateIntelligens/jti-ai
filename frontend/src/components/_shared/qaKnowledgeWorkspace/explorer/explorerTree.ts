@@ -1,5 +1,5 @@
-import type { HciotLanguage } from '../../../../config/hciotTopics';
-import type { HciotImage, HciotKnowledgeFile, HciotTopicCategory } from '../../../../services/api/hciot';
+import type { QaLanguage, QaAdminCategory } from '../../../../config/qaTopics';
+import type { QaImage, QaKnowledgeFile } from '../../../../services/api/_shared/qaKnowledge';
 import { NO_TOPIC_KEY, categoryPrefix, getFileLabel, sortByLabel } from '../topicUtils';
 
 export interface ExplorerFolderNode {
@@ -15,7 +15,7 @@ export interface ExplorerFileNode {
   key: string;
   kind: 'file';
   label: string;
-  file: HciotKnowledgeFile;
+  file: QaKnowledgeFile;
 }
 
 export interface ExplorerMergedCsvNode {
@@ -30,7 +30,7 @@ export interface ExplorerImageNode {
   key: string;
   kind: 'image';
   label: string;
-  image: HciotImage;
+  image: QaImage;
 }
 
 export type ExplorerNode = ExplorerFolderNode | ExplorerFileNode | ExplorerImageNode | ExplorerMergedCsvNode;
@@ -46,11 +46,11 @@ export function isFolderNode(node: ExplorerNode): node is ExplorerFolderNode {
   return node.kind === 'folder';
 }
 
-function storageKeyForExpanded(language: HciotLanguage): string {
+function storageKeyForExpanded(language: QaLanguage): string {
   return `hciot:knowledge-explorer:expanded:${language}`;
 }
 
-export function readExpandedKeys(language: HciotLanguage): string[] {
+export function readExpandedKeys(language: QaLanguage): string[] {
   try {
     const raw = localStorage.getItem(storageKeyForExpanded(language));
     const parsed = raw ? JSON.parse(raw) : [];
@@ -64,7 +64,7 @@ export function readExpandedKeys(language: HciotLanguage): string[] {
   }
 }
 
-export function writeExpandedKeys(language: HciotLanguage, keys: string[]): void {
+export function writeExpandedKeys(language: QaLanguage, keys: string[]): void {
   localStorage.setItem(storageKeyForExpanded(language), JSON.stringify(keys));
 }
 
@@ -126,19 +126,19 @@ export function flattenExplorerNodes(
   });
 }
 
-export function getNoTopicLabel(_language: HciotLanguage): string {
+export function getNoTopicLabel(_language: QaLanguage): string {
   return '未指定主題';
 }
 
-function isCsvFile(file: HciotKnowledgeFile): boolean {
+function isCsvFile(file: QaKnowledgeFile): boolean {
   return (file.name || '').toLowerCase().endsWith('.csv');
 }
 
-function sortFilesByDisplayLabel(files: HciotKnowledgeFile[]): HciotKnowledgeFile[] {
+function sortFilesByDisplayLabel(files: QaKnowledgeFile[]): QaKnowledgeFile[] {
   return files.slice().sort((left, right) => sortByLabel(getFileLabel(left), getFileLabel(right)));
 }
 
-function createFileNode(file: HciotKnowledgeFile): ExplorerFileNode {
+function createFileNode(file: QaKnowledgeFile): ExplorerFileNode {
   return {
     key: `file:${file.name}`,
     kind: 'file',
@@ -150,7 +150,7 @@ function createFileNode(file: HciotKnowledgeFile): ExplorerFileNode {
 function appendFileNode(
   nodes: ExplorerNode[],
   filePathKeys: Map<string, string[]>,
-  file: HciotKnowledgeFile,
+  file: QaKnowledgeFile,
   pathKeys: string[],
 ): void {
   filePathKeys.set(file.name, pathKeys);
@@ -158,8 +158,8 @@ function appendFileNode(
 }
 
 export function getCurrentPathLabel(
-  selectedFile: HciotKnowledgeFile | null,
-  _language: HciotLanguage,
+  selectedFile: QaKnowledgeFile | null,
+  _language: QaLanguage,
 ): string {
   if (!selectedFile) {
     return '選擇檔案開始編輯';
@@ -175,15 +175,15 @@ export function getCurrentPathLabel(
 }
 
 export function buildExplorerTree(
-  files: HciotKnowledgeFile[],
-  categories: HciotTopicCategory[],
-  language: HciotLanguage,
-  images: HciotImage[] = [],
+  files: QaKnowledgeFile[],
+  categories: QaAdminCategory[],
+  language: QaLanguage,
+  images: QaImage[] = [],
 ): { roots: ExplorerNode[]; filePathKeys: Map<string, string[]> } {
   const roots: ExplorerNode[] = [];
   const filePathKeys = new Map<string, string[]>();
-  const filesByCategory = new Map<string, HciotKnowledgeFile[]>();
-  const documentFiles: HciotKnowledgeFile[] = [];
+  const filesByCategory = new Map<string, QaKnowledgeFile[]>();
+  const documentFiles: QaKnowledgeFile[] = [];
 
   files.forEach((file) => {
     if (!file.topic_id) {
@@ -220,7 +220,7 @@ export function buildExplorerTree(
     const categoryLabel =
       category?.label || categoryFiles[0]?.category_label || categoryId;
     const categoryKey = `category:${categoryId}`;
-    const filesByTopic = new Map<string, HciotKnowledgeFile[]>();
+    const filesByTopic = new Map<string, QaKnowledgeFile[]>();
 
     categoryFiles.forEach((file) => {
       const topicKey = file.topic_id || NO_TOPIC_KEY;
@@ -229,7 +229,7 @@ export function buildExplorerTree(
       filesByTopic.set(topicKey, group);
     });
 
-    const resolveTopicLabel = (topicId: string, topicFiles: HciotKnowledgeFile[]): string => {
+    const resolveTopicLabel = (topicId: string, topicFiles: QaKnowledgeFile[]): string => {
       if (topicId === NO_TOPIC_KEY) return getNoTopicLabel(language);
       return category?.topics.find((item) => item.id === topicId)?.label
         || topicFiles[0]?.topic_label
@@ -249,8 +249,8 @@ export function buildExplorerTree(
       const topicLabel = resolveTopicLabel(topicId, topicFiles);
       const topicKey = `topic:${topicId}`;
 
-      const csvFiles: HciotKnowledgeFile[] = [];
-      const nonCsvFiles: HciotKnowledgeFile[] = [];
+      const csvFiles: QaKnowledgeFile[] = [];
+      const nonCsvFiles: QaKnowledgeFile[] = [];
       topicFiles.forEach((file) => {
         if (isCsvFile(file)) {
           csvFiles.push(file);

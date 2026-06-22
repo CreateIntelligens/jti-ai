@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import type { HciotTopicCategory } from '../../../../services/api/hciot';
+import type { QaAdminCategory } from '../../../../config/qaTopics';
 import { NEW_VALUE, normalizeLabel, slugify } from '../topicUtils';
 import type { ResolvedUploadTopic } from './types';
 
@@ -14,7 +14,7 @@ interface SavedTopicSelection {
 
 export type UploadTopicOption = { value: string; label: string };
 
-export function readSavedTopicSelection(categories: HciotTopicCategory[]): SavedTopicSelection {
+export function readSavedTopicSelection(categories: QaAdminCategory[]): SavedTopicSelection {
   if (!categories.length) {
     return { categoryId: NEW_VALUE, topicId: NEW_VALUE };
   }
@@ -42,7 +42,7 @@ export function isUploadTopicSelectDisabled(categoryId: string): boolean {
 
 export function buildUploadTopicOptions(
   categoryId: string,
-  sortedTopics: HciotTopicCategory['topics'],
+  sortedTopics: QaAdminCategory['topics'],
 ): UploadTopicOption[] {
   return [
     ...sortedTopics.map((topic) => ({ value: topic.id, label: topic.label })),
@@ -50,7 +50,7 @@ export function buildUploadTopicOptions(
   ];
 }
 
-function firstTopicId(category: HciotTopicCategory | undefined): string {
+function firstTopicId(category: QaAdminCategory | undefined): string {
   return category?.topics[0]?.id ?? NEW_VALUE;
 }
 
@@ -59,7 +59,7 @@ function resolveTopicInfo(
   topicId: string,
   newCategoryLabel: string,
   newTopicLabel: string,
-  currentCategory: HciotTopicCategory | null | undefined,
+  currentCategory: QaAdminCategory | null | undefined,
 ): ResolvedUploadTopic | null {
   if (!categoryId) return null;
 
@@ -102,7 +102,7 @@ function resolveTopicInfo(
   };
 }
 
-export function useUploadTopicSelection(categories: HciotTopicCategory[], open: boolean) {
+export function useUploadTopicSelection(categories: QaAdminCategory[], open: boolean) {
   const [categoryId, setCategoryId] = useState(NEW_VALUE);
   const [topicId, setTopicId] = useState(NEW_VALUE);
   const [newCategoryLabel, setNewCategoryLabel] = useState('');

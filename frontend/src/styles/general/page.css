@@ -1,0 +1,87 @@
+.app-shell .general-page {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(16rem, 24%) minmax(0, 1fr);
+  flex: 1;
+  gap: 0.75rem;
+  min-width: 0;
+  min-height: 0;
+}
+
+.app-shell .general-topic-panel {
+  min-width: 0;
+  min-height: 0;
+  padding: 1.25rem;
+  overflow: hidden;
+  border: 0.0625rem solid var(--border);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+}
+
+.app-shell .general-topic-panel .qa-topic-question-list {
+  max-height: none;
+}
+
+.app-shell .general-topic-toggle,
+.app-shell .general-topic-overlay {
+  display: none;
+}
+
+@media (max-width: 64rem) {
+  .app-shell .general-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-shell .general-topic-toggle {
+    position: absolute;
+    top: 0.75rem;
+    left: 0.75rem;
+    z-index: 4;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    min-height: 2rem;
+    padding: 0 0.625rem;
+    border: 0.0625rem solid var(--border);
+    border-radius: var(--r-md);
+    background: var(--surface);
+    color: var(--text-2);
+    font: inherit;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .app-shell .general-topic-panel {
+    position: fixed;
+    top: var(--header-h);
+    right: 0;
+    bottom: 0;
+    z-index: 32;
+    width: min(22rem, 88vw);
+    padding: 1.25rem;
+    border-radius: 0;
+    transform: translateX(100%);
+    transition: transform var(--trans);
+  }
+
+  .app-shell .general-topic-panel.is-open {
+    transform: translateX(0);
+  }
+
+  .app-shell .general-topic-overlay {
+    position: fixed;
+    inset: var(--header-h) 0 0;
+    z-index: 31;
+    display: block;
+    background: rgba(15, 23, 42, 0.35);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity var(--trans);
+  }
+
+  .app-shell .general-topic-overlay.is-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}

@@ -95,30 +95,38 @@ describe('MergedCsvPane refresh behavior', () => {
       ],
       source_files: ['qa.csv'],
     });
-    const updateKnowledgeFileContent = vi.fn().mockResolvedValue(undefined);
-    const updateTopic = vi.fn().mockResolvedValue(undefined);
+    const saveTopicMergedCsv = vi.fn().mockResolvedValue(undefined);
 
     render(renderPane({
       getTopicMergedCsv,
-      updateKnowledgeFileContent,
-      updateTopic,
+      saveTopicMergedCsv,
       deleteKnowledgeFile: vi.fn().mockResolvedValue(undefined),
     }, 0));
 
     fireEvent.click(await screen.findByRole('button', { name: '編輯題庫' }));
     fireEvent.click(screen.getByRole('button', { name: '儲存變更' }));
 
-    await waitFor(() => expect(updateKnowledgeFileContent).toHaveBeenCalledTimes(1));
-    expect(updateKnowledgeFileContent).toHaveBeenCalledWith(
-      'qa.csv',
-      [
-        '"index","q","a","img","url"',
-        '"1","第一題","A1","",""',
-        '"2","第二題","A2","",""',
-        '"3","第三題","A3","",""',
-      ].join('\n'),
+    // The pane saves the whole topic in one batched request; the per-file CSV
+    // content carries the renumbered 1..N index in display order.
+    await waitFor(() => expect(saveTopicMergedCsv).toHaveBeenCalledTimes(1));
+    expect(saveTopicMergedCsv).toHaveBeenCalledWith(
+      'ortho/prp',
+      {
+        files: [
+          {
+            filename: 'qa.csv',
+            content: [
+              '"index","q","a","img","url"',
+              '"1","第一題","A1","",""',
+              '"2","第二題","A2","",""',
+              '"3","第三題","A3","",""',
+            ].join('\n'),
+          },
+        ],
+        delete_files: [],
+        hidden_questions: [],
+      },
       'zh',
     );
-    expect(updateTopic).toHaveBeenCalledWith('ortho/prp', { hidden_questions: [] }, 'zh');
   });
 });

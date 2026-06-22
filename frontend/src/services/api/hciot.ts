@@ -1,8 +1,10 @@
 import type { StartChatResponse, ChatResponse, Prompt, KnowledgeFile, KnowledgeFileContent } from '../../types';
 import type { HciotCategory as HciotRuntimeCategory, HciotLanguage } from '../../config/hciotTopics';
+import type { QaAdminTopic, QaAdminCategory } from '../../config/qaTopics';
 import { API_BASE, fetchAsAdmin, fetchWithApiKey, handleResponse, normLang, buildUrl } from './base';
 import {
   createQaKnowledgeApi,
+  type QaImage,
   type QaExtractJobResponse as SharedQaExtractJobResponse,
   type QaImportResponse as SharedQaImportResponse,
   type QaKnowledgeUploadWithTopicOptions,
@@ -247,22 +249,10 @@ export async function updateHciotKnowledgeFileMetadata(
 // Topics are single-language end-to-end: each request/response carries the
 // label for one language only. The category tree shape is identical for the
 // public chat area and the admin UI.
-export interface HciotTopic {
-  id: string;
-  order?: number;
-  label: string;
-  questions: string[];
-  hidden_questions?: string[];
-  hidden?: boolean;
-}
-
-export interface HciotTopicCategory {
-  id: string;
-  order?: number;
-  label: string;
-  hidden?: boolean;
-  topics: HciotTopic[];
-}
+// Admin-facing topic/category are the neutral QA admin shapes; aliased here so
+// hciot's existing imports keep working. Canonical defs live in config/qaTopics.ts.
+export type HciotTopic = QaAdminTopic;
+export type HciotTopicCategory = QaAdminCategory;
 
 export async function listHciotTopics(language: HciotLanguage = 'zh'): Promise<{ categories: HciotRuntimeCategory[] }> {
   const lang = normLang(language);
@@ -366,13 +356,8 @@ export async function uploadHciotKnowledgeFileWithTopic(
 
 // ========== Image Admin ==========
 
-export interface HciotImage {
-  image_id: string;
-  size_bytes: number;
-  url: string;
-  reference_count?: number;
-  is_referenced?: boolean;
-}
+// Image record is the neutral QA shape; aliased here for hciot's existing imports.
+export type HciotImage = QaImage;
 
 export async function listHciotImages(): Promise<{ images: HciotImage[] }> {
   return fetchAdminJson<{ images: HciotImage[] }>('/images/');

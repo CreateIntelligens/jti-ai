@@ -34,10 +34,10 @@ export default function DocumentToQaStatusView({
   if (status === 'success') {
     return (
       <div className="qa-workspace-upload-file-body">
-        <div className="hciot-doc-success-step">
-          <div className="hciot-success-badge">✓</div>
-          <h4 className="hciot-success-title">{directSave ? '儲存成功！' : '匯入成功！'}</h4>
-          <p className="hciot-success-subtitle">
+        <div className="qa-doc-success-step">
+          <div className="qa-success-badge">✓</div>
+          <h4 className="qa-success-title">{directSave ? '儲存成功！' : '匯入成功！'}</h4>
+          <p className="qa-success-subtitle">
             {directSave ? '內容已儲存並建立索引。' : `已成功匯入 ${qaPairCount} 組問答。`}
           </p>
         </div>
@@ -48,10 +48,10 @@ export default function DocumentToQaStatusView({
   if (status === 'error') {
     return (
       <div className="qa-workspace-upload-file-body">
-        <div className="hciot-doc-error-step">
-          <AlertCircle size={36} className="hciot-error-icon" />
-          <h4 className="hciot-error-title">處理時發生錯誤</h4>
-          <p className="hciot-error-subtitle">{error}</p>
+        <div className="qa-doc-error-step">
+          <AlertCircle size={36} className="qa-error-icon" />
+          <h4 className="qa-error-title">處理時發生錯誤</h4>
+          <p className="qa-error-subtitle">{error}</p>
           <div className="qa-workspace-qa-footer-actions">
             <button type="button" className="qa-workspace-file-action-button" onClick={onReset}>
               重新開始
@@ -64,12 +64,12 @@ export default function DocumentToQaStatusView({
 
   return (
     <div className="qa-workspace-upload-file-body">
-      <div className="hciot-doc-progress-step">
-        <Loader2 size={36} className="hciot-spinner" />
-        <h4 className="hciot-progress-title">
+      <div className="qa-doc-progress-step">
+        <Loader2 size={36} className="qa-spinner" />
+        <h4 className="qa-progress-title">
           {progressTitle(status, directSave)}
         </h4>
-        <p className="hciot-progress-subtitle">
+        <p className="qa-progress-subtitle">
           {directSave ? '請稍候，正在處理內容。' : '通常需要 10-30 秒，視內容長度而定。'}
         </p>
       </div>

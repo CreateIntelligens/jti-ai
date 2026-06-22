@@ -1,16 +1,15 @@
 import { useMemo, useRef, useState } from 'react';
-import type { HciotLanguage } from '../../../../config/hciotTopics';
+import type { QaLanguage, QaAdminCategory } from '../../../../config/qaTopics';
 import type {
-  HciotImage,
-  HciotKnowledgeFile,
-  HciotTopicCategory,
-} from '../../../../services/api/hciot';
+  QaImage,
+  QaKnowledgeFile,
+} from '../../../../services/api/_shared/qaKnowledge';
 import type { QaWorkspaceApiClient } from '../QaKnowledgeWorkspace';
 import { categoryPrefix } from '../topicUtils';
 
 export interface UseWorkspaceDataOptions {
   api: QaWorkspaceApiClient;
-  language: HciotLanguage;
+  language: QaLanguage;
   onTopicsChanged?: () => Promise<void> | void;
   text: (zh: string, en: string) => string;
 }
@@ -23,9 +22,9 @@ export function useWorkspaceData({
 }: UseWorkspaceDataOptions) {
   const statusTimerRef = useRef<number | null>(null);
 
-  const [files, setFiles] = useState<HciotKnowledgeFile[]>([]);
-  const [categories, setCategories] = useState<HciotTopicCategory[]>([]);
-  const [images, setImages] = useState<HciotImage[]>([]);
+  const [files, setFiles] = useState<QaKnowledgeFile[]>([]);
+  const [categories, setCategories] = useState<QaAdminCategory[]>([]);
+  const [images, setImages] = useState<QaImage[]>([]);
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
   const [selectedImageName, setSelectedImageName] = useState<string | null>(null);
   const [selectedMergedTopicId, setSelectedMergedTopicId] = useState<string | null>(null);
@@ -154,6 +153,6 @@ export function useWorkspaceData({
     refreshWorkspace,
     refreshWorkspaceAfterTopicChange,
     completeUpload,
-    statusTimerRef,
   };
+
 }

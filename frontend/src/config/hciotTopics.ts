@@ -1,25 +1,15 @@
-export type HciotLanguage = 'zh' | 'en';
+// hciot consumes the neutral QA topic model; these names are kept as aliases so
+// existing hciot code (and its `language` arg) need not change. The canonical
+// definitions live in config/qaTopics.ts.
+import type { QaLanguage, QaTopic, QaCategory } from './qaTopics';
+import { normalizeQaLanguage } from './qaTopics';
 
-export interface HciotTopic {
-  id: string;
-  order?: number;
-  label: string;
-  questions: string[];
-}
-
-export interface HciotCategory {
-  id: string;
-  order?: number;
-  label: string;
-  topics: HciotTopic[];
-}
+export type HciotLanguage = QaLanguage;
+export type HciotTopic = QaTopic;
+export type HciotCategory = QaCategory;
 
 export const HCIOT_DEFAULT_STORE_NAME = (
   (import.meta.env.VITE_HCIOT_STORE_NAME as string | undefined)?.trim() || 'hciot'
 );
 
-export function normalizeHciotLanguage(language?: string): HciotLanguage {
-  return typeof language === 'string' && language.trim().toLowerCase().startsWith('en')
-    ? 'en'
-    : 'zh';
-}
+export const normalizeHciotLanguage = normalizeQaLanguage;

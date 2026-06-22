@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 
-import type { HciotLanguage } from '../../../../config/hciotTopics';
+import type { QaLanguage } from '../../../../config/qaTopics';
 import { toErrorMessage } from '../../../../utils/errors';
-import type { HciotImage, HciotQaPair } from '../../../../services/api/hciot';
+import type { QaImage, QaPair } from '../../../../services/api/_shared/qaKnowledge';
 import { createEmptyRow, type QARow } from './types';
 import type { ResolvedUploadTopic } from './types';
 import type { TopicLabels } from '../topicUtils';
@@ -29,7 +29,7 @@ import {
 
 interface DocumentToQaTabProps {
   open: boolean;
-  language: HciotLanguage;
+  language: QaLanguage;
   uploading: boolean;
   resolvedTopic: ResolvedUploadTopic | null;
   topicSelectionIncomplete: boolean;
@@ -49,7 +49,8 @@ interface DocumentToQaTabProps {
   /** When true, pasted text and uploaded docs are saved directly (chunked by
    * the RAG backfill) instead of going through AI Q&A extraction. */
   disableAiQaExtraction?: boolean;
-  availableImages: HciotImage[];
+  availableImages: QaImage[];
+  resolveImageUrl?: (imageId?: string) => string | null;
   onUploadImage: (file: File, imageId?: string) => Promise<UploadedImageResult>;
   onDeleteImage?: DeleteImageHandler;
 }
@@ -63,7 +64,7 @@ function fileExtension(file: File): string | undefined {
   return file.name.split('.').pop()?.toLowerCase();
 }
 
-function toHiddenPreviewRows(pairs: HciotQaPair[]): QARow[] {
+function toHiddenPreviewRows(pairs: QaPair[]): QARow[] {
   // `display` may be absent (AI-extracted pairs) — default to hidden in that
   // case, matching the previous behavior; honor it when the CSV provided one.
   const rows = pairs.map((pair): QARow => ({
@@ -101,9 +102,9 @@ function getHiddenQuestions(rows: QARow[]): string[] {
   return Array.from(new Set(hiddenQuestions));
 }
 
-function toPlainQaPairs(rows: QARow[]): HciotQaPair[] {
+function toPlainQaPairs(rows: QARow[]): QaPair[] {
   return rows.map(({ index, q, a, img, url }) => {
-    const pair: HciotQaPair = { q, a };
+    const pair: QaPair = { q, a };
     if (index) pair.index = index;
     if (img) pair.img = img;
     if (url) pair.url = url;
@@ -152,6 +153,7 @@ export default function DocumentToQaTab({
   api,
   disableAiQaExtraction = false,
   availableImages,
+  resolveImageUrl,
   onUploadImage,
   onDeleteImage,
 }: DocumentToQaTabProps) {
@@ -499,6 +501,7 @@ export default function DocumentToQaTab({
         availableImages={availableImages}
         qaPairs={qaPairs}
         error={error}
+        resolveImageUrl={resolveImageUrl}
         onChange={setQaPairs}
         onReset={handleReset}
         onImport={() => { void handleImport(); }}

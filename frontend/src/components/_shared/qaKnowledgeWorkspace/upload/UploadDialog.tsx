@@ -3,8 +3,8 @@ import { useEscapeKey } from '../../../../hooks/useEscapeKey';
 import { useOverlayPressClose } from '../../../../hooks/useOverlayPressClose';
 import { Image as ImageIcon, Plus, Upload, X } from 'lucide-react';
 
-import type { HciotLanguage } from '../../../../config/hciotTopics';
-import type { HciotImage, HciotTopicCategory } from '../../../../services/api/hciot';
+import type { QaLanguage, QaAdminCategory } from '../../../../config/qaTopics';
+import type { QaImage } from '../../../../services/api/_shared/qaKnowledge';
 import DocumentToQaTab from './DocumentToQaTab';
 import ImageUploadTab from './ImageUploadTab';
 import QaUploadTab from './QaUploadTab';
@@ -30,9 +30,9 @@ const TABS = [
 
 interface UploadDialogProps {
   open: boolean;
-  language: HciotLanguage;
-  categories: HciotTopicCategory[];
-  availableImages: HciotImage[];
+  language: QaLanguage;
+  categories: QaAdminCategory[];
+  availableImages: QaImage[];
   uploading: boolean;
   onClose: () => void;
   onUploadFile: (
@@ -53,6 +53,7 @@ interface UploadDialogProps {
   ) => Promise<{ name: string; uploaded_count: number }>;
   api: QaWorkspaceApiClient;
   disableAiQaExtraction?: boolean;
+  resolveImageUrl?: (imageId?: string) => string | null;
   onUploadImage: (file: File, imageId?: string) => Promise<UploadedImageResult>;
   onDeleteImage?: DeleteImageHandler;
   onUploadImageComplete: (count: number) => Promise<void>;
@@ -70,6 +71,7 @@ export default function UploadDialog({
   onSubmitQA,
   api,
   disableAiQaExtraction,
+  resolveImageUrl,
   onUploadImage,
   onDeleteImage,
   onUploadImageComplete,
@@ -134,6 +136,7 @@ export default function UploadDialog({
             api={api}
             disableAiQaExtraction={disableAiQaExtraction}
             availableImages={availableImages}
+            resolveImageUrl={resolveImageUrl}
             onUploadImage={onUploadImage}
             onDeleteImage={onDeleteImage}
           />
@@ -147,6 +150,7 @@ export default function UploadDialog({
             availableImages={availableImages}
             resolvedTopic={resolvedTopic}
             hasTopicSelection={Boolean(resolvedTopic)}
+            resolveImageUrl={resolveImageUrl}
             onClose={onClose}
             onSubmitQA={onSubmitQA}
             onUploadComplete={onUploadComplete}

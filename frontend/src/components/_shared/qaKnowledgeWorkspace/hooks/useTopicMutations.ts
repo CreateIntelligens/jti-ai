@@ -1,9 +1,6 @@
 import { useMemo, useState } from 'react';
-import type { HciotLanguage } from '../../../../config/hciotTopics';
-import type {
-  HciotKnowledgeFile,
-  HciotTopicCategory,
-} from '../../../../services/api/hciot';
+import type { QaLanguage, QaAdminCategory } from '../../../../config/qaTopics';
+import type { QaKnowledgeFile } from '../../../../services/api/_shared/qaKnowledge';
 import type { QaWorkspaceApiClient } from '../QaKnowledgeWorkspace';
 import {
   NEW_VALUE,
@@ -20,9 +17,9 @@ import {
 
 export interface UseTopicMutationsOptions {
   api: QaWorkspaceApiClient;
-  language: HciotLanguage;
-  files: HciotKnowledgeFile[];
-  categories: HciotTopicCategory[];
+  language: QaLanguage;
+  files: QaKnowledgeFile[];
+  categories: QaAdminCategory[];
   draft: FileMetadataDraft;
   setDraft: React.Dispatch<React.SetStateAction<FileMetadataDraft>>;
   patchDraft: (changes: Partial<FileMetadataDraft>) => void;
@@ -226,7 +223,7 @@ export function useTopicMutations({
       return;
     }
 
-    let orderedCategories: HciotTopicCategory[] | null = null;
+    let orderedCategories: QaAdminCategory[] | null = null;
 
     if (active.kind === 'category') {
       orderedCategories = moveItem(

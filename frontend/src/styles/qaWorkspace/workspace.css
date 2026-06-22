@@ -839,53 +839,53 @@
    AppSelect overrides for hciot theme
    ========================================================================== */
 .qa-workspace-file-select.app-select-trigger,
-.hciot-topic-select.app-select-trigger,
-.hciot-kb-select.app-select-trigger,
-.hciot-voice-select.app-select-trigger {
+.qa-topic-select.app-select-trigger,
+.qa-kb-select.app-select-trigger,
+.qa-voice-select.app-select-trigger {
   background-color: var(--hciot-panel-strong);
   border-color: var(--hciot-border);
   color: var(--hciot-ink);
 }
 
 .qa-workspace-file-select.app-select-trigger:hover:not([data-disabled]),
-.hciot-topic-select.app-select-trigger:hover:not([data-disabled]),
-.hciot-kb-select.app-select-trigger:hover:not([data-disabled]),
-.hciot-voice-select.app-select-trigger:hover:not([data-disabled]) {
+.qa-topic-select.app-select-trigger:hover:not([data-disabled]),
+.qa-kb-select.app-select-trigger:hover:not([data-disabled]),
+.qa-voice-select.app-select-trigger:hover:not([data-disabled]) {
   border-color: var(--hciot-accent);
 }
 
 .qa-workspace-file-select.app-select-trigger[data-state="open"],
-.hciot-topic-select.app-select-trigger[data-state="open"],
-.hciot-kb-select.app-select-trigger[data-state="open"],
-.hciot-voice-select.app-select-trigger[data-state="open"],
+.qa-topic-select.app-select-trigger[data-state="open"],
+.qa-kb-select.app-select-trigger[data-state="open"],
+.qa-voice-select.app-select-trigger[data-state="open"],
 .qa-workspace-file-select.app-select-trigger:focus,
-.hciot-topic-select.app-select-trigger:focus,
-.hciot-kb-select.app-select-trigger:focus,
-.hciot-voice-select.app-select-trigger:focus {
+.qa-topic-select.app-select-trigger:focus,
+.qa-kb-select.app-select-trigger:focus,
+.qa-voice-select.app-select-trigger:focus {
   border-color: var(--hciot-accent);
   box-shadow: 0 0 0 0.125rem color-mix(in srgb, var(--hciot-accent) 20%, transparent);
 }
 
-/* Dropdown portal — scoped to hciot-select-content class */
-.hciot-select-content.app-select-content {
+/* Dropdown portal — scoped to qa-select-content class */
+.qa-select-content.app-select-content {
   background: var(--hciot-panel-strong);
   border-color: var(--hciot-border);
   box-shadow: 0 0.5rem 1.5rem rgba(0, 0, 0, 0.15);
 }
 
-.hciot-select-content .app-select-item {
+.qa-select-content .app-select-item {
   color: var(--hciot-ink);
 }
 
-.hciot-select-content .app-select-item[data-highlighted] {
+.qa-select-content .app-select-item[data-highlighted] {
   background: var(--hciot-hover);
 }
 
-.hciot-select-content .app-select-item[data-state="checked"] {
+.qa-select-content .app-select-item[data-state="checked"] {
   color: var(--hciot-accent);
 }
 
-.hciot-select-content .app-select-item-indicator {
+.qa-select-content .app-select-item-indicator {
   color: var(--hciot-accent);
 }
 
@@ -939,7 +939,7 @@
   margin: 0;
 }
 
-.hciot-rag-flow-diagram {
+.qa-rag-flow-diagram {
   display: flex;
   align-items: center;
   justify-content: center;
@@ -954,7 +954,7 @@
   box-sizing: border-box;
 }
 
-.hciot-rag-flow-step {
+.qa-rag-flow-step {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -962,7 +962,7 @@
   flex: 1;
 }
 
-.hciot-rag-flow-step .step-num {
+.qa-rag-flow-step .step-num {
   display: grid;
   place-items: center;
   width: 1.5rem;
@@ -974,14 +974,14 @@
   font-weight: 700;
 }
 
-.hciot-rag-flow-step .step-text {
+.qa-rag-flow-step .step-text {
   font-size: 0.78rem;
   font-weight: 600;
   color: var(--hciot-ink);
   white-space: nowrap;
 }
 
-.hciot-rag-flow-arrow {
+.qa-rag-flow-arrow {
   color: var(--hciot-ink-soft);
   font-size: 0.9rem;
 }

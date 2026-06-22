@@ -361,7 +361,7 @@ body::before {
 
 /* ==================== HCIOT IMAGE ATTACHMENT ==================== */
 
-.hciot-image-attachment {
+.qa-image-attachment {
   margin-top: 0.85rem;
   overflow: hidden;
   border: 0.0625rem solid var(--hciot-border, var(--border-color));
@@ -370,21 +370,21 @@ body::before {
   box-shadow: var(--hciot-shadow, var(--shadow-sm));
 }
 
-.hciot-image-link {
+.qa-image-link {
   display: block;
   background: linear-gradient(180deg, rgba(2, 132, 199, 0.08), rgba(15, 23, 42, 0.02));
 }
 
-.hciot-image-link:focus-visible {
+.qa-image-link:focus-visible {
   outline: 0.125rem solid var(--hciot-accent, var(--primary-color));
   outline-offset: 0.125rem;
 }
 
-.hciot-image-link:hover .hciot-image-preview {
+.qa-image-link:hover .qa-image-preview {
   transform: scale(1.01);
 }
 
-.hciot-image-preview {
+.qa-image-preview {
   display: block;
   width: 100%;
   max-height: min(22rem, 52vh);
@@ -393,7 +393,7 @@ body::before {
   transition: transform 0.25s ease;
 }
 
-.hciot-image-caption {
+.qa-image-caption {
   padding: 0.7rem 0.85rem;
   border-top: 0.0625rem solid var(--hciot-border, var(--border-color));
   color: var(--hciot-ink-soft, var(--text-secondary));
@@ -409,7 +409,7 @@ body::before {
 /* ──────────────────────────────────────────────────────────────────────────
    自訂 <select> 行為基底 (跨 app/jti/hciot 共用)。
    只負責「移除原生外觀 + 自訂下拉箭頭」這層;顏色/尺寸/border 由各元件的
-   主題 class 自行疊加 (例: .header-app-nav / .input-base / .hciot-kb-select)。
+   主題 class 自行疊加 (例: .header-app-nav / .input-base / .qa-kb-select)。
    箭頭 SVG 用 path fill 版 (Chrome 相容);勿改回 stroke/polyline 版,
    未妥善編碼時 Chrome 會解析失敗使 background-image 變 none。
    ────────────────────────────────────────────────────────────────────────── */

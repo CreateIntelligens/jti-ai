@@ -287,7 +287,7 @@ export default function ChatArea({
             onKeyDown={handleKeyDown}
             placeholder={
               hasStore
-                ? `向「${currentStoreName}」提問...`
+                ? `向「${currentStoreName}」提問... (Enter 傳送 · Shift+Enter 換行)`
                 : '請先選擇知識庫...'
             }
             disabled={disabled}
@@ -300,7 +300,6 @@ export default function ChatArea({
             <Send />
           </button>
         </div>
-        <div className="input-hint">Enter 傳送 · Shift+Enter 換行</div>
       </div>
     </main>
   );

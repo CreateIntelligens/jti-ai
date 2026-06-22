@@ -1,13 +1,13 @@
 import { Download, FileText, Save, Trash2 } from 'lucide-react';
 
-import HciotSelect from '../../../hciot/HciotSelect';
-import type { HciotLanguage } from '../../../../config/hciotTopics';
-import type { HciotKnowledgeFile, HciotTopicCategory } from '../../../../services/api/hciot';
+import QaSelect from '../../QaSelect';
+import type { QaLanguage, QaAdminCategory } from '../../../../config/qaTopics';
+import type { QaKnowledgeFile } from '../../../../services/api/_shared/qaKnowledge';
 import { getFileLabel, NEW_VALUE, type FileMetadataDraft, type TopicOption } from '../topicUtils';
 import { getNoTopicLabel } from '../explorer/explorerTree';
 
 export interface FileDetailPaneState {
-  selectedFile: HciotKnowledgeFile | null;
+  selectedFile: QaKnowledgeFile | null;
   currentPathLabel: string;
   statusMessage: string | null;
   deleting: boolean;
@@ -32,10 +32,10 @@ export interface FileDetailPaneActions {
 }
 
 interface FileDetailPaneProps {
-  language: HciotLanguage;
+  language: QaLanguage;
   state: FileDetailPaneState;
   actions: FileDetailPaneActions;
-  categoryOptions: HciotTopicCategory[];
+  categoryOptions: QaAdminCategory[];
   topicOptions: TopicOption[];
 }
 
@@ -83,18 +83,18 @@ export default function FileDetailPane({
             請從左側檔案樹選擇檔案，或點擊左上方「＋」按鈕新增內容。
           </p>
 
-          <div className="hciot-rag-flow-diagram">
-            <div className="hciot-rag-flow-step">
+          <div className="qa-rag-flow-diagram">
+            <div className="qa-rag-flow-step">
               <span className="step-num">1</span>
               <span className="step-text">選取知識檔案</span>
             </div>
-            <div className="hciot-rag-flow-arrow">➔</div>
-            <div className="hciot-rag-flow-step">
+            <div className="qa-rag-flow-arrow">➔</div>
+            <div className="qa-rag-flow-step">
               <span className="step-num">2</span>
               <span className="step-text">編輯/關聯主題</span>
             </div>
-            <div className="hciot-rag-flow-arrow">➔</div>
-            <div className="hciot-rag-flow-step">
+            <div className="qa-rag-flow-arrow">➔</div>
+            <div className="qa-rag-flow-step">
               <span className="step-num">3</span>
               <span className="step-text">更新 RAG 索引</span>
             </div>
@@ -159,7 +159,7 @@ export default function FileDetailPane({
               科別 / 主題
             </label>
             <div className="qa-workspace-file-metadata-controls">
-              <HciotSelect
+              <QaSelect
                 className="qa-workspace-file-select"
                 value={draft.categoryId}
                 onChange={onCategoryChange}
@@ -172,7 +172,7 @@ export default function FileDetailPane({
 
               <span className="qa-workspace-file-path-separator">/</span>
 
-              <HciotSelect
+              <QaSelect
                 className="qa-workspace-file-select"
                 value={draft.topicId}
                 onChange={onTopicChange}

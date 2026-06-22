@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, Pencil, Trash2, Plus, Check, X, GripVertical } from 'lucide-react';
-import type { HciotTopicCategory } from '../../services/api/hciot';
+import type { HciotTopic, HciotTopicCategory } from '../../services/api/hciot';
 import * as api from '../../services/api';
 import ConfirmDialog from '../ConfirmDialog';
 import {
@@ -16,7 +16,6 @@ interface Props {
   onCategoriesChange: (cats: HciotTopicCategory[]) => void;
 }
 
-type HciotTopic = HciotTopicCategory['topics'][number];
 type DeleteTarget = { type: 'category' | 'topic'; catId: string; topicId?: string };
 
 function toQuestionLines(value: string): string[] {
@@ -229,9 +228,9 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
   };
 
   return (
-    <div className="hciot-te">
-      <div className="hciot-te-header">
-        <h4 className="hciot-te-title">
+    <div className="qa-te">
+      <div className="qa-te-header">
+        <h4 className="qa-te-title">
           科別與題目
         </h4>
       </div>
@@ -241,32 +240,32 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
         const isEditingThis = editingCatId === cat.id;
 
         return (
-          <div key={cat.id} className={`hciot-te-cat${isExpanded ? ' expanded' : ''}`}>
-            <div className="hciot-te-cat-header">
-              <button className="hciot-te-cat-toggle" onClick={() => setExpandedCatId(isExpanded ? null : cat.id)}>
+          <div key={cat.id} className={`qa-te-cat${isExpanded ? ' expanded' : ''}`}>
+            <div className="qa-te-cat-header">
+              <button className="qa-te-cat-toggle" onClick={() => setExpandedCatId(isExpanded ? null : cat.id)}>
                 {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
               </button>
 
               {isEditingThis ? (
-                <div className="hciot-te-inline-edit">
-                  <input className="hciot-kb-input" placeholder={t.catPlaceholder} value={editCatLabel}
+                <div className="qa-te-inline-edit">
+                  <input className="qa-kb-input" placeholder={t.catPlaceholder} value={editCatLabel}
                     onChange={(e) => setEditCatLabel(e.target.value)} autoFocus />
-                  <button className="hciot-te-icon-btn confirm" onClick={() => saveEditCat(cat)} disabled={saving}><Check size={14} /></button>
-                  <button className="hciot-te-icon-btn" onClick={() => setEditingCatId(null)}><X size={14} /></button>
+                  <button className="qa-te-icon-btn confirm" onClick={() => saveEditCat(cat)} disabled={saving}><Check size={14} /></button>
+                  <button className="qa-te-icon-btn" onClick={() => setEditingCatId(null)}><X size={14} /></button>
                 </div>
               ) : (
                 <>
-                  <span className="hciot-te-cat-name" onClick={() => setExpandedCatId(isExpanded ? null : cat.id)}>
+                  <span className="qa-te-cat-name" onClick={() => setExpandedCatId(isExpanded ? null : cat.id)}>
                     {cat.label}
                   </span>
-                  <span className="hciot-te-badge">
+                  <span className="qa-te-badge">
                     {cat.topics.length} {t.topics} · {totalQuestions(cat)} {t.questions}
                   </span>
-                  <div className="hciot-te-cat-actions">
-                    <button className="hciot-te-icon-btn" onClick={() => startEditCat(cat)} title={t.edit}>
+                  <div className="qa-te-cat-actions">
+                    <button className="qa-te-icon-btn" onClick={() => startEditCat(cat)} title={t.edit}>
                       <Pencil size={13} />
                     </button>
-                    <button className="hciot-te-icon-btn danger"
+                    <button className="qa-te-icon-btn danger"
                       onClick={() => setConfirmDelete({ type: 'category', catId: cat.id })}
                       title={t.delete}>
                       <Trash2 size={13} />
@@ -277,7 +276,7 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
             </div>
 
             {isExpanded && (
-              <div className="hciot-te-topics">
+              <div className="qa-te-topics">
                 {cat.topics.map((topic) => {
                   const isEditingTopic = editingTopicId === topic.id;
                   const isEditingQs = editingQuestions === topic.id;
@@ -289,25 +288,25 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
                   const isIndeterminate = visibleCount > 0 && visibleCount < qs.length;
 
                   return (
-                    <div key={topic.id} className="hciot-te-topic">
-                      <div className="hciot-te-topic-header">
-                        <GripVertical size={14} className="hciot-te-grip" />
+                    <div key={topic.id} className="qa-te-topic">
+                      <div className="qa-te-topic-header">
+                        <GripVertical size={14} className="qa-te-grip" />
                         {isEditingTopic ? (
-                          <div className="hciot-te-inline-edit">
-                            <input className="hciot-kb-input" placeholder={t.catPlaceholder} value={editTopicLabel}
+                          <div className="qa-te-inline-edit">
+                            <input className="qa-kb-input" placeholder={t.catPlaceholder} value={editTopicLabel}
                               onChange={(e) => setEditTopicLabel(e.target.value)} autoFocus />
-                            <button className="hciot-te-icon-btn confirm" onClick={() => saveEditTopic(topic.id)} disabled={saving}><Check size={14} /></button>
-                            <button className="hciot-te-icon-btn" onClick={() => setEditingTopicId(null)}><X size={14} /></button>
+                            <button className="qa-te-icon-btn confirm" onClick={() => saveEditTopic(topic.id)} disabled={saving}><Check size={14} /></button>
+                            <button className="qa-te-icon-btn" onClick={() => setEditingTopicId(null)}><X size={14} /></button>
                           </div>
                         ) : (
                           <>
-                            <span className="hciot-te-topic-name">{topic.label}</span>
-                            <span className="hciot-te-badge small">{qs.length} {t.questions}</span>
-                            <div className="hciot-te-cat-actions">
-                              <button className="hciot-te-icon-btn" onClick={() => startEditTopic(topic)} title={t.rename}>
+                            <span className="qa-te-topic-name">{topic.label}</span>
+                            <span className="qa-te-badge small">{qs.length} {t.questions}</span>
+                            <div className="qa-te-cat-actions">
+                              <button className="qa-te-icon-btn" onClick={() => startEditTopic(topic)} title={t.rename}>
                                 <Pencil size={12} />
                               </button>
-                              <button className="hciot-te-icon-btn danger"
+                              <button className="qa-te-icon-btn danger"
                                 onClick={() => setConfirmDelete({ type: 'topic', catId: cat.id, topicId: topic.id })}
                                 title={t.delete}>
                                 <Trash2 size={12} />
@@ -317,18 +316,18 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
                         )}
                       </div>
 
-                      <div className="hciot-te-questions">
+                      <div className="qa-te-questions">
                         {isEditingQs ? (
-                          <div className="hciot-te-qs-edit">
-                            <textarea className="hciot-te-qs-textarea" value={questionsText}
+                          <div className="qa-te-qs-edit">
+                            <textarea className="qa-te-qs-textarea" value={questionsText}
                               onChange={(e) => setQuestionsText(e.target.value)}
                               placeholder={t.qsPlaceholder}
                               rows={Math.max(4, qs.length + 1)} />
-                            <div className="hciot-te-qs-actions">
-                              <button className="hciot-te-btn confirm" onClick={() => saveQuestions(topic.id)} disabled={saving}>
+                            <div className="qa-te-qs-actions">
+                              <button className="qa-te-btn confirm" onClick={() => saveQuestions(topic.id)} disabled={saving}>
                                 {saving ? t.saving : t.save}
                               </button>
-                              <button className="hciot-te-btn" onClick={() => setEditingQuestions(null)}>
+                              <button className="qa-te-btn" onClick={() => setEditingQuestions(null)}>
                                 {t.cancel}
                               </button>
                             </div>
@@ -336,12 +335,12 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
                         ) : (
                           <>
                             {qs.length > 0 ? (
-                              <div className="hciot-te-qs-container">
-                                <div className="hciot-te-qs-header">
-                                  <label className="hciot-te-qs-select-all">
+                              <div className="qa-te-qs-container">
+                                <div className="qa-te-qs-header">
+                                  <label className="qa-te-qs-select-all">
                                     <input
                                       type="checkbox"
-                                      className="hciot-te-checkbox"
+                                      className="qa-te-checkbox"
                                       checked={allVisible}
                                       ref={(el) => {
                                         if (el) el.indeterminate = isIndeterminate;
@@ -349,24 +348,24 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
                                       onChange={(e) => handleHeaderCheckboxChange(topic, e.target.checked)}
                                       disabled={saving}
                                     />
-                                    <span className="hciot-te-qs-select-all-label">{t.selectAll}</span>
+                                    <span className="qa-te-qs-select-all-label">{t.selectAll}</span>
                                   </label>
                                 </div>
-                                <ul className="hciot-te-qs-list custom-scrollbar">
+                                <ul className="qa-te-qs-list custom-scrollbar">
                                   {qs.map((q, i) => {
                                     const isVisible = !hiddenQuestionSet.has(q);
                                     return (
-                                      <li key={i} className="hciot-te-q-item">
-                                        <label className="hciot-te-q-label-wrapper">
+                                      <li key={i} className="qa-te-q-item">
+                                        <label className="qa-te-q-label-wrapper">
                                           <input
                                             type="checkbox"
-                                            className="hciot-te-checkbox"
+                                            className="qa-te-checkbox"
                                             checked={isVisible}
                                             onChange={(e) => handleQuestionCheckboxChange(topic, q, e.target.checked)}
                                             disabled={saving}
                                           />
-                                          <span className="hciot-te-q-index">{i + 1}</span>
-                                          <span className="hciot-te-q-text">{q}</span>
+                                          <span className="qa-te-q-index">{i + 1}</span>
+                                          <span className="qa-te-q-text">{q}</span>
                                         </label>
                                       </li>
                                     );
@@ -374,9 +373,9 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
                                 </ul>
                               </div>
                             ) : (
-                              <p className="hciot-te-empty">{t.noQs}</p>
+                              <p className="qa-te-empty">{t.noQs}</p>
                             )}
-                            <button className="hciot-te-btn edit-qs" onClick={() => startEditQuestions(topic)}>
+                            <button className="qa-te-btn edit-qs" onClick={() => startEditQuestions(topic)}>
                               <Pencil size={12} /> {t.editQs}
                             </button>
                           </>
@@ -387,14 +386,14 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
                 })}
 
                 {addingTopicInCat === cat.id ? (
-                  <div className="hciot-te-add-row">
-                    <input className="hciot-kb-input" placeholder={t.newTopic}
+                  <div className="qa-te-add-row">
+                    <input className="qa-kb-input" placeholder={t.newTopic}
                       value={newTopicLabel} onChange={(e) => setNewTopicLabel(e.target.value)} autoFocus />
-                    <button className="hciot-te-icon-btn confirm" onClick={() => confirmAddTopic(cat)} disabled={saving}><Check size={14} /></button>
-                    <button className="hciot-te-icon-btn" onClick={resetTopicDraft}><X size={14} /></button>
+                    <button className="qa-te-icon-btn confirm" onClick={() => confirmAddTopic(cat)} disabled={saving}><Check size={14} /></button>
+                    <button className="qa-te-icon-btn" onClick={resetTopicDraft}><X size={14} /></button>
                   </div>
                 ) : (
-                  <button className="hciot-te-add-btn" onClick={() => setAddingTopicInCat(cat.id)}>
+                  <button className="qa-te-add-btn" onClick={() => setAddingTopicInCat(cat.id)}>
                     <Plus size={14} /> {t.addTopic}
                   </button>
                 )}
@@ -405,14 +404,14 @@ export default function HciotTopicEditor({ language, categories, onCategoriesCha
       })}
 
       {addingCat ? (
-        <div className="hciot-te-add-row">
-          <input className="hciot-kb-input" placeholder={t.newCat}
+        <div className="qa-te-add-row">
+          <input className="qa-kb-input" placeholder={t.newCat}
             value={newCatLabel} onChange={(e) => setNewCatLabel(e.target.value)} autoFocus />
-          <button className="hciot-te-icon-btn confirm" onClick={confirmAddCat} disabled={saving}><Check size={14} /></button>
-          <button className="hciot-te-icon-btn" onClick={resetCategoryDraft}><X size={14} /></button>
+          <button className="qa-te-icon-btn confirm" onClick={confirmAddCat} disabled={saving}><Check size={14} /></button>
+          <button className="qa-te-icon-btn" onClick={resetCategoryDraft}><X size={14} /></button>
         </div>
       ) : (
-        <button className="hciot-te-add-btn" onClick={() => setAddingCat(true)} >
+        <button className="qa-te-add-btn" onClick={() => setAddingCat(true)} >
           <Plus size={14} /> {t.addCat}
         </button>
       )}

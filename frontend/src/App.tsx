@@ -4,7 +4,6 @@ import { AlertTriangle, LogOut } from 'lucide-react';
 import { logout } from './services/api';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
-import ChatArea from './components/ChatArea';
 import AdminPanel from './components/AdminPanel';
 import ApiKeysPanel from './components/ApiKeysPanel';
 import PromptPanel from './components/PromptPanel';
@@ -15,6 +14,7 @@ import FilePreviewModal from './components/FilePreviewModal';
 import GeneralKnowledgeWorkspace from './components/general/GeneralKnowledgeWorkspace';
 import Jti from './pages/Jti';
 import Hciot from './pages/Hciot';
+import General from './pages/General';
 import Login from './pages/Login';
 import { useAppChat } from './hooks/useAppChat';
 import { useCurrentUserProfile } from './hooks/useCurrentUserProfile';
@@ -167,7 +167,7 @@ export default function App() {
           element={
             canShow('home') ? (
               <AuthGuard allowedRoles={['admin', 'super_admin']} allowGeneralUser canShow={canShow}>
-                <HomeShell />
+                <HomeShell canShow={canShow} />
               </AuthGuard>
             ) : (
               <Navigate to={fallback} replace />
@@ -180,7 +180,7 @@ export default function App() {
   );
 }
 
-function HomeShell() {
+function HomeShell({ canShow }: { canShow: (page: string) => boolean }) {
   const { profile, setProfile } = useCurrentUserProfile();
   const isAdmin = isAdminRole(profile?.role);
 
@@ -238,6 +238,7 @@ function HomeShell() {
           onOpenExtKeysPanel={() => openPanel('extkeys')}
           onShowStatus={showStatus}
           userProfile={profile}
+          canShow={canShow}
           onOpenUsersPanel={() => openPanel('users')}
           onLogout={() => setProfile(null)}
         />
@@ -276,7 +277,8 @@ function HomeShell() {
               />
             </main>
           ) : (
-            <ChatArea
+            <General
+              storeName={currentStore}
               messages={messages}
               onSendMessage={handleSendMessage}
               disabled={!currentStore || initializing}

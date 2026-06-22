@@ -1,9 +1,9 @@
 import { useRef, useState } from 'react';
 import { AlertCircle, Plus } from 'lucide-react';
 
-import type { HciotLanguage } from '../../../../config/hciotTopics';
-import type { HciotImage } from '../../../../services/api/hciot';
-import { getHciotImageUrl } from '../../../../utils/hciotImage';
+import type { QaLanguage } from '../../../../config/qaTopics';
+import type { QaImage } from '../../../../services/api/_shared/qaKnowledge';
+import { getQaImageUrl } from '../../../../utils/qaImage';
 import ExistingImagePicker from '../explorer/ExistingImagePicker';
 import ImageLightbox from '../ImageLightbox';
 import { usePendingImageUrls } from '../imageUpload';
@@ -18,10 +18,11 @@ import {
 const VISIBILITY_HINT = '勾選：顯示為預設問題。取消：仍會進知識庫,但不出現在按鈕列。';
 
 interface DocumentToQaPreviewProps {
-  language: HciotLanguage;
-  availableImages: HciotImage[];
+  language: QaLanguage;
+  availableImages: QaImage[];
   qaPairs: QARow[];
   error: string | null;
+  resolveImageUrl?: (imageId?: string) => string | null;
   onChange: (pairs: QARow[]) => void;
   onReset: () => void;
   onImport: () => void;
@@ -32,6 +33,7 @@ export default function DocumentToQaPreview({
   availableImages,
   qaPairs,
   error,
+  resolveImageUrl = getQaImageUrl,
   onChange,
   onReset,
   onImport,
@@ -105,7 +107,7 @@ export default function DocumentToQaPreview({
         {qaPairs.map((row, index) => {
           const previewUrl = row.pendingImageFile
             ? pendingUrls.get(row.pendingImageFile) || ''
-            : getHciotImageUrl(row.img) || '';
+            : resolveImageUrl(row.img) || '';
 
           return (
             <QaRowItem

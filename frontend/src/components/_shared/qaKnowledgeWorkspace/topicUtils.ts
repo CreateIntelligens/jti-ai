@@ -1,8 +1,5 @@
-import type { HciotLanguage } from '../../../config/hciotTopics';
-import type {
-  HciotKnowledgeFile,
-  HciotTopicCategory,
-} from '../../../services/api/hciot';
+import type { QaLanguage, QaAdminCategory } from '../../../config/qaTopics';
+import type { QaKnowledgeFile } from '../../../services/api/_shared/qaKnowledge';
 import { toErrorMessage } from '../../../utils/errors';
 
 export const NO_TOPIC_KEY = '__no_topic__';
@@ -20,8 +17,8 @@ export interface FileMetadataDraft {
   topicLabel: string;
 }
 
-export type TopicOption = HciotTopicCategory['topics'][number];
-export type CategoryOption = HciotTopicCategory;
+export type TopicOption = QaAdminCategory['topics'][number];
+export type CategoryOption = QaAdminCategory;
 
 export function slugify(text: string): string {
   return text
@@ -67,7 +64,7 @@ export const DEFAULT_TOPIC_LABEL = '預設主題';
 
 export function missingLabelMessage(
   kind: 'category' | 'topic',
-  language: HciotLanguage,
+  language: QaLanguage,
 ): string {
   if (language === 'zh') {
     return kind === 'category' ? '新增科別需要名稱' : '新增主題需要名稱';
@@ -86,20 +83,20 @@ export function createEmptyDraft(): FileMetadataDraft {
   };
 }
 
-export function getFileLabel(file: HciotKnowledgeFile): string {
+export function getFileLabel(file: QaKnowledgeFile): string {
   return (file.display_name || file.name || '').trim() || file.name;
 }
 
 function getCategoryLabel(
-  file: HciotKnowledgeFile,
-  category?: HciotTopicCategory,
+  file: QaKnowledgeFile,
+  category?: QaAdminCategory,
 ): string {
   return category?.label || file.category_label || '';
 }
 
 function getTopicLabel(
-  file: HciotKnowledgeFile,
-  category?: HciotTopicCategory,
+  file: QaKnowledgeFile,
+  category?: QaAdminCategory,
 ): string {
   const topic = category?.topics.find((item) => item.id === file.topic_id);
   return topic?.label || file.topic_label || '';
@@ -115,8 +112,8 @@ export function categoryPrefix(topicId: string | null | undefined): string {
 }
 
 export function draftFromFile(
-  file: HciotKnowledgeFile,
-  categories: HciotTopicCategory[],
+  file: QaKnowledgeFile,
+  categories: QaAdminCategory[],
 ): FileMetadataDraft {
   const categoryId = categoryPrefix(file.topic_id);
   const category = categories.find((item) => item.id === categoryId);
@@ -130,9 +127,9 @@ export function draftFromFile(
 }
 
 export function getMetadataPayload(
-  data: HciotKnowledgeFile | FileMetadataDraft,
+  data: QaKnowledgeFile | FileMetadataDraft,
 ) {
-  // Common logic for both HciotKnowledgeFile and FileMetadataDraft.
+  // Common logic for both QaKnowledgeFile and FileMetadataDraft.
   // Output uses the flattened single-label shape and only emits the label
   // for the file's own language partition.
   const isDraft = 'categoryId' in data;
@@ -148,7 +145,7 @@ export function getMetadataPayload(
       topicId = draft.topicId;
     }
   } else {
-    const file = data as HciotKnowledgeFile;
+    const file = data as QaKnowledgeFile;
     if (file.topic_id) {
       categoryId = categoryPrefix(file.topic_id);
       topicId = file.topic_id;
@@ -197,14 +194,14 @@ function buildGenericOptions<T extends { id: string; label: string }>(
 }
 
 export function buildCategoryOptions(
-  categories: HciotTopicCategory[],
+  categories: QaAdminCategory[],
   draft: FileMetadataDraft,
-): HciotTopicCategory[] {
+): QaAdminCategory[] {
   return buildGenericOptions(categories, draft.categoryId, draft.categoryLabel, { topics: [] });
 }
 
 export function buildTopicOptions(
-  currentCategory: HciotTopicCategory | null,
+  currentCategory: QaAdminCategory | null,
   draft: FileMetadataDraft,
 ): TopicOption[] {
   if (!currentCategory) {

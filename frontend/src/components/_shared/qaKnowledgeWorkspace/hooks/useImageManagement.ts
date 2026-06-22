@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import type { HciotImage } from '../../../../services/api/hciot';
+import type { QaImage } from '../../../../services/api/_shared/qaKnowledge';
 import type { QaWorkspaceApiClient } from '../QaKnowledgeWorkspace';
 import { getErrorMessage } from '../topicUtils';
 
 export interface UseImageManagementOptions {
   api: QaWorkspaceApiClient;
-  selectedImage: HciotImage | null;
+  selectedImage: QaImage | null;
   selectedImageName: string | null;
   setSelectedImageName: (name: string | null) => void;
   unusedImageCount: number;

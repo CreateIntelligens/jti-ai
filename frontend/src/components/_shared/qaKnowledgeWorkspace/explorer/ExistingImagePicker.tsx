@@ -3,19 +3,19 @@ import { useEscapeKey } from '../../../../hooks/useEscapeKey';
 import { useOverlayPressClose } from '../../../../hooks/useOverlayPressClose';
 import { Image as ImageIcon, Search, X } from 'lucide-react';
 
-import type { HciotLanguage } from '../../../../config/hciotTopics';
-import type { HciotImage } from '../../../../services/api/hciot';
+import type { QaLanguage } from '../../../../config/qaTopics';
+import type { QaImage } from '../../../../services/api/_shared/qaKnowledge';
 
 interface ExistingImagePickerProps {
   open: boolean;
-  language: HciotLanguage;
-  images: HciotImage[];
+  language: QaLanguage;
+  images?: QaImage[];
   selectedImageId?: string | null;
   onClose: () => void;
   onSelect: (imageId: string) => void;
 }
 
-function imageReferenceLabel(_language: HciotLanguage, image: HciotImage): string {
+function imageReferenceLabel(_language: QaLanguage, image: QaImage): string {
   const count = image.reference_count ?? 0;
   return count > 0
     ? `被 ${count} 題引用`
@@ -25,7 +25,7 @@ function imageReferenceLabel(_language: HciotLanguage, image: HciotImage): strin
 export default function ExistingImagePicker({
   open,
   language,
-  images,
+  images = [],
   selectedImageId,
   onClose,
   onSelect,
@@ -65,7 +65,7 @@ export default function ExistingImagePicker({
     return null;
   }
 
-  const renderSection = (title: string, sectionImages: HciotImage[]) => {
+  const renderSection = (title: string, sectionImages: QaImage[]) => {
     if (!sectionImages.length) {
       return null;
     }

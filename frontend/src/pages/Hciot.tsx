@@ -30,18 +30,18 @@ import type { TtsState } from '../types';
 import '../styles/shared/index.css';
 import '../styles/shared/animations.css';
 import '../styles/shared/settings.css';
-import '../styles/hciot/layout.css';
-import '../styles/hciot/components.css';
+import '../styles/qaWorkspace/layout.css';
+import '../styles/qaWorkspace/components.css';
 import '../styles/hciot/components-chat.css';
-import '../styles/hciot/components-topic.css';
-import '../styles/hciot/workspace.css';
-import '../styles/hciot/workspace-upload.css';
-import '../styles/hciot/workspace-upload-images.css';
-import '../styles/hciot/workspace-upload-enhancements.css';
-import '../styles/hciot/workspace-upload-preview.css';
-import '../styles/hciot/workspace-upload-edit.css';
-import '../styles/hciot/workspace-table.css';
-import '../styles/hciot/workspace-images.css';
+import '../styles/qaWorkspace/components-topic.css';
+import '../styles/qaWorkspace/workspace.css';
+import '../styles/qaWorkspace/workspace-upload.css';
+import '../styles/qaWorkspace/workspace-upload-images.css';
+import '../styles/qaWorkspace/workspace-upload-enhancements.css';
+import '../styles/qaWorkspace/workspace-upload-preview.css';
+import '../styles/qaWorkspace/workspace-upload-edit.css';
+import '../styles/qaWorkspace/workspace-table.css';
+import '../styles/qaWorkspace/workspace-images.css';
 
 const TTS_MAX_ATTEMPTS = 16;
 const TTS_POLL_INTERVAL_MS = 3000;
@@ -859,15 +859,15 @@ export default function Hciot() {
   const topicDisabledMessage = getTopicDisabledMessage(storeMissing, topicsError);
 
   return (
-    <div className="hciot-shell">
-      <div className="hciot-backdrop"></div>
+    <div className="qa-shell">
+      <div className="qa-backdrop"></div>
 
-      <header className="hciot-header">
-        <div className="hciot-brand">
+      <header className="qa-header">
+        <div className="qa-brand">
           {workspace === 'chat' && (
             <button
               type="button"
-              className="hciot-sidebar-toggle hciot-icon-button"
+              className="qa-sidebar-toggle qa-icon-button"
               onClick={() => setIsSidebarOpen((prev) => !prev)}
               title="科別主題"
               aria-label="科別主題"
@@ -876,18 +876,18 @@ export default function Hciot() {
               <Menu size={20} />
             </button>
           )}
-          <div className="hciot-brand-mark"><HeartPulse size={24} /></div>
+          <div className="qa-brand-mark"><HeartPulse size={24} /></div>
           <div>
-            <p className="hciot-brand-kicker">{HCIOT_UI_TEXT.brandKicker}</p>
-            <h1 className="hciot-brand-title">{HCIOT_UI_TEXT.appTitle}</h1>
+            <p className="qa-brand-kicker">{HCIOT_UI_TEXT.brandKicker}</p>
+            <h1 className="qa-brand-title">{HCIOT_UI_TEXT.appTitle}</h1>
           </div>
         </div>
 
-        <div className="hciot-header-actions">
-          <div className="hciot-view-toggle" role="tablist" aria-label="工作區切換">
+        <div className="qa-header-actions">
+          <div className="qa-view-toggle" role="tablist" aria-label="工作區切換">
             <button
               type="button"
-              className={`hciot-view-button${workspace === 'chat' ? ' is-active' : ''}`}
+              className={`qa-view-button${workspace === 'chat' ? ' is-active' : ''}`}
               onClick={() => switchWorkspace('chat')}
             >
               <HeartPulse size={16} />
@@ -895,17 +895,17 @@ export default function Hciot() {
             </button>
             <button
               type="button"
-              className={`hciot-view-button${workspace === 'files' ? ' is-active' : ''}`}
+              className={`qa-view-button${workspace === 'files' ? ' is-active' : ''}`}
               onClick={() => switchWorkspace('files')}
             >
               <FileText size={16} />
               <span>檔案管理</span>
             </button>
           </div>
-          <div className="hciot-tools-menu" ref={toolsMenuRef}>
+          <div className="qa-tools-menu" ref={toolsMenuRef}>
             <button
               type="button"
-              className={`hciot-tools-trigger hciot-icon-button text${showToolsMenu ? ' is-open' : ''}`}
+              className={`qa-tools-trigger qa-icon-button text${showToolsMenu ? ' is-open' : ''}`}
               onClick={() => setShowToolsMenu((prev) => !prev)}
               title="管理"
               aria-label="管理"
@@ -914,12 +914,12 @@ export default function Hciot() {
             >
               <Menu size={16} />
               <span>管理</span>
-              <ChevronDown size={14} className="hciot-tools-trigger-chevron" />
+              <ChevronDown size={14} className="qa-tools-trigger-chevron" />
             </button>
             {showToolsMenu && (
-              <div className="hciot-tools-popover" role="dialog" aria-label="HCIoT 管理選單">
+              <div className="qa-tools-popover" role="dialog" aria-label="HCIoT 管理選單">
                 <a
-                  className="hciot-tools-item"
+                  className="qa-tools-item"
                   href={HCIOT_MANUAL_URL}
                   target="_blank"
                   rel="noopener noreferrer"
@@ -927,11 +927,11 @@ export default function Hciot() {
                 >
                   <BookOpen size={16} />
                   <span>{HCIOT_MANUAL_LABEL}</span>
-                  <ExternalLink size={13} className="hciot-tools-item-external" />
+                  <ExternalLink size={13} className="qa-tools-item-external" />
                 </a>
                 {HCIOT_EXTERNAL_LINK_URL && (
                   <a
-                    className="hciot-tools-item"
+                    className="qa-tools-item"
                     href={HCIOT_EXTERNAL_LINK_URL}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -939,22 +939,22 @@ export default function Hciot() {
                   >
                     <Volume2 size={16} />
                     <span>{HCIOT_EXTERNAL_LINK_LABEL}</span>
-                    <ExternalLink size={13} className="hciot-tools-item-external" />
+                    <ExternalLink size={13} className="qa-tools-item-external" />
                   </a>
                 )}
                 {ttsCharacters.length > 0 && (
-                  <div className="hciot-tools-voice-panel">
-                    <span className="hciot-tools-section-label">聲音</span>
-                    <div className="hciot-tools-voice-row">
+                  <div className="qa-tools-voice-panel">
+                    <span className="qa-tools-section-label">聲音</span>
+                    <div className="qa-tools-voice-row">
                       <HciotSelect
-                        className="hciot-voice-select"
+                        className="qa-voice-select"
                         value={selectedTtsCharacter}
                         onChange={setSelectedTtsCharacter}
                         options={ttsCharacters.map((character) => ({ value: character, label: character }))}
                       />
                       <button
                         type="button"
-                        className={`hciot-voice-preview-btn hciot-icon-button${previewingVoice ? ' is-playing' : ''}`}
+                        className={`qa-voice-preview-btn qa-icon-button${previewingVoice ? ' is-playing' : ''}`}
                         onClick={playVoicePreview}
                         title="試聽選定聲音"
                         aria-label="試聽選定聲音"
@@ -967,28 +967,28 @@ export default function Hciot() {
               </div>
             )}
           </div>
-          <span className="hciot-header-divider" aria-hidden="true" />
-          <button className="hciot-icon-button" onClick={() => setShowSettingsModal(true)} title={HCIOT_UI_TEXT.settingsTitle}>
+          <span className="qa-header-divider" aria-hidden="true" />
+          <button className="qa-icon-button" onClick={() => setShowSettingsModal(true)} title={HCIOT_UI_TEXT.settingsTitle}>
             <Settings size={18} />
           </button>
-          <button className="hciot-icon-button" onClick={() => void restartConversation()} title={HCIOT_UI_TEXT.restartTitle}>
+          <button className="qa-icon-button" onClick={() => void restartConversation()} title={HCIOT_UI_TEXT.restartTitle}>
             <RotateCcw size={18} />
           </button>
-          <button className="hciot-icon-button" onClick={() => setShowHistoryModal(true)} title={HCIOT_UI_TEXT.historyTitle}>
+          <button className="qa-icon-button" onClick={() => setShowHistoryModal(true)} title={HCIOT_UI_TEXT.historyTitle}>
             <History size={18} />
           </button>
-          <button className="hciot-icon-button text" onClick={() => void toggleLanguage()} title={HCIOT_UI_TEXT.languageTitle}>
+          <button className="qa-icon-button text" onClick={() => void toggleLanguage()} title={HCIOT_UI_TEXT.languageTitle}>
             {currentLanguage === 'zh' ? '英文' : '中文'}
           </button>
-          <button className="hciot-icon-button" onClick={toggleTheme} title={HCIOT_UI_TEXT.themeTitle}>
+          <button className="qa-icon-button" onClick={toggleTheme} title={HCIOT_UI_TEXT.themeTitle}>
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </button>
           {isSuperAdmin(profile?.role) && (
-            <DbSyncButton app="hciot" className="hciot-icon-button" />
+            <DbSyncButton app="hciot" className="qa-icon-button" />
           )}
           {isAdminRole(profile?.role) && (
             <button
-              className="hciot-icon-button"
+              className="qa-icon-button"
               onClick={() => navigate('/')}
               title="返回後台"
             >
@@ -997,11 +997,11 @@ export default function Hciot() {
           )}
           {profile && (
             <>
-              <span className="hciot-profile-indicator">
+              <span className="qa-profile-indicator">
                 {profile.username} ({profile.role})
               </span>
               <button
-                className="hciot-icon-button"
+                className="qa-icon-button"
                 onClick={() => void handleLogoutClick()}
                 title="登出"
               >
@@ -1012,14 +1012,14 @@ export default function Hciot() {
         </div>
       </header>
 
-      <main className="hciot-main">
-        <section className={`hciot-chat-workspace${workspace === 'chat' ? ' is-active' : ''}`}>
+      <main className="qa-main">
+        <section className={`qa-chat-workspace${workspace === 'chat' ? ' is-active' : ''}`}>
           <div
-            className={`hciot-sidebar-overlay${isSidebarOpen ? ' is-visible' : ''}`}
+            className={`qa-sidebar-overlay${isSidebarOpen ? ' is-visible' : ''}`}
             onClick={() => setIsSidebarOpen(false)}
           />
-          <aside className={`hciot-sidebar custom-scrollbar${isSidebarOpen ? ' is-open' : ''}`}>
-            <div className="hciot-topic-inline-panel">
+          <aside className={`qa-sidebar custom-scrollbar${isSidebarOpen ? ' is-open' : ''}`}>
+            <div className="qa-topic-inline-panel">
               <HciotTopicGrid
                 topics={visibleTopics}
                 categories={categories}
@@ -1041,7 +1041,7 @@ export default function Hciot() {
             </div>
           </aside>
 
-          <div className="hciot-chat-container">
+          <div className="qa-chat-container">
             <HciotMessageList
               messages={messages}
               loading={loading}

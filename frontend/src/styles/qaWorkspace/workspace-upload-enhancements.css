@@ -9,7 +9,7 @@
   flex-shrink: 0;
 }
 
-.hciot-status-uploading {
+.qa-status-uploading {
   animation: spin 1s linear infinite;
   will-change: transform;
 }
@@ -19,27 +19,27 @@
 }
 
 /* Icons & Layout Utilities */
-.hciot-icon-blue {
+.qa-icon-blue {
   color: #3b82f6;
 }
 
-.hciot-icon-red {
+.qa-icon-red {
   color: #ef4444;
 }
 
-.hciot-icon-dark-blue {
+.qa-icon-dark-blue {
   color: #1d4ed8;
 }
 
-.hciot-icon-green {
+.qa-icon-green {
   color: #22c55e;
 }
 
-.hciot-icon-muted {
+.qa-icon-muted {
   color: #6b7280;
 }
 
-.hciot-icon-warning {
+.qa-icon-warning {
   color: #f59e0b;
 }
 

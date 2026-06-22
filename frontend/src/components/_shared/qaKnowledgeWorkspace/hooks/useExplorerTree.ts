@@ -1,10 +1,9 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import type { HciotLanguage } from '../../../../config/hciotTopics';
+import type { QaLanguage, QaAdminCategory } from '../../../../config/qaTopics';
 import type {
-  HciotImage,
-  HciotKnowledgeFile,
-  HciotTopicCategory,
-} from '../../../../services/api/hciot';
+  QaImage,
+  QaKnowledgeFile,
+} from '../../../../services/api/_shared/qaKnowledge';
 import {
   buildExplorerTree,
   filterExplorerNodes,
@@ -14,10 +13,10 @@ import {
 } from '../explorer/explorerTree';
 
 export interface UseExplorerTreeOptions {
-  files: HciotKnowledgeFile[];
-  categories: HciotTopicCategory[];
-  language: HciotLanguage;
-  images: HciotImage[];
+  files: QaKnowledgeFile[];
+  categories: QaAdminCategory[];
+  language: QaLanguage;
+  images: QaImage[];
 }
 
 export function useExplorerTree({

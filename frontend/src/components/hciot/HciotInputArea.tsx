@@ -22,11 +22,11 @@ export default function HciotInputArea({
   inputRef,
 }: HciotInputAreaProps) {
   return (
-    <form onSubmit={handleSubmit} className="hciot-input-form">
-      <div className="hciot-input-frame">
+    <form onSubmit={handleSubmit} className="qa-input-form">
+      <div className="qa-input-frame">
         <textarea
           ref={inputRef}
-          className="hciot-chat-input"
+          className="qa-chat-input"
           value={userInput}
           onChange={(e) => setUserInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -35,19 +35,19 @@ export default function HciotInputArea({
           autoComplete="off"
           spellCheck={false}
         />
-        <div className="hciot-input-footer">
-          <div className="hciot-inline-status">
-            <span className="hciot-status-dot"></span>
+        <div className="qa-input-footer">
+          <div className="qa-inline-status">
+            <span className="qa-status-dot"></span>
             <span>{statusText}</span>
-            {sessionInfo ? <span className="hciot-session-chip">{sessionInfo}</span> : null}
+            {sessionInfo ? <span className="qa-session-chip">{sessionInfo}</span> : null}
           </div>
           <button
             type="submit"
-            className="hciot-send-button"
+            className="qa-send-button"
             disabled={!sessionId || !userInput.trim()}
             aria-label="Send message"
           >
-            <svg className="hciot-send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25">
+            <svg className="qa-send-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25">
               <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
             </svg>
           </button>

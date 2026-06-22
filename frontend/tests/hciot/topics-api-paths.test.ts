@@ -48,6 +48,8 @@ describe('HCIoT topic API paths', () => {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ hidden: true }),
+      // Admin requests go through fetchAsAdmin, which sends the session cookie.
+      credentials: 'include',
     });
   });
 });

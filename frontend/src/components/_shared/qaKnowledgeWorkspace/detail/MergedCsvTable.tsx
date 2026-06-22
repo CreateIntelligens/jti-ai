@@ -16,16 +16,16 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import type { HciotImage, HciotMergedCsvRow } from '../../../../services/api/hciot';
-import type { HciotLanguage } from '../../../../config/hciotTopics';
-import { getHciotImageUrl, normalizeImageId } from '../../../../utils/hciotImage';
+import type { QaImage, QaMergedCsvRow } from '../../../../services/api/_shared/qaKnowledge';
+import type { QaLanguage } from '../../../../config/qaTopics';
+import { getQaImageUrl, normalizeImageId } from '../../../../utils/qaImage';
 import ExistingImagePicker from '../explorer/ExistingImagePicker';
 import { usePendingImageUrls } from '../imageUpload';
 import type { FileStatus } from '../upload/types';
 import ImageLightbox from '../ImageLightbox';
 import ZoomableThumbnail from '../ZoomableThumbnail';
 
-export interface EditableMergedCsvRow extends HciotMergedCsvRow {
+export interface EditableMergedCsvRow extends QaMergedCsvRow {
   pendingImageFile?: File | null;
   pendingImageName?: string;
   imgStatus?: FileStatus;
@@ -51,10 +51,11 @@ function applyExistingRowImage(imageId: string): Partial<EditableMergedCsvRow> {
 }
 
 interface MergedCsvTableProps {
-  language: HciotLanguage;
+  language: QaLanguage;
   rows: EditableMergedCsvRow[];
   sourceFiles: string[];
-  availableImages: HciotImage[];
+  availableImages: QaImage[];
+  resolveImageUrl?: (imageId?: string) => string | null;
   loading: boolean;
   error: string | null;
   isEditing: boolean;
@@ -138,6 +139,7 @@ export default function MergedCsvTable({
   rows,
   sourceFiles,
   availableImages,
+  resolveImageUrl = getQaImageUrl,
   loading,
   error,
   isEditing,
@@ -283,7 +285,7 @@ export default function MergedCsvTable({
                   const hasImage = Boolean(row.img || hasPendingImage);
                   const imageUrl = hasPendingImage
                     ? (row.pendingImageFile ? pendingUrls.get(row.pendingImageFile) || '' : '')
-                    : getHciotImageUrl(row.img);
+                    : resolveImageUrl(row.img);
                   const imageLabel = row.pendingImageName || normalizeImageId(row.img) || row.img;
                   const questionText = getQuestionText(row);
                   const hasQuestionText = questionText.length > 0;

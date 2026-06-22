@@ -1,10 +1,10 @@
 import { Trash2, Image as ImageIcon } from 'lucide-react';
-import type { HciotLanguage } from '../../../../config/hciotTopics';
-import type { HciotImage } from '../../../../services/api/hciot';
+import type { QaLanguage } from '../../../../config/qaTopics';
+import type { QaImage } from '../../../../services/api/_shared/qaKnowledge';
 
 interface ImageDetailPaneProps {
-  language: HciotLanguage;
-  selectedImage: HciotImage | null;
+  language: QaLanguage;
+  selectedImage: QaImage | null;
   deleting: boolean;
   cleaningUnused: boolean;
   unusedImageCount: number;

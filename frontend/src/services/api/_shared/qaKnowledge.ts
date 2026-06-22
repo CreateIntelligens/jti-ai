@@ -20,6 +20,16 @@ type KnowledgeUploadResponse = QaKnowledgeFile & {
 export type QaKnowledgeFile = KnowledgeFile;
 export type QaKnowledgeFileContent = KnowledgeFileContent;
 
+// Neutral image record shared by all QA-format sub-apps (hciot, general, esg…).
+// hciot keeps a `HciotImage` alias of this in services/api/hciot.ts.
+export interface QaImage {
+  image_id: string;
+  size_bytes: number;
+  url: string;
+  reference_count?: number;
+  is_referenced?: boolean;
+}
+
 export interface QaKnowledgeUploadWithTopicOptions {
   language: string;
   file: File;

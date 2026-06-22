@@ -42,7 +42,7 @@
   background: rgba(0, 0, 0, 0.04);
 }
 
-.hciot-shell {
+.qa-shell {
   --s-accent: var(--hciot-accent, #0284c7);
   --s-accent-rgb: 2, 132, 199;
   --s-modal-bg: var(--hciot-panel-strong, #1e293b);

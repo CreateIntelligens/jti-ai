@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Image as ImageIcon, X } from 'lucide-react';
 
-import type { HciotLanguage } from '../../../../config/hciotTopics';
+import type { QaLanguage } from '../../../../config/qaTopics';
 import { usePendingImageUrls, type UploadedImageResult } from '../imageUpload';
 import UploadStatusIcon from './UploadStatusIcon';
 import UploadTabBody from './UploadTabBody';
@@ -9,7 +9,7 @@ import type { ImageItem } from './types';
 
 interface ImageUploadTabProps {
   open: boolean;
-  language: HciotLanguage;
+  language: QaLanguage;
   onClose: () => void;
   onUploadImage: (file: File, imageId?: string) => Promise<UploadedImageResult>;
   onUploadImageComplete: (count: number) => Promise<void>;
@@ -126,7 +126,7 @@ export default function ImageUploadTab({
             {previewUrl ? (
               <img src={previewUrl} alt={item.imageId.trim() || item.file.name} className="qa-workspace-upload-image-thumb" />
             ) : (
-              <ImageIcon size={16} className="hciot-icon-green" />
+              <ImageIcon size={16} className="qa-icon-green" />
             )}
             <div className="qa-workspace-upload-image-info">
               <span className="qa-workspace-upload-file-name">{item.file.name}</span>

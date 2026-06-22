@@ -176,14 +176,14 @@ export default function HciotKnowledgeTab({
       )}
 
       {/* Topic association fields */}
-      <div className="hciot-kb-topic-section">
-        <p className="hciot-kb-topic-hint">{t.hint}</p>
+      <div className="qa-kb-topic-section">
+        <p className="qa-kb-topic-hint">{t.hint}</p>
 
-        <div className="hciot-kb-selectors">
-          <div className="hciot-kb-field">
-            <label className="hciot-kb-label">{t.category}</label>
+        <div className="qa-kb-selectors">
+          <div className="qa-kb-field">
+            <label className="qa-kb-label">{t.category}</label>
             <HciotSelect
-              className="hciot-kb-select"
+              className="qa-kb-select"
               value={selectedCategoryId}
               onChange={setSelectedCategoryId}
               options={[
@@ -195,10 +195,10 @@ export default function HciotKnowledgeTab({
           </div>
 
           {(effectiveCategoryId || isNewCategory) && (
-            <div className="hciot-kb-field">
-              <label className="hciot-kb-label">{t.topic}</label>
+            <div className="qa-kb-field">
+              <label className="qa-kb-label">{t.topic}</label>
               <HciotSelect
-                className="hciot-kb-select"
+                className="qa-kb-select"
                 value={selectedTopicId}
                 onChange={setSelectedTopicId}
                 disabled={isNewCategory && !effectiveCategoryId}
@@ -213,14 +213,14 @@ export default function HciotKnowledgeTab({
         </div>
 
         {isNewCategory && (
-          <div className="hciot-kb-new-fields">
-            <input className="hciot-kb-input" placeholder={t.catName} value={newCategoryLabel} onChange={(e) => setNewCategoryLabel(e.target.value)} />
+          <div className="qa-kb-new-fields">
+            <input className="qa-kb-input" placeholder={t.catName} value={newCategoryLabel} onChange={(e) => setNewCategoryLabel(e.target.value)} />
           </div>
         )}
 
         {isNewTopic && effectiveCategoryId && (
-          <div className="hciot-kb-new-fields">
-            <input className="hciot-kb-input" placeholder={t.topicName} value={newTopicLabel} onChange={(e) => setNewTopicLabel(e.target.value)} />
+          <div className="qa-kb-new-fields">
+            <input className="qa-kb-input" placeholder={t.topicName} value={newTopicLabel} onChange={(e) => setNewTopicLabel(e.target.value)} />
           </div>
         )}
       </div>

@@ -13,23 +13,23 @@ export default function HciotImageAttachment({ imageId, alt }: HciotImageAttachm
   }
 
   return (
-    <figure className="hciot-image-attachment">
+    <figure className="qa-image-attachment">
       <a
-        className="hciot-image-link"
+        className="qa-image-link"
         href={imageUrl}
         target="_blank"
         rel="noreferrer"
         title={`Open image ${imageId}`}
       >
         <img
-          className="hciot-image-preview"
+          className="qa-image-preview"
           src={imageUrl}
           alt={alt || `HCIoT reference image ${imageId}`}
           loading="lazy"
           decoding="async"
         />
       </a>
-      <figcaption className="hciot-image-caption">Image ID: {imageId}</figcaption>
+      <figcaption className="qa-image-caption">Image ID: {imageId}</figcaption>
     </figure>
   );
 }

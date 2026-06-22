@@ -1,16 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 
-import type { HciotLanguage } from '../../../config/hciotTopics';
+import type { QaLanguage, QaAdminCategory } from '../../../config/qaTopics';
 import type {
-  HciotImage,
-  HciotKnowledgeFile,
-  HciotMergedCsvRow,
-  HciotQaPair,
-  HciotTopicCategory,
+  QaImage,
+  QaKnowledgeFile,
+  QaMergedCsvRow,
+  QaPair,
   QaExtractJobResponse,
   QaImportResponse,
   SaveTopicCsvMergedPayload,
-} from '../../../services/api/hciot';
+} from '../../../services/api/_shared/qaKnowledge';
 import ExplorerSidebar from './explorer/ExplorerSidebar';
 import VisibilityOrderModal from './explorer/VisibilityOrderModal';
 import FileDetailPane from './detail/FileDetailPane';
@@ -22,6 +21,7 @@ import {
   type TopicLabels,
 } from './topicUtils';
 import { useEscapeKey } from '../../../hooks/useEscapeKey';
+import { getQaImageUrl } from '../../../utils/qaImage';
 import { getCurrentPathLabel } from './explorer/explorerTree';
 
 // Custom Hooks
@@ -55,57 +55,57 @@ type KnowledgeMetadataPayload = {
 };
 
 type MergedCsvResponse = {
-  rows: HciotMergedCsvRow[];
+  rows: QaMergedCsvRow[];
   source_files: string[];
 };
 
 export interface QaWorkspaceApiClient {
-  listKnowledgeFiles(language: HciotLanguage): Promise<{ files: HciotKnowledgeFile[] }>;
-  listTopicsAdmin(language: HciotLanguage): Promise<{ categories: HciotTopicCategory[] }>;
-  listImages(): Promise<{ images: HciotImage[] }>;
+  listKnowledgeFiles(language: QaLanguage): Promise<{ files: QaKnowledgeFile[] }>;
+  listTopicsAdmin(language: QaLanguage): Promise<{ categories: QaAdminCategory[] }>;
+  listImages(): Promise<{ images: QaImage[] }>;
   getReindexStatus(sourceType: QaWorkspaceSourceType): Promise<{ reindexing: boolean }>;
   reindex(sourceType: QaWorkspaceSourceType): Promise<unknown>;
-  getKnowledgeFileContent(filename: string, language: HciotLanguage): Promise<KnowledgeFileContentResponse>;
+  getKnowledgeFileContent(filename: string, language: QaLanguage): Promise<KnowledgeFileContentResponse>;
   uploadKnowledgeFileWithTopic(opts: {
-    language: HciotLanguage;
+    language: QaLanguage;
     file: File;
     categoryId?: string;
     topicId?: string;
     categoryLabel?: string;
     topicLabel?: string;
     hiddenQuestions?: string[];
-  }): Promise<HciotKnowledgeFile & { uploaded_count?: number }>;
-  deleteKnowledgeFile(filename: string, language: HciotLanguage): Promise<void>;
-  updateTopic(topicId: string, data: TopicUpdatePayload, language: HciotLanguage): Promise<Record<string, unknown>>;
-  reorderTopics(topicIds: string[], language: HciotLanguage): Promise<{ updated: number }>;
-  setCategoryHidden(categoryId: string, hidden: boolean, language: HciotLanguage): Promise<Record<string, unknown>>;
-  uploadImage(file: File, imageId?: string): Promise<HciotImage>;
+  }): Promise<QaKnowledgeFile & { uploaded_count?: number }>;
+  deleteKnowledgeFile(filename: string, language: QaLanguage): Promise<void>;
+  updateTopic(topicId: string, data: TopicUpdatePayload, language: QaLanguage): Promise<Record<string, unknown>>;
+  reorderTopics(topicIds: string[], language: QaLanguage): Promise<{ updated: number }>;
+  setCategoryHidden(categoryId: string, hidden: boolean, language: QaLanguage): Promise<Record<string, unknown>>;
+  uploadImage(file: File, imageId?: string): Promise<QaImage>;
   deleteImage(imageId: string): Promise<void>;
   deleteUnusedImages(): Promise<{ deleted_count: number; deleted_image_ids: string[] }>;
-  createTopic(topicId: string, label: string, categoryLabel: string, questions: string[] | undefined, language: HciotLanguage): Promise<Record<string, unknown>>;
-  updateKnowledgeFileMetadata(filename: string, metadata: KnowledgeMetadataPayload, language: HciotLanguage): Promise<HciotKnowledgeFile & { topic_synced: boolean }>;
-  updateKnowledgeFileContent(filename: string, content: string, language: HciotLanguage): Promise<{ message: string; synced: boolean; topic_synced: boolean }>;
-  downloadKnowledgeFile(filename: string, language: HciotLanguage): void;
-  getTopicMergedCsv(topicId: string, language: HciotLanguage): Promise<MergedCsvResponse>;
+  createTopic(topicId: string, label: string, categoryLabel: string, questions: string[] | undefined, language: QaLanguage): Promise<Record<string, unknown>>;
+  updateKnowledgeFileMetadata(filename: string, metadata: KnowledgeMetadataPayload, language: QaLanguage): Promise<QaKnowledgeFile & { topic_synced: boolean }>;
+  updateKnowledgeFileContent(filename: string, content: string, language: QaLanguage): Promise<{ message: string; synced: boolean; topic_synced: boolean }>;
+  downloadKnowledgeFile(filename: string, language: QaLanguage): void;
+  getTopicMergedCsv(topicId: string, language: QaLanguage): Promise<MergedCsvResponse>;
   saveTopicMergedCsv(
     topicId: string,
     payload: SaveTopicCsvMergedPayload,
-    language: HciotLanguage,
+    language: QaLanguage,
   ): Promise<{ message: string; topic_synced: boolean }>;
   createQaExtractJob(
-    language: HciotLanguage,
+    language: QaLanguage,
     source: { file: File } | { text: string },
     categoryId: string,
     topicId: string,
     categoryLabel: string,
     topicLabel: string,
   ): Promise<{ job_id: string; status: string }>;
-  parseQaCsvText(text: string): Promise<{ parsed: boolean; qa_pairs: HciotQaPair[] }>;
+  parseQaCsvText(text: string): Promise<{ parsed: boolean; qa_pairs: QaPair[] }>;
   getQaExtractJob(jobId: string): Promise<QaExtractJobResponse>;
   importQaExtractJob(
     jobId: string,
-    language: HciotLanguage,
-    qaPairs: HciotQaPair[],
+    language: QaLanguage,
+    qaPairs: QaPair[],
     hiddenQuestions?: string[],
   ): Promise<QaImportResponse>;
 }
@@ -113,20 +113,24 @@ export interface QaWorkspaceApiClient {
 export interface QaWorkspaceConfig {
   sourceType: QaWorkspaceSourceType;
   api: QaWorkspaceApiClient;
-  text?: (language: HciotLanguage, zh: string, en: string) => string;
+  text?: (language: QaLanguage, zh: string, en: string) => string;
   /** When true, pasted text and uploaded docs are saved directly (and chunked
    * by the RAG backfill) instead of going through AI Q&A extraction. */
   disableAiQaExtraction?: boolean;
+  /** Resolve an image id to its display URL. Each host app owns its own image
+   * URL scheme (hciot uses /api/hciot/images/, general uses per-store paths), so
+   * the host supplies this. Defaults to the hciot scheme when omitted. */
+  resolveImageUrl?: (imageId?: string) => string | null;
 }
 
 interface QaKnowledgeWorkspaceProps {
   active: boolean;
-  language: HciotLanguage;
+  language: QaLanguage;
   onTopicsChanged?: () => Promise<void> | void;
   config: QaWorkspaceConfig;
 }
 
-function getLocalizedText(_language: HciotLanguage, zh: string, _en: string): string {
+function getLocalizedText(_language: QaLanguage, zh: string, _en: string): string {
   return zh;
 }
 
@@ -143,6 +147,7 @@ export default function QaKnowledgeWorkspace({
 
   const api = config.api;
   const text = (zh: string, en: string) => (config.text || getLocalizedText)(language, zh, en);
+  const resolveImageUrl = config.resolveImageUrl || getQaImageUrl;
 
   // 1. Workspace Data Hook
   const workspaceData = useWorkspaceData({
@@ -312,7 +317,7 @@ export default function QaKnowledgeWorkspace({
   };
 
   const handleSaveManagement = async (
-    nextCategories: HciotTopicCategory[],
+    nextCategories: QaAdminCategory[],
     changes: {
       categoryHidden: Array<{ categoryId: string; hidden: boolean }>;
       topicHidden: Array<{ topicId: string; hidden: boolean }>;
@@ -396,6 +401,7 @@ export default function QaKnowledgeWorkspace({
         onSubmitQA={handleQASubmit}
         api={api}
         disableAiQaExtraction={config.disableAiQaExtraction}
+        resolveImageUrl={resolveImageUrl}
         onUploadImage={api.uploadImage}
         onDeleteImage={api.deleteImage}
         onUploadImageComplete={imageManagement.handleUploadImageComplete}
@@ -420,6 +426,7 @@ export default function QaKnowledgeWorkspace({
           statusMessage={workspaceData.statusMessage}
           hiddenQuestions={workspaceData.selectedMergedTopic?.hidden_questions}
           refreshKey={workspaceData.topicRefreshKey}
+          resolveImageUrl={resolveImageUrl}
           api={api}
           onRefreshWorkspace={() => workspaceData.refreshWorkspaceAfterTopicChange()}
           onUploadImage={api.uploadImage}

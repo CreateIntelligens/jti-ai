@@ -1,4 +1,4 @@
-import HciotSelect from '../../../hciot/HciotSelect';
+import QaSelect from '../../QaSelect';
 
 import { NEW_VALUE } from '../topicUtils';
 import {
@@ -39,7 +39,7 @@ export default function UploadTopicSelector({ topic }: UploadTopicSelectorProps)
         指定科別 / 主題
       </label>
       <div className="qa-workspace-qa-selectors">
-        <HciotSelect
+        <QaSelect
           className="qa-workspace-file-select"
           value={topic.categoryId}
           onChange={topic.handleCategoryChange}
@@ -49,7 +49,7 @@ export default function UploadTopicSelector({ topic }: UploadTopicSelectorProps)
           ]}
         />
         <span className="qa-workspace-file-path-separator">/</span>
-        <HciotSelect
+        <QaSelect
           className="qa-workspace-file-select"
           value={topic.topicId}
           onChange={topic.handleTopicChange}

@@ -10,7 +10,9 @@ import type {
 import { API_BASE, fetchAsAdmin, fetchWithApiKey, fetchWithUserGeminiKey, handleResponse, STORAGE_KEYS, STORAGE_ACTIVE, normLang, buildUrl } from './base';
 import { createQuizBankApi, type QuizBankApi } from './_shared/quizBank';
 import { createQaKnowledgeApi } from './_shared/qaKnowledge';
-import type { HciotTopicCategory, HciotImage } from './hciot';
+import type { QaAdminCategory, QaCategory } from '../../config/qaTopics';
+import type { QaImage } from './_shared/qaKnowledge';
+import { normalizeImageId } from '../../utils/qaImage';
 
 // ========== Stores & Files ==========
 
@@ -549,15 +551,22 @@ export function parseGeneralQaCsvText(text: string) {
 
 // ----- Topics (HCIoT-shaped category tree, keyed by store_name) -----
 
+export async function listGeneralTopics(storeName: string): Promise<{ categories: QaCategory[] }> {
+  const response = await fetchWithUserGeminiKey(
+    `${API_BASE}/general/stores/${encodeURIComponent(storeName)}/topics`,
+  );
+  return handleResponse<{ categories: QaCategory[] }>(response);
+}
+
 async function generalAdminJson<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetchAsAdmin(`${GENERAL_ADMIN_BASE}${path}`, options);
   return handleResponse<T>(response);
 }
 
-export function listGeneralTopicsAdmin(storeName: string): Promise<{ categories: HciotTopicCategory[] }> {
+export function listGeneralTopicsAdmin(storeName: string): Promise<{ categories: QaAdminCategory[] }> {
   // Unfiltered listing (includes hidden topics/questions) — served only under
   // the authed admin mount.
-  return generalAdminJson<{ categories: HciotTopicCategory[] }>(
+  return generalAdminJson<{ categories: QaAdminCategory[] }>(
     `/stores/${encodeURIComponent(storeName)}/topics/all`,
   );
 }
@@ -612,17 +621,25 @@ export function setGeneralCategoryHidden(
 
 // ----- Images (per-store) -----
 
-export function listGeneralImages(storeName: string): Promise<{ images: HciotImage[] }> {
-  return generalAdminJson<{ images: HciotImage[] }>(
+// Browser-loadable URL for a general store's image (the QA workspace previews
+// resolve image ids through config.resolveImageUrl; hciot uses its own scheme).
+export function getGeneralImageUrl(storeName: string, imageId?: string): string | null {
+  const normalized = normalizeImageId(imageId);
+  if (!normalized) return null;
+  return `${GENERAL_ADMIN_BASE}/stores/${encodeURIComponent(storeName)}/images/${encodeURIComponent(normalized)}`;
+}
+
+export function listGeneralImages(storeName: string): Promise<{ images: QaImage[] }> {
+  return generalAdminJson<{ images: QaImage[] }>(
     `/stores/${encodeURIComponent(storeName)}/images`,
   );
 }
 
-export async function uploadGeneralImage(storeName: string, file: File, imageId?: string): Promise<HciotImage> {
+export async function uploadGeneralImage(storeName: string, file: File, imageId?: string): Promise<QaImage> {
   const formData = new FormData();
   formData.append('file', file);
   formData.append('image_id', imageId || file.name.replace(/\.[^.]+$/, ''));
-  return generalAdminJson<HciotImage>(`/stores/${encodeURIComponent(storeName)}/images`, {
+  return generalAdminJson<QaImage>(`/stores/${encodeURIComponent(storeName)}/images`, {
     method: 'POST',
     body: formData,
   });

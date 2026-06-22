@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Table as TableIcon, Download, Edit, Save, Trash2, X } from 'lucide-react';
 
-import type { HciotLanguage } from '../../../../config/hciotTopics';
-import type { HciotImage, HciotMergedCsvRow } from '../../../../services/api/hciot';
+import type { QaLanguage } from '../../../../config/qaTopics';
+import type { QaImage, QaMergedCsvRow } from '../../../../services/api/_shared/qaKnowledge';
 import { buildCsvString } from '../../../../utils/csv';
 import { downloadBlob } from '../../../../utils/download';
 import { extractUploadedImageId, rollbackUploadedImages, type DeleteImageHandler, type UploadedImageResult } from '../imageUpload';
@@ -15,8 +15,9 @@ import type { QaWorkspaceApiClient } from '../QaKnowledgeWorkspace';
 interface MergedCsvPaneProps {
   topicId: string;
   topicLabel?: string | null;
-  language: HciotLanguage;
-  availableImages: HciotImage[];
+  language: QaLanguage;
+  availableImages: QaImage[];
+  resolveImageUrl?: (imageId?: string) => string | null;
   statusMessage: string | null;
   api: QaWorkspaceApiClient;
   refreshKey?: number;
@@ -36,14 +37,14 @@ const DOWNLOAD_CSV_HEADER = ['index', 'q', 'a', 'img', 'url', 'display'];
 // merged list — not its position within its own source file. Topics split
 // across per-image `_IMG_` files rely on these global values to reconstruct
 // the cross-file order on read and when syncing the topic's question list.
-function toCsvString(rows: HciotMergedCsvRow[], globalIndex: Map<HciotMergedCsvRow, number>): string {
+function toCsvString(rows: QaMergedCsvRow[], globalIndex: Map<QaMergedCsvRow, number>): string {
   return buildCsvString(
     SAVE_CSV_HEADER,
     rows.map((row, position) => [globalIndex.get(row) ?? position + 1, row.q, row.a, row.img, row.url || '']),
   );
 }
 
-function toDownloadCsvString(rows: HciotMergedCsvRow[], hiddenSet: Set<string>): string {
+function toDownloadCsvString(rows: QaMergedCsvRow[], hiddenSet: Set<string>): string {
   return buildCsvString(
     DOWNLOAD_CSV_HEADER,
     rows.map((row, index) => {
@@ -54,7 +55,7 @@ function toDownloadCsvString(rows: HciotMergedCsvRow[], hiddenSet: Set<string>):
   );
 }
 
-function hasMeaningfulRowContent(row: Pick<HciotMergedCsvRow, 'q' | 'a' | 'img' | 'url'>): boolean {
+function hasMeaningfulRowContent(row: Pick<QaMergedCsvRow, 'q' | 'a' | 'img' | 'url'>): boolean {
   return Boolean(row.q.trim() || row.a.trim() || row.img?.trim() || row.url?.trim());
 }
 
@@ -67,6 +68,7 @@ export default function MergedCsvPane({
   topicLabel,
   language,
   availableImages,
+  resolveImageUrl,
   statusMessage,
   api,
   refreshKey = 0,
@@ -194,7 +196,7 @@ export default function MergedCsvPane({
       stage = 'save';
       const savedRows = preparedRows.filter(hasMeaningfulRowContent);
       const globalIndex = new Map(savedRows.map((row, position) => [row, position + 1]));
-      const grouped = new Map<string, HciotMergedCsvRow[]>();
+      const grouped = new Map<string, QaMergedCsvRow[]>();
 
       for (const row of savedRows) {
         const file = row.source_file ?? mainFile;
@@ -382,6 +384,7 @@ export default function MergedCsvPane({
           rows={rows}
           sourceFiles={sourceFiles}
           availableImages={availableImages}
+          resolveImageUrl={resolveImageUrl}
           loading={loading}
           error={error}
           isEditing={isEditing}

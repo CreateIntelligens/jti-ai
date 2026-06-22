@@ -1,7 +1,7 @@
 import type { RefObject } from 'react';
 import { AlertCircle, Download, FileText, Table, Type, X } from 'lucide-react';
 
-import type { HciotLanguage } from '../../../../config/hciotTopics';
+import type { QaLanguage } from '../../../../config/qaTopics';
 import { downloadBlob } from '../../../../utils/download';
 import UploadTabBody from './UploadTabBody';
 import {
@@ -11,7 +11,7 @@ import {
 } from './documentToQaTypes';
 
 interface DocumentToQaSourceFormProps {
-  language: HciotLanguage;
+  language: QaLanguage;
   isEn: boolean;
   mode: DocumentSourceMode;
   fileItems: DocFileItem[];
@@ -126,12 +126,12 @@ export default function DocumentToQaSourceForm({
     : '在此貼上文章內容，AI 會自動分析並擷取問答對。';
 
   return (
-    <div className="hciot-doc-source-tab">
-      <div className="hciot-doc-mode-toggle" role="tablist">
+    <div className="qa-doc-source-tab">
+      <div className="qa-doc-mode-toggle" role="tablist">
         <button
           type="button"
           role="tab"
-          className={`hciot-doc-mode-button${mode === 'file' ? ' is-active' : ''}`}
+          className={`qa-doc-mode-button${mode === 'file' ? ' is-active' : ''}`}
           onClick={() => onModeChange('file')}
         >
           <FileText size={14} />
@@ -140,7 +140,7 @@ export default function DocumentToQaSourceForm({
         <button
           type="button"
           role="tab"
-          className={`hciot-doc-mode-button${mode === 'text' ? ' is-active' : ''}`}
+          className={`qa-doc-mode-button${mode === 'text' ? ' is-active' : ''}`}
           onClick={() => onModeChange('text')}
         >
           <Type size={14} />
@@ -184,7 +184,7 @@ export default function DocumentToQaSourceForm({
           onClose={onClose}
           renderItem={(item, index) => (
             <div key={`${item.file.name}-${index}`} className="qa-workspace-upload-file-item">
-              <FileText size={16} className="hciot-icon-dark-blue" />
+              <FileText size={16} className="qa-icon-dark-blue" />
               <span className="qa-workspace-upload-file-name">{item.file.name}</span>
               <span className="qa-workspace-upload-file-size">{formatFileSize(item.file.size)}</span>
               <div className="qa-workspace-file-actions">
@@ -206,12 +206,12 @@ export default function DocumentToQaSourceForm({
       {mode === 'text' && (
         <div className="qa-workspace-upload-file-body">
           <textarea
-            className="hciot-doc-text-input custom-scrollbar"
+            className="qa-doc-text-input custom-scrollbar"
             placeholder={textPlaceholder}
             value={text}
             onChange={(event) => onTextChange(event.target.value)}
           />
-          <div className="hciot-doc-text-meta">
+          <div className="qa-doc-text-meta">
             <span className={text.length > MAX_TEXT_LENGTH ? 'is-over' : ''}>
               {text.length.toLocaleString()} / {MAX_TEXT_LENGTH.toLocaleString()} 字
             </span>

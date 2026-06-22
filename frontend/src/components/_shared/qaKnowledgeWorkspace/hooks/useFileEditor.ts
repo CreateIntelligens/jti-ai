@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { HciotLanguage } from '../../../../config/hciotTopics';
-import type {
-  HciotKnowledgeFile,
-  HciotTopicCategory,
-} from '../../../../services/api/hciot';
+import type { QaLanguage, QaAdminCategory } from '../../../../config/qaTopics';
+import type { QaKnowledgeFile } from '../../../../services/api/_shared/qaKnowledge';
 import type { QaWorkspaceApiClient } from '../QaKnowledgeWorkspace';
 import {
   NEW_VALUE,
@@ -19,14 +16,14 @@ import {
 
 export interface UseFileEditorOptions {
   api: QaWorkspaceApiClient;
-  language: HciotLanguage;
+  language: QaLanguage;
   selectedFileName: string | null;
   setSelectedFileName: (name: string | null) => void;
   setSelectedImageName: (name: string | null) => void;
   setSelectedMergedTopicId: (name: string | null) => void;
-  selectedFile: HciotKnowledgeFile | null;
-  categories: HciotTopicCategory[];
-  setFiles: React.Dispatch<React.SetStateAction<HciotKnowledgeFile[]>>;
+  selectedFile: QaKnowledgeFile | null;
+  categories: QaAdminCategory[];
+  setFiles: React.Dispatch<React.SetStateAction<QaKnowledgeFile[]>>;
   refreshWorkspaceAfterTopicChange: (preferredFileName?: string | null) => Promise<void>;
   showStatus: (message: string) => void;
   ensureSelectedPathExpanded: (fileName: string) => void;

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { Plus, Upload } from 'lucide-react';
 
-import type { HciotLanguage } from '../../../../config/hciotTopics';
-import type { HciotImage } from '../../../../services/api/hciot';
+import type { QaLanguage } from '../../../../config/qaTopics';
+import type { QaImage } from '../../../../services/api/_shared/qaKnowledge';
 import { toErrorMessage } from '../../../../utils/errors';
-import { getHciotImageUrl } from '../../../../utils/hciotImage';
+import { getQaImageUrl } from '../../../../utils/qaImage';
 import ExistingImagePicker from '../explorer/ExistingImagePicker';
 import ImageLightbox from '../ImageLightbox';
 import {
@@ -26,11 +26,12 @@ import QaRowItem from './QaRowItem';
 
 interface QaUploadTabProps {
   open: boolean;
-  language: HciotLanguage;
+  language: QaLanguage;
   uploading: boolean;
-  availableImages: HciotImage[];
+  availableImages: QaImage[];
   resolvedTopic: ResolvedUploadTopic | null;
   hasTopicSelection: boolean;
+  resolveImageUrl?: (imageId?: string) => string | null;
   onClose: () => void;
   onSubmitQA: (
     file: File,
@@ -51,6 +52,7 @@ export default function QaUploadTab({
   availableImages,
   resolvedTopic,
   hasTopicSelection,
+  resolveImageUrl = getQaImageUrl,
   onClose,
   onSubmitQA,
   onUploadComplete,
@@ -207,7 +209,7 @@ export default function QaUploadTab({
           {rows.map((row, index) => {
             const previewUrl = row.pendingImageFile
               ? pendingUrls.get(row.pendingImageFile) || ''
-              : getHciotImageUrl(row.img) || '';
+              : resolveImageUrl(row.img) || '';
 
             return (
               <QaRowItem

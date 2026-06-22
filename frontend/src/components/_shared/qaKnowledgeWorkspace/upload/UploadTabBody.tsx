@@ -1,10 +1,10 @@
 import type { ReactNode, RefObject } from 'react';
 import { Upload } from 'lucide-react';
 
-import type { HciotLanguage } from '../../../../config/hciotTopics';
+import type { QaLanguage } from '../../../../config/qaTopics';
 
 interface UploadTabBodyProps<T> {
-  language: HciotLanguage;
+  language: QaLanguage;
   dragOver: boolean;
   setDragOver: (over: boolean) => void;
   onDrop: (event: React.DragEvent) => void;

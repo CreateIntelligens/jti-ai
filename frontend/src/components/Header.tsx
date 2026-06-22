@@ -41,6 +41,19 @@ interface HeaderProps {
   onOpenUsersPanel?: () => void;
   onLogout?: () => void;
   updateNotice?: AppUpdateNotice | null;
+  canShow?: (page: string) => boolean;
+}
+
+const APP_NAV_OPTIONS = [
+  { page: 'home', value: '/', label: 'ai360 km 通用知識庫' },
+  { page: 'hciot', value: '/hciot', label: 'HCIoT 衛教助手' },
+  { page: 'jti', value: '/jti', label: 'JTI 智慧助手' },
+];
+
+export function buildAppNavOptions(canShow?: (page: string) => boolean) {
+  return APP_NAV_OPTIONS
+    .filter((option) => !canShow || canShow(option.page))
+    .map(({ value, label }) => ({ value, label }));
 }
 
 export default function Header({
@@ -59,6 +72,7 @@ export default function Header({
   onOpenUsersPanel,
   onLogout,
   updateNotice,
+  canShow,
 }: HeaderProps) {
   const navigate = useNavigate();
   const isUpdateNoticeControlled = updateNotice !== undefined;
@@ -211,11 +225,7 @@ export default function Header({
                 if (val) navigate(val);
               }}
               placeholder="前往應用"
-              options={[
-                { value: '/', label: 'ai360 km 通用知識庫' },
-                { value: '/hciot', label: 'HCIoT 衛教助手' },
-                { value: '/jti', label: 'JTI 智慧助手' },
-              ]}
+              options={buildAppNavOptions(canShow)}
             />
             {onOpenUsersPanel && (
               <button
