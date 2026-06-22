@@ -185,7 +185,7 @@ def test_require_admin_rejects_user():
 
 @requires_jwt
 def test_real_jwt_round_trip_through_verify_auth(monkeypatch):
-    monkeypatch.setenv("SESSION_JWT_SECRET", "test-secret")
+    monkeypatch.setenv("SESSION_JWT_SECRET", "test-secret-with-at-least-32-characters-long")
     monkeypatch.setattr(deps, "user_manager", None, raising=False)
     from app.security.tokens import create_session_token
 

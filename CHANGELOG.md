@@ -1,5 +1,55 @@
 # Changelog
 
+## [1.1.0] - 2026-06-22
+
+通用知識庫（General）全面升級為 **per-store 多租戶架構**，新增 ESG app tier；JTI 與 ESG 遷移至共用 Managed App Runtime，後端啟動效能提升，並完善 app 隔離與安全修補。
+
+### General — per-store 多租戶知識庫
+
+- **per-store 知識庫**：通用知識庫（文件、圖片、topic/Q&A）全面改為以 `store_name` 為鍵的多租戶架構，各 store 資料完全隔離。
+- **per-store RAG reindex**：重新索引 API 支援 per-store 粒度，同時覆蓋主知識庫與文件知識庫兩條管道。
+- **per-store topics + images router**：新增通用 topics 與圖片路由，與 HCIoT category-tree 結構對齊。
+- **QA knowledge workspace**：新增通用 QA 知識工作台（API client + router），掛載至 app，供前端管理。
+- `store_name` 強制小寫不變性（key alignment），並補充文件說明。
+- 修正：Topic 問題以扁平結構儲存以確保通用 CSV 同步正常運作。
+- 安全修補：通用圖片 serving 防範 stored XSS；通用未過濾 topics listing 改為要求 admin 身份（IDOR 修補）。
+- `GeneralTopicStore` 新增型別安全的 `store_name` 轉型。
+
+### ESG App Tier
+
+- 新增 **ESG app tier**，含統一的多應用測驗種子機制（unified multi-app quiz seeding）。
+- ESG quiz 取代原色彩測驗；修正初始化 race condition 與前端按鈕尺寸。
+- Quiz unique index 加入 `store_name` 防止跨 store 衝突。
+- 修正：quiz bank 為空時回傳清楚的錯誤訊息。
+
+### Managed App Runtime
+
+- **JTI + ESG 遷移至共用 General Managed-App Runtime**：統一 session、prompt、TTS、knowledge 初始化流程。
+- Chat / quiz endpoint 強制 app 隔離，並加入 lazy module loading 避免冷啟動阻塞。
+- 完成 managed app runtime 功能對齊（parity），確保 JTI 與 ESG 均支援所有 runtime features。
+
+### 效能與維運
+
+- **RAG backfill 批次化**：backfill 階段的讀取與 fingerprint 計算改為批次操作，顯著降低啟動時的資料庫往返次數。
+- **app 資料路徑整理**：`data/jti/`、`data/esg/`、`data/shared/` 路徑統一，`.gitignore` 同步更新。
+
+### 測試
+
+- 補齊 per-store RAG chunk 鍵值的測試驗證。
+- 通用測試共用 fake mongo；backfill 文件按 source 分類撈取。
+- 修正 `home_api_compat` 的 shared mongo mock，停止測試外洩。
+- 更新 pytest fixture 與 JWT fixture，排除第三方套件警告（0 warnings）。
+
+---
+
+## [1.0.1] - 2026-06-18
+
+### HCIoT
+
+- **本地備份機制**：新增 HCIoT 知識庫與圖片的本地備份功能。
+
+---
+
 ## [1.0.0] - 2026-06-09
 
 首個正式版本。整合 JTI 活動助理、HCIoT 醫院衛教助理與通用知識庫聊天於同一後端,

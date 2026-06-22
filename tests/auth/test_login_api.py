@@ -37,7 +37,7 @@ class _FakeUserManager:
 
 @pytest.fixture
 def client(monkeypatch):
-    monkeypatch.setenv("SESSION_JWT_SECRET", "test-secret")
+    monkeypatch.setenv("SESSION_JWT_SECRET", "test-secret-with-at-least-32-characters-long")
     user = User(
         id="user_abc",
         username="alice",

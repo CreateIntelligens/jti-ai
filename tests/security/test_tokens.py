@@ -27,7 +27,7 @@ def test_create_without_secret_raises(monkeypatch):
 def test_create_falls_back_to_admin_api_key(monkeypatch):
     """SESSION_JWT_SECRET 未設時改用 ADMIN_API_KEY,不丟例外。"""
     monkeypatch.delenv("SESSION_JWT_SECRET", raising=False)
-    monkeypatch.setenv("ADMIN_API_KEY", "admin-secret")
+    monkeypatch.setenv("ADMIN_API_KEY", "admin-secret-with-at-least-32-characters-long")
     token = create_session_token("user_1", "admin", None)
     assert isinstance(token, str) and token
 
@@ -36,7 +36,7 @@ def test_create_falls_back_to_admin_api_key(monkeypatch):
 
 @pytest.mark.parametrize("garbage", ["", "not.a.jwt", "abc", "x.y.z"])
 def test_decode_garbage_returns_none(monkeypatch, garbage):
-    monkeypatch.setenv("SESSION_JWT_SECRET", "test-secret")
+    monkeypatch.setenv("SESSION_JWT_SECRET", "test-secret-with-at-least-32-characters-long")
     assert decode_session_token(garbage) is None
 
 
@@ -44,7 +44,7 @@ def test_decode_garbage_returns_none(monkeypatch, garbage):
 
 @requires_jwt
 def test_round_trip_returns_claims(monkeypatch):
-    monkeypatch.setenv("SESSION_JWT_SECRET", "test-secret")
+    monkeypatch.setenv("SESSION_JWT_SECRET", "test-secret-with-at-least-32-characters-long")
     token = create_session_token("user_1", "user", "jti")
     claims = decode_session_token(token)
     assert claims is not None
@@ -57,7 +57,7 @@ def test_round_trip_returns_claims(monkeypatch):
 
 @requires_jwt
 def test_scope_none_round_trips(monkeypatch):
-    monkeypatch.setenv("SESSION_JWT_SECRET", "test-secret")
+    monkeypatch.setenv("SESSION_JWT_SECRET", "test-secret-with-at-least-32-characters-long")
     token = create_session_token("u", "admin", None)
     claims = decode_session_token(token)
     assert claims is not None
@@ -66,7 +66,7 @@ def test_scope_none_round_trips(monkeypatch):
 
 @requires_jwt
 def test_tampered_token_returns_none(monkeypatch):
-    monkeypatch.setenv("SESSION_JWT_SECRET", "test-secret")
+    monkeypatch.setenv("SESSION_JWT_SECRET", "test-secret-with-at-least-32-characters-long")
     token = create_session_token("user_1", "admin", None)
     # 竄改 payload 段 (中間段) 必定使簽章失效。
     # 不可只翻最後一字元:base64url 末字元僅帶少數有效 bit,
@@ -79,14 +79,14 @@ def test_tampered_token_returns_none(monkeypatch):
 
 @requires_jwt
 def test_wrong_secret_returns_none(monkeypatch):
-    monkeypatch.setenv("SESSION_JWT_SECRET", "secret-one")
+    monkeypatch.setenv("SESSION_JWT_SECRET", "secret-one-with-at-least-32-characters-long")
     token = create_session_token("user_1", "admin", None)
-    monkeypatch.setenv("SESSION_JWT_SECRET", "secret-two")
+    monkeypatch.setenv("SESSION_JWT_SECRET", "secret-two-with-at-least-32-characters-long")
     assert decode_session_token(token) is None
 
 
 @requires_jwt
 def test_expired_token_returns_none(monkeypatch):
-    monkeypatch.setenv("SESSION_JWT_SECRET", "test-secret")
+    monkeypatch.setenv("SESSION_JWT_SECRET", "test-secret-with-at-least-32-characters-long")
     token = create_session_token("user_1", "admin", None, expires_in=-10)
     assert decode_session_token(token) is None
