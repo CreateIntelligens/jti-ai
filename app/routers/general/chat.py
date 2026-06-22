@@ -363,7 +363,7 @@ async def send_message(req: ChatMessageRequest, request: Request, auth: dict = D
         quiz_response = await handle_quiz_message(session, req, config=quiz_cfg)
         if quiz_response:
             return {
-                "answer": quiz_response.message,
+                "message": quiz_response.message,
                 "session_id": session.session_id,
                 "turn_number": quiz_response.turn_number,
                 "citations": [],
@@ -393,7 +393,7 @@ async def send_message(req: ChatMessageRequest, request: Request, auth: dict = D
 
             quiz_start_res = await execute_quiz_start(session.session_id, user_message=req.message, config=quiz_cfg)
             return {
-                "answer": quiz_start_res.message,
+                "message": quiz_start_res.message,
                 "session_id": session.session_id,
                 "turn_number": quiz_start_res.turn_number,
                 "citations": [],
@@ -454,10 +454,8 @@ async def send_message(req: ChatMessageRequest, request: Request, auth: dict = D
     turn_number = log_result[1] if log_result else None
 
     return {
-        # `message` 對齊 jti/hciot/esg 的 ChatResponse 主鍵;`answer` 暫留供舊前端/
-        # 對外 SDK 相容(expand-then-contract,日後收斂成 ChatResponse 再移除)。
+        # `message` 對齊 jti/hciot/esg 的 ChatResponse 主鍵(general 全線統一)。
         "message": answer,
-        "answer": answer,
         "session_id": session.session_id,
         "turn_number": turn_number,
         "citations": citations,

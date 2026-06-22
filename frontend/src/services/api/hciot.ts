@@ -117,7 +117,7 @@ export async function hciotSendMessage(
   });
   const data = await handleResponse<any>(response);
   return {
-    answer: data.message ?? data.answer ?? '',
+    answer: data.message ?? '',
     turn_number: data.turn_number,
     citations: data.citations,
     image_id: data.image_id,

@@ -194,10 +194,10 @@ export async function sendMessage(text: string, sessionId?: string, turnNumber?:
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: text, session_id: sessionId, turn_number: turnNumber, model: getSelectedModel() }),
   });
-  // 對齊 jti/hciot:在 service 邊界把後端的 message 映射成內部統一的 answer。
+  // 後端 general 已全線統一回 message;service 邊界映射成內部統一的 answer。
   const data = await handleResponse<any>(response);
   return {
-    answer: data.message ?? data.answer ?? '',
+    answer: data.message ?? '',
     turn_number: data.turn_number,
     citations: data.citations,
     image_id: data.image_id,

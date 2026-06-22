@@ -179,7 +179,7 @@ class TestGeneralQuizApi(unittest.TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertIn("First Question?", payload["answer"])
+        self.assertIn("First Question?", payload["message"])
         self.assertEqual(payload["options"], ["A. Option A"])
 
 

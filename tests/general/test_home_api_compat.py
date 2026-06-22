@@ -434,7 +434,7 @@ def test_general_chat_uses_browser_gemini_key_for_general_store(monkeypatch):
         headers=headers,
     )
     assert response.status_code == 200
-    assert response.json()["answer"] == "和泰回答"
+    assert response.json()["message"] == "和泰回答"
     assert response.json()["citations"] == [{"title": "FAQ", "uri": "faq.csv", "text": "和泰知識"}]
     assert captured["owner_key_hash"] == hashlib.sha256(b"AIza-user-key").hexdigest()
 
@@ -493,7 +493,7 @@ def test_home_can_start_and_send_general_chat(monkeypatch):
     )
 
     assert response.status_code == 200
-    assert response.json()["answer"] == "回答：常見問題"
+    assert response.json()["message"] == "回答：常見問題"
     assert response.json()["citations"] == [{"title": "FAQ", "uri": "faq.csv", "text": "常見問題"}]
     assert response.json()["tts_message_id"] == "tts-general"
     assert captured == {
