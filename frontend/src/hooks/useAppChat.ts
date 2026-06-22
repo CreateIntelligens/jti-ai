@@ -235,6 +235,9 @@ export function useAppChat(isAdmin: boolean = false) {
       if (result.session_id) {
         setSessionId(result.session_id);
       }
+      if (result.opening_message) {
+        setMessages([{ role: 'model', text: result.opening_message }]);
+      }
     } catch (e) {
       const errorMsg = toErrorMessage(e);
       showStatus('連線失敗: ' + errorMsg);

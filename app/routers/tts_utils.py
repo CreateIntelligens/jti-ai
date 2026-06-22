@@ -15,7 +15,9 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from app.schemas.chat import ChatResponse
+from app.services.general.tts import get_managed_tts_job_manager
 from app.services.tts_jobs import TtsJobManager
+from app.services.tts_text import prepare_tts_text
 
 logger = logging.getLogger(__name__)
 
@@ -144,3 +146,13 @@ def register_tts_endpoints(
             raise HTTPException(status_code=500, detail="Failed to queue TTS generation")
 
         return {"tts_message_id": tts_message_id}
+
+
+def wire_tts(router, app: str) -> Callable:
+    """Mount shared TTS endpoints and return the managed-app manager getter."""
+
+    def get_manager():
+        return get_managed_tts_job_manager(app)
+
+    register_tts_endpoints(router, get_manager, text_formatter=prepare_tts_text)
+    return get_manager

@@ -11,7 +11,6 @@ from app.services.quiz.config import ESG_STORE_NAME
 CreateBankRequest = general_quiz_bank.CreateBankRequest
 CreateQuestionRequest = general_quiz_bank.CreateQuestionRequest
 CreateQuizSetRequest = general_quiz_bank.CreateQuizSetRequest
-UpdateBankRequest = general_quiz_bank.UpdateBankRequest
 UpdateQuestionRequest = general_quiz_bank.UpdateQuestionRequest
 UpdateQuizResultRequest = general_quiz_bank.UpdateQuizResultRequest
 DEFAULT_BANK_ID = general_quiz_bank.DEFAULT_BANK_ID
@@ -37,40 +36,6 @@ def create_bank(
 ):
     return general_quiz_bank.create_bank(
         ESG_STORE_NAME,
-        request_data,
-        request,
-        language,
-        auth,
-    )
-
-
-@router.get("/banks/{bank_id}")
-def get_bank(
-    bank_id: str,
-    request: Request,
-    language: str = Query("zh"),
-    auth: dict = Depends(verify_auth),
-):
-    return general_quiz_bank.get_bank(
-        ESG_STORE_NAME,
-        bank_id,
-        request,
-        language,
-        auth,
-    )
-
-
-@router.patch("/banks/{bank_id}")
-def update_bank(
-    bank_id: str,
-    request_data: UpdateBankRequest,
-    request: Request,
-    language: str = Query("zh"),
-    auth: dict = Depends(verify_auth),
-):
-    return general_quiz_bank.update_bank(
-        ESG_STORE_NAME,
-        bank_id,
         request_data,
         request,
         language,
@@ -119,24 +84,6 @@ def list_questions(
 ):
     return general_quiz_bank.list_questions(
         ESG_STORE_NAME,
-        request,
-        language,
-        bank_id,
-        auth,
-    )
-
-
-@router.get("/questions/{question_id}")
-def get_question(
-    question_id: str,
-    request: Request,
-    language: str = Query("zh"),
-    bank_id: str = Query(DEFAULT_BANK_ID),
-    auth: dict = Depends(verify_auth),
-):
-    return general_quiz_bank.get_question(
-        ESG_STORE_NAME,
-        question_id,
         request,
         language,
         bank_id,

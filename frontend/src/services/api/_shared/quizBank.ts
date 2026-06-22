@@ -72,12 +72,9 @@ export interface QuizBankApi {
   deleteQuizBank(language: string, bankId: string): Promise<void>;
   activateQuizBank(language: string, bankId: string): Promise<void>;
   listQuizQuestions(language?: string, bankId?: string): Promise<{ questions: QuizQuestion[]; total: number }>;
-  getQuizQuestion(language: string, id: string, bankId?: string): Promise<QuizQuestion>;
   createQuizQuestion(language: string, question: QuizQuestion, bankId?: string): Promise<QuizQuestion>;
   updateQuizQuestion(language: string, id: string, data: Partial<QuizQuestion>, bankId?: string): Promise<QuizQuestion>;
   deleteQuizQuestion(language: string, id: string, bankId?: string): Promise<void>;
-  getQuizBankMetadata(language?: string, bankId?: string): Promise<QuizBankMetadata>;
-  updateQuizBankMetadata(language: string, data: Partial<QuizBankMetadata>, bankId?: string): Promise<QuizBankMetadata>;
   listQuizSets(language?: string): Promise<{ sets: QuizSet[]; total: number; max: number }>;
   createQuizSet(language: string, name: string): Promise<QuizSet>;
   deleteQuizSet(language: string, setId: string): Promise<void>;
@@ -130,9 +127,6 @@ export function createQuizBankApi(basePath: string): QuizBankApi {
     async listQuizQuestions(language = 'zh', bankId) {
       return apiCall('GET', '/questions/', language, undefined, bankId ? { bank_id: bankId } : {});
     },
-    async getQuizQuestion(language, id, bankId) {
-      return apiCall('GET', `/questions/${encodeURIComponent(id)}`, language, undefined, bankId ? { bank_id: bankId } : {});
-    },
     async createQuizQuestion(language, question, bankId) {
       return apiCall('POST', '/questions/', language, question, bankId ? { bank_id: bankId } : {});
     },
@@ -141,12 +135,6 @@ export function createQuizBankApi(basePath: string): QuizBankApi {
     },
     async deleteQuizQuestion(language, id, bankId) {
       return apiCall('DELETE', `/questions/${encodeURIComponent(id)}`, language, undefined, bankId ? { bank_id: bankId } : {});
-    },
-    async getQuizBankMetadata(language = 'zh', bankId = 'default') {
-      return apiCall('GET', `/banks/${encodeURIComponent(bankId)}`, language);
-    },
-    async updateQuizBankMetadata(language, data, bankId = 'default') {
-      return apiCall('PATCH', `/banks/${encodeURIComponent(bankId)}`, language, data);
     },
     async listQuizSets(language = 'zh') {
       return apiCall('GET', '/quiz-results/sets/', language);

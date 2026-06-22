@@ -193,10 +193,6 @@ export async function listQuizQuestions(language: string = 'zh', bankId?: string
   return jtiQuizApi.listQuizQuestions(language, bankId);
 }
 
-export async function getQuizQuestion(language: string, id: string, bankId?: string): Promise<QuizQuestion> {
-  return jtiQuizApi.getQuizQuestion(language, id, bankId);
-}
-
 export async function createQuizQuestion(language: string, question: QuizQuestion, bankId?: string): Promise<QuizQuestion> {
   return jtiQuizApi.createQuizQuestion(language, question, bankId);
 }
@@ -207,14 +203,6 @@ export async function updateQuizQuestion(language: string, id: string, data: Par
 
 export async function deleteQuizQuestion(language: string, id: string, bankId?: string): Promise<void> {
   return jtiQuizApi.deleteQuizQuestion(language, id, bankId);
-}
-
-export async function getQuizBankMetadata(language: string = 'zh', bankId: string = 'default'): Promise<QuizBankMetadata> {
-  return jtiQuizApi.getQuizBankMetadata(language, bankId);
-}
-
-export async function updateQuizBankMetadata(language: string, data: Partial<QuizBankMetadata>, bankId: string = 'default'): Promise<QuizBankMetadata> {
-  return jtiQuizApi.updateQuizBankMetadata(language, data, bankId);
 }
 
 export async function listQuizSets(language: string = 'zh'): Promise<{ sets: QuizSet[]; total: number; max: number }> {

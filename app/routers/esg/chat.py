@@ -10,6 +10,7 @@ from fastapi.responses import JSONResponse
 
 import app.deps as deps
 from app.auth import require_app_access, require_history_access, verify_admin
+from app.routers.tts_utils import wire_tts
 from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
@@ -85,12 +86,15 @@ def _get_conversation_logger():
     return deps.get_esg_conversation_logger()
 
 
+_get_tts_manager = wire_tts(runtime_router, _MODE)
+
 chat_service = ManagedChatService(
     ManagedChatConfig(
         app=_MODE,
         opening_messages=_OPENING_MESSAGES,
         session_manager_getter=_get_session_manager,
         conversation_logger_getter=_get_conversation_logger,
+        tts_manager_getter=_get_tts_manager,
         agent=main_agent,
         quiz=ESG_QUIZ_CONFIG,
     )

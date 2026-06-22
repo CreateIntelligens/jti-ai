@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import app.deps as deps
+from app.services.general.tts import get_managed_tts_job_manager
 from app.services.jti.main_agent import main_agent
 from app.services.quiz.config import JTI_STORE_NAME, QuizFlowConfig
 from app.services.tts_text import prepare_tts_text
@@ -17,7 +18,7 @@ def _get_conversation_logger():
 
 
 def _get_tts_manager():
-    return deps.get_jti_tts_job_manager()
+    return get_managed_tts_job_manager("jti")
 
 
 JTI_QUIZ_CONFIG = QuizFlowConfig(

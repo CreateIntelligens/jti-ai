@@ -2,6 +2,7 @@ from app.prompts import PromptManager, StorePrompts
 from app.routers.general import chat as general_chat
 from app.routers.general import prompts as prompt_routes
 from app.routers.general.stores import resolve_store_config
+from app.services.esg import agent_prompts as esg_prompts
 from app.services.jti import agent_prompts as jti_prompts
 
 
@@ -22,6 +23,14 @@ def test_managed_default_prompt_exposes_english_persona_for_copying():
     assert item["content"] == jti_prompts.PERSONA["zh"]
     assert item["content_en"] == jti_prompts.PERSONA["en"]
     assert item["response_rule_sections"]["en"] == jti_prompts.DEFAULT_RESPONSE_RULE_SECTIONS["en"]
+
+
+def test_esg_managed_default_prompt_exposes_aikka_persona_for_copying():
+    item = prompt_routes._system_default_prompt_item("__esg__en")
+
+    assert item["content"] == esg_prompts.PERSONA["zh"]
+    assert item["content_en"] == esg_prompts.PERSONA["en"]
+    assert item["response_rule_sections"]["en"] == esg_prompts.DEFAULT_RESPONSE_RULE_SECTIONS["en"]
 
 
 def test_prompt_manager_create_and_update_preserve_english_persona():
@@ -93,3 +102,18 @@ def test_general_english_store_custom_prompt_uses_english_persona(monkeypatch):
     assert "English response style marker" in instruction
     assert "中文 persona marker" not in instruction
     assert "中文 response style marker" not in instruction
+
+
+def test_general_esg_store_default_prompt_uses_aikka_persona(monkeypatch):
+    manager = InMemoryPromptManager()
+    monkeypatch.setattr(general_chat.deps, "prompt_manager", manager)
+
+    instruction = general_chat._resolve_general_system_instruction(
+        "__esg__en",
+        {"role": "admin"},
+        resolve_store_config("__esg__en"),
+    )
+
+    assert "AIKKA" in instruction
+    assert "SET FUTURE" in instruction
+    assert "low-carbon living" in instruction

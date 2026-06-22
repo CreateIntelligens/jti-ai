@@ -19,13 +19,16 @@ from app.routers.general.stores import (
     resolve_store_config,
     store_config_matches_scope,
 )
+from app.routers.tts_utils import attach_tts_message_id, wire_tts
 from app.schemas.chat import (
+    ChatResponse,
     DeleteConversationRequest,
     DeleteConversationResponse,
     ExportGeneralConversationsResponse,
     GeneralConversationsBySessionResponse,
     GeneralConversationsResponse,
 )
+from app.services.tts_text import prepare_tts_text
 from app.models_config import DEFAULT_RAG_MODEL
 from app.utils import (
     LazyProxy,
@@ -50,6 +53,7 @@ from app.services.general.agent_prompts import (
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/chat", tags=["General Chat"])
+_get_tts_manager = wire_tts(router, "general")
 
 
 class ChatStartRequest(BaseModel):
@@ -128,6 +132,21 @@ def _resolve_active_prompt(store_name: str, auth: dict):
     return deps.prompt_manager.get_active_prompt(store_name)
 
 
+def _resolve_opening_message(store_name: str, auth: dict, language: str = "zh") -> str:
+    """從該店 active prompt 的 welcome 取開場白,沿用 esg 的「title\\ndescription」格式。
+
+    動態店沒有固定開場白範本,welcome 是唯一來源;未設或取不到時回空字串
+    (前端見空字串就不顯示開場白)。"""
+    prompt = _resolve_active_prompt(store_name, auth)
+    welcome = getattr(prompt, "welcome", None) or {}
+    block = welcome.get(language) or welcome.get("zh")
+    if not block:
+        return ""
+    title = (block.get("title") or "").strip()
+    description = (block.get("description") or "").strip()
+    return "\n".join(part for part in (title, description) if part)
+
+
 def _compose_prompt_system_instruction(prompt, language: str = "zh") -> str:
     """Compose a system instruction from a Prompt's persona + optional sections."""
     sections_by_lang = prompt.response_rule_sections or {}
@@ -165,8 +184,8 @@ def _app_default_system_instruction(managed_app: str, language: str = "zh") -> s
     """Full system instruction (persona + rule sections) for a managed app.
 
     When the General entry point opens a managed app's fixed store
-    (__jti__ / __hciot__), the session should behave like a chat inside that
-    app — same persona and the same response rule sections — rather than the
+    (__jti__ / __hciot__ / __esg__), the session should behave like a chat
+    inside that app — same persona and the same response rule sections — rather than the
     generic General assistant. Each app module owns its own
     build_system_instruction (with app-specific safety wrap / headers), so we
     defer to it instead of re-assembling the pieces here.
@@ -175,6 +194,8 @@ def _app_default_system_instruction(managed_app: str, language: str = "zh") -> s
         from app.services.jti import agent_prompts as app_prompts
     elif managed_app == "hciot":
         from app.services.hciot import agent_prompts as app_prompts
+    elif managed_app == "esg":
+        from app.services.esg import agent_prompts as app_prompts
     else:
         return None
 
@@ -182,7 +203,7 @@ def _app_default_system_instruction(managed_app: str, language: str = "zh") -> s
     sections = app_prompts.DEFAULT_RESPONSE_RULE_SECTIONS.get(
         language, app_prompts.DEFAULT_RESPONSE_RULE_SECTIONS["zh"]
     )
-    # NB: jti/hciot expose different names for the char-limit kwarg
+    # NB: managed apps expose different names for the char-limit kwarg
     # (max_response_chars vs limit); both default to their own
     # DEFAULT_MAX_RESPONSE_CHARS, so we omit it and let each app decide.
     return app_prompts.build_system_instruction(
@@ -215,8 +236,8 @@ def _resolve_general_system_instruction(store_name: str, auth: dict, config) -> 
       1. A user-defined prompt for this store (prompt_manager) — always wins, and
          lives entirely in General's own prompt store, so editing it never touches
          the app's own prompt (and vice versa). Only the *defaults* are shared.
-      2. No custom prompt + a managed app store (__jti__/__hciot__): borrow that
-         app's DEFAULT persona + rule sections, so it behaves like the app.
+      2. No custom prompt + a managed app store (__jti__/__hciot__/__esg__):
+         borrow that app's DEFAULT persona + rule sections, so it behaves like the app.
       3. Otherwise: the generic General prompt, augmented with the store topic so
          terse queries can be expanded.
     """
@@ -226,7 +247,7 @@ def _resolve_general_system_instruction(store_name: str, auth: dict, config) -> 
         return custom
 
     managed_app = getattr(config, "managed_app", None)
-    if config is not None and config.managed_language and managed_app in {"jti", "hciot"}:
+    if config is not None and config.managed_language and managed_app in {"jti", "hciot", "esg"}:
         app_instruction = _app_default_system_instruction(managed_app, language)
         if app_instruction is not None:
             return app_instruction
@@ -289,10 +310,15 @@ def start_chat(req: ChatStartRequest, request: Request, auth: dict = Depends(ver
         store_name,
     )
 
+    opening_message = _resolve_opening_message(
+        store_name, auth, language=managed_language or "zh"
+    )
+
     return {
         "ok": True,
         "prompt_applied": system_instruction is not None,
         "session_id": session.session_id,
+        "opening_message": opening_message,
     }
 
 
@@ -405,6 +431,16 @@ async def send_message(req: ChatMessageRequest, request: Request, auth: dict = D
     citations = result.get("citations") or []
     logger.info("[AI回應] 一般對話 | %s...", answer[:80])
 
+    language = session.language
+    tts_response = attach_tts_message_id(
+        ChatResponse(
+            message=answer,
+            tts_text=prepare_tts_text(answer, language),
+        ),
+        language,
+        _get_tts_manager(),
+    )
+
     log_result = _get_conversation_logger().log_conversation(
         session_id=session.session_id,
         user_message=req.message,
@@ -418,10 +454,14 @@ async def send_message(req: ChatMessageRequest, request: Request, auth: dict = D
     turn_number = log_result[1] if log_result else None
 
     return {
+        # `message` 對齊 jti/hciot/esg 的 ChatResponse 主鍵;`answer` 暫留供舊前端/
+        # 對外 SDK 相容(expand-then-contract,日後收斂成 ChatResponse 再移除)。
+        "message": answer,
         "answer": answer,
         "session_id": session.session_id,
         "turn_number": turn_number,
         "citations": citations,
+        "tts_message_id": tts_response.tts_message_id,
     }
 
 

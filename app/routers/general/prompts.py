@@ -49,7 +49,7 @@ class SetActivePromptRequest(BaseModel):
     prompt_id: Optional[str] = None
 
 
-_APP_PROMPT_MODULES = {"jti", "hciot"}
+_APP_PROMPT_MODULES = {"jti", "hciot", "esg"}
 
 
 def _app_prompt_module(app: str):
@@ -57,6 +57,8 @@ def _app_prompt_module(app: str):
         from app.services.jti import agent_prompts
     elif app == "hciot":
         from app.services.hciot import agent_prompts
+    elif app == "esg":
+        from app.services.esg import agent_prompts
     else:
         from app.services.general import agent_prompts
     return agent_prompts
@@ -70,8 +72,8 @@ def _assembled_app_prompt(app_prompts, language: str) -> str:
     sections = app_prompts.DEFAULT_RESPONSE_RULE_SECTIONS.get(
         language, app_prompts.DEFAULT_RESPONSE_RULE_SECTIONS["zh"]
     )
-    # jti/hciot name the char-limit kwarg differently (max_response_chars vs
-    # limit) but both default to their own DEFAULT_MAX_RESPONSE_CHARS, so omit it.
+    # Managed apps name the char-limit kwarg differently (max_response_chars vs
+    # limit), but all default to their own DEFAULT_MAX_RESPONSE_CHARS, so omit it.
     return app_prompts.build_system_instruction(
         persona=persona,
         language=language,
@@ -82,7 +84,7 @@ def _assembled_app_prompt(app_prompts, language: str) -> str:
 def _system_default_prompt_item(store_name: str) -> dict:
     """A read-only "系統預設" entry for the prompt list.
 
-    For a managed app store (__jti__/__hciot__) it carries that app's fully
+    For a managed app store (__jti__/__hciot__/__esg__) it carries that app's fully
     assembled default prompt; for any other (general/dynamic) store it carries
     the generic General default. This lets the prompt panel show — and let the
     admin copy or keep active — the built-in default alongside custom prompts,
@@ -95,7 +97,8 @@ def _system_default_prompt_item(store_name: str) -> dict:
 
     name = "系統預設"
     if is_managed:
-        name = f"系統預設（{'JTI' if managed_app == 'jti' else 'HCIoT'}）"
+        labels = {"jti": "JTI", "hciot": "HCIoT", "esg": "ESG"}
+        name = f"系統預設（{labels[managed_app]}）"
 
     return {
         "id": SYSTEM_DEFAULT_PROMPT_ID,

@@ -29,14 +29,6 @@ api_key_manager: APIKeyManager | None = None
 user_manager: UserManager | None = None
 
 
-def get_jti_tts_job_manager():
-    return get_managed_tts_job_manager("jti")
-
-
-def get_hciot_tts_job_manager():
-    return get_managed_tts_job_manager("hciot")
-
-
 def init_managers():
     """Called from app startup event to initialise managers."""
     global prompt_manager, api_key_manager, user_manager
@@ -56,12 +48,14 @@ def init_managers():
         get_general_conversation_logger()
         get_jti_session_manager()
         get_jti_conversation_logger()
-        get_jti_tts_job_manager()
+        get_managed_tts_job_manager("jti")
         get_hciot_session_manager()
         get_hciot_conversation_logger()
-        get_hciot_tts_job_manager()
+        get_managed_tts_job_manager("hciot")
         get_esg_session_manager()
         get_esg_conversation_logger()
+        get_managed_tts_job_manager("esg")
+        get_managed_tts_job_manager("general")
 
         # === Module-specific startup hooks ===
         from .services.jti.startup import jti_startup

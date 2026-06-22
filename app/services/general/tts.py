@@ -27,6 +27,16 @@ MANAGED_TTS_CONFIGS: dict[str, ManagedTtsConfig] = {
         character_env="HCIOT_TTS_CHARACTER",
         default_character="healthy2",
     ),
+    "esg": ManagedTtsConfig(
+        app="esg",
+        character_env="ESG_TTS_CHARACTER",
+        default_character="hayley",
+    ),
+    "general": ManagedTtsConfig(
+        app="general",
+        character_env="GENERAL_TTS_CHARACTER",
+        default_character="hayley",
+    ),
 }
 
 

@@ -108,12 +108,9 @@ def test_jti_quiz_bank_route_contract_is_unchanged() -> None:
     assert actual == {
         ("GET", "/banks/"),
         ("POST", "/banks/"),
-        ("GET", "/banks/{bank_id}"),
-        ("PATCH", "/banks/{bank_id}"),
         ("DELETE", "/banks/{bank_id}"),
         ("POST", "/banks/{bank_id}/activate"),
         ("GET", "/questions/"),
-        ("GET", "/questions/{question_id}"),
         ("POST", "/questions/"),
         ("PUT", "/questions/{question_id}"),
         ("DELETE", "/questions/{question_id}"),

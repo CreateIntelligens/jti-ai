@@ -51,17 +51,6 @@ class UpdateQuestionRequest(BaseModel):
     options: Optional[list[QuestionOption]] = None
 
 
-class UpdateBankRequest(BaseModel):
-    """Update bank metadata fields."""
-    name: Optional[str] = None
-    title: Optional[str] = None
-    description: Optional[str] = None
-    total_questions: Optional[int] = None
-    dimensions: Optional[list[str]] = None
-    tie_breaker_priority: Optional[list[str]] = None
-    selection_rules: Optional[dict] = None
-
-
 class UpdateQuizResultRequest(BaseModel):
     title: Optional[str] = None
     color_name: Optional[str] = None
@@ -110,45 +99,6 @@ def create_bank(
         return bank
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-
-@router.get("/banks/{bank_id}")
-def get_bank(
-    store_name: str,
-    bank_id: str,
-    request: Request,
-    language: str = Query("zh"),
-    auth: dict = Depends(verify_auth),
-):
-    """Get a bank's metadata."""
-    _authorize_store_access(store_name, request, auth)
-    store = get_quiz_bank_store()
-    meta = store.get_metadata(language, bank_id, store_name=store_name)
-    if not meta:
-        raise HTTPException(status_code=404, detail=f"Bank '{bank_id}' not found")
-    return meta
-
-
-@router.patch("/banks/{bank_id}")
-def update_bank(
-    store_name: str,
-    bank_id: str,
-    request_data: UpdateBankRequest,
-    request: Request,
-    language: str = Query("zh"),
-    auth: dict = Depends(verify_auth),
-):
-    """Update a bank's metadata."""
-    _authorize_store_access(store_name, request, auth)
-    if bank_id == DEFAULT_BANK_ID:
-        raise HTTPException(status_code=403, detail="Cannot modify default bank")
-    store = get_quiz_bank_store()
-    update_data = request_data.model_dump(exclude_none=True)
-    if not update_data:
-        raise HTTPException(status_code=400, detail="No fields to update")
-    result = store.upsert_metadata(language, bank_id, update_data, store_name=store_name)
-    invalidate_quiz_cache(language, store_name=store_name)
-    return result
 
 
 @router.delete("/banks/{bank_id}")
@@ -208,24 +158,6 @@ def list_questions(
     store = get_quiz_bank_store()
     questions = store.list_questions(language, bank_id, store_name=store_name)
     return {"questions": questions, "total": len(questions)}
-
-
-@router.get("/questions/{question_id}")
-def get_question(
-    store_name: str,
-    question_id: str,
-    request: Request,
-    language: str = Query("zh"),
-    bank_id: str = Query(DEFAULT_BANK_ID),
-    auth: dict = Depends(verify_auth),
-):
-    """Get a single question."""
-    _authorize_store_access(store_name, request, auth)
-    store = get_quiz_bank_store()
-    question = store.get_question(language, bank_id, question_id, store_name=store_name)
-    if not question:
-        raise HTTPException(status_code=404, detail=f"Question '{question_id}' not found")
-    return question
 
 
 @router.post("/questions/", status_code=201)

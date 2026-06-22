@@ -180,7 +180,12 @@ export async function startChat(storeName: string, previousSessionId?: string | 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ store_name: storeName, model: getSelectedModel(), previous_session_id: previousSessionId || undefined }),
   });
-  return handleResponse<StartChatResponse>(response);
+  const data = await handleResponse<any>(response);
+  return {
+    session_id: data.session_id,
+    opening_message: data.opening_message,
+    prompt_applied: data.prompt_applied,
+  };
 }
 
 export async function sendMessage(text: string, sessionId?: string, turnNumber?: number): Promise<ChatResponse> {
@@ -189,7 +194,16 @@ export async function sendMessage(text: string, sessionId?: string, turnNumber?:
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ message: text, session_id: sessionId, turn_number: turnNumber, model: getSelectedModel() }),
   });
-  return handleResponse<ChatResponse>(response);
+  // 對齊 jti/hciot:在 service 邊界把後端的 message 映射成內部統一的 answer。
+  const data = await handleResponse<any>(response);
+  return {
+    answer: data.message ?? data.answer ?? '',
+    turn_number: data.turn_number,
+    citations: data.citations,
+    image_id: data.image_id,
+    tts_text: data.tts_text,
+    tts_message_id: data.tts_message_id,
+  };
 }
 
 // ========== Prompts ==========

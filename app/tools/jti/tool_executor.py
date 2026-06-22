@@ -8,6 +8,7 @@ from typing import Dict, Any, Optional
 import logging
 from google.genai import types
 import app.deps as deps
+from app.services.general.tts import get_managed_tts_job_manager
 from app.tools.jti.quiz import (
     generate_quiz,
     generate_random_quiz,
@@ -483,7 +484,7 @@ Format:
 JTI_CONFIG = QuizFlowConfig(
     session_manager_getter=deps.get_jti_session_manager,
     conversation_logger_getter=deps.get_jti_conversation_logger,
-    tts_manager_getter=deps.get_jti_tts_job_manager,
+    tts_manager_getter=lambda: get_managed_tts_job_manager("jti"),
     store_name=JTI_STORE_NAME,
     mode="jti",
 )

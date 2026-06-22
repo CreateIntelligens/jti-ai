@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 import app.deps as deps
 from app.auth import require_app_access, require_history_access, verify_admin
-from app.routers.tts_utils import register_tts_endpoints
+from app.routers.tts_utils import wire_tts
 from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
@@ -26,7 +26,6 @@ from app.schemas.chat import (
 from app.services.general.managed_chat import ManagedChatConfig, ManagedChatService
 from app.services.jti.main_agent import main_agent
 from app.services.jti.quiz_flow import JTI_QUIZ_CONFIG
-from app.services.tts_text import prepare_tts_text
 from app.utils import (
     build_date_query,
     build_history_summary_response,
@@ -85,11 +84,7 @@ def _get_conversation_logger():
     return deps.get_jti_conversation_logger()
 
 
-def _get_tts_manager():
-    return deps.get_jti_tts_job_manager()
-
-
-register_tts_endpoints(runtime_router, _get_tts_manager, text_formatter=prepare_tts_text)
+_get_tts_manager = wire_tts(runtime_router, "jti")
 
 chat_service = ManagedChatService(
     ManagedChatConfig(

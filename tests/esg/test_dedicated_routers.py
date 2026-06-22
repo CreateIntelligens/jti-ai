@@ -184,6 +184,8 @@ def test_esg_router_contracts() -> None:
     assert actual_chat == {
         ("POST", "/api/esg/chat/start"),
         ("POST", "/api/esg/chat/message"),
+        ("POST", "/api/esg/tts"),
+        ("GET", "/api/esg/tts/{tts_message_id}"),
         ("GET", "/api/esg/history"),
         ("GET", "/api/esg/history/export"),
         ("DELETE", "/api/esg/history"),
@@ -210,12 +212,9 @@ def test_esg_router_contracts() -> None:
     assert _route_contract(quiz_bank.router) == {
         ("GET", "/banks/"),
         ("POST", "/banks/"),
-        ("GET", "/banks/{bank_id}"),
-        ("PATCH", "/banks/{bank_id}"),
         ("DELETE", "/banks/{bank_id}"),
         ("POST", "/banks/{bank_id}/activate"),
         ("GET", "/questions/"),
-        ("GET", "/questions/{question_id}"),
         ("POST", "/questions/"),
         ("PUT", "/questions/{question_id}"),
         ("DELETE", "/questions/{question_id}"),

@@ -11,7 +11,7 @@ from fastapi.responses import JSONResponse
 
 import app.deps as deps
 from app.auth import require_app_access, require_history_access, verify_admin
-from app.routers.tts_utils import attach_tts_message_id, register_tts_endpoints
+from app.routers.tts_utils import attach_tts_message_id, wire_tts
 from app.schemas.chat import (
     ChatRequest,
     ChatResponse,
@@ -23,7 +23,6 @@ from app.schemas.chat import (
 )
 from app.services.hciot.main_agent import main_agent
 from app.services.hciot.runtime_settings import get_available_tts_characters
-from app.services.tts_text import prepare_tts_text
 from app.utils import (
     build_date_query,
     build_history_summary_response,
@@ -83,17 +82,13 @@ def _get_conversation_logger():
     return deps.get_hciot_conversation_logger()
 
 
-def _get_tts_manager():
-    return deps.get_hciot_tts_job_manager()
-
-
 @runtime_router.get("/tts/characters")
 async def get_tts_characters():
     """Return available TTS character voices."""
     return {"characters": get_available_tts_characters()}
 
 
-register_tts_endpoints(runtime_router, _get_tts_manager, text_formatter=prepare_tts_text)
+_get_tts_manager = wire_tts(runtime_router, "hciot")
 
 
 @runtime_router.post("/chat/start", response_model=CreateSessionResponse)

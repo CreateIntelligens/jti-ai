@@ -443,6 +443,8 @@ def test_home_can_start_and_send_general_chat(monkeypatch):
     from app.routers.general import chat as general_chat
     from app.services.general import main_agent as general_agent_mod
 
+    captured = {}
+
     class FakeConversationLogger:
         def log_conversation(self, **_kwargs):
             return "log-id", 1
@@ -457,8 +459,21 @@ def test_home_can_start_and_send_general_chat(monkeypatch):
             "tool_calls": [],
         }
 
+    def fake_attach_tts(response, language, manager):
+        captured["tts_text"] = response.tts_text
+        captured["language"] = language
+        captured["manager"] = manager
+        return response.model_copy(update={"tts_message_id": "tts-general"})
+
     monkeypatch.setattr(general_agent_mod.main_agent, "chat", fake_agent_chat)
     monkeypatch.setattr(general_chat, "_get_conversation_logger", lambda: FakeConversationLogger())
+    monkeypatch.setattr(general_chat, "_get_tts_manager", lambda: "general-manager", raising=False)
+    monkeypatch.setattr(
+        general_chat,
+        "attach_tts_message_id",
+        fake_attach_tts,
+        raising=False,
+    )
 
     client = TestClient(app)
 
@@ -480,6 +495,12 @@ def test_home_can_start_and_send_general_chat(monkeypatch):
     assert response.status_code == 200
     assert response.json()["answer"] == "回答：常見問題"
     assert response.json()["citations"] == [{"title": "FAQ", "uri": "faq.csv", "text": "常見問題"}]
+    assert response.json()["tts_message_id"] == "tts-general"
+    assert captured == {
+        "tts_text": "回答：常见问题",
+        "language": "zh",
+        "manager": "general-manager",
+    }
 
 
 def test_list_stores_filtering_by_app(monkeypatch):
