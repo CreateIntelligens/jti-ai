@@ -23,10 +23,10 @@ logger = logging.getLogger(__name__)
 
 QUIZ_SEED_TABLE = [
     # (managed_app, store_name, language, json_path)
-    ("jti", "__jti__",   "zh", "data/quiz_bank_jti_zh.json"),
-    ("jti", "__jti__en", "en", "data/quiz_bank_jti_en.json"),
-    ("esg", "__esg__",   "zh", "data/quiz_bank_esg_zh.json"),
-    ("esg", "__esg__en", "en", "data/quiz_bank_esg_en.json"),
+    ("jti", "__jti__",   "zh", "data/jti/quiz_bank_zh.json"),
+    ("jti", "__jti__en", "en", "data/jti/quiz_bank_en.json"),
+    ("esg", "__esg__",   "zh", "data/esg/quiz_bank_zh.json"),
+    ("esg", "__esg__en", "en", "data/esg/quiz_bank_en.json"),
 ]
 
 _backfill_done = False

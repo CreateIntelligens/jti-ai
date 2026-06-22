@@ -19,7 +19,7 @@ _TTS_API_URL = os.getenv("TTS_API_URL", "http://10.9.0.35:8001/tts")
 _TIMEOUT_SECONDS = float(os.getenv("TTS_TIMEOUT_SECONDS", "20"))
 _CACHE_TTL_SECONDS = int(os.getenv("TTS_CACHE_TTL_SECONDS", "900"))
 _MAX_JOBS = int(os.getenv("TTS_MAX_JOBS", "500"))
-_CACHE_DIR = Path(os.getenv("TTS_CACHE_DIR", "/app/data/tts_cache"))
+_CACHE_DIR = Path(os.getenv("TTS_CACHE_DIR", "/app/data/shared/tts_cache"))
 
 
 class TtsJobManager:

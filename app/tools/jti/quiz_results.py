@@ -19,8 +19,8 @@ from app.services.quiz.config import JTI_STORE_NAME
 logger = logging.getLogger(__name__)
 
 QUIZ_RESULTS_PATHS = {
-    "zh": Path("data/quiz_results.json"),
-    "en": Path("data/quiz_results_en.json"),
+    "zh": Path("data/jti/quiz_results_zh.json"),
+    "en": Path("data/jti/quiz_results_en.json"),
 }
 _quiz_results_cache: Dict[tuple, Dict[str, Any]] = {}
 

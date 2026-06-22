@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Optional
 logger = logging.getLogger(__name__)
 
 class LanceDBStore:
-    def __init__(self, uri: str = "data/lancedb", table_name: str = "knowledge"):
+    def __init__(self, uri: str = "data/shared/lancedb", table_name: str = "knowledge"):
         self.uri = uri
         self.table_name = table_name
         self._db = None
@@ -196,7 +196,7 @@ def get_lancedb_store() -> LanceDBStore:
     global _lancedb_store
     if _lancedb_store is None:
         _lancedb_store = LanceDBStore(
-            uri=os.getenv("LANCEDB_PATH", "data/lancedb"),
+            uri=os.getenv("LANCEDB_PATH", "data/shared/lancedb"),
             table_name=os.getenv("LANCEDB_TABLE_NAME", "knowledge"),
         )
     return _lancedb_store
