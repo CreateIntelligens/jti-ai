@@ -123,6 +123,7 @@ from .auth import verify_auth, _extract_bearer_token
 from .services.agent_utils import strip_citations
 from .services.model_discovery import get_available_models
 from .routers.jti import chat as jti_chat, quiz as jti_quiz, prompts as jti_prompts, knowledge as jti_knowledge, quiz_bank as jti_quiz_bank
+from .routers.jti import topics_admin as jti_topics_admin
 from .routers.general import chat, prompts, stores, api_keys, models, users, db_sync, quiz_bank as general_quiz_bank
 from .routers.general import knowledge as general_knowledge
 from .routers.general import topics_admin as general_topics, images as general_images
@@ -135,6 +136,7 @@ from .routers.esg import (
     quiz as esg_quiz,
     quiz_bank as esg_quiz_bank,
 )
+from .routers.esg import topics_admin as esg_topics_admin
 from .routers.admin_rag import router as admin_rag_router
 from .routers.auth_routes import router as auth_router
 from .services.mongo_client import get_mongo_client
@@ -469,6 +471,8 @@ app.include_router(jti_prompts.router, prefix="/api/jti-admin/prompts")
 app.include_router(jti_prompts.router, prefix="/api/jti/prompts", include_in_schema=False)
 app.include_router(jti_knowledge.router, prefix="/api/jti-admin/knowledge")
 app.include_router(jti_knowledge.router, prefix="/api/jti/knowledge", include_in_schema=False)
+app.include_router(jti_topics_admin.public_router, prefix="/api/jti")
+app.include_router(jti_topics_admin.router, prefix="/api/jti-admin/topics")
 app.include_router(jti_quiz_bank.router, prefix="/api/jti-admin/quiz-bank")
 app.include_router(jti_quiz_bank.router, prefix="/api/jti/quiz-bank", include_in_schema=False)
 app.include_router(hciot_chat.runtime_router)
@@ -490,6 +494,8 @@ app.include_router(esg_prompts.router, prefix="/api/esg-admin/prompts")
 app.include_router(esg_prompts.router, prefix="/api/esg/prompts", include_in_schema=False)
 app.include_router(esg_knowledge.router, prefix="/api/esg-admin/knowledge")
 app.include_router(esg_knowledge.router, prefix="/api/esg/knowledge", include_in_schema=False)
+app.include_router(esg_topics_admin.public_router, prefix="/api/esg")
+app.include_router(esg_topics_admin.router, prefix="/api/esg-admin/topics")
 app.include_router(esg_quiz_bank.router, prefix="/api/esg-admin/quiz-bank")
 app.include_router(esg_quiz_bank.router, prefix="/api/esg/quiz-bank", include_in_schema=False)
 app.include_router(hciot_qa_extract.router, prefix="/api/hciot-admin/knowledge")

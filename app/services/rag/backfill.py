@@ -13,6 +13,7 @@ from app.services.general.knowledge_store import get_general_knowledge_store
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.hciot.topic_store import get_hciot_topic_store
 from app.services.jti.knowledge_store import get_jti_knowledge_store
+from app.services.esg.knowledge_store import get_esg_knowledge_store
 
 logger = logging.getLogger(__name__)
 _SUPPORTED_KNOWLEDGE_EXTENSIONS = (".csv", ".txt", ".md", ".docx")
@@ -272,9 +273,7 @@ class BackfillService:
         if source_type == "esg":
             # ESG is a fixed managed app with a simple file knowledge base under
             # namespace "esg", partitioned by language (zh/en) like hciot/jti.
-            from app.services.knowledge_store import get_namespaced_knowledge_store
-
-            store = get_namespaced_knowledge_store("esg")
+            store = get_esg_knowledge_store()
             yield from self._iter_files_with_data(store.list_files_with_data(language))
             return
 

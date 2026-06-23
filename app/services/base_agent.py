@@ -216,6 +216,16 @@ class BaseAgent:
             ),
         )
 
+    def _get_text_only_config(self, session: Session) -> types.GenerateContentConfig:
+        """Per-session config for the answer pass after RAG results are known."""
+        base = self._make_chat_config(session)
+        return types.GenerateContentConfig(
+            system_instruction=base.system_instruction,
+            thinking_config=base.thinking_config,
+            tools=None,
+            temperature=0.7,
+        )
+
     def _get_or_create_chat_session(self, session: Session, model: str | None = None):
         """Get or create a persistent Gemini chat session."""
         sid = session.session_id
@@ -366,6 +376,7 @@ class BaseAgent:
         from app.services.gemini_service import gemini_with_retry, run_sync
 
         force_config = self._get_force_tool_config(session)
+        history_start = self._chat_history_len(chat_session)
         chat_session, response = await self._send_enriched_with_model_fallback(
             chat_session,
             enriched,
@@ -386,14 +397,28 @@ class BaseAgent:
             response_parts = []
             for tool_name, tool_result, raw_citations in results:
                 citations = self._merge_citations(citations, raw_citations or [])
-                response_parts.append(
-                    types.Part.from_function_response(
-                        name=tool_name,
-                        response={"result": tool_result},
-                    )
-                )
+                response_parts.append(f"[{tool_name}]\n{tool_result}")
 
-            response = await run_sync(gemini_with_retry, lambda pp=response_parts: chat_session.send_message(pp))
+            answer_prompt = self._build_rag_answer_prompt(
+                session,
+                user_message,
+                "\n\n---\n\n".join(response_parts),
+            )
+            text_only_config = self._get_text_only_config(session)
+            response = await run_sync(
+                gemini_with_retry,
+                lambda prompt=answer_prompt: chat_session.send_message(
+                    prompt,
+                    config=text_only_config,
+                ),
+            )
+            self._replace_internal_tool_history(
+                chat_session,
+                history_start,
+                user_message,
+                response,
+            )
+            break
 
         self._clean_enriched_history(chat_session, user_message)
         return response, citations
@@ -551,6 +576,46 @@ class BaseAgent:
         return sorted(scored_docs, key=lambda c: c["_rrf_score"], reverse=True)[:cap]
 
     @staticmethod
+    def _chat_history_len(chat_session) -> int | None:
+        history = getattr(chat_session, "_curated_history", None)
+        return len(history) if isinstance(history, list) else None
+
+    def _build_rag_answer_prompt(
+        self,
+        session: Session,
+        user_message: str,
+        tool_result: str,
+    ) -> str:
+        q_label = self._get_question_label(session.language)
+        if session.language == "en":
+            return (
+                f"{self._get_session_state(session)}\n\n"
+                f"<Knowledge search results>\n{tool_result}\n</Knowledge search results>\n\n"
+                f"{q_label} {user_message}"
+            )
+        return (
+            f"{self._get_session_state(session)}\n\n"
+            f"<知識庫查詢結果>\n{tool_result}\n</知識庫查詢結果>\n\n"
+            f"{q_label} {user_message}"
+        )
+
+    def _replace_internal_tool_history(
+        self,
+        chat_session,
+        history_start: int | None,
+        user_message: str,
+        response,
+    ) -> None:
+        history = getattr(chat_session, "_curated_history", None)
+        if not isinstance(history, list) or history_start is None:
+            return
+
+        final_text = strip_citations(extract_response_text(response))
+        del history[history_start:]
+        if final_text:
+            self._append_to_chat_history(chat_session, user_message, final_text)
+
+    @staticmethod
     def _clean_enriched_history(chat_session, original_user_message: str):
         """將 enriched_message 替換回乾淨的 user_message，避免 KB 結果累積在歷史中。
         Walks backwards to skip function_response entries (from tool calling)."""
@@ -622,7 +687,8 @@ class BaseAgent:
             citations, extra_meta = self._preprocess_chat_data(session, citations)
 
             # 提取文字與同步 DB
-            final_text = strip_citations(extract_response_text(response)) or self._get_chat_fallback_message(session.language)
+            final_text = strip_citations(extract_response_text(response))
+            final_text = final_text or self._get_chat_fallback_message(session.language)
             self._sync_history_to_db_background(session_id, user_message, final_text, citations)
 
             # 組裝結果

@@ -105,6 +105,24 @@ class QaKbKnowledgeStoreBase:
         query["filename"] = {"$not": {"$regex": r"\.csv$", "$options": "i"}}
         return self.collection.count_documents(query, limit=1) > 0
 
+    def has_orphan_csv_files(self, language: str) -> bool:
+        """True if any CSV in this language still lacks a ``topic_id`` (orphan).
+
+        Cheap O(1) preflight (``count_documents(..., limit=1)``) so the read path
+        can skip pulling the full file list when there is nothing to adopt — the
+        common steady state after the first request. ``topic_id`` missing, null,
+        or empty all count as orphan, mirroring ``_adopt_orphan_csvs``' filter
+        (``not file.get("topic_id")``).
+        """
+        query = self._query(language)
+        query["filename"] = {"$regex": r"\.csv$", "$options": "i"}
+        query["$or"] = [
+            {"topic_id": {"$exists": False}},
+            {"topic_id": None},
+            {"topic_id": ""},
+        ]
+        return self.collection.count_documents(query, limit=1) > 0
+
     def iter_csv_files_with_data(self, language: str):
         """Yield ``(filename, data_bytes)`` for every CSV in the language."""
         query = self._query(language)

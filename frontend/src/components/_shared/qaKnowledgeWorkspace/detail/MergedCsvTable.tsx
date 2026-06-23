@@ -56,6 +56,8 @@ interface MergedCsvTableProps {
   sourceFiles: string[];
   availableImages: QaImage[];
   resolveImageUrl?: (imageId?: string) => string | null;
+  // When true (general/JTI/ESG), hide the HCIoT-only 圖片 (IMG) / 網址 (URL) columns.
+  disableImages?: boolean;
   loading: boolean;
   error: string | null;
   isEditing: boolean;
@@ -140,6 +142,7 @@ export default function MergedCsvTable({
   sourceFiles,
   availableImages,
   resolveImageUrl = getQaImageUrl,
+  disableImages,
   loading,
   error,
   isEditing,
@@ -273,8 +276,8 @@ export default function MergedCsvTable({
                 </th>
                 <th className="qa-workspace-csv-col-question">問題 (Q)</th>
                 <th className="qa-workspace-csv-col-answer">回答 (A)</th>
-                <th className="qa-workspace-csv-col-wide">圖片 (IMG)</th>
-                <th className="qa-workspace-csv-col-wide">網址 (URL)</th>
+                {!disableImages && <th className="qa-workspace-csv-col-wide">圖片 (IMG)</th>}
+                {!disableImages && <th className="qa-workspace-csv-col-wide">網址 (URL)</th>}
                 {isEditing && <th className="qa-workspace-csv-col-action">-</th>}
               </tr>
             </thead>
@@ -342,6 +345,7 @@ export default function MergedCsvTable({
                           row.a
                         )}
                       </td>
+                      {!disableImages && (
                       <td>
                         {isEditing ? (
                           <div className="qa-workspace-merged-csv-img-cell">
@@ -433,6 +437,8 @@ export default function MergedCsvTable({
                           </div>
                         ) : null}
                       </td>
+                      )}
+                      {!disableImages && (
                       <td className="qa-workspace-csv-cell-break">
                         {isEditing ? (
                           <textarea
@@ -442,6 +448,7 @@ export default function MergedCsvTable({
                           />
                         ) : renderUrlValue(row.url)}
                       </td>
+                      )}
                       {isEditing && (
                         <td className="qa-workspace-csv-cell-center">
                           <button

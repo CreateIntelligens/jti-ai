@@ -435,13 +435,24 @@ def _add_knowledge_routes(router: APIRouter, config: QaKbRouterConfig) -> None:
             topic_store = config.topic_store_factory(language)
             topic = topic_store.get_topic(topic_id)
             if topic:
-                current_questions = set((topic.get("questions") or {}).get(language) or [])
-                topic_store.update_topic(topic_id, {
-                    f"hidden_questions.{language}": [
-                        question for question in request.hidden_questions
-                        if question in current_questions
-                    ],
-                })
+                raw_questions = topic.get("questions") or []
+                if isinstance(raw_questions, dict):
+                    current_questions = set(raw_questions.get(language) or [])
+                elif isinstance(raw_questions, list):
+                    current_questions = set(raw_questions)
+                else:
+                    current_questions = set()
+                hidden_questions = [
+                    question for question in request.hidden_questions
+                    if question in current_questions
+                ]
+                single_language = config.other_language(language) == language
+                update_payload = (
+                    {"hidden_questions": hidden_questions}
+                    if single_language
+                    else {f"hidden_questions.{language}": hidden_questions}
+                )
+                topic_store.update_topic(topic_id, update_payload)
 
         config.invalidate_cache(language)
         return {"message": "已更新", "topic_synced": topic_synced}

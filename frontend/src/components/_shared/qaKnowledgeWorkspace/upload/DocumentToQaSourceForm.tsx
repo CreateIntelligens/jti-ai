@@ -21,6 +21,7 @@ interface DocumentToQaSourceFormProps {
   fileInputRef: RefObject<HTMLInputElement | null>;
   canSubmit: boolean;
   disableAiQaExtraction?: boolean;
+  disableImages?: boolean;
   onModeChange: (mode: DocumentSourceMode) => void;
   onTextChange: (text: string) => void;
   onDragOverChange: (dragOver: boolean) => void;
@@ -45,18 +46,30 @@ const CSV_EXAMPLE_ROWS = [
   ['2', '療程前需要注意什麼？', '請先告知用藥與過敏史', '', 'https://example.com/checklist', 'false'],
 ] as const;
 
-const CSV_EXAMPLE_TEXT = [CSV_EXAMPLE_HEADERS, ...CSV_EXAMPLE_ROWS]
-  .map((row) => row.join(','))
-  .join('\n');
+// img/url 為 HCIoT 特例欄位；其餘 app 隱藏，範例表與下載一併拿掉這兩欄。
+const IMG_URL_COLUMN_INDICES = [
+  CSV_EXAMPLE_HEADERS.indexOf('img' as never),
+  CSV_EXAMPLE_HEADERS.indexOf('url' as never),
+];
 
-function downloadCsvExample() {
+function dropImageColumns(row: readonly string[], disableImages: boolean): string[] {
+  if (!disableImages) return [...row];
+  return row.filter((_, index) => !IMG_URL_COLUMN_INDICES.includes(index));
+}
+
+function downloadCsvExample(disableImages: boolean) {
+  const text = [CSV_EXAMPLE_HEADERS, ...CSV_EXAMPLE_ROWS]
+    .map((row) => dropImageColumns(row, disableImages).join(','))
+    .join('\n');
   downloadBlob(
-    new Blob([`\uFEFF${CSV_EXAMPLE_TEXT}`], { type: 'text/csv;charset=utf-8' }),
+    new Blob([`\uFEFF${text}`], { type: 'text/csv;charset=utf-8' }),
     'qa-upload-example.csv',
   );
 }
 
-function CsvFormatExample() {
+function CsvFormatExample({ disableImages = false }: { disableImages?: boolean }) {
+  const headers = dropImageColumns(CSV_EXAMPLE_HEADERS, disableImages);
+  const rows = CSV_EXAMPLE_ROWS.map((row) => dropImageColumns(row, disableImages));
   return (
     <section className="qa-workspace-csv-example" aria-labelledby="qa-csv-example-title">
       <div className="qa-workspace-csv-example-header">
@@ -67,7 +80,7 @@ function CsvFormatExample() {
         <button
           type="button"
           className="qa-workspace-csv-example-download"
-          onClick={downloadCsvExample}
+          onClick={() => downloadCsvExample(disableImages)}
         >
           <Download size={14} />
           <span>下載 CSV 範例</span>
@@ -77,13 +90,13 @@ function CsvFormatExample() {
         <table className="qa-workspace-csv-example-table">
           <thead>
             <tr>
-              {CSV_EXAMPLE_HEADERS.map((header) => (
+              {headers.map((header) => (
                 <th key={header}>{header}</th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {CSV_EXAMPLE_ROWS.map((row) => (
+            {rows.map((row) => (
               <tr key={row[0]}>
                 {row.map((cell, index) => (
                   <td key={`${row[0]}-${index}`}>{cell}</td>
@@ -107,6 +120,7 @@ export default function DocumentToQaSourceForm({
   fileInputRef,
   canSubmit,
   disableAiQaExtraction = false,
+  disableImages = false,
   onModeChange,
   onTextChange,
   onDragOverChange,
@@ -199,7 +213,7 @@ export default function DocumentToQaSourceForm({
               </div>
             </div>
           )}
-          afterContent={<CsvFormatExample />}
+          afterContent={<CsvFormatExample disableImages={disableImages} />}
         />
       )}
 

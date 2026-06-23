@@ -136,7 +136,7 @@ select.input-base option {
   border: 0.0625rem solid rgba(239, 68, 68, .2);
   border-radius: .375rem;
   background: rgba(239, 68, 68, .1);
-  color: #fca5a5;
+  color: var(--red-500);
   font-size: .8125rem;
 }
 .rp-overlay .users-panel-list-wrap {
@@ -187,22 +187,22 @@ select.input-base option {
 .rp-overlay .kc-badge.role-super-admin {
   border: 0.0625rem solid rgba(239, 68, 68, .2);
   background: rgba(239, 68, 68, .1);
-  color: #f87171;
+  color: var(--red-500);
 }
 .rp-overlay .kc-badge.role-admin {
   border: 0.0625rem solid rgba(245, 158, 11, .2);
   background: rgba(245, 158, 11, .1);
-  color: #fbbf24;
+  color: var(--accent);
 }
 .rp-overlay .kc-badge.role-user {
   border: 0.0625rem solid rgba(139, 92, 246, .2);
   background: rgba(139, 92, 246, .1);
-  color: #a78bfa;
+  color: var(--violet-600);
 }
 .rp-overlay .kc-badge.self {
   border: 0.0625rem solid rgba(59, 130, 246, .2);
   background: rgba(59, 130, 246, .1);
-  color: #60a5fa;
+  color: var(--primary);
 }
 
 /* ── External Key Row ── */
@@ -290,4 +290,222 @@ select.input-base option {
 .rp-overlay .rp-section-toggle:hover { color: var(--primary); }
 .rp-overlay .key-card.active {
   border-color: var(--primary); background: var(--primary-lt);
+}
+
+/* ── Sidebar navigation panel ── */
+.app-shell .project-group {
+  border-bottom: 0.0625rem solid var(--border);
+}
+
+.app-shell .project-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem 0.375rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.app-shell .project-toggle {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-shell .project-toggle:focus-visible,
+.app-shell .store-item-btn:focus-visible,
+.app-shell .new-store-btn:focus-visible {
+  outline: 0.125rem solid var(--primary);
+  outline-offset: -0.125rem;
+}
+
+.app-shell .store-item-btn {
+  border-radius: var(--r-md);
+}
+
+.app-shell .store-item-btn.active {
+  background: var(--primary-lt);
+  color: var(--primary);
+}
+
+.app-shell .file-panel {
+  border-top: 0.0625rem solid var(--border);
+  background: var(--surface);
+}
+
+.app-shell .sb-footer {
+  flex-shrink: 0;
+  padding: 0.625rem;
+  border-top: 0.0625rem solid var(--border);
+  background: var(--surface);
+}
+
+.app-shell .new-store-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  border: 0.0625rem dashed var(--border-md);
+  border-radius: var(--r-md);
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background var(--trans), border-color var(--trans), color var(--trans);
+}
+
+.app-shell .new-store-btn:hover {
+  border-color: var(--primary);
+  background: var(--primary-lt);
+  color: var(--primary);
+}
+
+/* ── General centered modals ── */
+.app-shell .general-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(15, 23, 42, 0.38);
+}
+
+.app-shell .general-modal {
+  width: min(32rem, 100%);
+  max-height: calc(100dvh - 2rem);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  overflow: auto;
+  padding: 1rem;
+  border: 0.0625rem solid var(--border);
+  border-radius: var(--r-xl);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-lg);
+}
+
+.app-shell .general-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.app-shell .general-modal-header h2 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 650;
+  letter-spacing: 0;
+}
+
+.app-shell .general-modal-close {
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0.0625rem solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  color: var(--text-2);
+  cursor: pointer;
+}
+
+.app-shell .general-modal-close:hover:not(:disabled) {
+  border-color: var(--border-md);
+  color: var(--text);
+}
+
+.app-shell .general-form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  color: var(--text-2);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.app-shell .general-form-field input,
+.app-shell .general-form-field select {
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0.5rem 0.625rem;
+  border: 0.0625rem solid var(--border-md);
+  border-radius: var(--r-md);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-weight: 500;
+  outline: none;
+}
+
+.app-shell .general-form-field input:focus,
+.app-shell .general-form-field select:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 0.1875rem var(--primary-lt);
+}
+
+.app-shell .general-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.app-shell .drop-zone.upload-modal-trigger {
+  display: block;
+  width: calc(100% - 1rem);
+  font-family: var(--font);
+}
+
+.app-shell .general-upload-drop {
+  min-height: 10rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 1.5rem;
+  border: 0.09375rem dashed var(--border-md);
+  border-radius: var(--r-lg);
+  background: var(--bg);
+  color: var(--text-2);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--trans), border-color var(--trans), color var(--trans);
+}
+
+.app-shell .general-upload-drop svg {
+  color: var(--primary);
+}
+
+.app-shell .general-upload-drop:hover:not(:disabled),
+.app-shell .general-upload-drop.drag-over {
+  border-color: var(--primary);
+  background: var(--primary-lt);
+  color: var(--primary);
+}
+
+.app-shell .general-upload-drop.uploading {
+  opacity: 0.7;
+  cursor: wait;
 }

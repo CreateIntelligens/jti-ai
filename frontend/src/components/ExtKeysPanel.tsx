@@ -1,323 +1,224 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Copy, Eye, Link2, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { KeyRound, Users, X } from 'lucide-react';
 import * as api from '../services/api';
-import type { Store } from '../types';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { useOverlayPressClose } from '../hooks/useOverlayPressClose';
-import { toErrorMessage } from '../utils/errors';
-import AppSelect from './AppSelect';
+import { PROJECT_COLORS } from '../utils/storeDisplay';
 
 interface ExtKeysPanelProps {
   isOpen: boolean;
   onClose: () => void;
-  stores: Store[];
   isAdmin: boolean;
-  onShowStatus?: (msg: string) => void;
+  onApiKeySaved: () => void;
 }
 
-interface APIKey {
-  id: string;
-  key_prefix: string;
+interface SavedGeminiKey {
   name: string;
-  store_name: string;
-  prompt_index: number | null;
-  created_at: string;
+  key: string;
 }
 
-async function writeClipboard(text: string): Promise<void> {
-  if (navigator.clipboard?.writeText) {
-    await navigator.clipboard.writeText(text);
-    return;
-  }
-
-  const textarea = document.createElement('textarea');
-  textarea.value = text;
-  textarea.style.position = 'fixed';
-  textarea.style.opacity = '0';
-  document.body.appendChild(textarea);
-
-  try {
-    textarea.focus();
-    textarea.select();
-    if (!document.execCommand('copy')) {
-      throw new Error('execCommand copy failed');
-    }
-  } finally {
-    document.body.removeChild(textarea);
-  }
+function maskKey(key: string): string {
+  if (key.length <= 8) return '••••••••';
+  return `${key.slice(0, 4)}••••${key.slice(-4)}`;
 }
 
 export default function ExtKeysPanel({
   isOpen,
   onClose,
-  stores,
   isAdmin,
-  onShowStatus,
+  onApiKeySaved,
 }: ExtKeysPanelProps) {
-  const [apiKeys, setApiKeys] = useState<APIKey[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [newKeyName, setNewKeyName] = useState('');
-  const [targetStore, setTargetStore] = useState('');
-  const [newKeyResult, setNewKeyResult] = useState<string | null>(null);
-  const [revealedKeys, setRevealedKeys] = useState<Record<string, string>>({});
-  const [revealingId, setRevealingId] = useState<string | null>(null);
+  const [systemKeyNames, setSystemKeyNames] = useState<string[]>([]);
+  const [savedKeys, setSavedKeys] = useState<SavedGeminiKey[]>([]);
+  const [activeKey, setActiveKey] = useState('system');
+  const [newName, setNewName] = useState('');
+  const [newKey, setNewKey] = useState('');
+  const [saving, setSaving] = useState(false);
   const overlayPressClose = useOverlayPressClose(onClose);
 
   useEscapeKey(onClose, isOpen);
 
-  const storeLabelByName = useMemo(
-    () => new Map(stores.map((s) => [s.name, s.display_name || s.name])),
-    [stores],
-  );
-  const storeOptions = [
-    { value: '', label: '選擇目標知識庫...' },
-    ...stores.map((s) => ({
-      value: s.name,
-      label: s.display_name || s.name,
-    })),
-  ];
+  const reloadLocalKeys = () => {
+    setSavedKeys(api.getSavedApiKeys());
+    setActiveKey(api.getActiveApiKeyName());
+  };
 
   useEffect(() => {
-    if (isOpen) {
-      loadKeys();
-      setNewKeyResult(null);
-      setRevealedKeys({});
-    }
-  }, [isOpen]);
+    if (!isOpen) return;
+    reloadLocalKeys();
+    setNewName('');
+    setNewKey('');
 
-  const loadKeys = async () => {
-    setLoading(true);
+    let active = true;
+    if (isAdmin) {
+      void api.getKeyInfos()
+        .then((data) => {
+          if (active) setSystemKeyNames(data.names || []);
+        })
+        .catch(() => {
+          if (active) setSystemKeyNames([]);
+        });
+    } else {
+      setSystemKeyNames([]);
+    }
+    return () => { active = false; };
+  }, [isAdmin, isOpen]);
+
+  const selectKey = (name: string) => {
+    api.setActiveApiKey(name);
+    setActiveKey(name);
+    onApiKeySaved();
+  };
+
+  const handleSave = () => {
+    const name = newName.trim();
+    const key = newKey.trim();
+    if (!name || !key) return;
+    setSaving(true);
     try {
-      const data = await api.listApiKeys();
-      setApiKeys(data);
-    } catch {
-      setApiKeys([]);
+      api.saveApiKey(name, key);
+      setNewName('');
+      setNewKey('');
+      reloadLocalKeys();
+      onApiKeySaved();
     } finally {
-      setLoading(false);
+      setSaving(false);
     }
   };
 
-  const handleCreate = async () => {
-    const trimmedName = newKeyName.trim();
-    if (!trimmedName || !targetStore) return;
-    setCreating(true);
-    try {
-      const result = await api.createApiKey(trimmedName, targetStore, null);
-      setNewKeyResult(result.key);
-      setNewKeyName('');
-      setTargetStore('');
-      await loadKeys();
-      onShowStatus?.('✅ API Key 已建立');
-    } catch (e) {
-      alert('建立失敗: ' + (toErrorMessage(e)));
-    } finally {
-      setCreating(false);
-    }
+  const handleDelete = (name: string) => {
+    if (!confirm(`確定要刪除「${name}」嗎？`)) return;
+    api.deleteApiKey(name);
+    reloadLocalKeys();
+    onApiKeySaved();
   };
-
-  const handleDelete = async (keyId: string) => {
-    if (!confirm('確定要撤銷此 API Key 嗎？')) return;
-    try {
-      await api.deleteServerApiKey(keyId);
-      await loadKeys();
-      onShowStatus?.('API Key 已撤銷');
-    } catch (e) {
-      alert('撤銷失敗: ' + (toErrorMessage(e)));
-    }
-  };
-
-  const hideRevealedKey = (keyId: string) => {
-    setRevealedKeys((prev) => {
-      const next = { ...prev };
-      delete next[keyId];
-      return next;
-    });
-  };
-
-  const handleReveal = async (keyId: string) => {
-    if (revealedKeys[keyId]) {
-      hideRevealedKey(keyId);
-      return;
-    }
-    if (!confirm('注意：您正在檢視敏感金鑰，請確保周圍無人窺視。確定要顯示完整金鑰嗎？')) return;
-    setRevealingId(keyId);
-    try {
-      const plain = await api.revealApiKey(keyId);
-      setRevealedKeys((prev) => ({ ...prev, [keyId]: plain }));
-    } catch (e) {
-      alert('讀取失敗: ' + toErrorMessage(e));
-    } finally {
-      setRevealingId(null);
-    }
-  };
-
-  const copyToClipboard = async (text: string) => {
-    try {
-      await writeClipboard(text);
-      onShowStatus?.('✅ 已複製');
-    } catch {
-      onShowStatus?.('❌ 複製失敗，請手動複製');
-    }
-  };
-
-  const apiBase = 'http://<IP>:8913';
-  const curlExample = [
-    '# 1) 開啟對話 session，取得 session_id',
-    `curl -X POST "${apiBase}/api/chat/start" \\`,
-    '  -H "Authorization: Bearer sk-xxxxxxxx" \\',
-    '  -H "Content-Type: application/json" -d \'{}\'',
-    '',
-    '# 2) 送出訊息（SID 換成上一步拿到的 session_id）',
-    `curl -X POST "${apiBase}/api/chat/message" \\`,
-    '  -H "Authorization: Bearer sk-xxxxxxxx" \\',
-    '  -H "Content-Type: application/json" \\',
-    '  -d \'{"message":"你好","session_id":"SID"}\'',
-  ].join('\n');
 
   if (!isOpen) return null;
 
   return (
     <div className="rp-overlay" {...overlayPressClose}>
-      <div className="rp-panel" onClick={(e) => e.stopPropagation()}>
+      <div className="rp-panel" onClick={(event) => event.stopPropagation()}>
         <div className="rp-header">
           <span className="rp-title">對外 API Keys</span>
-          <button className="icon-btn" onClick={onClose}><X size={18} /></button>
+          <button className="icon-btn" onClick={onClose} aria-label="關閉對外 API Keys">
+            <X size={18} />
+          </button>
         </div>
         <div className="rp-body">
-          {/* Create new key（僅 admin 可發行；user 為唯讀） */}
-          {isAdmin && (
-            <>
-              <div>
-                <div className="rp-section-title">發行新 Key</div>
-                <div className="rp-form-stack">
-                  <input
-                    className="input-base"
-                    placeholder="Key 名稱"
-                    value={newKeyName}
-                    onChange={(e) => setNewKeyName(e.target.value)}
-                  />
-                  <AppSelect
-                    className="input-base"
-                    value={targetStore}
-                    onChange={setTargetStore}
-                    options={storeOptions}
-                    disabled={creating}
-                  />
-                  <button
-                    className="btn btn-primary btn-sm self-start"
-                    onClick={handleCreate}
-                    disabled={creating || !newKeyName.trim() || !targetStore}
-                  >
-                    {creating ? '建立中...' : '發行'}
-                  </button>
-                </div>
-
-                {/* Newly created key */}
-                {newKeyResult && (
-                  <div className="rp-key-result">
-                    <div className="rp-key-result-label">
-                      Key 已建立！
-                    </div>
-                    <div className="rp-key-result-row">
-                      <code className="rp-key-result-code">
-                        {newKeyResult}
-                      </code>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        onClick={() => copyToClipboard(newKeyResult)}
-                        title="複製"
-                      >
-                        <Copy size={14} />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="sep-row">
-                <div className="sep-line" />
-                <span className="sep-label">已發行</span>
-                <div className="sep-line" />
-              </div>
-            </>
-          )}
-
-          {/* Key list */}
-          <div>
-            {loading ? (
-              <div className="rp-loading">載入中...</div>
-            ) : apiKeys.length === 0 ? (
-              <div className="rp-list-empty">
-                尚無對外 API Key
-              </div>
-            ) : (
-              <div className="rp-list">
-                {apiKeys.map((k) => {
-                  const revealedKey = revealedKeys[k.id];
-                  return (
-                    <div key={k.id} className="ext-key-row">
-                      <Link2 className="ekr-icon" size={14} />
-                      <span className="ekr-name">{k.name}</span>
-                      {revealedKey ? (
-                        <code className="ekr-key">{revealedKey}</code>
-                      ) : (
-                        <span className="ekr-key">{k.key_prefix}••••</span>
-                      )}
-                      <button
-                        className="btn btn-ghost btn-sm shrink-0"
-                        onClick={() => handleReveal(k.id)}
-                        disabled={revealingId === k.id}
-                        title={revealedKey ? '隱藏金鑰' : '顯示完整金鑰'}
-                      >
-                        <Eye size={14} />
-                      </button>
-                      {revealedKey && (
-                        <button
-                          className="btn btn-ghost btn-sm shrink-0"
-                          onClick={() => copyToClipboard(revealedKey)}
-                          title="複製"
-                        >
-                          <Copy size={14} />
-                        </button>
-                      )}
-                      <span className="ekr-meta">
-                        {storeLabelByName.get(k.store_name) || k.store_name}
-                      </span>
-                      {isAdmin && (
-                        <button
-                          className="btn btn-danger btn-sm shrink-0"
-                          onClick={() => handleDelete(k.id)}
-                        >
-                          撤銷
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+          <div className="rp-info-box ext-key-intro">
+            選擇 General 知識庫連線使用的 Gemini Key。自訂 Key 僅儲存在此瀏覽器。
           </div>
 
-          {/* 如何使用（curl 範例，佔位符 sk-xxxxxxxx） */}
-          <details className="ext-howto">
-            <summary>如何使用這把 Key（curl 範例）</summary>
-            <div className="ext-howto-body">
-              <div className="ext-howto-hint">
-                把 <code>sk-xxxxxxxx</code> 換成你上方複製的金鑰即可呼叫。
-              </div>
-              <div className="rp-key-result-row">
-                <pre className="ext-howto-code">{curlExample}</pre>
-                <button
-                  className="btn btn-ghost btn-sm shrink-0"
-                  onClick={() => copyToClipboard(curlExample)}
-                  title="複製範例"
-                >
-                  <Copy size={14} />
-                </button>
-              </div>
+          <div>
+            <div className="rp-section-title">系統 Gemini Keys（專案）</div>
+            <div className="rp-stack">
+              <button
+                type="button"
+                className={`key-card key-card-clickable${activeKey === 'system' ? ' active' : ''}`}
+                onClick={() => selectKey('system')}
+              >
+                <span className="kc-icon kc-icon-system"><KeyRound size={16} /></span>
+                <span className="kc-info">
+                  <span className="kc-name-row">
+                    <span className="kc-name">系統預設</span>
+                    <span className="kc-badge system">系統</span>
+                  </span>
+                  <span className="kc-meta">使用伺服器端 Gemini Key</span>
+                </span>
+                {activeKey === 'system' && <span className="kc-active-tag">使用中</span>}
+              </button>
+              {systemKeyNames.map((name, index) => (
+                <div key={`${name}-${index}`} className="key-card">
+                  <span
+                    className="kc-icon project-key-icon"
+                    style={{ color: PROJECT_COLORS[index % PROJECT_COLORS.length] }}
+                  >
+                    <KeyRound size={16} />
+                  </span>
+                  <span className="kc-info">
+                    <span className="kc-name">{name || `專案 ${index + 1}`}</span>
+                    <span className="kc-meta">系統專案 Key</span>
+                  </span>
+                </div>
+              ))}
             </div>
-          </details>
+          </div>
+
+          <div className="sep-row"><div className="sep-line" /></div>
+
+          <div>
+            <div className="rp-section-title">瀏覽器 Gemini Keys</div>
+            <div className="rp-stack">
+              {savedKeys.length === 0 && (
+                <div className="rp-list-empty">尚未新增自訂 Key</div>
+              )}
+              {savedKeys.map((savedKey) => (
+                <button
+                  type="button"
+                  key={savedKey.name}
+                  className={`key-card key-card-clickable${activeKey === savedKey.name ? ' active' : ''}`}
+                  onClick={() => selectKey(savedKey.name)}
+                >
+                  <span className="kc-icon kc-icon-user"><Users size={16} /></span>
+                  <span className="kc-info">
+                    <span className="kc-name-row">
+                      <span className="kc-name">{savedKey.name}</span>
+                      <span className="kc-badge user">自訂</span>
+                    </span>
+                    <span className="kc-meta">{maskKey(savedKey.key)}</span>
+                  </span>
+                  {activeKey === savedKey.name && <span className="kc-active-tag">使用中</span>}
+                  <span
+                    className="btn btn-danger btn-sm"
+                    role="button"
+                    tabIndex={0}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      handleDelete(savedKey.name);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        handleDelete(savedKey.name);
+                      }
+                    }}
+                  >
+                    刪除
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="rp-section-title">新增 Gemini Key</div>
+            <div className="rp-form-stack">
+              <input
+                className="input-base"
+                placeholder="名稱"
+                value={newName}
+                onChange={(event) => setNewName(event.target.value)}
+              />
+              <input
+                className="input-base"
+                type="password"
+                placeholder="Gemini API Key（例如 AIza…）"
+                value={newKey}
+                onChange={(event) => setNewKey(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') handleSave();
+                }}
+              />
+              <button
+                className="btn btn-primary btn-sm self-start"
+                onClick={handleSave}
+                disabled={saving || !newName.trim() || !newKey.trim()}
+              >
+                {saving ? '儲存中…' : '新增 Key'}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

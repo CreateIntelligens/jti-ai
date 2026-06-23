@@ -18,6 +18,8 @@ interface MergedCsvPaneProps {
   language: QaLanguage;
   availableImages: QaImage[];
   resolveImageUrl?: (imageId?: string) => string | null;
+  // HCIoT-only IMG/URL columns; hidden for general/JTI/ESG (see config.disableImages).
+  disableImages?: boolean;
   statusMessage: string | null;
   api: QaWorkspaceApiClient;
   refreshKey?: number;
@@ -69,6 +71,7 @@ export default function MergedCsvPane({
   language,
   availableImages,
   resolveImageUrl,
+  disableImages,
   statusMessage,
   api,
   refreshKey = 0,
@@ -385,6 +388,7 @@ export default function MergedCsvPane({
           sourceFiles={sourceFiles}
           availableImages={availableImages}
           resolveImageUrl={resolveImageUrl}
+          disableImages={disableImages}
           loading={loading}
           error={error}
           isEditing={isEditing}

@@ -3,9 +3,16 @@
 .app-container {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   position: relative;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app-container > .app-shell {
+  width: 100%;
+  flex: 1;
 }
 
 .app-content {
@@ -21,14 +28,14 @@
 /* ==================== HEADER ==================== */
 
 .app-container header {
-  background: rgba(32, 33, 36, 0.92);
-  border-bottom: 0.0625rem solid var(--glass-border);
-  padding: 0.75rem 1.25rem;
+  background: var(--surface);
+  border-bottom: 0.0625rem solid var(--border);
+  padding: 0 1rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1rem;
-  min-height: 4rem;
+  min-height: var(--header-h);
   position: relative;
   z-index: 10;
 }
@@ -115,24 +122,24 @@
 /* ==================== SIDEBAR ==================== */
 
 .app-container aside {
-  width: 21.5rem;
+  width: var(--sidebar-w);
   flex-shrink: 0;
-  background: var(--glass-bg);
-  border: 0.0625rem solid var(--glass-border);
-  border-radius: 1rem;
+  background: var(--surface);
+  border: 0.0625rem solid var(--border);
+  border-radius: var(--r-xl);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   transition: margin-left 0.6s cubic-bezier(0.16, 1, 0.3, 1),
               opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
               transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow: var(--shadow-float);
+  box-shadow: var(--shadow-sm);
   position: relative;
   transform: translateX(0);
 }
 
 .app-container aside.closed {
-  margin-left: calc(-21.5rem - 1rem); /* Width + gap to fully slide out */
+  margin-left: calc(var(--sidebar-w) * -1 - 0.75rem);
   opacity: 0;
   pointer-events: none;
   transform: translateX(-1.5rem);
@@ -221,12 +228,12 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  background: var(--glass-bg);
-  border: 0.0625rem solid var(--glass-border);
-  border-radius: 1rem;
+  background: var(--surface);
+  border: 0.0625rem solid var(--border);
+  border-radius: var(--r-xl);
   position: relative;
   overflow: hidden;
-  box-shadow: var(--shadow-float);
+  box-shadow: var(--shadow-sm);
 }
 
 @keyframes ambientPulse {
@@ -268,9 +275,9 @@
 /* ==================== INPUT AREA ==================== */
 
 .input-area {
-  background: rgba(10, 14, 39, 0.6);
-  padding: 1rem;
-  border-top: 0.0625rem solid var(--glass-border);
+  background: transparent;
+  padding: 0.75rem;
+  border-top: 0.0625rem solid var(--border);
   display: flex;
   align-items: flex-end;
   gap: 0.75rem;
@@ -362,7 +369,7 @@
 
 @media (max-width: 64rem) {
   .app-container aside {
-    width: 20rem;
+    width: var(--sidebar-w);
   }
 
   .message {
@@ -372,8 +379,8 @@
 
 @media (max-width: 48rem) {
   .app-content {
-    padding: 1rem;
-    gap: 1rem;
+    padding: 0.5rem;
+    gap: 0.5rem;
   }
 
   .app-container header {
@@ -419,10 +426,10 @@
 
   .app-container aside {
     position: absolute;
-    left: 1rem;
+    left: 0;
     top: 0;
     bottom: 0;
-    width: 18.75rem;
+    width: var(--sidebar-w);
     z-index: 20;
   }
 

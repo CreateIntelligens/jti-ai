@@ -117,6 +117,10 @@ export interface QaWorkspaceConfig {
   /** When true, pasted text and uploaded docs are saved directly (and chunked
    * by the RAG backfill) instead of going through AI Q&A extraction. */
   disableAiQaExtraction?: boolean;
+  /** When true, this app has no image/url support (HCIoT-only feature). The
+   * image upload tab and "manage images" affordances are hidden; the client's
+   * image methods are expected to be no-ops returning empty results. */
+  disableImages?: boolean;
   /** Resolve an image id to its display URL. Each host app owns its own image
    * URL scheme (hciot uses /api/hciot/images/, general uses per-store paths), so
    * the host supplies this. Defaults to the hciot scheme when omitted. */
@@ -401,6 +405,7 @@ export default function QaKnowledgeWorkspace({
         onSubmitQA={handleQASubmit}
         api={api}
         disableAiQaExtraction={config.disableAiQaExtraction}
+        disableImages={config.disableImages}
         resolveImageUrl={resolveImageUrl}
         onUploadImage={api.uploadImage}
         onDeleteImage={api.deleteImage}
@@ -427,6 +432,7 @@ export default function QaKnowledgeWorkspace({
           hiddenQuestions={workspaceData.selectedMergedTopic?.hidden_questions}
           refreshKey={workspaceData.topicRefreshKey}
           resolveImageUrl={resolveImageUrl}
+          disableImages={config.disableImages}
           api={api}
           onRefreshWorkspace={() => workspaceData.refreshWorkspaceAfterTopicChange()}
           onUploadImage={api.uploadImage}

@@ -1,5 +1,8 @@
 import { API_BASE, fetchAsAdmin, handleResponse, normLang, buildUrl } from './base';
 import { createQuizBankApi } from './_shared/quizBank';
+import { createQaKnowledgeApi, type QaMergedCsvResponse, type SaveTopicCsvMergedPayload } from './_shared/qaKnowledge';
+import { createFixedAppTopicApi } from './_shared/fixedAppTopics';
+import type { QaAdminCategory, QaCategory } from '../../config/qaTopics';
 
 // ========== JTI Types ==========
 
@@ -243,5 +246,94 @@ export async function importQuizBank(language: string, bankId: string, file: Fil
 
 export async function exportQuizBankCsv(language: string, bankId: string): Promise<void> {
   return jtiQuizApi.exportQuizBankCsv(language, bankId);
+}
+
+// ========== JTI index Q&A topics ==========
+// 路由對照後端 main.py：
+//   public_router → /api/jti            （/topics/{lang}, /topics/{lang}/all）
+//   admin router  → /api/jti-admin/topics
+//   merged csv    → /api/jti-admin/knowledge/topic-csv-merged
+
+// JTI 與 ESG 對稱，topic surface 全由 factory 依 app 產生；以下 named export 為
+// 轉接層，維持既有呼叫端與測試介面不變。
+export const jtiTopicApi = createFixedAppTopicApi('jti');
+
+/** 公開：只含可見的 topics/questions（過濾隱藏）。 */
+export function listJtiTopics(language: string): Promise<{ categories: QaCategory[] }> {
+  return jtiTopicApi.listTopics(language);
+}
+
+/** Admin：完整 topics（含隱藏），供文件工作區管理。 */
+export function listJtiTopicsAdmin(language: string): Promise<{ categories: QaAdminCategory[] }> {
+  return jtiTopicApi.listTopicsAdmin(language);
+}
+
+export function setJtiCategoryHidden(categoryId: string, hidden: boolean, language: string) {
+  return jtiTopicApi.setCategoryHidden(categoryId, hidden, language);
+}
+
+export function getJtiTopicMergedCsv(topicId: string, language: string): Promise<QaMergedCsvResponse> {
+  return jtiTopicApi.getTopicMergedCsv(topicId, language);
+}
+
+// ========== JTI knowledge workspace (shared QA client) ==========
+// The shared file/CSV/extraction surface, bound to JTI's admin knowledge mount.
+
+const jtiQaKnowledgeApi = createQaKnowledgeApi(`${API_BASE}/jti-admin/knowledge`);
+
+export function uploadJtiKnowledgeFileWithTopic(
+  opts: Parameters<typeof jtiQaKnowledgeApi.uploadKnowledgeFileWithTopic>[0],
+) {
+  return jtiQaKnowledgeApi.uploadKnowledgeFileWithTopic(opts);
+}
+
+export function updateJtiKnowledgeFileMetadata(
+  filename: string,
+  metadata: { topic_id?: string | null; category_label?: string | null; topic_label?: string | null },
+  language: string = 'zh',
+) {
+  return jtiQaKnowledgeApi.updateKnowledgeFileMetadata(filename, metadata, language);
+}
+
+export function saveJtiTopicMergedCsv(
+  topicId: string,
+  payload: SaveTopicCsvMergedPayload,
+  language: string = 'zh',
+) {
+  return jtiQaKnowledgeApi.saveTopicMergedCsv(topicId, payload, language);
+}
+
+export function parseJtiQaCsvText(text: string) {
+  return jtiQaKnowledgeApi.parseQaCsvText(text);
+}
+
+export function createJtiTopic(
+  topicId: string,
+  label: string,
+  categoryLabel: string,
+  questions: string[] | undefined,
+  language: string,
+) {
+  return jtiTopicApi.createTopic(topicId, label, categoryLabel, questions, language);
+}
+
+export function updateJtiTopic(
+  topicId: string,
+  data: { labels?: string; category_labels?: string; questions?: string[]; hidden_questions?: string[]; hidden?: boolean },
+  language: string,
+) {
+  return jtiTopicApi.updateTopic(topicId, data, language);
+}
+
+export function reorderJtiTopics(topicIds: string[], language: string) {
+  return jtiTopicApi.reorderTopics(topicIds, language);
+}
+
+export function deleteJtiTopic(topicId: string, language: string) {
+  return jtiTopicApi.deleteTopic(topicId, language);
+}
+
+export function deleteJtiTopics(topicIds: string[], language: string) {
+  return jtiTopicApi.deleteTopics(topicIds, language);
 }
 

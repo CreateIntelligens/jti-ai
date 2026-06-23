@@ -53,6 +53,8 @@ interface UploadDialogProps {
   ) => Promise<{ name: string; uploaded_count: number }>;
   api: QaWorkspaceApiClient;
   disableAiQaExtraction?: boolean;
+  // HCIoT-only feature: hide the 上傳圖片 tab and img/url example columns elsewhere.
+  disableImages?: boolean;
   resolveImageUrl?: (imageId?: string) => string | null;
   onUploadImage: (file: File, imageId?: string) => Promise<UploadedImageResult>;
   onDeleteImage?: DeleteImageHandler;
@@ -71,11 +73,13 @@ export default function UploadDialog({
   onSubmitQA,
   api,
   disableAiQaExtraction,
+  disableImages = false,
   resolveImageUrl,
   onUploadImage,
   onDeleteImage,
   onUploadImageComplete,
 }: UploadDialogProps) {
+  const visibleTabs = disableImages ? TABS.filter((item) => item.id !== 'image') : TABS;
   const [tab, setTab] = useState<Tab>('file');
   const overlayPressClose = useOverlayPressClose(onClose);
   const topic = useUploadTopicSelection(categories, open);
@@ -102,7 +106,7 @@ export default function UploadDialog({
         </div>
 
         <div className="qa-workspace-upload-tabs" role="tablist">
-          {TABS.map((item) => (
+          {visibleTabs.map((item) => (
             <button
               key={item.id}
               type="button"
@@ -135,6 +139,7 @@ export default function UploadDialog({
             onUploadComplete={onUploadComplete}
             api={api}
             disableAiQaExtraction={disableAiQaExtraction}
+            disableImages={disableImages}
             availableImages={availableImages}
             resolveImageUrl={resolveImageUrl}
             onUploadImage={onUploadImage}

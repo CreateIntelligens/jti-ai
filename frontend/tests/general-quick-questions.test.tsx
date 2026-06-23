@@ -1,5 +1,5 @@
 import React from 'react';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const apiMocks = vi.hoisted(() => ({
@@ -60,12 +60,16 @@ describe('General quick questions', () => {
     );
 
     await waitFor(() => expect(apiMocks.listGeneralTopics).toHaveBeenCalledWith('store-a'));
-    expect(await screen.findByText('顯示問題')).toBeTruthy();
+
+    // 常見問題會同時出現在 ChatArea 的 quick-prompt 與右側 SuggestSidebar，
+    // 故將斷言限定在側欄（aria-label「常見問題」）範圍內，避免抓到多個。
+    const sidebar = await screen.findByRole('complementary', { name: '常見問題' });
+    expect(within(sidebar).getByText('顯示問題')).toBeTruthy();
     expect(screen.queryByText('隱藏問題')).toBeNull();
     expect(screen.queryByText('不應顯示')).toBeNull();
     expect(screen.queryByText('隱藏分類')).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: /顯示問題/ }));
+    fireEvent.click(within(sidebar).getByRole('button', { name: /顯示問題/ }));
 
     expect(onSendMessage).toHaveBeenCalledWith('顯示問題');
   });

@@ -410,7 +410,7 @@ export async function deleteConversations(mode: 'jti' | 'hciot' | 'general', ses
 
 // ========== RAG Admin ==========
 
-export type RagSourceType = 'hciot' | 'jti' | 'all';
+export type RagSourceType = 'hciot' | 'jti' | 'esg' | 'all';
 
 export interface ReindexRagResponse {
   started: boolean;

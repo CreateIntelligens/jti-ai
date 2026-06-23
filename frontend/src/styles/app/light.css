@@ -90,7 +90,7 @@
 [data-theme="light"] .app-container input:not([type="checkbox"]):focus,
 [data-theme="light"] .app-container select:focus,
 [data-theme="light"] .app-container textarea:focus {
-  background: #fff;
+  background: var(--surface);
   border-color: var(--crystal-teal);
   box-shadow: 0 0 0 0.1875rem rgba(15, 118, 110, 0.1);
 }
@@ -107,7 +107,7 @@
 }
 
 [data-theme="light"] .custom-select-trigger.open {
-  background: #fff;
+  background: var(--surface);
   border-color: var(--crystal-teal);
   box-shadow: 0 0 0 0.1875rem rgba(15, 118, 110, 0.1);
 }
@@ -140,7 +140,7 @@
 [data-theme="light"] .modal button,
 [data-theme="light"] .overlay button {
   background: var(--primary-color);
-  color: #fff;
+  color: var(--on-primary);
   box-shadow: 0 0.125rem 0.5rem rgba(15, 118, 110, 0.2);
 }
 
@@ -162,14 +162,14 @@
 [data-theme="light"] .app-content button.secondary:hover,
 [data-theme="light"] .modal button.secondary:hover,
 [data-theme="light"] .overlay button.secondary:hover {
-  background: #fff;
+  background: var(--surface);
   border-color: var(--crystal-teal);
 }
 
 [data-theme="light"] .app-content button.danger,
 [data-theme="light"] .modal button.danger,
 [data-theme="light"] .overlay button.danger {
-  background: linear-gradient(135deg, var(--crystal-rose), #e11d48);
+  background: var(--danger-color);
 }
 
 [data-theme="light"] .app-content button:disabled,
@@ -244,7 +244,7 @@
 }
 
 [data-theme="light"] .header-link:hover {
-  background: #fff;
+  background: var(--surface);
   border-color: var(--crystal-teal);
 }
 
@@ -371,7 +371,7 @@
 
 [data-theme="light"] .prompt-modal-tab-btn.active.apikey {
   background: linear-gradient(135deg, rgba(2, 132, 199, 0.15), rgba(14, 165, 233, 0.05));
-  color: #0284c7;
+  color: var(--primary-color);
   box-shadow: 0 0.125rem 0.5rem rgba(2, 132, 199, 0.15);
 }
 
@@ -398,5 +398,5 @@
 
 [data-theme="light"] .overlay .file-preview-modal .fpm-close:hover,
 [data-theme="light"] .overlay button.fpm-close:hover {
-  color: #1e293b !important;
+  color: var(--text-primary) !important;
 }

@@ -1,7 +1,7 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { AlertTriangle, LogOut } from 'lucide-react';
-import { logout } from './services/api';
+import { hasKnownAuthSession, logout } from './services/api';
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import AdminPanel from './components/AdminPanel';
@@ -10,8 +10,10 @@ import PromptPanel from './components/PromptPanel';
 import ExtKeysPanel from './components/ExtKeysPanel';
 import UsersPanel from './components/UsersPanel';
 import ConversationHistoryModal from './components/ConversationHistoryModal';
-import FilePreviewModal from './components/FilePreviewModal';
 import GeneralKnowledgeWorkspace from './components/general/GeneralKnowledgeWorkspace';
+import HciotKnowledgeWorkspace from './components/hciot/HciotKnowledgeWorkspace';
+import JtiKnowledgeWorkspace from './components/jti/JtiKnowledgeWorkspace';
+import EsgKnowledgeWorkspace from './components/esg/EsgKnowledgeWorkspace';
 import Jti from './pages/Jti';
 import Hciot from './pages/Hciot';
 import General from './pages/General';
@@ -20,7 +22,7 @@ import { useAppChat } from './hooks/useAppChat';
 import { useCurrentUserProfile } from './hooks/useCurrentUserProfile';
 import { PROJECT_COLORS, getStoreIcon } from './utils/storeDisplay';
 import { getProfileRedirectPath, isAdminRole, isGeneralUserScope } from './utils/authRouting';
-import type { FileItem } from './types';
+import type { AppTarget, KnowledgeLanguage } from './types';
 import './styles/shared/index.css';
 import './styles/shared/animations.css';
 import './styles/app/layout.css';
@@ -38,6 +40,21 @@ import './styles/conversation-history-detail.css';
 import './styles/conversation-history-light.css';
 
 type PanelId = 'admin' | 'apikeys' | 'prompt' | 'extkeys' | 'users' | null;
+
+// 固定庫（hciot/jti/esg）的文件工作區都吃相同 props；以 appTarget 為 key 查表
+// 渲染，新增 app 只要在此註冊一行，不必再加一段 if/三元。其餘（general）走
+// 預設的 GeneralKnowledgeWorkspace（吃 storeName 而非 language）。
+type FixedAppWorkspaceComponent = ComponentType<{
+  active: boolean;
+  language: KnowledgeLanguage;
+  onTopicsChanged?: () => Promise<void> | void;
+}>;
+
+const FIXED_APP_WORKSPACES: Partial<Record<AppTarget, FixedAppWorkspaceComponent>> = {
+  hciot: HciotKnowledgeWorkspace,
+  jti: JtiKnowledgeWorkspace,
+  esg: EsgKnowledgeWorkspace,
+};
 
 interface AuthGuardProps {
   children: ReactNode;
@@ -59,7 +76,9 @@ function pageNameForPath(path: string): string {
 }
 
 function AuthGuard({ children, allowedRoles, allowedApp, allowGeneralUser = false, canShow }: AuthGuardProps) {
-  const { profile, loading, error } = useCurrentUserProfile();
+  const { profile, loading, error } = useCurrentUserProfile({
+    enabled: hasKnownAuthSession(),
+  });
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -183,23 +202,27 @@ export default function App() {
 function HomeShell({ canShow }: { canShow: (page: string) => boolean }) {
   const { profile, setProfile } = useCurrentUserProfile();
   const isAdmin = isAdminRole(profile?.role);
+  useEffect(() => {
+    if (localStorage.getItem('theme') === null) {
+      localStorage.setItem('theme', 'light');
+    }
+  }, []);
 
   const {
     sidebarOpen,
     conversationHistoryModalOpen, setConversationHistoryModalOpen,
     status, stores, filteredStores, keyNames,
     knowledgeTargets, currentTarget, currentTargetId, currentStore,
-    files, filesLoading,
     messages, setMessages,
     loading,
     initializing,
     sessionId, setSessionId,
+    managedContext,
     theme, toggleTheme,
     toggleSidebar, showStatus,
     refreshStores, handleRefreshKnowledge,
     handleStoreChange, handleRestartChat,
     handleCreateStore, handleDeleteStore,
-    handleUploadFile, handleDeleteFile,
     handleSendMessage, handleRegenerate, handleEditAndResend,
   } = useAppChat(isAdmin);
 
@@ -207,8 +230,15 @@ function HomeShell({ canShow }: { canShow: (page: string) => boolean }) {
   const openPanel = (id: PanelId) => setPanel(id);
   const closePanel = () => setPanel(null);
 
-  const [previewFile, setPreviewFile] = useState<FileItem | null>(null);
-  const [knowledgeWorkspaceOpen, setKnowledgeWorkspaceOpen] = useState(false);
+  const [knowledgeWorkspaceView, setKnowledgeWorkspaceView] = useState<'chat' | 'files'>('chat');
+
+  // 切換知識庫或失去 admin/store 時，自動退回對話檢視，並確保側邊欄展開。
+  useEffect(() => {
+    setKnowledgeWorkspaceView('chat');
+    if (!sidebarOpen) {
+      toggleSidebar();
+    }
+  }, [currentStore]);
 
   // Derive store display info for chat area
   const activeStore = currentTarget?.kind === 'store'
@@ -217,14 +247,13 @@ function HomeShell({ canShow }: { canShow: (page: string) => boolean }) {
   const currentStoreName = activeStore ? (activeStore.display_name || activeStore.name) : null;
   const currentStoreIcon = getStoreIcon(activeStore?.managed_app || '');
   const currentProjectIdx = typeof activeStore?.key_index === 'number' ? activeStore.key_index : 0;
-  const currentProjectName = keyNames.length > 1
-    ? (keyNames[currentProjectIdx] || `Key #${currentProjectIdx + 1}`)
-    : null;
+  const currentProjectName = keyNames[currentProjectIdx]
+    || (keyNames.length > 0 ? `Key #${currentProjectIdx + 1}` : '全部專案');
   const currentProjectColor = PROJECT_COLORS[currentProjectIdx % PROJECT_COLORS.length];
 
   return (
     <div className="app-container">
-      <div className="app-shell">
+      <div className={`app-shell ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
         <Header
           sidebarOpen={sidebarOpen}
           onToggleSidebar={toggleSidebar}
@@ -236,6 +265,8 @@ function HomeShell({ canShow }: { canShow: (page: string) => boolean }) {
           onOpenAdminPanel={() => openPanel('admin')}
           onOpenApiKeysPanel={() => openPanel('apikeys')}
           onOpenExtKeysPanel={() => openPanel('extkeys')}
+          onOpenPromptPanel={() => openPanel('prompt')}
+          onRefresh={handleRefreshKnowledge}
           onShowStatus={showStatus}
           userProfile={profile}
           canShow={canShow}
@@ -243,57 +274,65 @@ function HomeShell({ canShow }: { canShow: (page: string) => boolean }) {
           onLogout={() => setProfile(null)}
         />
         <div className="app-body">
-          <Sidebar
-            isOpen={sidebarOpen}
-            stores={filteredStores}
-            keyNames={keyNames}
-            knowledgeTargets={knowledgeTargets}
-            currentTargetId={currentTargetId}
-            files={files}
-            filesLoading={filesLoading}
-            onTargetChange={handleStoreChange}
-            onUploadFile={handleUploadFile}
-            onDeleteFile={handleDeleteFile}
-            onCreateStore={handleCreateStore}
-            onOpenFile={(f) => setPreviewFile(f)}
-            canManageKnowledge={isAdmin}
-            onOpenKnowledgeWorkspace={
-              isAdmin && currentStore ? () => setKnowledgeWorkspaceOpen(true) : undefined
-            }
-          />
-          {knowledgeWorkspaceOpen && isAdmin && currentStore ? (
-            <main className="app-main">
-              <button
-                type="button"
-                className="knowledge-workspace-close"
-                onClick={() => setKnowledgeWorkspaceOpen(false)}
-              >
-                ← 返回對話
-              </button>
-              <GeneralKnowledgeWorkspace
-                active={knowledgeWorkspaceOpen}
-                storeName={currentStore}
-                onTopicsChanged={() => { void handleRefreshKnowledge(); }}
-              />
-            </main>
-          ) : (
-            <General
-              storeName={currentStore}
-              messages={messages}
-              onSendMessage={handleSendMessage}
-              disabled={!currentStore || initializing}
-              loading={loading}
-              onRegenerate={handleRegenerate}
-              onEditAndResend={handleEditAndResend}
-              currentStoreName={currentStoreName}
-              currentStoreIcon={currentStoreIcon}
-              currentProjectName={currentProjectName}
-              currentProjectColor={currentProjectColor}
-              onOpenPromptPanel={() => openPanel('prompt')}
-              onRestartChat={handleRestartChat}
-              onCreateStore={isAdmin ? () => openPanel('admin') : undefined}
+          {knowledgeWorkspaceView === 'chat' && (
+            <Sidebar
+              isOpen={sidebarOpen}
+              stores={filteredStores}
+              keyNames={keyNames}
+              knowledgeTargets={knowledgeTargets}
+              currentTargetId={currentTargetId}
+              onTargetChange={handleStoreChange}
+              onCreateStore={handleCreateStore}
+              canManageKnowledge={isAdmin}
             />
           )}
+          <General
+            storeName={currentStore}
+            appTarget={managedContext?.appTarget}
+            appLanguage={managedContext?.language}
+            messages={messages}
+            onSendMessage={handleSendMessage}
+            disabled={!currentStore || initializing}
+            loading={loading}
+            onRegenerate={handleRegenerate}
+            onEditAndResend={handleEditAndResend}
+            currentStoreName={currentStoreName}
+            currentStoreIcon={currentStoreIcon}
+            currentProjectName={currentProjectName}
+            currentProjectColor={currentProjectColor}
+            onOpenPromptPanel={() => openPanel('prompt')}
+            onRestartChat={handleRestartChat}
+            onCreateStore={isAdmin ? () => openPanel('admin') : undefined}
+            viewMode={knowledgeWorkspaceView}
+            onChangeView={setKnowledgeWorkspaceView}
+            /* 設計稿：只要選了知識庫就顯示「對話/文件」toggle，
+               不再限制 admin / 非 managed。 */
+            filesViewEnabled={Boolean(currentStore)}
+            filesView={
+              currentStore ? (() => {
+                const onTopicsChanged = () => { void handleRefreshKnowledge(); };
+                const active = knowledgeWorkspaceView === 'files';
+                // 固定庫（hciot/jti/esg）的檔案歸各自 app 的 admin API，不走
+                // general API（否則列表會是空的）；以 appTarget 查表渲染。
+                const FixedWorkspace = managedContext
+                  ? FIXED_APP_WORKSPACES[managedContext.appTarget]
+                  : undefined;
+                return FixedWorkspace && managedContext ? (
+                  <FixedWorkspace
+                    active={active}
+                    language={managedContext.language}
+                    onTopicsChanged={onTopicsChanged}
+                  />
+                ) : (
+                  <GeneralKnowledgeWorkspace
+                    active={active}
+                    storeName={currentStore}
+                    onTopicsChanged={onTopicsChanged}
+                  />
+                );
+              })() : undefined
+            }
+          />
         </div>
       </div>
 
@@ -316,10 +355,9 @@ function HomeShell({ canShow }: { canShow: (page: string) => boolean }) {
       <ApiKeysPanel
         isOpen={panel === 'apikeys'}
         onClose={closePanel}
-        onApiKeySaved={() => {
-          showStatus('✅ API Key 已儲存');
-          void handleRefreshKnowledge();
-        }}
+        stores={stores}
+        isAdmin={isAdmin}
+        onShowStatus={showStatus}
       />
       <PromptPanel
         isOpen={panel === 'prompt'}
@@ -332,18 +370,11 @@ function HomeShell({ canShow }: { canShow: (page: string) => boolean }) {
       <ExtKeysPanel
         isOpen={panel === 'extkeys'}
         onClose={closePanel}
-        stores={stores}
         isAdmin={isAdmin}
-        onShowStatus={showStatus}
-      />
-
-      <FilePreviewModal
-        isOpen={previewFile !== null}
-        store={activeStore || null}
-        file={previewFile}
-        onClose={() => setPreviewFile(null)}
-        onSaved={() => { void handleRefreshKnowledge(); }}
-        onShowStatus={showStatus}
+        onApiKeySaved={() => {
+          showStatus('✅ API Key 已儲存');
+          void handleRefreshKnowledge();
+        }}
       />
 
       {/* ── Conversation History (kept as modal) ── */}

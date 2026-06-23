@@ -1,92 +1,96 @@
-/* ===== CONVERSATION HISTORY — LIGHT MODE ===== */
+/* ===== CONVERSATION HISTORY — DARK MODE OVERRIDES ===== */
+/* Light mode is the default; tokens from variables.css cover it.
+   Only overrides needed for [data-theme="dark"] are listed here. */
 
-[data-theme="light"] .conversation-history-overlay {
-  background: rgba(28, 25, 23, 0.45);
+[data-theme="dark"] .conversation-history-overlay {
+  background: rgba(0, 0, 0, 0.6);
 }
 
-[data-theme="light"] .conversation-history-modal {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(250, 250, 249, 0.98));
-  border-color: rgba(15, 118, 110, 0.12);
-  box-shadow: 0 1.5625rem 5rem rgba(0, 0, 0, 0.15), 0 0 3.75rem rgba(15, 118, 110, 0.08);
+/* Dark: modal background uses the dark surface token — no special override needed
+   since .conversation-history-modal already uses var(--surface) which resolves
+   correctly under [data-theme="dark"] via variables.css / shared/index.css.
+   Extra glow for depth in dark mode: */
+[data-theme="dark"] .conversation-history-modal {
+  box-shadow: var(--shadow-lg), 0 0 3rem rgba(138, 180, 248, 0.08);
 }
 
-[data-theme="light"] .conversation-header-icon {
-  background: rgba(15, 118, 110, 0.08);
-  border-color: rgba(15, 118, 110, 0.2);
+/* Dark mode session card: slightly elevated vs. bg */
+[data-theme="dark"] .session-card {
+  background: var(--surface, #303134);
 }
 
-[data-theme="light"] .conversation-close-btn {
-  background: rgba(0, 0, 0, 0.04);
-  border-color: rgba(0, 0, 0, 0.08);
-  color: var(--text-muted);
+[data-theme="dark"] .session-card:hover {
+  background: var(--surface, #303134);
+  border-color: var(--primary, #8ab4f8);
 }
 
-[data-theme="light"] .conversation-close-btn:hover {
-  background: rgba(225, 29, 72, 0.08);
-  border-color: rgba(225, 29, 72, 0.2);
-  color: #e11d48;
+/* Dark mode toolbar buttons */
+[data-theme="dark"] .conversation-toolbar {
+  background: var(--surface-2, #292a2d);
 }
 
-[data-theme="light"] .session-card {
-  background: rgba(255, 255, 255, 0.6);
-  border-color: rgba(15, 118, 110, 0.1);
+[data-theme="dark"] .conversation-footer {
+  background: var(--surface-2, #292a2d);
 }
 
-[data-theme="light"] .session-card:hover {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: var(--crystal-teal);
+/* Dark mode session conversations area */
+[data-theme="dark"] .session-conversations {
+  background: var(--surface-2, #292a2d);
 }
 
-[data-theme="light"] .session-badge {
-  background: rgba(15, 118, 110, 0.08);
-  border-color: rgba(15, 118, 110, 0.2);
+/* Dark mode turn cards */
+[data-theme="dark"] .turn-card {
+  background: var(--surface, #303134);
 }
 
-[data-theme="light"] .session-conversations {
-  background: rgba(250, 250, 249, 0.6);
+[data-theme="dark"] .turn-card-toggle:hover {
+  background: var(--bg, #202124);
 }
 
-[data-theme="light"] .turn-card {
-  background: rgba(255, 255, 255, 0.7);
-  border-color: rgba(15, 118, 110, 0.08);
+[data-theme="dark"] .turn-detail {
+  background: var(--surface-2, #292a2d);
 }
 
-[data-theme="light"] .turn-card:hover {
-  border-color: rgba(15, 118, 110, 0.2);
+[data-theme="dark"] .turn-detail-response {
+  background: var(--bg, #202124);
 }
 
-[data-theme="light"] .turn-detail {
-  background: rgba(250, 250, 249, 0.8);
+/* Dark mode tool cards */
+[data-theme="dark"] .turn-tool-card {
+  background: rgba(251, 188, 4, 0.08);
+  border-color: rgba(251, 188, 4, 0.18);
 }
 
-[data-theme="light"] .turn-detail-response {
-  background: rgba(15, 118, 110, 0.04);
-  border-color: rgba(15, 118, 110, 0.1);
+/* Dark mode spinner */
+[data-theme="dark"] .conversation-spinner {
+  border-color: var(--border, #5f6368);
+  border-top-color: var(--primary, #8ab4f8);
 }
 
-[data-theme="light"] .turn-tool-card {
-  background: rgba(180, 83, 9, 0.05);
-  border-color: rgba(180, 83, 9, 0.12);
+/* Dark mode delete button */
+[data-theme="dark"] .batch-delete-btn {
+  background: rgba(242, 139, 130, 0.1) !important;
+  border-color: rgba(242, 139, 130, 0.3) !important;
+  color: var(--red, #f28b82) !important;
 }
 
-[data-theme="light"] .session-card-actions button:hover {
-  background: rgba(15, 118, 110, 0.06);
+[data-theme="dark"] .batch-delete-btn:hover:not(:disabled) {
+  background: rgba(242, 139, 130, 0.18) !important;
 }
 
-[data-theme="light"] .session-card-actions button.session-delete-btn:hover {
-  background: rgba(190, 24, 93, 0.08);
-  color: var(--crystal-rose);
+[data-theme="dark"] .session-card-actions button.session-delete-btn:hover {
+  background: rgba(242, 139, 130, 0.1);
+  color: var(--red, #f28b82);
 }
 
-[data-theme="light"] .session-checkbox {
-  border-color: #cbd5e1;
+/* Dark mode date picker dropdown */
+[data-theme="dark"] .date-picker-dropdown {
+  background: var(--surface, #303134);
 }
 
-[data-theme="light"] .batch-delete-btn {
-  background: rgba(190, 24, 93, 0.06) !important;
-}
-
-[data-theme="light"] .conversation-spinner {
-  border-color: rgba(15, 118, 110, 0.15);
-  border-top-color: var(--crystal-teal);
+/* Dark mode mini calendar */
+[data-theme="dark"] .mini-cal-day.selected,
+[data-theme="dark"] .mini-cal-day.in-range {
+  background: var(--primary, #8ab4f8);
+  color: var(--bg, #202124);
 }

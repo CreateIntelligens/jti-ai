@@ -5,12 +5,14 @@ import {
   Database,
   DatabaseBackup,
   DatabaseZap,
+  House,
   History,
   KeyRound,
   Link2,
   Loader2,
   Menu,
   Moon,
+  PanelLeftClose,
   RefreshCw,
   Settings,
   Sun,
@@ -23,7 +25,6 @@ import * as api from '../services/api';
 import { useLogoutRedirect } from '../hooks/useLogoutRedirect';
 import { isAdminRole, isSuperAdmin } from '../utils/authRouting';
 import { fetchAppUpdateNotice, getAppUpdateNotice, type AppUpdateNotice } from '../utils/appVersion';
-import AppSelect from './AppSelect';
 
 interface HeaderProps {
   sidebarOpen: boolean;
@@ -36,6 +37,8 @@ interface HeaderProps {
   onOpenAdminPanel: () => void;
   onOpenApiKeysPanel: () => void;
   onOpenExtKeysPanel: () => void;
+  onOpenPromptPanel?: () => void;
+  onRefresh?: () => void | Promise<void>;
   onShowStatus: (msg: string) => void;
   userProfile?: api.UserProfile | null;
   onOpenUsersPanel?: () => void;
@@ -67,6 +70,8 @@ export default function Header({
   onOpenAdminPanel,
   onOpenApiKeysPanel,
   onOpenExtKeysPanel,
+  onOpenPromptPanel,
+  onRefresh,
   onShowStatus,
   userProfile,
   onOpenUsersPanel,
@@ -81,6 +86,7 @@ export default function Header({
   ));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isReindexing, setIsReindexing] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -105,9 +111,44 @@ export default function Header({
     };
   }, [isUpdateNoticeControlled]);
 
+  // Close the settings menu on an outside click or Escape. Listening on the
+  // document (not just the header) means clicks anywhere on the page dismiss it.
+  useEffect(() => {
+    if (!settingsOpen) return undefined;
+
+    const handlePointerDown = (event: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(event.target as Node)) {
+        setSettingsOpen(false);
+      }
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setSettingsOpen(false);
+    };
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [settingsOpen]);
+
   const openPanel = (openFn: () => void) => {
     openFn();
     setSettingsOpen(false);
+  };
+
+  const handleRefresh = async () => {
+    if (!onRefresh || isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await onRefresh();
+      onShowStatus('✅ 知識庫已重新整理');
+    } catch (error) {
+      onShowStatus(error instanceof Error ? error.message : '重新整理失敗');
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleReindexRag = async () => {
@@ -187,17 +228,14 @@ export default function Header({
   };
 
   return (
-    <header
-      className="app-header"
-      onClick={() => settingsOpen && setSettingsOpen(false)}
-    >
+    <header className="app-header">
       <div className="header-left">
         <button
           className="sidebar-toggle"
           onClick={onToggleSidebar}
           aria-label={sidebarOpen ? '關閉側邊欄' : '開啟側邊欄'}
         >
-          <Menu size={18} />
+          {sidebarOpen ? <PanelLeftClose size={18} /> : <Menu size={18} />}
         </button>
         <div className="app-logo">
           AI360 <span>Knowledge</span>
@@ -216,28 +254,6 @@ export default function Header({
       </div>
 
       <div className="header-right">
-        {isAdmin && (
-          <>
-            <AppSelect
-              className="header-app-nav"
-              value=""
-              onChange={(val) => {
-                if (val) navigate(val);
-              }}
-              placeholder="前往應用"
-              options={buildAppNavOptions(canShow)}
-            />
-            {onOpenUsersPanel && (
-              <button
-                className="icon-btn"
-                onClick={onOpenUsersPanel}
-                title="帳號管理"
-              >
-                <Users size={18} />
-              </button>
-            )}
-          </>
-        )}
         <button
           className="icon-btn"
           title="對話歷史"
@@ -247,91 +263,109 @@ export default function Header({
           <History size={18} />
         </button>
         <button
+          className={`icon-btn${isRefreshing ? ' is-spinning' : ''}`}
+          onClick={() => void handleRefresh()}
+          title="重新整理知識庫"
+          disabled={!onRefresh || isRefreshing}
+        >
+          <RefreshCw size={18} />
+        </button>
+        <button
           className="icon-btn"
           onClick={onToggleTheme}
           title={theme === 'dark' ? '切換為淺色主題' : '切換為深色主題'}
         >
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </button>
-        <button
-          className="icon-btn icon-btn-pill"
-          onClick={() => openPanel(onOpenExtKeysPanel)}
-          title="對外 API Keys"
-        >
-          <Link2 size={16} /> 對外 Keys
-        </button>
-        {isAdmin && (
-          <>
-            <div
-              className="dd-wrap"
-              ref={wrapRef}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <button
-                className="icon-btn"
-                onClick={() => setSettingsOpen((o) => !o)}
-                title="設定"
-              >
-                <Settings size={16} />
+        <div className="dd-wrap" ref={wrapRef}>
+          <button
+            className="icon-btn"
+            onClick={() => setSettingsOpen((open) => !open)}
+            title="設定"
+            aria-expanded={settingsOpen}
+            aria-haspopup="menu"
+          >
+            <Settings size={18} />
+          </button>
+          {settingsOpen && (
+            <div className="dd-menu" role="menu">
+              <div className="dd-section-label">面板</div>
+              {isAdmin && (
+                <button className="dd-item" onClick={() => openPanel(onOpenAdminPanel)}>
+                  <Database size={16} /> 知識庫管理
+                </button>
+              )}
+              <button className="dd-item" onClick={() => openPanel(onOpenApiKeysPanel)}>
+                <KeyRound size={16} /> API Key 設定
               </button>
-              {settingsOpen && (
-                <div className="dd-menu">
-                  <button className="dd-item" onClick={() => openPanel(onOpenAdminPanel)}>
-                    <Database size={16} /> 知識庫管理
-                  </button>
-                  <button className="dd-item" onClick={() => openPanel(onOpenApiKeysPanel)}>
-                    <KeyRound size={16} /> API Key 設定
-                  </button>
+              <button className="dd-item" onClick={() => openPanel(onOpenExtKeysPanel)}>
+                <Link2 size={16} /> 對外 API Keys
+              </button>
+              {onOpenPromptPanel && (
+                <button className="dd-item" onClick={() => openPanel(onOpenPromptPanel)}>
+                  <Settings size={16} /> Prompt 設定
+                </button>
+              )}
+              {isAdmin && (
+                <>
                   <div className="dd-sep" />
-                  <button
-                    className="dd-item"
-                    onClick={handleReindexRag}
-                    disabled={isReindexing}
-                  >
+                  <button className="dd-item" onClick={handleReindexRag} disabled={isReindexing}>
                     {isReindexing ? <Loader2 size={16} /> : <RefreshCw size={16} />}
                     重新索引 RAG
                   </button>
+                  <div className="dd-sep" />
+                  <div className="dd-section-label">進階</div>
+                  {onOpenUsersPanel && (
+                    <button className="dd-item" onClick={() => openPanel(onOpenUsersPanel)}>
+                      <Users size={16} /> 帳號管理
+                    </button>
+                  )}
                   {isSuper && (
                     <>
-                      <button
-                        className="dd-item"
-                        onClick={handleGlobalDbSync}
-                        disabled={isSyncing}
-                        title="全域同步（所有應用 + 系統設定）至備援庫"
-                      >
+                      <button className="dd-item" onClick={handleGlobalDbSync} disabled={isSyncing}>
                         {isSyncing ? <Loader2 size={16} /> : <DatabaseBackup size={16} />}
                         全域同步至備援庫
                       </button>
-                      <button
-                        className="dd-item"
-                        onClick={handleReverseRestore}
-                        disabled={isSyncing}
-                        title="災後從備援庫補回主庫（AWS 為主，只補不覆蓋；先預演再確認）"
-                      >
+                      <button className="dd-item" onClick={handleReverseRestore} disabled={isSyncing}>
                         {isSyncing ? <Loader2 size={16} /> : <DatabaseZap size={16} />}
                         從備援庫補回主庫
                       </button>
                     </>
                   )}
-                </div>
+                </>
+              )}
+
+              {isAdmin && buildAppNavOptions(canShow).length > 1 && (
+                <>
+                  <div className="dd-sep" />
+                  <div className="dd-section-label">切換應用</div>
+                  {buildAppNavOptions(canShow).map((option) => (
+                    <button
+                      key={option.value}
+                      className="dd-item"
+                      onClick={() => {
+                        navigate(option.value);
+                        setSettingsOpen(false);
+                      }}
+                    >
+                      <House size={16} /> {option.label}
+                    </button>
+                  ))}
+                </>
+              )}
+
+              {userProfile && (
+                <>
+                  <div className="dd-sep" />
+                  <div className="dd-account">{userProfile.username}（{userProfile.role}）</div>
+                  <button className="dd-item dd-item-danger" onClick={() => void handleLogoutClick()}>
+                    <LogOut size={16} /> 登出
+                  </button>
+                </>
               )}
             </div>
-          </>
-        )}
-        {userProfile && (
-          <>
-            <span className="profile-badge">
-              {userProfile.username} ({userProfile.role})
-            </span>
-            <button
-              className="icon-btn"
-              onClick={() => void handleLogoutClick()}
-              title="登出"
-            >
-              <LogOut size={18} />
-            </button>
-          </>
-        )}
+          )}
+        </div>
       </div>
     </header>
   );

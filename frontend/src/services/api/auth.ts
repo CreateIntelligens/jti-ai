@@ -1,5 +1,27 @@
 import { API_BASE, handleResponse } from './base';
 
+const SESSION_HINT_KEY = 'jtai:auth-session-known';
+
+function readSessionStorage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+export function hasKnownAuthSession(): boolean {
+  return readSessionStorage()?.getItem(SESSION_HINT_KEY) === '1';
+}
+
+function rememberAuthSession(): void {
+  readSessionStorage()?.setItem(SESSION_HINT_KEY, '1');
+}
+
+function forgetAuthSession(): void {
+  readSessionStorage()?.removeItem(SESSION_HINT_KEY);
+}
+
 export interface UserProfile {
   user_id: string | null;
   username: string | null;
@@ -38,21 +60,35 @@ export async function login(username: string, password: string): Promise<LoginRe
     },
     body: JSON.stringify({ username, password }),
   });
-  return handleResponse<LoginResponse>(response);
+  const result = await handleResponse<LoginResponse>(response);
+  rememberAuthSession();
+  return result;
 }
 
 export async function logout(): Promise<LogoutResponse> {
-  const response = await fetch(`${API_BASE}/auth/logout`, {
-    method: 'POST',
-    credentials: 'include',
-  });
-  return handleResponse<LogoutResponse>(response);
+  try {
+    const response = await fetch(`${API_BASE}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    return await handleResponse<LogoutResponse>(response);
+  } finally {
+    forgetAuthSession();
+  }
 }
 
 export async function getMe(): Promise<UserProfile> {
   const response = await fetch(`${API_BASE}/auth/me`, {
     credentials: 'include',
   });
+  if (response.ok) {
+    const profile = await response.json() as UserProfile;
+    rememberAuthSession();
+    return profile;
+  }
+  if (response.status === 401) {
+    forgetAuthSession();
+  }
   return handleResponse<UserProfile>(response);
 }
 

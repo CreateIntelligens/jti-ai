@@ -1,4 +1,54 @@
 /* ==================== CONVERSATION HISTORY MODAL ==================== */
+/* Tokens are from .app-shell (variables.css) — same system as General page. */
+
+/* ── Reset: override legacy glassmorphism rules from forms.css + light.css ──
+   forms.css:  .app-container input           { background: rgba(26,31,58,0.5) }  → specificity 0,2,1
+   light.css:  [data-theme] .app-container input { background: rgba(255,255,255,0.9) } → specificity 0,3,1
+   Our selector .conversation-history-modal input is only 0,2,1 — use !important to win.
+   This is intentional containment; the modal should be 100% isolated from the old glassmorphism system. */
+
+/* Modal isolation: solid background — nothing should be transparent */
+.conversation-history-modal {
+  contain: paint;  /* create independent paint context */
+}
+
+/* Kill ALL transparency from forms.css / light.css on inputs inside the modal */
+.conversation-history-modal input:not([type="checkbox"]) {
+  background: var(--surface, #ffffff) !important;
+  border: 0.0625rem solid var(--border, #dadce0) !important;
+  border-radius: var(--r-sm, 0.375rem) !important;
+  color: var(--text, #202124) !important;
+  box-shadow: none !important;
+  padding: 0.375rem 0.625rem !important; /* Fallback default padding for inputs */
+  font-size: inherit !important;
+}
+
+/* Kill the glow box-shadow + glassmorphism background on ALL buttons */
+.conversation-history-modal button {
+  background: transparent;
+  border: none;
+  color: var(--text, #202124);
+  box-shadow: none !important;
+  padding: 0; /* Let specific buttons override this without needing !important */
+  transform: none;
+  border-radius: var(--r-sm, 0.375rem);
+  font-size: inherit;
+  font-family: var(--font, 'Inter', sans-serif);
+  cursor: pointer;
+  transition: background var(--trans, 0.18s), color var(--trans, 0.18s);
+}
+
+.conversation-history-modal button:hover {
+  transform: none;
+  box-shadow: none !important;
+}
+
+.conversation-history-modal button:disabled {
+  box-shadow: none !important;
+  transform: none;
+  cursor: not-allowed;
+  opacity: 0.45;
+}
 
 .conversation-history-overlay {
   position: fixed;
@@ -7,8 +57,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(7, 8, 21, 0.88);
-  animation: overlayFade 0.3s ease-out;
+  background: rgba(28, 25, 23, 0.45);
+  animation: overlayFade 0.2s ease-out;
 }
 
 .conversation-history-modal {
@@ -17,79 +67,84 @@
   height: 88vh;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, rgba(26, 31, 58, 0.95), rgba(10, 14, 39, 0.95));
-  border: 0.0625rem solid var(--glass-border);
-  border-radius: 1.5rem;
-  box-shadow: var(--shadow-deep), 0 0 5rem rgba(61, 217, 211, 0.15);
+  background: var(--surface, #ffffff);
+  border: 0.0625rem solid var(--border, #dadce0);
+  border-radius: var(--r-lg, 1rem);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
-  animation: modalSlide 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  animation: modalSlide 0.3s cubic-bezier(0.34, 1.2, 0.64, 1);
+  font-family: var(--font, 'Inter', -apple-system, sans-serif);
+  color: var(--text, #202124);
 }
 
+/* ── Header ── */
 .conversation-header {
-  padding: 1.5rem 2rem;
-  border-bottom: 0.0625rem solid var(--glass-border);
+  padding: 1.125rem 1.5rem;
+  border-bottom: 0.0625rem solid var(--border, #dadce0);
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
   position: relative;
+  background: var(--surface, #ffffff);
 }
 
 .conversation-header-left {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 .conversation-header-icon {
-  width: 3rem;
-  height: 3rem;
-  border-radius: 0.875rem;
-  background: rgba(61, 217, 211, 0.1);
-  border: 0.0625rem solid rgba(61, 217, 211, 0.25);
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: var(--r-md, 0.625rem);
+  background: var(--primary-lt, #e8f0fe);
+  border: 0.0625rem solid color-mix(in srgb, var(--primary, #1a73e8) 20%, transparent);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--crystal-teal);
+  color: var(--primary, #1a73e8);
+  flex-shrink: 0;
 }
 
 .conversation-header h2 {
   margin: 0;
-  font-family: 'Inter', -apple-system, sans-serif;
-  font-size: 1.5rem;
+  font-family: var(--font, 'Inter', sans-serif);
+  font-size: 1.125rem;
   font-weight: 700;
-  color: var(--crystal-teal);
+  color: var(--text, #202124);
 }
 
 .conversation-header-subtitle {
-  margin: 0.25rem 0 0 0;
-  font-size: 0.8rem;
-  color: var(--text-muted);
+  margin: 0.125rem 0 0;
+  font-size: 0.78rem;
+  color: var(--text-3, #70757a);
 }
 
+/* ── Close Button ── */
 .conversation-history-modal .conversation-close-btn {
   position: absolute;
-  top: 1rem;
+  top: 0.875rem;
   right: 1rem;
-  width: 2.25rem;
-  height: 2.25rem;
-  border-radius: 0.625rem;
-  background: rgba(255, 255, 255, 0.06);
-  border: 0.0625rem solid rgba(255, 255, 255, 0.1);
-  color: var(--text-muted);
+  width: 2rem;
+  height: 2rem;
+  border-radius: var(--r-sm, 0.375rem);
+  background: transparent;
+  border: none;
+  color: var(--text-2, #5f6368);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: background var(--trans, 0.18s), color var(--trans, 0.18s);
   padding: 0;
   box-shadow: none;
 }
 
 .conversation-history-modal .conversation-close-btn:hover {
-  background: rgba(255, 107, 157, 0.12);
-  border-color: rgba(255, 107, 157, 0.3);
-  color: var(--crystal-rose);
+  background: var(--border, #dadce0);
+  color: var(--text, #202124);
   transform: none;
   box-shadow: none;
 }
@@ -98,161 +153,192 @@
   transform: scale(0.95);
 }
 
+/* ── Toolbar ── */
 .conversation-toolbar {
-  padding: 1rem 2rem;
-  border-bottom: 0.0625rem solid var(--glass-border);
+  padding: 0.75rem 1.5rem;
+  border-bottom: 0.0625rem solid var(--border, #dadce0);
   display: flex;
   align-items: center;
   gap: 0.625rem;
   flex-shrink: 0;
   flex-wrap: wrap;
-  --tb-h: 2.5rem;
+  background: var(--surface-2, #f8f9fa);
+  --tb-h: 2.375rem;
 }
 
+/* ── Search ── */
 .conversation-search-wrapper {
   flex: 1;
+  min-width: 10rem;
   position: relative;
 }
 
 .conversation-search-wrapper svg {
   position: absolute;
-  left: 1rem;
+  left: 0.75rem;
   top: 50%;
   transform: translateY(-50%);
-  color: var(--text-muted);
+  color: var(--text-3, #70757a);
   pointer-events: none;
 }
 
-.conversation-search-wrapper input {
+/* Specific selector with high specificity to override the reset block's padding */
+.conversation-history-modal .conversation-search-wrapper input:not([type="checkbox"]) {
   width: 100%;
   height: var(--tb-h);
-  padding: 0 1rem 0 2.8rem;
-  border-radius: var(--radius-pill);
-  font-size: 0.9rem;
+  padding: 0 0.75rem 0 2.5rem !important; /* ensures search text clearance for the magnifying glass */
+  border-radius: var(--radius-pill, 999rem) !important;
+  font-size: 0.875rem !important;
+  background: var(--surface, #ffffff) !important;
+  border: 0.0625rem solid var(--border, #dadce0) !important;
+  color: var(--text, #202124) !important;
+  font-family: var(--font, 'Inter', sans-serif);
+  outline: none;
+  transition: border-color var(--trans, 0.18s), box-shadow var(--trans, 0.18s);
 }
 
-/* Date picker inputs */
+.conversation-search-wrapper input:focus {
+  border-color: var(--primary, #1a73e8);
+  box-shadow: 0 0 0 0.1875rem var(--focus-ring, rgba(26, 115, 232, 0.18));
+}
+
+.conversation-search-wrapper input::placeholder {
+  color: var(--text-3, #70757a);
+}
+
+/* ── Date Picker ── */
 .date-picker-anchor {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 0.375rem;
+  gap: 0.25rem;
 }
 
 .date-picker-input {
   display: flex;
   align-items: center;
-  gap: 0.3125rem;
+  gap: 0.25rem;
   height: var(--tb-h);
-  padding: 0;
-  border-radius: 0;
+  padding: 0 0.375rem;
+  border-radius: var(--r-sm, 0.375rem);
   border: none;
   background: none;
   cursor: pointer;
+  transition: background var(--trans, 0.18s);
+}
+
+.date-picker-input:hover {
+  background: var(--border, #dadce0);
+}
+
+.date-picker-input svg {
+  color: var(--text-3, #70757a);
+  flex-shrink: 0;
+  transition: color var(--trans, 0.18s);
 }
 
 .date-picker-input:hover svg,
 .date-picker-input:focus-within svg,
 .date-picker-input.active svg {
-  color: var(--crystal-teal);
+  color: var(--primary, #1a73e8);
 }
 
-.date-picker-input svg {
-  color: var(--text-muted);
-  flex-shrink: 0;
-}
-
-.date-picker-input input {
-  background: none;
-  border: none;
-  border-bottom: 0.0625rem solid var(--glass-border);
-  color: var(--text-primary);
-  font-size: 0.82rem;
-  width: 5.625rem;
-  height: 1.75rem;
-  padding: 0 0.125rem;
+/* Specific selector with high specificity to override the reset block's padding and border */
+.conversation-history-modal .date-picker-input input:not([type="checkbox"]) {
+  background: none !important;
+  border: none !important;
+  border-bottom: 0.0625rem solid var(--border, #dadce0) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  color: var(--text, #202124) !important;
+  font-size: 0.8rem !important;
+  width: 6.5rem;
+  height: 1.5rem;
+  padding: 0 0.125rem !important;
   outline: none;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  letter-spacing: 0.0187rem;
-  transition: border-color 0.2s;
+  font-family: var(--font, 'Inter', sans-serif);
+  letter-spacing: 0.02em;
+  transition: border-color var(--trans, 0.18s);
 }
 
 .date-picker-input input:focus {
-  border-bottom-color: var(--crystal-teal);
+  border-bottom-color: var(--primary, #1a73e8);
 }
 
 .date-picker-input input::placeholder {
-  color: var(--text-muted);
+  color: var(--text-3, #70757a);
 }
 
 .date-picker-sep {
-  color: var(--text-muted);
-  font-size: 0.9rem;
-  line-height: var(--tb-h);
+  color: var(--text-3, #70757a);
+  font-size: 0.875rem;
 }
 
 .date-filter-clear {
   background: none;
   border: none;
-  color: var(--crystal-rose);
+  color: var(--red, #d93025);
   cursor: pointer;
-  font-size: 1.1rem;
-  width: 1.75rem;
-  height: 1.75rem;
+  font-size: 1rem;
+  width: 1.5rem;
+  height: 1.5rem;
   padding: 0;
-  border-radius: 0.375rem;
+  border-radius: var(--r-sm, 0.375rem);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  transition: background var(--trans, 0.18s);
 }
 
 .date-filter-clear:hover {
-  background: rgba(255, 107, 157, 0.1);
+  background: var(--red-lt, #fce8e6);
 }
 
-/* Calendar dropdown */
+/* ── Calendar Dropdown ── */
 .date-picker-dropdown {
   position: absolute;
   top: calc(100% + 0.375rem);
   left: 0;
   z-index: 100;
-  background: var(--crystal-deep);
-  border: 0.0625rem solid var(--glass-border);
-  border-radius: 0.875rem;
-  box-shadow: var(--shadow-deep);
+  background: var(--surface, #ffffff);
+  border: 0.0625rem solid var(--border, #dadce0);
+  border-radius: var(--r-md, 0.625rem);
+  box-shadow: var(--shadow-md);
   overflow: hidden;
 }
 
 .date-picker-tabs {
   display: flex;
-  border-bottom: 0.0625rem solid var(--glass-border);
+  border-bottom: 0.0625rem solid var(--border, #dadce0);
 }
 
 .date-picker-tabs button {
   flex: 1;
-  padding: 0.4375rem 0;
+  padding: 0.375rem 0;
   font-size: 0.75rem;
   font-weight: 600;
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: var(--text-2, #5f6368);
   cursor: pointer;
-  transition: color 0.15s, background 0.15s;
-  letter-spacing: 0.0312rem;
+  transition: color var(--trans, 0.18s), background var(--trans, 0.18s);
+  letter-spacing: 0.02em;
+  font-family: var(--font, 'Inter', sans-serif);
 }
 
 .date-picker-tabs button:hover {
-  color: var(--text-primary);
+  color: var(--text, #202124);
+  background: var(--surface-2, #f8f9fa);
 }
 
 .date-picker-tabs button.active {
-  color: var(--crystal-teal);
-  background: rgba(61, 217, 211, 0.08);
-  box-shadow: inset 0 -0.125rem 0 var(--crystal-teal);
+  color: var(--primary, #1a73e8);
+  background: var(--primary-lt, #e8f0fe);
+  box-shadow: inset 0 -0.125rem 0 var(--primary, #1a73e8);
 }
 
-/* Mini Calendar */
+/* ── Mini Calendar ── */
 .mini-cal {
   width: 15rem;
   padding: 0.625rem;
@@ -260,11 +346,11 @@
 }
 
 .mini-cal-label {
-  font-size: 0.72rem;
-  color: var(--text-muted);
+  font-size: 0.7rem;
+  color: var(--text-3, #70757a);
   margin-bottom: 0.375rem;
   font-weight: 600;
-  letter-spacing: 0.0312rem;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 
@@ -278,22 +364,23 @@
 .mini-cal-title {
   font-size: 0.85rem;
   font-weight: 600;
-  color: var(--text-primary);
+  color: var(--text, #202124);
 }
 
 .mini-cal-nav {
   background: none;
   border: none;
-  color: var(--text-muted);
+  color: var(--text-2, #5f6368);
   cursor: pointer;
   padding: 0.25rem;
-  border-radius: 0.375rem;
+  border-radius: var(--r-sm, 0.375rem);
   display: flex;
+  transition: background var(--trans, 0.18s), color var(--trans, 0.18s);
 }
 
 .mini-cal-nav:hover {
-  color: var(--text-primary);
-  background: var(--glass-highlight);
+  color: var(--text, #202124);
+  background: var(--border, #dadce0);
 }
 
 .mini-cal-grid {
@@ -308,26 +395,28 @@
 
 .mini-cal-wday {
   text-align: center;
-  font-size: 0.7rem;
-  color: var(--text-muted);
+  font-size: 0.68rem;
+  color: var(--text-3, #70757a);
   padding: 0.125rem 0;
+  font-weight: 500;
 }
 
 .mini-cal-day {
   text-align: center;
   font-size: 0.78rem;
-  padding: 0.3125rem 0;
-  border-radius: 0.5rem;
+  padding: 0.3rem 0;
+  border-radius: var(--r-sm, 0.375rem);
   background: none;
   border: none;
-  color: var(--text-secondary);
+  color: var(--text-2, #5f6368);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background var(--trans, 0.18s), color var(--trans, 0.18s);
+  font-family: var(--font, 'Inter', sans-serif);
 }
 
 .mini-cal-day:hover:not(.empty) {
-  background: var(--glass-highlight);
-  color: var(--text-primary);
+  background: var(--border, #dadce0);
+  color: var(--text, #202124);
 }
 
 .mini-cal-day.empty {
@@ -335,26 +424,27 @@
 }
 
 .mini-cal-day.today {
-  color: var(--crystal-cyan);
+  color: var(--primary, #1a73e8);
   font-weight: 600;
 }
 
 .mini-cal-day.selected,
 .mini-cal-day.in-range {
-  background: var(--crystal-teal);
-  color: #fff;
+  background: var(--primary, #1a73e8);
+  color: var(--on-primary, #ffffff);
   font-weight: 600;
 }
 
+/* ── Content List ── */
 .conversation-list {
   flex: 1;
   overflow-y: auto;
-  padding: 1.25rem 2rem;
+  padding: 1.25rem 1.5rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.75rem;
   scrollbar-width: thin;
-  scrollbar-color: var(--crystal-teal) transparent;
+  scrollbar-color: var(--border, #dadce0) transparent;
 }
 
 .conversation-list::-webkit-scrollbar {
@@ -366,34 +456,41 @@
 }
 
 .conversation-list::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, var(--crystal-teal), var(--crystal-cyan));
+  background: var(--border, #dadce0);
   border-radius: 0.1875rem;
 }
 
+.conversation-list::-webkit-scrollbar-thumb:hover {
+  background: var(--border-md, #cbd5e1);
+}
+
+/* ── Empty / Loading ── */
 .conversation-empty {
   display: flex;
   align-items: center;
   justify-content: center;
   height: 100%;
   text-align: center;
-  color: var(--text-muted);
+  color: var(--text-3, #70757a);
 }
 
 .conversation-empty svg {
-  color: rgba(61, 217, 211, 0.25);
-  margin-bottom: 1rem;
+  color: color-mix(in srgb, var(--primary, #1a73e8) 25%, transparent);
+  margin-bottom: 0.75rem;
 }
 
-.conversation-empty-pad { padding: 2rem; }
+.conversation-empty-pad {
+  padding: 2rem;
+}
 
 .conversation-spinner {
-  width: 3rem;
-  height: 3rem;
-  border: 0.1875rem solid rgba(61, 217, 211, 0.2);
-  border-top-color: var(--crystal-teal);
+  width: 2.5rem;
+  height: 2.5rem;
+  border: 0.1875rem solid var(--border, #dadce0);
+  border-top-color: var(--primary, #1a73e8);
   border-radius: 50%;
   animation: spin 1s linear infinite;
-  margin: 0 auto 1rem;
+  margin: 0 auto 0.75rem;
 }
 
-/* spin keyframe is in shared.css */
+/* spin keyframe is in shared/animations.css */

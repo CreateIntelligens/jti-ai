@@ -49,6 +49,8 @@ interface DocumentToQaTabProps {
   /** When true, pasted text and uploaded docs are saved directly (chunked by
    * the RAG backfill) instead of going through AI Q&A extraction. */
   disableAiQaExtraction?: boolean;
+  // Hide the HCIoT-only img/url columns in the CSV format example / download.
+  disableImages?: boolean;
   availableImages: QaImage[];
   resolveImageUrl?: (imageId?: string) => string | null;
   onUploadImage: (file: File, imageId?: string) => Promise<UploadedImageResult>;
@@ -152,6 +154,7 @@ export default function DocumentToQaTab({
   onUploadComplete,
   api,
   disableAiQaExtraction = false,
+  disableImages = false,
   availableImages,
   resolveImageUrl,
   onUploadImage,
@@ -526,6 +529,7 @@ export default function DocumentToQaTab({
       fileInputRef={fileInputRef}
       canSubmit={canSubmit}
       disableAiQaExtraction={disableAiQaExtraction}
+      disableImages={disableImages}
       onModeChange={(nextMode) => {
         setMode(nextMode);
         setError(null);

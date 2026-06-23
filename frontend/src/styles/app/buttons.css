@@ -13,7 +13,7 @@
   box-sizing: border-box;
 }
 .app-shell .btn-primary,
-.rp-overlay .btn-primary { background: var(--primary); color: #fff; }
+.rp-overlay .btn-primary { background: var(--primary); color: var(--on-primary); }
 .app-shell .btn-primary:hover,
 .rp-overlay .btn-primary:hover { background: var(--primary-dark); }
 .app-shell .btn-primary:disabled,
@@ -49,7 +49,7 @@
   font-size: .85rem; cursor: pointer; transition: all var(--trans); font-family: var(--font);
 }
 .app-shell .message-edit-btn.save,
-.rp-overlay .message-edit-btn.save { background: var(--primary); color: #fff; font-weight: 600; }
+.rp-overlay .message-edit-btn.save { background: var(--primary); color: var(--on-primary); font-weight: 600; }
 .app-shell .message-edit-btn.save:hover:not(:disabled),
 .rp-overlay .message-edit-btn.save:hover:not(:disabled) { background: var(--primary-dark); }
 .app-shell .message-edit-btn.save:disabled,
@@ -58,3 +58,40 @@
 .rp-overlay .message-edit-btn.cancel { background: transparent; color: var(--text-2); border: 0.0625rem solid var(--border); }
 .app-shell .message-edit-btn.cancel:hover,
 .rp-overlay .message-edit-btn.cancel:hover { background: var(--border); }
+
+/* ── Chat Send Button ── */
+.app-shell .send-btn {
+  width: 2rem;
+  height: 2rem;
+  flex: 0 0 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0.0625rem solid var(--primary);
+  border-radius: var(--r-md);
+  background: var(--primary);
+  color: var(--on-primary);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: background var(--trans), box-shadow var(--trans), transform var(--trans);
+}
+
+.app-shell .send-btn:hover:not(:disabled) {
+  background: var(--primary-dark);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-0.0625rem);
+}
+
+.app-shell .send-btn:disabled {
+  border-color: var(--border-md);
+  background: var(--primary-lt);
+  color: var(--primary);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.app-shell .send-btn:focus-visible {
+  outline: 0.125rem solid var(--primary);
+  outline-offset: 0.125rem;
+}

@@ -17,16 +17,17 @@ describe('home chat input alignment', () => {
     const scopedSendButton = readRuleBody('.app-shell .input-area button.send-btn');
     const sendIcon = readRuleBody('.send-btn svg');
 
-    expect(inputWrap).toContain('align-items: center');
+    // 多行輸入時送出鈕對齊輸入列底部（flex-end），而非垂直置中。
+    expect(inputWrap).toContain('align-items: flex-end');
     expect(sendButton).toContain('padding: 0');
     expect(sendButton).toContain('box-sizing: border-box');
     expect(sendButton).toContain('line-height: 0');
-    expect(sendButton).toContain('width: 2.25rem');
-    expect(sendButton).toContain('height: 2.25rem');
+    expect(sendButton).toContain('width: 2rem');
+    expect(sendButton).toContain('height: 2rem');
     expect(scopedSendButton).toContain('padding: 0');
-    expect(scopedSendButton).toContain('width: 2.25rem');
-    expect(scopedSendButton).toContain('height: 2.25rem');
-    expect(scopedSendButton).toContain('flex: 0 0 2.25rem');
+    expect(scopedSendButton).toContain('width: 2rem');
+    expect(scopedSendButton).toContain('height: 2rem');
+    expect(scopedSendButton).toContain('flex: 0 0 2rem');
     expect(sendIcon).toContain('width: .9375rem');
     expect(sendIcon).toContain('height: .9375rem');
     expect(sendIcon).toContain('flex: 0 0 .9375rem');
@@ -47,9 +48,11 @@ describe('home chat input alignment', () => {
     const hoverButton = readRuleBody('.send-btn:not(:disabled):hover');
     const activeButton = readRuleBody('.send-btn:not(:disabled):active');
 
-    expect(sendButton).toContain('linear-gradient');
+    // Redesign 後改用 design token 的純色底 + 陰影（取代手調 gradient）。
+    expect(sendButton).toContain('background: var(--primary)');
     expect(sendButton).toContain('box-shadow:');
     expect(hoverButton).toContain('transform: translateY(-.0625rem)');
+    expect(hoverButton).toContain('background: var(--primary-dark)');
     expect(activeButton).toContain('transform: translateY(0)');
   });
 });

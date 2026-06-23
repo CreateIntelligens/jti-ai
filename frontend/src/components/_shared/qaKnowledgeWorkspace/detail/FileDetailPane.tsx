@@ -73,30 +73,32 @@ export default function FileDetailPane({
 
   if (!selectedFile) {
     return (
-      <div className="qa-workspace-file-editor-empty-state-container">
-        <div className="qa-workspace-file-editor-empty-state-card">
-          <div className="qa-workspace-file-editor-empty-state-icon-wrap">
-            <FileText size={48} className="qa-workspace-file-editor-empty-state-icon" />
-          </div>
-          <h3 className="qa-workspace-file-editor-empty-state-title">知識庫管理工作區</h3>
-          <p className="qa-workspace-file-editor-empty-state-description">
-            請從左側檔案樹選擇檔案，或點擊左上方「＋」按鈕新增內容。
-          </p>
+      <div className="qa-workspace-file-editor is-empty">
+        <div className="qa-workspace-file-editor-empty-state-container">
+          <div className="qa-workspace-file-editor-empty-state-card">
+            <div className="qa-workspace-file-editor-empty-state-icon-wrap">
+              <FileText size={48} className="qa-workspace-file-editor-empty-state-icon" />
+            </div>
+            <h3 className="qa-workspace-file-editor-empty-state-title">知識庫管理工作區</h3>
+            <p className="qa-workspace-file-editor-empty-state-description">
+              請從左側檔案樹選擇檔案，或點擊左上方「＋」按鈕新增內容。
+            </p>
 
-          <div className="qa-rag-flow-diagram">
-            <div className="qa-rag-flow-step">
-              <span className="step-num">1</span>
-              <span className="step-text">選取知識檔案</span>
-            </div>
-            <div className="qa-rag-flow-arrow">➔</div>
-            <div className="qa-rag-flow-step">
-              <span className="step-num">2</span>
-              <span className="step-text">編輯/關聯主題</span>
-            </div>
-            <div className="qa-rag-flow-arrow">➔</div>
-            <div className="qa-rag-flow-step">
-              <span className="step-num">3</span>
-              <span className="step-text">更新 RAG 索引</span>
+            <div className="qa-rag-flow-diagram">
+              <div className="qa-rag-flow-step">
+                <span className="step-num">1</span>
+                <span className="step-text">選取知識檔案</span>
+              </div>
+              <div className="qa-rag-flow-arrow">➔</div>
+              <div className="qa-rag-flow-step">
+                <span className="step-num">2</span>
+                <span className="step-text">編輯/關聯主題</span>
+              </div>
+              <div className="qa-rag-flow-arrow">➔</div>
+              <div className="qa-rag-flow-step">
+                <span className="step-num">3</span>
+                <span className="step-text">更新 RAG 索引</span>
+              </div>
             </div>
           </div>
         </div>

@@ -118,22 +118,22 @@
   align-items: center;
   justify-content: center;
   gap: 1rem;
-  background-color: var(--bg, #0f172a);
-  color: var(--text, #f8fafc);
+  background-color: var(--bg);
+  color: var(--text);
   font-family: var(--font, sans-serif);
 }
 .auth-guard-spinner {
   width: 2.5rem;
   height: 2.5rem;
   border: .1875rem solid rgba(255, 255, 255, .1);
-  border-top-color: var(--primary, #3b82f6);
+  border-top-color: var(--primary);
   border-radius: 50%;
   animation: auth-guard-spin 1s linear infinite;
   will-change: transform;
 }
 @keyframes auth-guard-spin { to { transform: rotate(360deg); } }
 .auth-guard-text {
-  color: var(--text-2, #94a3b8);
+  color: var(--text-2);
   font-size: .875rem;
   font-weight: 500;
   letter-spacing: 0;
@@ -146,8 +146,8 @@
   height: 100dvh;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(circle at center, #1e1b4b 0%, #09090b 100%);
-  color: #ffffff;
+  background: var(--bg);
+  color: var(--text);
   font-family: var(--font, sans-serif);
   padding: 1.5rem;
   box-sizing: border-box;
@@ -161,12 +161,10 @@
   max-width: 24rem;
   width: 100%;
   padding: 2.5rem 2rem;
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(0.75rem);
-  -webkit-backdrop-filter: blur(0.75rem);
-  border: 0.0625rem solid rgba(255, 255, 255, 0.08);
-  border-radius: 1rem;
-  box-shadow: 0 1.5rem 3rem rgba(0, 0, 0, 0.4);
+  background: var(--surface);
+  border: 0.0625rem solid var(--border);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-lg);
   animation: auth-guard-fade-in 0.4s ease-out;
 }
 
@@ -189,7 +187,7 @@
   height: 4.5rem;
   border-radius: 50%;
   background: rgba(245, 158, 11, 0.1);
-  color: #f59e0b;
+  color: var(--accent);
   margin-bottom: 1.5rem;
   border: 0.0625rem solid rgba(245, 158, 11, 0.2);
 }
@@ -198,19 +196,19 @@
   font-size: 1.25rem;
   font-weight: 600;
   margin: 0 0 0.75rem 0;
-  color: #f8fafc;
+  color: var(--text);
   letter-spacing: 0.05em;
 }
 
 .auth-guard-error-message {
   font-size: 0.875rem;
   line-height: 1.5;
-  color: #94a3b8;
+  color: var(--text-2);
   margin: 0 0 2rem 0;
 }
 
 .auth-guard-error-message strong {
-  color: #f1f5f9;
+  color: var(--text);
 }
 
 .auth-guard-error-btn {
@@ -224,15 +222,15 @@
   font-weight: 500;
   cursor: pointer;
   border: none;
-  background: #3b82f6;
-  color: #ffffff;
+  background: var(--primary);
+  color: var(--on-primary);
   transition: all 0.2s ease;
   font-family: var(--font, sans-serif);
   width: 100%;
 }
 
 .auth-guard-error-btn:hover {
-  background: #2563eb;
+  background: var(--primary-dark);
   transform: translateY(-0.0625rem);
   box-shadow: 0 0.25rem 0.75rem rgba(37, 99, 235, 0.3);
 }
@@ -252,7 +250,7 @@
 .dd-sep { height: 0.0625rem; background: var(--border); margin: .25rem 0; }
 
 /* ── Body ── */
-.app-shell .app-body { display: flex; flex: 1; overflow: hidden; padding: .75rem; gap: .75rem; }
+.app-shell .app-body { display: flex; flex: 1; overflow: hidden; padding: .75rem; gap: .75rem; min-height: 0; }
 
 /* ── Sidebar ── */
 .app-shell .sidebar {
@@ -369,7 +367,7 @@
 .create-actions { display: flex; gap: .375rem; }
 
 /* ── Chat Area ── */
-.app-shell .chat-area { flex: 1; display: flex; flex-direction: column; background: var(--surface); border: 0.0625rem solid var(--border); border-radius: var(--r-xl); overflow: hidden; min-width: 0; }
+.app-shell .chat-area { flex: 1; display: flex; flex-direction: column; background: var(--surface); border: 0.0625rem solid var(--border); border-radius: var(--r-xl); overflow: hidden; min-width: 0; box-shadow: var(--shadow-sm); }
 .app-shell .app-main {
   flex: 1;
   display: flex;
@@ -406,12 +404,583 @@
   flex: 1;
   min-height: 0;
 }
-.chat-topbar { padding: .625rem 1.125rem; border-bottom: 0.0625rem solid var(--border); display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-shrink: 0; }
+.chat-topbar {
+  height: 3.5rem;
+  min-height: 3.5rem;
+  padding: 0 1.125rem;
+  border-bottom: 0.0625rem solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
 .ctl-label { display: flex; align-items: center; gap: .5rem; font-size: .9375rem; font-weight: 600; color: var(--text); min-width: 0; }
 .ctl-dot { width: .4375rem; height: .4375rem; border-radius: 50%; background: var(--primary); flex-shrink: 0; }
 .ctl-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ctl-project { font-size: .75rem; font-weight: 400; color: var(--text-3); margin-left: .25rem; }
 .ctl-actions { display: flex; align-items: center; gap: .25rem; }
+
+/* ── 對話 / 文件 segmented toggle ── */
+.view-toggle { display: flex; gap: .25rem; background: var(--border); padding: .25rem; border-radius: var(--r-md); }
+.view-tab {
+  display: inline-flex; align-items: center; gap: .375rem;
+  padding: .375rem .625rem; border: none; background: none;
+  font-size: .8125rem; font-family: var(--font); font-weight: 500;
+  color: var(--text-3); cursor: pointer; border-radius: .375rem;
+  transition: all var(--trans); white-space: nowrap;
+}
+.view-tab:hover { color: var(--text); }
+.view-tab.active { background: var(--surface); color: var(--primary); box-shadow: var(--shadow-sm); }
+.view-tab svg { flex-shrink: 0; }
+
+/* ── 文件檢視容器（知識庫工作區嵌在 chat-area 內）── */
+/* 解決雙側邊欄贅餘的問題：
+   在檔案檢視下，讓左邊的文件樹（Explorer）與右邊的編輯器（Editor）「左右分開」形成獨立卡片。
+   同時，讓頂部工具列（chat-topbar）作為右側編輯器卡片的頂部 Header，使其外觀與對話框保持一致。 */
+
+/* 文件檢視容器：嵌入共用 QA workspace。 */
+.chat-files-view {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0 !important;
+
+  --hciot-bg: var(--surface);
+  --hciot-panel: var(--surface);
+  --hciot-panel-strong: var(--surface);
+  --hciot-border: var(--border);
+  --hciot-border-strong: var(--border-md);
+  --hciot-ink: var(--text);
+  --hciot-ink-soft: var(--text-2);
+  --hciot-hover: var(--primary-lt);
+  --hciot-text: var(--text);
+  --hciot-text-muted: var(--text-3);
+  --hciot-accent: var(--primary);
+  --hciot-accent-strong: var(--primary-dark);
+  --hciot-secondary: var(--accent);
+  --hciot-shadow: var(--shadow-md);
+}
+
+/* workspace 撐滿文件檢視容器，背景設為透明 */
+.chat-files-view .qa-workspace.is-active {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  background: transparent !important;
+}
+
+/* 桌機與大版面配置 (Desktop Split-Pane Card Layout) */
+@media (min-width: 48.0625rem) {
+  /* 讓外層的 chat-area 容器透明，僅作為 grid 排版網格 */
+  .app-shell .chat-area.is-files-view {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+    display: grid !important;
+    /* 左欄寬度使用與全域側欄相同的 var(--sidebar-w)，展開/收合狀態由 .sidebar-closed 決定 */
+    grid-template-columns: var(--sidebar-w) minmax(0, 1fr) !important;
+    grid-template-rows: auto 1fr !important;
+    gap: 0 .75rem !important; /* 垂直無間距（讓右側頂欄與編輯器完美貼合），水平間距 .75rem */
+    transition: grid-template-columns 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                gap 0.5s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  }
+
+  /* 收合狀態：將左側欄寬度縮為 0，水平間距設為 0 */
+  .app-shell.sidebar-closed .chat-area.is-files-view {
+    grid-template-columns: 0 minmax(0, 1fr) !important;
+    gap: 0 !important;
+  }
+
+  /* 頂欄融合到右側編輯器頂部，作為其卡片的 Header */
+  .app-shell .chat-area.is-files-view .chat-topbar {
+    grid-column: 2 !important;
+    grid-row: 1 !important;
+    background: var(--surface) !important;
+    border: 0.0625rem solid var(--border) !important;
+    border-bottom: 0.0625rem solid var(--border) !important;
+    border-radius: var(--r-xl) var(--r-xl) 0 0 !important;
+    box-shadow: var(--shadow-sm) !important;
+    clip-path: inset(-20px -20px 0px -20px) !important; /* 切掉底部陰影避免重疊 */
+    z-index: 5;
+  }
+
+  /* 將中間層級設為 display: contents，使 inner elements 能夠直接參與 grid 排版 */
+  .app-shell .chat-area.is-files-view .chat-files-view {
+    display: contents !important;
+  }
+  .chat-files-view .qa-workspace {
+    display: contents !important;
+  }
+
+  /* 左欄：文件樹（獨立卡片，並拉伸至最上方與頂欄對齊） */
+  .chat-files-view .qa-workspace-explorer {
+    grid-column: 1 !important;
+    grid-row: 1 / span 2 !important;
+    background: var(--surface) !important;
+    border: 0.0625rem solid var(--border) !important;
+    border-radius: var(--r-xl) !important;
+    box-shadow: var(--shadow-sm) !important;
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+    width: var(--sidebar-w) !important;
+    opacity: 1 !important;
+    transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+                border-color 0.5s ease !important;
+  }
+
+  /* 收合狀態下隱藏左欄 */
+  .app-shell.sidebar-closed .chat-files-view .qa-workspace-explorer {
+    width: 0 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    border: none !important;
+  }
+
+  /* 右欄：編輯器容器（做為卡片的 Body 部分，與頂部 Header 貼合） */
+  .chat-files-view .qa-workspace-file-editor {
+    grid-column: 2 !important;
+    grid-row: 2 !important;
+    background: var(--surface) !important;
+    border: 0.0625rem solid var(--border) !important;
+    border-top: none !important; /* 移去頂邊框以和 header 貼合 */
+    border-radius: 0 0 var(--r-xl) var(--r-xl) !important;
+    box-shadow: var(--shadow-sm) !important;
+    clip-path: inset(0px -20px -20px -20px) !important; /* 切掉頂部陰影避免重疊 */
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+}
+
+/* 扁平化內部屬性與編輯區域，融入外層右側卡片 */
+.chat-files-view .qa-workspace-file-metadata,
+.chat-files-view .qa-workspace-file-editor-panel {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  border-radius: 0 !important;
+}
+
+/* 空狀態下卡片完全填滿右側，無巢狀框與多餘內距 */
+.chat-files-view .qa-workspace-file-editor.is-empty {
+  padding: 0 !important;
+}
+.chat-files-view .qa-workspace-file-editor-empty-state-container {
+  min-height: auto !important;
+  height: 100% !important;
+  margin: 0 !important;
+  flex: 1 !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+}
+
+/* 檔案樹格子放寬間距（共用 workspace 在 General 顯得太密）。 */
+.chat-files-view .qa-workspace-explorer-body {
+  padding: .625rem .5rem 1rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.chat-files-view .qa-workspace-explorer-tree { gap: .25rem; }
+.chat-files-view .qa-workspace-explorer-row-wrap { padding: .125rem 0; }
+
+/* 檔案樹行選取與 hover 樣式 */
+.chat-files-view .qa-workspace-explorer-row {
+  border-radius: var(--r-md) !important;
+  border-color: transparent !important;
+}
+.chat-files-view .qa-workspace-explorer-row:hover {
+  background: var(--border) !important;
+  color: var(--text) !important;
+}
+.chat-files-view .qa-workspace-explorer-row.is-selected {
+  background: var(--primary-lt) !important;
+  color: var(--primary) !important;
+}
+.chat-files-view .qa-workspace-explorer-row-label { font-size: .875rem; line-height: 1.5; }
+.chat-files-view .qa-workspace-explorer-row-grip { height: 1.875rem; }
+
+/* 檔案樹行選取 icon 顏色優化 */
+.chat-files-view .qa-workspace-explorer-row-icon.tone-general { color: var(--accent) !important; }
+.chat-files-view .qa-workspace-explorer-row-icon.tone-category { color: var(--primary) !important; }
+.chat-files-view .qa-workspace-explorer-row-icon.tone-topic { color: var(--violet) !important; }
+.chat-files-view .qa-workspace-explorer-row-icon.tone-file { color: var(--text-2) !important; }
+.chat-files-view .qa-workspace-explorer-row-icon.tone-merged { color: #137333 !important; }
+
+/* 檔案樹行內操作按鈕 (Rename, Delete) */
+.chat-files-view .qa-workspace-explorer-row-delete,
+.chat-files-view .qa-workspace-explorer-row-rename {
+  border: none !important;
+  background: transparent !important;
+  color: var(--text-2) !important;
+  border-radius: var(--r-sm) !important;
+}
+.chat-files-view .qa-workspace-explorer-row-rename:hover {
+  background: var(--border) !important;
+  color: var(--text) !important;
+}
+.chat-files-view .qa-workspace-explorer-row-delete:hover {
+  background: var(--red-lt) !important;
+  color: var(--red) !important;
+}
+
+/* 搜尋框樣式 */
+.chat-files-view .qa-workspace-explorer-search {
+  display: flex !important;
+  align-items: center !important;
+  min-width: 0 !important;
+  flex: 1 !important;
+  border: 0.0625rem solid var(--border) !important;
+  border-radius: var(--r-md) !important;
+  background: var(--bg) !important;
+  color: var(--text) !important;
+  height: 2.25rem !important;
+  padding: 0 0.625rem !important;
+  transition: border-color var(--trans), box-shadow var(--trans) !important;
+}
+.chat-files-view .qa-workspace-explorer-search:focus-within {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 0.125rem var(--focus-ring) !important;
+  background: var(--surface) !important;
+}
+.chat-files-view .qa-workspace-explorer-search svg {
+  color: var(--text-3) !important;
+  flex-shrink: 0 !important;
+}
+.chat-files-view .qa-workspace-explorer-search input {
+  color: var(--text) !important;
+  font-size: 0.875rem !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  line-height: normal !important;
+}
+.chat-files-view .qa-workspace-explorer-search input::placeholder {
+  color: var(--text-3) !important;
+}
+
+/* 確保在 General 頁面下，左側檔案樹即使觸發 collapsed 狀態，搜尋輸入框與節點標籤依然顯示，避免 UI 塞住或隱藏 */
+.chat-files-view .qa-workspace-explorer.is-collapsed .qa-workspace-explorer-search input,
+.chat-files-view .qa-workspace-explorer.is-collapsed .qa-workspace-explorer-row-label {
+  width: 100% !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  overflow: visible !important;
+}
+
+/* 確保 is-collapsed 狀態下的搜尋框 padding 保持正常，不被縮減 */
+.chat-files-view .qa-workspace-explorer.is-collapsed .qa-workspace-explorer-search {
+  padding: 0 0.625rem !important;
+}
+
+/* 檔案樹工具列按鈕樣式 */
+.chat-files-view .qa-workspace-explorer-icon-button {
+  width: 2.25rem !important;
+  height: 2.25rem !important;
+  min-height: 0 !important;
+  border: none !important;
+  background: transparent !important;
+  color: var(--text-2) !important;
+  border-radius: var(--r-md) !important;
+}
+.chat-files-view .qa-workspace-explorer-icon-button:hover:not(:disabled) {
+  background: var(--border) !important;
+  color: var(--text) !important;
+}
+.chat-files-view .qa-workspace-explorer-icon-button.reindex {
+  background: var(--accent-lt) !important;
+  color: var(--accent) !important;
+}
+.chat-files-view .qa-workspace-explorer-icon-button.reindex:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 24%, transparent) !important;
+  color: var(--accent) !important;
+}
+
+/* 編輯區檔案標頭與屬性樣式 */
+.chat-files-view .qa-workspace-file-kicker {
+  color: var(--primary) !important;
+  font-weight: 600 !important;
+}
+.chat-files-view .qa-workspace-file-title {
+  color: var(--text) !important;
+}
+.chat-files-view .qa-workspace-file-path {
+  color: var(--text-2) !important;
+}
+
+/* 檔案詳細資訊區塊 */
+.chat-files-view .qa-workspace-file-editor-meta {
+  background: var(--surface-2) !important;
+  border-bottom-color: var(--border) !important;
+  color: var(--text-2) !important;
+}
+
+/* 文字編輯器/預覽區樣式 */
+.chat-files-view .qa-workspace-file-textarea {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+  border-top: 0.0625rem solid var(--border) !important;
+  border-radius: 0 0 var(--r-lg) var(--r-lg) !important;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.chat-files-view .qa-workspace-file-editor-empty,
+.chat-files-view .qa-workspace-file-empty {
+  color: var(--text-2) !important;
+}
+.chat-files-view .qa-workspace-file-empty h3 {
+  color: var(--text) !important;
+}
+
+/* 動作按鈕樣式 */
+.chat-files-view .qa-workspace-file-action-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: .375rem !important;
+  height: 2.25rem !important;
+  padding: 0 .875rem !important;
+  border-radius: var(--r-md) !important;
+  font-size: .8125rem !important;
+  font-family: var(--font) !important;
+  font-weight: 500 !important;
+  cursor: pointer !important;
+  transition: all var(--trans) !important;
+  white-space: nowrap !important;
+  box-sizing: border-box !important;
+  background: none !important;
+  color: var(--text-2) !important;
+  border: 0.0625rem solid var(--border) !important;
+}
+.chat-files-view .qa-workspace-file-action-button:hover:not(:disabled) {
+  background: var(--border) !important;
+  color: var(--text) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+.chat-files-view .qa-workspace-file-action-button.primary {
+  background: var(--primary) !important;
+  color: var(--on-primary) !important;
+  border: none !important;
+}
+.chat-files-view .qa-workspace-file-action-button.primary:hover:not(:disabled) {
+  background: var(--primary-dark) !important;
+  color: var(--on-primary) !important;
+}
+.chat-files-view .qa-workspace-file-action-button.danger {
+  background: none !important;
+  color: var(--red) !important;
+  border: 0.0625rem solid var(--red-lt) !important;
+}
+.chat-files-view .qa-workspace-file-action-button.danger:hover:not(:disabled) {
+  background: var(--red-lt) !important;
+  color: var(--red) !important;
+}
+.chat-files-view .qa-workspace-file-action-button:disabled {
+  opacity: .45 !important;
+  cursor: not-allowed !important;
+}
+
+/* 屬性下拉選單與輸入框樣式 */
+.chat-files-view .qa-workspace-file-select,
+.chat-files-view .qa-workspace-file-input {
+  height: 2.25rem !important;
+  border-radius: var(--r-md) !important;
+  border: 0.0625rem solid var(--border) !important;
+  background-color: var(--surface) !important;
+  color: var(--text) !important;
+  font-size: 0.875rem !important;
+  padding: 0 0.75rem !important;
+  transition: border-color var(--trans), box-shadow var(--trans) !important;
+}
+.chat-files-view .qa-workspace-file-select option {
+  background: var(--surface) !important;
+  color: var(--text) !important;
+}
+.chat-files-view .qa-workspace-file-select:hover:not(:disabled),
+.chat-files-view .qa-workspace-file-input:hover:not(:disabled) {
+  border-color: var(--primary) !important;
+}
+.chat-files-view .qa-workspace-file-select:focus,
+.chat-files-view .qa-workspace-file-input:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 0.125rem var(--focus-ring) !important;
+}
+
+/* 檔案變更狀態 Banner */
+.chat-files-view .qa-workspace-file-status-banner {
+  border: 0.0625rem solid var(--primary-lt) !important;
+  background: var(--primary-lt) !important;
+  color: var(--primary) !important;
+  border-radius: var(--r-md) !important;
+}
+
+/* 空白狀態卡片與圖表樣式 */
+.chat-files-view .qa-workspace-file-editor-empty-state-container {
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+.chat-files-view .qa-workspace-file-editor-empty-state-icon-wrap {
+  background: var(--primary-lt) !important;
+  color: var(--primary) !important;
+  border-color: var(--border) !important;
+}
+.chat-files-view .qa-workspace-file-editor-empty-state-title {
+  color: var(--text) !important;
+}
+.chat-files-view .qa-workspace-file-editor-empty-state-description {
+  color: var(--text-2) !important;
+}
+.chat-files-view .qa-rag-flow-diagram {
+  background: var(--bg) !important;
+  border: 0.0625rem solid var(--border) !important;
+  border-radius: var(--r-lg) !important;
+  box-shadow: none !important;
+}
+.chat-files-view .qa-rag-flow-step .step-num {
+  background: var(--primary) !important;
+  color: var(--on-primary) !important;
+}
+.chat-files-view .qa-rag-flow-step .step-text {
+  color: var(--text) !important;
+}
+.chat-files-view .qa-rag-flow-arrow {
+  color: var(--text-3) !important;
+}
+
+/* 科別與主題管理彈窗 (Manage Modal) */
+.chat-files-view .qa-workspace-manage-modal-backdrop {
+  background: rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(0.25rem) !important;
+}
+.chat-files-view .qa-workspace-manage-modal {
+  background: var(--surface) !important;
+  border: 0.0625rem solid var(--border) !important;
+  border-radius: var(--r-xl) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+.chat-files-view .qa-workspace-manage-header,
+.chat-files-view .qa-workspace-manage-footer {
+  border-color: var(--border) !important;
+  background: var(--surface-2) !important;
+}
+.chat-files-view .qa-workspace-manage-title {
+  color: var(--text) !important;
+  font-family: var(--font) !important;
+  font-weight: 700 !important;
+}
+.chat-files-view .qa-workspace-manage-category {
+  border: 0.0625rem solid var(--border) !important;
+  background: var(--bg) !important;
+}
+.chat-files-view .qa-workspace-manage-category.is-hidden {
+  opacity: 0.45 !important;
+}
+.chat-files-view .qa-workspace-manage-topic {
+  background: var(--surface) !important;
+  border: 0.0625rem solid var(--border) !important;
+}
+.chat-files-view .qa-workspace-manage-topic.is-hidden {
+  opacity: 0.45 !important;
+}
+.chat-files-view .qa-workspace-manage-grip {
+  color: var(--text-3) !important;
+}
+.chat-files-view .qa-workspace-manage-grip:hover {
+  color: var(--text) !important;
+}
+.chat-files-view .qa-workspace-manage-label {
+  color: var(--text) !important;
+  font-weight: 500 !important;
+}
+.chat-files-view .qa-workspace-manage-check input[type="checkbox"] {
+  accent-color: var(--primary) !important;
+}
+
+/* 新增內容 Q&A Creator Modal */
+.chat-files-view .qa-workspace-qa-overlay {
+  background: rgba(0, 0, 0, 0.4) !important;
+  backdrop-filter: blur(0.25rem) !important;
+}
+.chat-files-view .qa-workspace-qa-dialog {
+  background: var(--surface) !important;
+  border: 0.0625rem solid var(--border) !important;
+  border-radius: var(--r-xl) !important;
+  box-shadow: var(--shadow-lg) !important;
+}
+.chat-files-view .qa-workspace-qa-header {
+  border-color: var(--border) !important;
+  background: var(--surface-2) !important;
+}
+.chat-files-view .qa-workspace-qa-header h3 {
+  color: var(--text) !important;
+  font-family: var(--font) !important;
+  font-weight: 700 !important;
+}
+.chat-files-view .qa-workspace-upload-tab {
+  color: var(--text-2) !important;
+  font-family: var(--font) !important;
+}
+.chat-files-view .qa-workspace-upload-tab:hover {
+  color: var(--text) !important;
+}
+.chat-files-view .qa-workspace-upload-tab.is-active {
+  color: var(--primary) !important;
+  border-bottom-color: var(--primary) !important;
+}
+.chat-files-view .qa-workspace-upload-dropzone {
+  border: 0.125rem dashed var(--border-md) !important;
+  border-radius: var(--r-lg) !important;
+  color: var(--text-2) !important;
+  background: var(--bg) !important;
+  margin: 0.75rem 1.25rem !important;
+  padding: 1.5rem !important;
+}
+.chat-files-view .qa-workspace-upload-dropzone:hover,
+.chat-files-view .qa-workspace-upload-dropzone.is-dragover {
+  border-color: var(--primary) !important;
+  background: var(--primary-lt) !important;
+  color: var(--primary) !important;
+}
+.chat-files-view .qa-workspace-csv-example-download {
+  border: 0.0625rem solid var(--primary-lt) !important;
+  background: var(--primary-lt) !important;
+  color: var(--primary) !important;
+}
+.chat-files-view .qa-workspace-csv-example-download:hover {
+  background: color-mix(in srgb, var(--primary) 20%, transparent) !important;
+}
+.chat-files-view .qa-workspace-csv-example-table th {
+  background: var(--bg) !important;
+  color: var(--text-2) !important;
+}
+.chat-files-view .qa-doc-mode-button.is-active {
+  border-color: var(--primary) !important;
+  background: var(--primary-lt) !important;
+  color: var(--primary) !important;
+}
+.chat-files-view .qa-workspace-image-picker-card.is-selected {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 0.125rem var(--focus-ring) !important;
+}
 
 /* ── Messages ── */
 .app-shell .messages-area { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 1.25rem 1.5rem; display: flex; flex-direction: column; gap: 1.125rem; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
@@ -420,7 +989,7 @@
 .app-shell .msg-row.model { align-items: flex-start; }
 .msg-bubble { max-width: 72%; padding: .6875rem .9375rem; border-radius: var(--r-lg); font-size: .9375rem; line-height: 1.65; white-space: pre-wrap; word-break: break-word; animation: msgIn .22s cubic-bezier(.34,1.56,.64,1); }
 @keyframes msgIn { from { opacity: 0; transform: translateY(.625rem) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
-.msg-bubble.user { background: var(--primary); color: #fff; border-bottom-right-radius: .25rem; }
+.msg-bubble.user { background: var(--primary); color: var(--on-primary); border-bottom-right-radius: .25rem; }
 .msg-bubble.model { background: var(--slate-100); color: var(--text); border-bottom-left-radius: .25rem; }
 [data-theme="dark"] .msg-bubble.model { background: var(--slate-800); }
 .msg-bubble.error { background: var(--red-100); color: var(--red-700); }
@@ -442,26 +1011,25 @@
 .empty-icon { width: 3.25rem; height: 3.25rem; border-radius: .875rem; background: var(--border); display: flex; align-items: center; justify-content: center; margin-bottom: .25rem; }
 .empty-icon svg { width: 1.625rem; height: 1.625rem; color: var(--text-3); }
 .empty-title { font-size: 1.0625rem; font-weight: 600; color: var(--text-2); }
-.empty-sub { font-size: .875rem; max-width: 22rem; line-height: 1.6; }
+.empty-sub { font-size: .875rem; max-width: 32rem; line-height: 1.6; text-wrap: balance; }
 .welcome-icon { font-size: 2rem; margin-bottom: .25rem; }
 .welcome-chips { display: flex; flex-wrap: wrap; gap: .5rem; justify-content: center; margin-top: .25rem; }
 .welcome-chip { padding: .4375rem .875rem; border: 0.0625rem solid var(--border); border-radius: var(--radius-pill); font-size: .875rem; color: var(--text-2); background: none; cursor: pointer; transition: all var(--trans); font-family: var(--font); }
 .welcome-chip:hover { border-color: var(--primary); color: var(--primary); background: var(--primary-lt); }
 
 /* ── Input ── */
-.app-shell .input-area { display: block; background: transparent; padding: .875rem .5rem 1rem; border-top: 0.0625rem solid var(--border); flex-shrink: 0; gap: 0; align-items: stretch; position: static; }
-.app-shell .input-area button.send-btn { width: 2.25rem; height: 2.25rem; min-width: 0; min-height: 0; padding: 0; flex: 0 0 2.25rem; }
-.input-wrap { display: flex; align-items: center; gap: .625rem; background: var(--bg); border: 0.09375rem solid var(--border-md); border-radius: var(--r-lg); padding: .625rem .625rem .625rem 1rem; transition: border-color var(--trans), box-shadow var(--trans); }
+.app-shell .input-area { display: block; background: transparent; padding: .6875rem .9375rem; border-top: 0.0625rem solid var(--border); flex-shrink: 0; gap: 0; align-items: stretch; position: static; }
+.app-shell .input-area button.send-btn { width: 2rem; height: 2rem; min-width: 0; min-height: 0; padding: 0; flex: 0 0 2rem; }
+.input-wrap { display: flex; align-items: flex-end; gap: .5rem; background: var(--bg); border: 0.0625rem solid var(--border-md); border-radius: var(--r-lg); padding: .4375rem .4375rem .4375rem .75rem; transition: border-color var(--trans), box-shadow var(--trans); }
 .input-wrap:focus-within { border-color: var(--primary); box-shadow: 0 0 0 .1875rem rgba(15,118,110,.1); }
-.chat-ta { flex: 1 1 auto; width: 100%; min-width: 0; border: none; background: none; resize: none; font-family: var(--font); font-size: .9375rem; color: var(--text); outline: none; min-height: 1.5rem; max-height: 10rem; line-height: 1.5; padding: .25rem 0; box-sizing: border-box; }
+.chat-ta { flex: 1 1 auto; width: 100%; min-width: 0; border: none; background: none; resize: none; font-family: var(--font); font-size: .9375rem; color: var(--text); outline: none; min-height: 1.5rem; max-height: 8rem; line-height: 1.5; padding: .1875rem 0; box-sizing: border-box; }
 .chat-ta::placeholder { color: var(--text-3); }
-.send-btn { width: 2.25rem; height: 2.25rem; padding: 0; box-sizing: border-box; line-height: 0; border-radius: var(--r-md); background: linear-gradient(145deg, var(--primary), var(--primary-dark)); color: #fff; border: 0.0625rem solid var(--primary); box-shadow: 0 .25rem .625rem rgba(15,118,110,.22), inset 0 .0625rem 0 rgba(255,255,255,.18); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform var(--trans), box-shadow var(--trans), border-color var(--trans), filter var(--trans); }
+.send-btn { width: 2rem; height: 2rem; padding: 0; box-sizing: border-box; line-height: 0; border-radius: var(--r-md); background: var(--primary); color: var(--on-primary); border: 0.0625rem solid var(--primary); box-shadow: var(--shadow-sm); cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform var(--trans), box-shadow var(--trans), background var(--trans); }
 .send-btn svg { width: .9375rem; height: .9375rem; flex: 0 0 .9375rem; pointer-events: none; }
 .send-btn:disabled { opacity: 1; background: var(--primary-lt); color: var(--primary); border-color: var(--border-md); box-shadow: none; cursor: not-allowed; }
-.send-btn:not(:disabled):hover { transform: translateY(-.0625rem); filter: brightness(1.04); box-shadow: 0 .375rem .875rem rgba(15,118,110,.26), inset 0 .0625rem 0 rgba(255,255,255,.2); }
-.send-btn:not(:disabled):active { transform: translateY(0); filter: brightness(.96); box-shadow: 0 .125rem .375rem rgba(15,118,110,.2), inset 0 .0625rem 0 rgba(255,255,255,.14); }
+.send-btn:not(:disabled):hover { transform: translateY(-.0625rem); background: var(--primary-dark); box-shadow: var(--shadow-md); }
+.send-btn:not(:disabled):active { transform: translateY(0); box-shadow: var(--shadow-sm); }
 .send-btn:focus-visible { outline: .125rem solid var(--primary); outline-offset: .125rem; }
-.input-hint { font-size: .75rem; color: var(--text-3); text-align: center; margin-top: .3125rem; }
 
 /* ── Responsive ── */
 

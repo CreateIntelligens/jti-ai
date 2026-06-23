@@ -1,12 +1,10 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { BookOpen, MessageSquare, Pencil, Plus, RefreshCw, RotateCcw, Send } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback, useLayoutEffect, type ReactNode } from 'react';
+import { BookOpen, FileText, ListChecks, MessageSquare, Pencil, Plus, RotateCcw, Send } from 'lucide-react';
 import type { Message } from '../types';
 import { useEnterToSubmit } from '../hooks/useEnterToSubmit';
 import { useFocusOnOpen } from '../hooks/useFocusOnOpen';
 import { useScrollToBottom } from '../hooks/useScrollToBottom';
 import CitationsList from './CitationsList';
-
-const QUICK_PROMPTS = ['幫我總結主要內容', '有哪些常見問題？', '請給我快速入門指南'];
 
 interface ChatAreaProps {
   messages: Message[];
@@ -20,9 +18,25 @@ interface ChatAreaProps {
   currentStoreIcon?: string;
   currentProjectName?: string | null;
   currentProjectColor?: string;
+  /* Prompt 設定改由 Header 設定選單開啟；重新開始功能依設計稿移除。
+     仍保留這兩個選用 prop 以相容上層呼叫端，但 topbar 不再渲染。 */
   onOpenPromptPanel?: () => void;
   onRestartChat?: () => void;
   onCreateStore?: () => void;
+  onOpenTopics?: () => void;
+  topicsOpen?: boolean;
+  topicsDisabled?: boolean;
+  quickPrompts?: string[];
+  quickPromptsLoading?: boolean;
+  quickPromptsMessage?: string;
+  /* 對話 / 文件 檢視切換（topbar segmented toggle）。
+     viewMode==='files' 時下方內容區改 render filesView，並隱藏輸入框。 */
+  viewMode?: 'chat' | 'files';
+  onChangeView?: (mode: 'chat' | 'files') => void;
+  filesViewEnabled?: boolean;
+  filesView?: ReactNode;
+  /* chat 右側常駐「常見問題」側欄（suggestOpen 時顯示）。 */
+  suggestSidebar?: ReactNode;
 }
 
 export default function ChatArea({
@@ -36,9 +50,18 @@ export default function ChatArea({
   currentStoreIcon,
   currentProjectName,
   currentProjectColor,
-  onOpenPromptPanel,
-  onRestartChat,
   onCreateStore,
+  onOpenTopics,
+  topicsOpen = false,
+  topicsDisabled = false,
+  quickPrompts = [],
+  quickPromptsLoading = false,
+  quickPromptsMessage,
+  viewMode = 'chat',
+  onChangeView,
+  filesViewEnabled = false,
+  filesView,
+  suggestSidebar,
 }: ChatAreaProps) {
   const [input, setInput] = useState('');
   const [shouldFocus, setShouldFocus] = useState(false);
@@ -49,6 +72,20 @@ export default function ChatArea({
   const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   useScrollToBottom(chatEndRef, [messages, loading]);
+
+  const resizeComposer = useCallback((element: HTMLTextAreaElement | null) => {
+    if (!element) return;
+    element.style.height = 'auto';
+    if (element.scrollHeight <= 0) return;
+    const rootFontSize = Number.parseFloat(
+      window.getComputedStyle(document.documentElement).fontSize,
+    ) || 16;
+    element.style.height = `${Math.min(element.scrollHeight / rootFontSize, 8)}rem`;
+  }, []);
+
+  useLayoutEffect(() => {
+    resizeComposer(textareaRef.current);
+  }, [input, resizeComposer]);
 
   useEffect(() => {
     if (shouldFocus && textareaRef.current && !disabled) {
@@ -109,7 +146,7 @@ export default function ChatArea({
   const hasStore = Boolean(currentStoreName);
 
   return (
-    <main className="chat-area">
+    <main className={`chat-area${viewMode === 'files' ? ' is-files-view' : ''}`}>
       {/* ── Top bar ── */}
       {hasStore && (
         <div className="chat-topbar">
@@ -124,28 +161,50 @@ export default function ChatArea({
             )}
           </div>
           <div className="ctl-actions">
-            {onRestartChat && (
+            {viewMode === 'chat' && onOpenTopics && (
               <button
-                className="icon-btn"
-                title="重新開始"
-                onClick={onRestartChat}
+                className={`icon-btn icon-btn-pill general-topics-btn${topicsOpen ? ' active' : ''}`}
+                title="常見問題"
+                onClick={onOpenTopics}
+                disabled={topicsDisabled}
+                aria-expanded={topicsOpen}
+                aria-controls="general-suggest-sidebar"
               >
-                <RefreshCw size={18} />
+                <ListChecks size={16} /> 常見問題
               </button>
             )}
-            {onOpenPromptPanel && (
-              <button
-                className="icon-btn icon-btn-pill"
-                title="Prompt 設定"
-                onClick={onOpenPromptPanel}
-              >
-                <MessageSquare size={16} /> Prompt
-              </button>
+            {filesViewEnabled && onChangeView && (
+              <div className="view-toggle" role="tablist" aria-label="檢視切換">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={viewMode === 'chat'}
+                  className={`view-tab${viewMode === 'chat' ? ' active' : ''}`}
+                  onClick={() => onChangeView('chat')}
+                >
+                  <MessageSquare size={14} /> 對話
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={viewMode === 'files'}
+                  className={`view-tab${viewMode === 'files' ? ' active' : ''}`}
+                  onClick={() => onChangeView('files')}
+                >
+                  <FileText size={14} /> 文件
+                </button>
+              </div>
             )}
           </div>
         </div>
       )}
 
+      {/* ── Files view (knowledge workspace) ── */}
+      {viewMode === 'files' && filesView ? (
+        <div className="chat-files-view">{filesView}</div>
+      ) : (
+        <div className="chat-main-row">
+        <div className="chat-main-col">
       {/* ── Empty state: no store selected ── */}
       {!hasStore ? (
         <div className="empty-state">
@@ -154,7 +213,7 @@ export default function ChatArea({
           </div>
           <div className="empty-title">選擇左側知識庫開始對話</div>
           <div className="empty-sub">
-            選擇一個已有的知識庫，或新增新知識庫，系統就會自動建立 RAG 對話 session。
+            選擇一個已有的知識庫，或新增新知識庫，系統就會自動建立 RAG 對話工作階段。
           </div>
           {onCreateStore && (
             <button className="btn btn-primary mt-1" onClick={onCreateStore} >
@@ -170,19 +229,26 @@ export default function ChatArea({
           </div>
           <div className="empty-title">向「{currentStoreName}」提問</div>
           <div className="empty-sub">
-            知識庫已就緒，可以直接提問或點選建議問題：
+            {quickPromptsLoading
+              ? '正在載入常見問題…'
+              : quickPrompts.length > 0
+                ? '知識庫已就緒，可以直接提問或點選常見問題：'
+                : quickPromptsMessage || '目前沒有可用的常見問題，仍可直接輸入問題。'}
           </div>
-          <div className="welcome-chips">
-            {QUICK_PROMPTS.map((p, i) => (
+          {quickPrompts.length > 0 && (
+            <div className="welcome-chips">
+            {quickPrompts.map((prompt) => (
               <button
-                key={i}
+                key={prompt}
                 className="welcome-chip"
-                onClick={() => sendQuick(p)}
+                onClick={() => sendQuick(prompt)}
+                disabled={disabled || loading}
               >
-                {p}
+                {prompt}
               </button>
             ))}
-          </div>
+            </div>
+          )}
         </div>
       ) : (
         /* ── Messages ── */
@@ -216,7 +282,7 @@ export default function ChatArea({
                         onClick={() => handleEditSubmit(editingTurn)}
                         disabled={!editText.trim()}
                       >
-                        送出
+                        傳送
                       </button>
                       <button
                         className="message-edit-btn cancel"
@@ -259,9 +325,9 @@ export default function ChatArea({
                           <button
                             className="msg-act-btn"
                             onClick={() => onRegenerate(msg.turnNumber!)}
-                            title="重新生成"
+                            title="重新產生"
                           >
-                            <RotateCcw size={12} /> 重新生成
+                            <RotateCcw size={12} /> 重新產生
                           </button>
                         )}
                       </>
@@ -287,7 +353,7 @@ export default function ChatArea({
             onKeyDown={handleKeyDown}
             placeholder={
               hasStore
-                ? `向「${currentStoreName}」提問... (Enter 傳送 · Shift+Enter 換行)`
+                ? `向「${currentStoreName}」提問（Enter 傳送 · Shift+Enter 換行）...`
                 : '請先選擇知識庫...'
             }
             disabled={disabled}
@@ -296,11 +362,16 @@ export default function ChatArea({
             className="send-btn"
             onClick={handleSubmit}
             disabled={disabled || !input.trim() || loading}
+            aria-label="傳送"
           >
             <Send />
           </button>
         </div>
       </div>
+        </div>
+        {hasStore && suggestSidebar}
+        </div>
+      )}
     </main>
   );
 }

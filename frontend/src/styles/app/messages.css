@@ -57,7 +57,7 @@
 .app-container .message.user {
   background: var(--primary-color);
   border: 0.0625rem solid rgba(61, 217, 211, 0.3);
-  color: #ffffff;
+  color: var(--on-primary);
   border-bottom-right-radius: 0.375rem;
   box-shadow: var(--shadow-md);
 }
@@ -91,7 +91,7 @@
 .app-container .message.error {
   background: var(--danger-color);
   border: 0.0625rem solid rgba(255, 107, 157, 0.3);
-  color: #ffb3d9;
+  color: var(--red-100);
 }
 
 /* Message action buttons (edit / regenerate) */
@@ -209,35 +209,35 @@
 
 /* Light mode overrides */
 [data-theme="light"] .message-action-btn {
-  background: #f5f5f4;
-  border-color: #d6d3d1;
-  color: #78716c;
+  background: var(--slate-100);
+  border-color: var(--slate-200);
+  color: var(--slate-600);
 }
 
 [data-theme="light"] .message-action-btn:hover {
-  background: #e7e5e4;
-  color: #0f766e;
-  border-color: #0f766e;
+  background: var(--slate-200);
+  color: var(--primary-color);
+  border-color: var(--primary-color);
 }
 
 [data-theme="light"] .message-edit-textarea {
   background: rgba(255, 255, 255, 0.8);
-  border-color: #0f766e;
-  color: #1c1917;
+  border-color: var(--primary-color);
+  color: var(--text-primary);
 }
 
 [data-theme="light"] .message-edit-btn.save {
-  background: #0f766e;
-  color: #fff;
+  background: var(--primary-color);
+  color: var(--on-primary);
 }
 
 [data-theme="light"] .message-edit-btn.cancel {
-  color: #78716c;
-  border-color: #d6d3d1;
+  color: var(--slate-600);
+  border-color: var(--slate-200);
 }
 
 [data-theme="light"] .message-edit-btn.cancel:hover {
-  background: #e7e5e4;
+  background: var(--slate-200);
 }
 
 .loading-dots {
@@ -273,4 +273,101 @@
     content: '⬡⬡';
     opacity: 0.6;
   }
+}
+
+/* ==================== GENERAL CHAT REDESIGN ==================== */
+
+.app-shell .messages-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
+  padding: 1.25rem 1.5rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+.app-shell .msg-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.app-shell .msg-row.user { align-items: flex-end; }
+.app-shell .msg-row.model { align-items: flex-start; }
+
+.app-shell .msg-bubble {
+  max-width: 72%;
+  padding: 0.6875rem 0.9375rem;
+  border-radius: var(--r-lg);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.app-shell .msg-bubble.user {
+  background: var(--primary);
+  color: var(--on-primary);
+  border-bottom-right-radius: 0.25rem;
+}
+
+.app-shell .msg-bubble.model {
+  background: var(--slate-100);
+  color: var(--text);
+  border-bottom-left-radius: 0.25rem;
+}
+
+[data-theme="dark"] .app-shell .msg-bubble.model { background: var(--slate-800); }
+
+.app-shell .msg-bubble.error {
+  background: var(--red-100);
+  color: var(--red-700);
+}
+
+.app-shell .msg-loading {
+  display: flex;
+  align-items: center;
+  gap: 0.3125rem;
+  padding: 0.3125rem 0;
+}
+
+.app-shell .msg-loading span {
+  width: 0.4375rem;
+  height: 0.4375rem;
+  border-radius: 50%;
+  background: var(--text-3);
+  animation: dot 1.2s ease-in-out infinite;
+}
+
+.app-shell .msg-actions {
+  display: flex;
+  gap: 0.25rem;
+  opacity: 0;
+  transition: opacity var(--trans);
+}
+
+.app-shell .msg-row:hover .msg-actions,
+.app-shell .msg-row:focus-within .msg-actions { opacity: 1; }
+
+.app-shell .msg-act-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.125rem 0.4375rem;
+  border: 0.0625rem solid var(--border);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--text-3);
+  font: inherit;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: background var(--trans), color var(--trans);
+}
+
+.app-shell .msg-act-btn:hover {
+  background: var(--border);
+  color: var(--text-2);
 }

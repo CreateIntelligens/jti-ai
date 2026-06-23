@@ -5,21 +5,25 @@
 
 .app-shell,
 .rp-overlay {
-  /* ── Palette ── */
-  --teal-50: #f0fdfa; --teal-100: #ccfbf1; --teal-200: #99f6e4;
-  --teal-500: #14b8a6; --teal-600: #0d9488; --teal-700: #0f766e; --teal-800: #115e59;
-  --amber-400: #fbbf24; --amber-500: #f59e0b; --amber-600: #d97706;
-  --slate-50: #f8fafc; --slate-100: #f1f5f9; --slate-200: #e2e8f0;
-  --slate-300: #cbd5e1; --slate-400: #94a3b8; --slate-500: #64748b;
-  --slate-600: #475569; --slate-700: #334155; --slate-800: #1e293b; --slate-900: #0f172a;
-  --red-100: #fee2e2; --red-500: #ef4444; --red-700: #b91c1c;
-  --violet-100: #ede9fe; --violet-600: #7c3aed;
+  /* ── Palette (Google Material) ── */
+  --teal-50: #e8f0fe; --teal-100: #d2e3fc; --teal-200: #aecbfa;
+  --teal-500: #1a73e8; --teal-600: #1967d2; --teal-700: #1557b0; --teal-800: #174ea6;
+  --amber-400: #fdd663; --amber-500: #f9ab00; --amber-600: #e37400;
+  --slate-50: #f8f9fa; --slate-100: #f1f3f4; --slate-200: #e8eaed;
+  --slate-300: #dadce0; --slate-400: #9aa0a6; --slate-500: #80868b;
+  --slate-600: #5f6368; --slate-700: #3c4043; --slate-800: #202124; --slate-900: #171717;
+  --red-100: #fce8e6; --red-500: #d93025; --red-700: #b3261e;
+  --violet-100: #e8def8; --violet-600: #6750a4;
 
   /* ── Semantic ── */
-  --bg: #f8fafc; --surface: #ffffff; --border: #e2e8f0; --border-md: #cbd5e1;
-  --primary: #0f766e; --primary-lt: #ccfbf1; --primary-dark: #115e59;
-  --accent: #d97706; --accent-lt: #fef3c7;
-  --text: #1e293b; --text-2: #475569; --text-3: #94a3b8;
+  --bg: #f8f9fa; --surface: #ffffff; --surface-2: #f8f9fa; --border: #dadce0; --border-md: #cbd5e1;
+  --primary: #1a73e8; --primary-lt: #e8f0fe; --primary-dark: #1557b0;
+  --accent: #f9ab00; --accent-lt: #feefc3;
+  --violet: #6750a4; --violet-lt: #e8def8;
+  --red: #d93025; --red-lt: #fce8e6;
+  --focus-ring: rgba(26, 115, 232, .18);
+  --text: #202124; --text-2: #5f6368; --text-3: #70757a;
+  --on-primary: #ffffff;
 
   /* ── Radii ── */
   --r-sm: .375rem; --r-md: .625rem; --r-lg: 1rem; --r-xl: 1.25rem;
@@ -49,11 +53,14 @@
 /* ── Dark Mode ── */
 [data-theme="dark"] .app-shell,
 [data-theme="dark"] .rp-overlay {
-  --bg: #0f172a; --surface: #1e293b; --border: #334155; --border-md: #475569;
-  --primary: #14b8a6; --primary-lt: rgba(20,184,166,.12); --primary-dark: #0d9488;
-  --accent: #fbbf24; --accent-lt: rgba(251,191,36,.12);
-  --text: #f1f5f9; --text-2: #94a3b8; --text-3: #475569;
-  --shadow-sm: 0 .0625rem .25rem rgba(0,0,0,.3);
-  --shadow-md: 0 .25rem 1rem rgba(0,0,0,.4);
-  --shadow-lg: 0 .5rem 2rem rgba(0,0,0,.5);
+  --bg: #202124; --surface: #303134; --surface-2: #292a2d; --border: #5f6368; --border-md: #5f6368;
+  --primary: #8ab4f8; --primary-lt: rgba(138,180,248,.16); --primary-dark: #9bbff9;
+  --accent: #fbbc04; --accent-lt: rgba(251,188,4,.16);
+  --violet: #d0bcff; --violet-lt: rgba(208,188,255,.16);
+  --red: #f28b82; --red-lt: rgba(242,139,130,.16);
+  --focus-ring: rgba(138,180,248,.24);
+  --text: #e8eaed; --text-2: #9aa0a6; --text-3: #80868b;
+  --shadow-sm: 0 .0625rem .125rem 0 rgba(0,0,0,.3), 0 .0625rem .1875rem .0625rem rgba(0,0,0,.15);
+  --shadow-md: 0 .0625rem .125rem 0 rgba(0,0,0,.3), 0 .125rem .375rem .125rem rgba(0,0,0,.15);
+  --shadow-lg: 0 .25rem .375rem 0 rgba(0,0,0,.3), 0 .25rem .5rem .1875rem rgba(0,0,0,.15);
 }
