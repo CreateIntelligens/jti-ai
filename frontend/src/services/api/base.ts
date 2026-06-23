@@ -26,25 +26,67 @@ export async function handleResponse<T>(response: Response): Promise<T> {
   return response.json();
 }
 
+// 常見 FastAPI/pydantic 驗證 type → 中文。msg 缺漏時的 fallback。
+const VALIDATION_TYPE_MESSAGES: Record<string, string> = {
+  'missing': '為必填',
+  'value_error.missing': '為必填',
+  'string_too_short': '長度不足',
+  'value_error.any_str.min_length': '長度不足',
+  'string_too_long': '長度超過上限',
+  'value_error.email': 'Email 格式不正確',
+};
+
+/**
+ * 把單筆 FastAPI 422 驗證錯誤格式化成「欄位: 說明」。
+ * loc 通常是 ["body", "field"] 之類；跳過 body/query/path 等位置前綴只留欄位名。
+ */
+function formatValidationError(item: unknown): string {
+  if (!item || typeof item !== 'object') return '';
+  const { loc, msg, type } = item as { loc?: unknown; msg?: unknown; type?: unknown };
+  const fieldParts = Array.isArray(loc)
+    ? loc.filter((p) => typeof p === 'string' && !['body', 'query', 'path', 'header'].includes(p))
+    : [];
+  const field = fieldParts.join('.');
+  const reason =
+    (typeof type === 'string' && VALIDATION_TYPE_MESSAGES[type]) ||
+    (typeof msg === 'string' ? msg : '') ||
+    '格式不正確';
+  return field ? `${field}: ${reason}` : reason;
+}
+
 /**
  * 從錯誤 response 取出可讀訊息。
  * 優先解析 FastAPI 的 { detail: ... } 結構,避免把原始 JSON 字串直接丟給使用者。
+ * 非 JSON 回應(blob 下載等)無法走 handleResponse 的端點，可在 !response.ok 時
+ * 直接呼叫此函式取得一致的錯誤訊息。
  */
-async function extractErrorMessage(response: Response): Promise<string> {
+export async function extractErrorMessage(response: Response): Promise<string> {
+  // 後端未啟動時 nginx 會回 502/503/504 + 一坨 HTML 錯誤頁；直接給友善訊息，
+  // 不要把整段 <html>…</html> 丟到畫面上。
+  if (response.status === 502 || response.status === 503 || response.status === 504) {
+    return '伺服器暫時無法連線，請稍後再試（後端服務可能尚未啟動）。';
+  }
+
   const raw = await response.text();
   if (raw) {
     try {
       const parsed = JSON.parse(raw);
       const detail = parsed?.detail;
       if (typeof detail === 'string') return detail;
-      // FastAPI 驗證錯誤: detail 是陣列
+      // FastAPI 驗證錯誤(422): detail 是 [{loc, msg, type}, ...]。
+      // 帶上欄位名並合併多筆，避免只顯示無頭緒的英文 "field required"。
       if (Array.isArray(detail) && detail.length > 0) {
-        const first = detail[0];
-        if (typeof first?.msg === 'string') return first.msg;
+        const formatted = detail
+          .map(formatValidationError)
+          .filter(Boolean);
+        if (formatted.length > 0) return formatted.join('；');
       }
       if (typeof parsed?.message === 'string') return parsed.message;
     } catch {
-      // 非 JSON,退回原始文字
+      // 非 JSON（例如 nginx/proxy 的 HTML 錯誤頁）：別把原始 HTML 丟給使用者。
+      if (raw.trimStart().startsWith('<')) {
+        return response.statusText || '伺服器發生錯誤，請稍後再試。';
+      }
       return raw;
     }
   }

@@ -1,4 +1,4 @@
-import { fetchAsAdmin, handleResponse, normLang, buildUrl } from '../base';
+import { extractErrorMessage, fetchAsAdmin, handleResponse, normLang, buildUrl } from '../base';
 import { downloadBlob } from '../../../utils/download';
 
 export interface QuizQuestionOption {
@@ -156,7 +156,7 @@ export function createQuizBankApi(basePath: string): QuizBankApi {
     },
     async exportQuizResultsCsv(language) {
       const response = await fetchAsAdmin(buildApiUrl('/transfer/export', language, { type: 'results' }));
-      if (!response.ok) throw new Error('Export failed');
+      if (!response.ok) throw new Error(await extractErrorMessage(response));
       downloadBlob(await response.blob(), `quiz_results_${language}.csv`);
     },
     async getQuizBankStats(language = 'zh', bankId) {
@@ -172,7 +172,7 @@ export function createQuizBankApi(basePath: string): QuizBankApi {
     },
     async exportQuizBankCsv(language, bankId) {
       const response = await fetchAsAdmin(buildApiUrl('/transfer/export', language, { bank_id: bankId, type: 'questions' }));
-      if (!response.ok) throw new Error('Export failed');
+      if (!response.ok) throw new Error(await extractErrorMessage(response));
       downloadBlob(await response.blob(), `quiz_bank_${bankId}_${language}.csv`);
     }
   };
