@@ -7,16 +7,69 @@ MongoDB Session 管理服務
 3. 支持查詢和分析
 """
 
-from typing import Dict, Optional, List, Any
+import json
+import logging
+import os
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 from app.models.session import Session, SessionStep, compute_expires_at
 from app.services.mongo_client import get_mongo_db
 from app.tools.jti.quiz import complete_selected_questions, get_total_questions
+
 from .session_state_mixin import SessionStateMixin
-import logging
 
 logger = logging.getLogger(__name__)
+
+
+_SESSION_CACHE_KEY_PREFIX = "session"
+_DEFAULT_CACHE_TTL_SECONDS = 24 * 60 * 60
+_CACHE_CLIENT_AUTO = object()
+
+
+def _build_cache_client():
+    """Create a Redis client when REDIS_URL is configured.
+
+    Redis is a performance cache only. If the package, URL, or server is not
+    available, session persistence continues through MongoDB.
+    """
+    redis_url = os.getenv("REDIS_URL")
+    if not redis_url:
+        return None
+
+    try:
+        import redis
+    except Exception as exc:
+        logger.warning("Redis cache disabled: redis package unavailable (%s)", exc)
+        return None
+
+    try:
+        client = redis.Redis.from_url(
+            redis_url,
+            decode_responses=True,
+            socket_connect_timeout=1,
+            socket_timeout=1,
+        )
+        client.ping()
+        logger.info("Redis session cache enabled")
+        return client
+    except Exception as exc:
+        logger.warning("Redis session cache disabled: %s", exc)
+        return None
+
+
+def _cache_ttl_seconds(expires_at: Any, *, now: Optional[datetime] = None) -> int:
+    if not isinstance(expires_at, datetime):
+        return _DEFAULT_CACHE_TTL_SECONDS
+
+    if now is not None:
+        current = now
+    elif expires_at.tzinfo is not None:
+        current = datetime.now(expires_at.tzinfo)
+    else:
+        current = datetime.now()
+    ttl = int((expires_at - current).total_seconds())
+    return max(1, ttl)
 
 
 def _get_log_snapshot(log: Dict[str, Any]) -> Dict[str, Any]:
@@ -159,9 +212,67 @@ def _session_doc_with_expiry(session: Session, now: datetime) -> Dict[str, Any]:
 class MongoSessionManager(SessionStateMixin):
     """MongoDB Session 管理器"""
 
-    def __init__(self, db_name: str):
+    def __init__(self, db_name: str, cache_client: Any = _CACHE_CLIENT_AUTO):
+        self.db_name = db_name
         self.db = get_mongo_db(db_name)
         self.sessions_collection = self.db["sessions"]
+        self.cache = (
+            _build_cache_client()
+            if cache_client is _CACHE_CLIENT_AUTO
+            else cache_client
+        )
+
+    def _cache_key(self, session_id: str) -> str:
+        return f"{_SESSION_CACHE_KEY_PREFIX}:{self.db_name}:{session_id}"
+
+    def _cache_get(self, session_id: str) -> Optional[Session]:
+        if self.cache is None:
+            return None
+
+        try:
+            key = self._cache_key(session_id)
+            cached = self.cache.get(key)
+            if not cached:
+                return None
+            if isinstance(cached, bytes):
+                cached = cached.decode("utf-8")
+            payload = json.loads(cached)
+            return Session(**payload)
+        except Exception as exc:
+            logger.warning("Ignoring invalid Redis session cache for %s: %s", session_id, exc)
+            try:
+                self.cache.delete(key)
+            except Exception:
+                pass
+            return None
+
+    def _cache_set(self, session: Session, expires_at: Any = None) -> None:
+        if self.cache is None:
+            return
+
+        try:
+            expiry = (
+                expires_at
+                if expires_at is not None
+                else compute_expires_at(session.step, datetime.now())
+            )
+            ttl = _cache_ttl_seconds(expiry)
+            payload = json.dumps(session.model_dump(mode="json"), ensure_ascii=False)
+            self.cache.set(self._cache_key(session.session_id), payload, ex=ttl)
+        except Exception as exc:
+            logger.warning(
+                "Failed to write Redis session cache for %s: %s",
+                session.session_id,
+                exc,
+            )
+
+    def _cache_delete(self, session_id: str) -> None:
+        if self.cache is None:
+            return
+        try:
+            self.cache.delete(self._cache_key(session_id))
+        except Exception as exc:
+            logger.warning("Failed to delete Redis session cache for %s: %s", session_id, exc)
 
     def create_session(self, language: str = "zh") -> Session:
         """Create new session（建立即落庫，多 worker 共享狀態）.
@@ -182,15 +293,23 @@ class MongoSessionManager(SessionStateMixin):
         self.sessions_collection.update_one(
             {"session_id": session.session_id}, {"$set": doc}, upsert=True
         )
+        self._cache_set(session, doc.get("expires_at"))
 
     def get_session(self, session_id: str) -> Optional[Session]:
-        """取得 session（一律查 MongoDB，跨 worker 共享）"""
+        """取得 session（Redis read-through，miss 時回 MongoDB）"""
         try:
+            cached = self._cache_get(session_id)
+            if cached is not None:
+                return cached
+
             doc = self.sessions_collection.find_one({"session_id": session_id})
             if doc is None:
                 logger.warning(f"Session not found in MongoDB: {session_id}")
                 return None
-            return self._doc_to_session(doc)
+            session = self._doc_to_session(doc)
+            if session is not None:
+                self._cache_set(session, doc.get("expires_at"))
+            return session
         except Exception as e:
             logger.error(f"Failed to get session from MongoDB: {e}")
             return None
@@ -214,6 +333,7 @@ class MongoSessionManager(SessionStateMixin):
         """刪除 session"""
         try:
             result = self.sessions_collection.delete_one({"session_id": session_id})
+            self._cache_delete(session_id)
 
             if result.deleted_count > 0:
                 logger.info(f"Deleted session from MongoDB: {session_id}")
@@ -275,6 +395,7 @@ class MongoSessionManager(SessionStateMixin):
                 metadata={},
             )
             _persist_rebuilt_session(self.sessions_collection, session_id, session)
+            self._cache_set(session)
             logger.info(
                 f"Rebuilt session from {len(logs)} logs: {session_id[:8]}... "
                 f"(step={step}, answers={len(answers)}, questions={len(selected_questions)})"

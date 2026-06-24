@@ -44,33 +44,31 @@ def _backfill_store_name(db) -> None:
         return
     _backfill_done = True
 
-    # 1. Backfill quiz_bank_metadata
+    # Backfill quiz_bank_metadata
     meta_col = db["quiz_bank_metadata"]
     meta_col.update_many({"store_name": {"$exists": False}}, {"$set": {"store_name": JTI_STORE_NAME}})
 
-    # Drop old index
     try:
         meta_col.drop_index("language_1_bank_id_1")
         logger.info("[Startup] Dropped old quiz_bank_metadata index language_1_bank_id_1")
     except Exception:
         pass
 
-    # 2. Backfill quiz_bank_questions
+    # Backfill quiz_bank_questions
     q_col = db["quiz_bank_questions"]
     q_col.update_many({"store_name": {"$exists": False}}, {"$set": {"store_name": JTI_STORE_NAME}})
 
-    # 3. Backfill quiz_results_metadata
+    # Backfill quiz_results_metadata
     res_meta_col = db["quiz_results_metadata"]
     res_meta_col.update_many({"store_name": {"$exists": False}}, {"$set": {"store_name": JTI_STORE_NAME}})
 
-    # Drop old index
     try:
         res_meta_col.drop_index("uniq_language_set_id")
         logger.info("[Startup] Dropped old quiz_results_metadata index uniq_language_set_id")
     except Exception:
         pass
 
-    # 4. Backfill quiz_results
+    # Backfill quiz_results
     res_col = db["quiz_results"]
     res_col.update_many({"store_name": {"$exists": False}}, {"$set": {"store_name": JTI_STORE_NAME}})
 
@@ -89,10 +87,9 @@ def _upgrade_legacy_data() -> None:
     if db is None:
         return
 
-    # Backfill store_name first
     _backfill_store_name(db)
 
-    # --- Metadata ---
+    # Upgrade metadata: add bank_id to legacy docs or delete duplicates
     meta_col = db["quiz_bank_metadata"]
     legacy_meta = list(meta_col.find({"bank_id": {"$exists": False}}))
     for doc in legacy_meta:
@@ -114,20 +111,17 @@ def _upgrade_legacy_data() -> None:
             )
             logger.info("[Startup] Upgraded legacy metadata for %s", lang)
 
-    # --- Questions ---
+    # Upgrade questions: add bank_id to legacy docs or delete duplicates
     q_col = db["quiz_bank_questions"]
     legacy_questions = list(q_col.find({"bank_id": {"$exists": False}}))
     for doc in legacy_questions:
         lang = doc.get("language")
         q_id = doc.get("id")
         store_name = doc.get("store_name", JTI_STORE_NAME)
-        # Check if a proper default-bank question with this id already exists
         existing = q_col.find_one({"store_name": store_name, "language": lang, "bank_id": DEFAULT_BANK_ID, "id": q_id})
         if existing:
-            # Delete the legacy duplicate
             q_col.delete_one({"_id": doc["_id"]})
         else:
-            # Upgrade in-place
             q_col.update_one(
                 {"_id": doc["_id"]},
                 {"$set": {"bank_id": DEFAULT_BANK_ID}},
@@ -239,12 +233,8 @@ def migrate_esg_legacy_data() -> None:
         "store_b66923e91295": "__esg__en",  # ESG_EN
     }
 
-    # 1. system_config.knowledge_stores (store registry)
-    # __esg__/__esg__en are fixed managed stores defined in MANAGED_STORES, so
-    # they must NOT also exist as dynamic registry docs — a duplicate doc makes
-    # the store list show each ESG store twice. Drop the legacy hash registration
-    # entirely (its data is migrated to the fixed store below); also clean up any
-    # stray registry doc that previously got renamed to the fixed name.
+    # Remove legacy registry docs (__esg__/__esg__en are fixed managed stores and must not
+    # also exist as dynamic registry docs, which would cause duplicates in store listings)
     col_stores = db_control["knowledge_stores"]
     for old_name, new_name in mapping.items():
         removed = col_stores.delete_many({"name": {"$in": [old_name, new_name]}}).deleted_count
@@ -263,26 +253,26 @@ def migrate_esg_legacy_data() -> None:
             else:
                 collection.update_one({"_id": doc["_id"]}, {"$set": {"store_name": new_store}})
 
-    # 2. system_config.prompts
+    # Rename prompts
     col_prompts = db_control["prompts"]
     for old_name, new_name in mapping.items():
         safe_rename(col_prompts, {}, old_name, new_name)
 
-    # 3. jti_app.quiz_bank_metadata / quiz_bank_questions
+    # Rename quiz bank metadata and questions
     col_bank_meta = db_jti["quiz_bank_metadata"]
     col_bank_qs = db_jti["quiz_bank_questions"]
     for old_name, new_name in mapping.items():
         safe_rename(col_bank_meta, {"language": {"$exists": True}, "bank_id": {"$exists": True}}, old_name, new_name)
         safe_rename(col_bank_qs, {"language": {"$exists": True}, "bank_id": {"$exists": True}, "id": {"$exists": True}}, old_name, new_name)
 
-    # 4. jti_app.quiz_results_metadata / quiz_results
+    # Rename quiz results metadata and results
     col_res_meta = db_jti["quiz_results_metadata"]
     col_res = db_jti["quiz_results"]
     for old_name, new_name in mapping.items():
         safe_rename(col_res_meta, {"language": {"$exists": True}, "set_id": {"$exists": True}}, old_name, new_name)
         safe_rename(col_res, {"language": {"$exists": True}, "set_id": {"$exists": True}, "quiz_id": {"$exists": True}}, old_name, new_name)
 
-    # 5. general_app.conversations
+    # Rename conversations in general app
     col_convs = db_general["conversations"]
     for old_name, new_name in mapping.items():
         col_convs.update_many({"store_name": old_name}, {"$set": {"store_name": new_name}})
@@ -365,9 +355,9 @@ def _upgrade_legacy_quiz_results() -> None:
     if db is None:
         return
 
-    # Backfill store_name first
     _backfill_store_name(db)
 
+    # Upgrade results: add set_id to legacy docs or delete duplicates
     col = db["quiz_results"]
     legacy_docs = list(col.find({"set_id": {"$exists": False}}))
     for doc in legacy_docs:
@@ -385,7 +375,7 @@ def _upgrade_legacy_quiz_results() -> None:
     if legacy_docs:
         logger.info("[Startup] Processed %d legacy quiz result docs", len(legacy_docs))
 
-    # 原子建立 default set metadata,避免啟動/併發時重複 insert。
+    # Atomic upsert for default set metadata (uses $setOnInsert to avoid duplicates on concurrent startup)
     meta_col = db["quiz_results_metadata"]
     for lang in ["zh", "en"]:
         now = datetime.now(timezone.utc)

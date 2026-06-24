@@ -3,6 +3,11 @@ import pytest
 from app.services.hciot.main_agent import MainAgent
 
 
+@pytest.fixture
+def anyio_backend():
+    return "asyncio"
+
+
 def test_localize_citations_uses_display_name(monkeypatch):
     fake_store = type(
         "FakeStore",
@@ -73,6 +78,7 @@ async def test_hciot_chat_injects_session_state_into_prompt(monkeypatch):
             "session_id": "sid-123",
             "language": "zh",
             "chat_history": [],
+            "metadata": {"model": agent.model_name},
             "step": type("Step", (), {"value": "WELCOME"})(),
             "model_dump": lambda self: {"session_id": "sid-123"},
         },

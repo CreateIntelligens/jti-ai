@@ -6,9 +6,9 @@ They MUST NOT be exposed to frontend editing.
 
 Usage in each project's agent_prompts.py:
     from app.services.safety_prompts import wrap_with_safety, SENSITIVE_HANDLING
-    # In build_system_instruction():
-    #   1. Call wrap_with_safety(persona, language) to prepend Priority 0
-    #   2. Append SENSITIVE_HANDLING[lang] in _compose_response_rules()
+    In build_system_instruction():
+    - Call wrap_with_safety(persona, language) to prepend Priority 0
+    - Append SENSITIVE_HANDLING[lang] in _compose_response_rules()
 """
 
 from __future__ import annotations

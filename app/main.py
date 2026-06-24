@@ -14,7 +14,6 @@ import uvicorn.logging
 
 from .logging_config import configure_file_logging
 
-# ANSI color codes
 GREEN = "\033[32m"
 YELLOW = "\033[33m"
 RED = "\033[31m"
@@ -31,7 +30,6 @@ _FIXED_RAG_BACKFILL_JOBS = (
     ("esg", "en"),
 )
 
-# Status code color mapping
 _STATUS_COLORS: dict[str, str] = {
     "200": GREEN, "201": GREEN,
     "400": RED, "401": RED, "403": RED, "404": RED,
@@ -77,8 +75,6 @@ def _configure_warning_filters() -> None:
 class _AccessLogNoiseFilter(logging.Filter):
     """Drop noisy access log entries from polling endpoints and health checks."""
 
-    # Successful GETs the frontend polls frequently — they spam the log without
-    # any operational signal. Only filter the 200 case so real failures still surface.
     _QUIET_GET_PATHS = (
         "/api/hciot/topics/",
         "/api/stores",
@@ -112,23 +108,19 @@ def _configure_runtime() -> None:
 
 _configure_runtime()
 
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 from google.genai import types
 from google.genai.errors import ClientError
+from pydantic import BaseModel
 
-from .auth import verify_auth, _extract_bearer_token
+from .auth import _extract_bearer_token, verify_auth
 from .services.agent_utils import strip_citations
 from .services.model_discovery import get_available_models
-from .routers.jti import chat as jti_chat, quiz as jti_quiz, prompts as jti_prompts, knowledge as jti_knowledge, quiz_bank as jti_quiz_bank
-from .routers.jti import topics_admin as jti_topics_admin
-from .routers.general import chat, prompts, stores, api_keys, models, users, db_sync, quiz_bank as general_quiz_bank
-from .routers.general import knowledge as general_knowledge
-from .routers.general import topics_admin as general_topics, images as general_images
-from .routers.hciot import chat as hciot_chat, prompts as hciot_prompts, knowledge as hciot_knowledge, qa_extract as hciot_qa_extract, images as hciot_images
-from .routers.hciot import topics_admin as hciot_topics_admin
+from .services.mongo_client import get_mongo_client
+from .routers.admin_rag import router as admin_rag_router
+from .routers.auth_routes import router as auth_router
 from .routers.esg import (
     chat as esg_chat,
     knowledge as esg_knowledge,
@@ -137,9 +129,36 @@ from .routers.esg import (
     quiz_bank as esg_quiz_bank,
 )
 from .routers.esg import topics_admin as esg_topics_admin
-from .routers.admin_rag import router as admin_rag_router
-from .routers.auth_routes import router as auth_router
-from .services.mongo_client import get_mongo_client
+from .routers.general import (
+    api_keys,
+    chat,
+    db_sync,
+    models,
+    prompts,
+    quiz_bank as general_quiz_bank,
+    stores,
+    users,
+)
+from .routers.general import images as general_images
+from .routers.general import knowledge as general_knowledge
+from .routers.general import topics_admin as general_topics
+from .routers.hciot import (
+    chat as hciot_chat,
+    images as hciot_images,
+    knowledge as hciot_knowledge,
+    prompts as hciot_prompts,
+    qa_extract as hciot_qa_extract,
+)
+from .routers.hciot import topics_admin as hciot_topics_admin
+from .routers.jti import (
+    chat as jti_chat,
+    knowledge as jti_knowledge,
+    prompts as jti_prompts,
+    quiz as jti_quiz,
+    quiz_bank as jti_quiz_bank,
+)
+from .routers.jti import topics_admin as jti_topics_admin
+
 import app.deps as deps
 
 logger = logging.getLogger(__name__)
@@ -149,19 +168,15 @@ logger = logging.getLogger(__name__)
 async def lifespan(_: FastAPI):
     """Initialize managers and background backfill on application startup."""
     deps.init_managers()
-    
-    # Self-Hosted RAG: background backfill
+
     try:
         from app.services.rag.backfill import get_backfill_service
         asyncio.create_task(_run_rag_backfill(get_backfill_service()))
     except Exception as e:
         logger.error(f"[RAG] Failed to init backfill: {e}")
-        
+
     yield
 
-    # Teardown: stop the embedding model's multiprocess pool before exit so
-    # its semaphores are reclaimed deterministically (avoids the resource_tracker
-    # "leaked semaphore" warning that __del__-at-shutdown would otherwise emit).
     try:
         from app.services.embedding.service import EmbeddingService
         if EmbeddingService.release():
@@ -204,11 +219,10 @@ async def _run_rag_backfill(backfill):
 
     try:
         general_store_names = _list_general_store_names()
-        # Await each executor submission before the next one; building all
-        # futures first would run LanceDB writes concurrently and recreate the
-        # boot-time file descriptor spike this path avoids.
         for source_type, partition in _build_rag_backfill_jobs(general_store_names):
-            await loop.run_in_executor(None, backfill.run_backfill, source_type, partition)
+            await loop.run_in_executor(
+                None, backfill.run_backfill, source_type, partition
+            )
 
         total = backfill.lancedb_store.get_stats().get("count", 0)
         elapsed = time.time() - t0
@@ -220,8 +234,8 @@ async def _run_rag_backfill(backfill):
         logger.error("[RAG] Backfill failed: %s", e)
 
 
-
 app = FastAPI(title="ai360 km api", lifespan=lifespan)
+
 
 @app.exception_handler(ClientError)
 async def gemini_client_error_handler(request: Request, exc: ClientError):
@@ -241,6 +255,7 @@ async def gemini_client_error_handler(request: Request, exc: ClientError):
         content={"detail": detail},
     )
 
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -249,13 +264,13 @@ app.add_middleware(
 )
 
 
-# ========== OpenAI Compatible API ==========
+from app.models_config import DEFAULT_MODEL, fallback_chain  # noqa: E402
+
 
 class OpenAIChatMessage(BaseModel):
     role: str
     content: str
 
-from app.models_config import DEFAULT_MODEL, fallback_chain  # noqa: E402
 
 class OpenAIChatRequest(BaseModel):
     model: str = DEFAULT_MODEL
@@ -264,10 +279,12 @@ class OpenAIChatRequest(BaseModel):
     max_tokens: int | None = None
     stream: bool = False
 
+
 class OpenAIChatChoice(BaseModel):
     index: int
     message: OpenAIChatMessage
     finish_reason: str
+
 
 class OpenAIChatResponse(BaseModel):
     id: str
@@ -280,7 +297,6 @@ class OpenAIChatResponse(BaseModel):
 
 def _get_system_prompt(api_key_info, store_name: str, messages: list) -> Optional[str]:
     """Resolve system prompt by priority: request > API key > store default."""
-    # 1. System message from request (highest priority)
     system_messages = [msg for msg in messages if msg.role == "system"]
     if system_messages:
         return system_messages[-1].content
@@ -288,13 +304,11 @@ def _get_system_prompt(api_key_info, store_name: str, messages: list) -> Optiona
     if not deps.prompt_manager:
         return None
 
-    # 2. Prompt index specified by API key
     if api_key_info and api_key_info.prompt_index is not None:
         prompts = deps.prompt_manager.list_prompts(store_name)
         if 0 <= api_key_info.prompt_index < len(prompts):
             return prompts[api_key_info.prompt_index].content
 
-    # 3. Store's active prompt (fallback)
     active_prompt = deps.prompt_manager.get_active_prompt(store_name)
     if active_prompt:
         return active_prompt.content
@@ -303,7 +317,9 @@ def _get_system_prompt(api_key_info, store_name: str, messages: list) -> Optiona
 
 
 @app.post("/v1/chat/completions")
-async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Request, auth: dict = Depends(verify_auth)):
+async def openai_chat_completions(
+    request: OpenAIChatRequest, raw_request: Request, auth: dict = Depends(verify_auth)
+):
     """OpenAI-compatible Chat Completions API with knowledge-base-bound API keys."""
     from app.services.rag.service import get_rag_pipeline
     from app.services.gemini_service import client as gemini_client, gemini_with_fallback
@@ -311,12 +327,14 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
     if not gemini_client:
         raise HTTPException(status_code=500, detail="Gemini API key not configured")
 
-    # Resolve store_name and api_key_info
     api_key_info = None
     if auth["role"] in ("admin", "super_admin"):
         store_name = os.getenv("JTI_STORE_ID_ZH", "")
         if not store_name:
-            raise HTTPException(status_code=400, detail="Knowledge store not configured (JTI_STORE_ID_ZH)")
+            raise HTTPException(
+                status_code=400,
+                detail="Knowledge store not configured (JTI_STORE_ID_ZH)",
+            )
     else:
         if not deps.api_key_manager:
             raise HTTPException(status_code=500, detail="API Key Manager not initialized")
@@ -324,31 +342,31 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
         api_key_info = deps.api_key_manager.verify_key(token) if token else None
         store_name = auth["store_name"]
 
-    # Extract last user message
     user_messages = [msg for msg in request.messages if msg.role == "user"]
     if not user_messages:
         raise HTTPException(status_code=400, detail="No user message found")
 
     last_message = user_messages[-1].content
-
     system_prompt = _get_system_prompt(api_key_info, store_name, request.messages)
 
-    # Validate against API-advertised models when discovery succeeds.
     available_names = {model.name for model in get_available_models(gemini_client)}
     warning = None
     if available_names and request.model not in available_names:
         model_name = DEFAULT_MODEL
         available_list = ", ".join(sorted(available_names))
-        warning = f"Unsupported model '{request.model}', using default '{DEFAULT_MODEL}'. Available: {available_list}"
+        warning = (
+            f"Unsupported model '{request.model}', using default '{DEFAULT_MODEL}'. "
+            f"Available: {available_list}"
+        )
     else:
         model_name = request.model
 
     try:
-        # Use local RAG pipeline for retrieval
         pipeline = get_rag_pipeline()
-        kb_text, _citations = pipeline.retrieve(last_message, language="zh", source_type="jti_knowledge", top_k=3)
+        kb_text, _citations = pipeline.retrieve(
+            last_message, language="zh", source_type="jti_knowledge", top_k=3
+        )
 
-        # Build prompt with RAG context
         contents = last_message
         if kb_text:
             contents = f"<知識庫查詢結果>\n{kb_text}\n</知識庫查詢結果>\n\n使用者問題： {last_message}"
@@ -386,18 +404,15 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
             choices=[
                 OpenAIChatChoice(
                     index=0,
-                    message=OpenAIChatMessage(
-                        role="assistant",
-                        content=answer_text
-                    ),
-                    finish_reason="stop"
+                    message=OpenAIChatMessage(role="assistant", content=answer_text),
+                    finish_reason="stop",
                 )
             ],
             usage={
                 "prompt_tokens": 0,
                 "completion_tokens": 0,
-                "total_tokens": 0
-            }
+                "total_tokens": 0,
+            },
         )
 
         return result
@@ -406,35 +421,26 @@ async def openai_chat_completions(request: OpenAIChatRequest, raw_request: Reque
         raise HTTPException(status_code=500, detail=str(e))
 
 
-# ========== Health & Root ==========
-
 @app.get("/health")
 async def health_check():
     """Service health check (no auth required)."""
     checks = {}
 
-    # 1. MongoDB
     try:
         mongo = get_mongo_client()
         checks["mongodb"] = await asyncio.to_thread(mongo.health_check)
     except Exception:
         checks["mongodb"] = False
 
-    # 2. Gemini API Keys registry
     try:
         from .services.gemini_clients import get_key_count
         checks["gemini_api_key"] = get_key_count() > 0
     except Exception:
         checks["gemini_api_key"] = False
 
-    # 3. API Key Manager
     checks["api_key_manager"] = deps.api_key_manager is not None
-
-    # 4. General Session Manager (MongoDB persistence)
     checks["general_session_manager"] = deps.get_general_chat_session_manager() is not None
 
-    # 是否運行在 Atlas 備援庫上。fallback 期間撤權（停用帳號 / 撤銷 key / 刪帳號）
-    # 可能尚未同步至備援，屬 fail-open 風險窗口，明確標示供監控告警。
     from .services.mongo_client import is_using_fallback
     on_fallback = is_using_fallback()
 
@@ -446,7 +452,6 @@ async def health_check():
         content={
             "status": "ok" if all_ok else "degraded",
             "checks": checks,
-            # True = 正用備援庫，撤權可能落後（fail-open 風險），應儘速修復主庫並重啟。
             "database_fallback": on_fallback,
         },
     )
@@ -458,7 +463,6 @@ def index():
     return {"message": "ai360 km api", "docs": "/docs"}
 
 
-# ========== Include Routers ==========
 app.include_router(admin_rag_router)
 app.include_router(auth_router)
 app.include_router(jti_chat.runtime_router)

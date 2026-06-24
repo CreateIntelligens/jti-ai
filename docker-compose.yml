@@ -29,6 +29,19 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
   backend:
     build:
       context: .
@@ -58,6 +71,8 @@ services:
         # service_started(非 healthy):tunnel 連不上主庫時 backend 仍啟動,
         # 由 app 端 resolve_mongodb_uri() fallback 至 Atlas 備援。
         condition: service_started
+      redis:
+        condition: service_started
     deploy:
       resources:
         reservations:
@@ -71,6 +86,7 @@ services:
       - PYTHONDONTWRITEBYTECODE=1
       - MODE=${MODE:-prod}
       - BACKEND_PORT=${PORT:-8008}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - TZ=Asia/Taipei
       - HF_HOME=/home/appuser/.cache/huggingface
     # 不帶 command：由 entrypoint 依 MODE 推導 uvicorn 參數（dev=--reload / prod=--workers 2）

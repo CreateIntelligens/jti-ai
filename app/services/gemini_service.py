@@ -31,9 +31,9 @@ def init_gemini_client():
         logger.warning("GEMINI_API_KEYS not found - Gemini client not initialized")
 
 
-async def run_sync(fn: Callable[..., T], *args) -> T:
+async def run_sync(fn: Callable[..., T], *args, **kwargs) -> T:
     """Run a synchronous function in a thread to avoid blocking the event loop."""
-    return await asyncio.to_thread(fn, *args)
+    return await asyncio.to_thread(fn, *args, **kwargs)
 
 
 def _is_model_gone(err: Exception) -> bool:

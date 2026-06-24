@@ -14,12 +14,10 @@ import time
 from collections import OrderedDict
 from typing import Any, cast
 
-_CHAT_SESSION_CACHE_MAX = 128
-
 from google.genai import types
 
-from app.models.session import Session
 import app.services.gemini_service as _gemini_service
+from app.models.session import Session
 from app.routers.general.stores import resolve_key_index_for_store
 from app.services.agent_utils import (
     build_chat_history,
@@ -32,10 +30,11 @@ from app.services.rag.service import get_rag_pipeline
 
 logger = logging.getLogger(__name__)
 
+_CHAT_SESSION_CACHE_MAX = 128
+
 
 class BaseAgent:
     """Gemini chat session 管理基底類別"""
-
 
     def __init__(self, model_name: str):
         self.model_name = model_name
@@ -251,11 +250,10 @@ class BaseAgent:
 
         store_name = self._get_store_name_for_session(session)
         client = get_client_by_index(resolve_key_index_for_store(store_name))
-        
-        # Sync the model selection to DB metadata
-        if session.metadata.get("model") != model_to_use:
-            session.metadata["model"] = model_to_use
-            self._session_manager.update_session(session)
+
+        # Avoid a synchronous DB metadata write on every chat-session rebuild.
+        # Fallback model changes still persist in _send_enriched_with_model_fallback.
+        session.metadata.setdefault("model", model_to_use)
 
         # Cast: build_chat_history returns list[Content]; the SDK accepts
         # list[Content | dict] but list is invariant so Pyright can't narrow.
@@ -665,7 +663,8 @@ class BaseAgent:
             if not _gemini_client:
                 return {"error": "Gemini client not initialized", "message": "系統未正確初始化，請檢查 API Key 設定。"}
 
-            session = self._session_manager.get_session(session_id)
+            # Redis miss can fall through to synchronous PyMongo; keep it off the event loop.
+            session = await _gemini_service.run_sync(self._session_manager.get_session, session_id)
             if not session:
                 return {"error": "Session not found", "message": "找不到對話記錄，請重新開始。"}
 

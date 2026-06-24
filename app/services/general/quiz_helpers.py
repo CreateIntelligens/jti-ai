@@ -229,7 +229,6 @@ async def _judge_user_choice(user_message: str, question: dict) -> str | None:
     options = question.get("options", []) if isinstance(question, dict) else []
     labels = list("ABCDE")[: len(options)]
 
-    # 1. 規則判斷
     if (res := _match_exact_label(msg_upper, labels)):
         logger.info(f"[規則判斷] 字母匹配: '{user_message}' -> {res}")
         return res
@@ -241,6 +240,7 @@ async def _judge_user_choice(user_message: str, question: dict) -> str | None:
     if (res := _match_option_text(msg_lower, options)):
         logger.info(f"[規則判斷] 選項文字匹配: '{user_message}' -> {res}")
         return res
+
     logger.info(f"[LLM判斷] 規則無法判定，呼叫 LLM: '{user_message}'")
     try:
         client = get_default_client()
