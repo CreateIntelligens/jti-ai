@@ -161,8 +161,10 @@ class TestRAGPipeline(unittest.TestCase):
 
         mock_embedding_service.encode.return_value = np.random.rand(1, 1024)
 
+        # backfill 取 ESG store 用的是 app.services.rag.backfill.get_esg_knowledge_store
+        # （見 backfill.py L276），須 patch 使用端；patch 錯模組會讓它讀到真實 ESG 資料。
         with patch(
-            "app.services.knowledge_store.get_namespaced_knowledge_store",
+            "app.services.rag.backfill.get_esg_knowledge_store",
             return_value=esg_store,
         ):
             backfill.run_backfill("esg", "zh")
