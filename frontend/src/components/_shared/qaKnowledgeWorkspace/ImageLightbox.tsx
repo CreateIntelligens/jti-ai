@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { useEscapeKey } from '../../../hooks/useEscapeKey';
 import { useOverlayPressClose } from '../../../hooks/useOverlayPressClose';
 
@@ -15,7 +16,10 @@ export default function ImageLightbox({ url, alt = '', onClose }: ImageLightboxP
 
   if (!url) return null;
 
-  return (
+  // INVARIANT: portal to body so the fixed overlay escapes ancestors with
+  // backdrop-filter/transform (e.g. .qa-message-thread), which would otherwise
+  // become the containing block and trap the lightbox inside the chat panel.
+  return createPortal(
     <div className="qa-workspace-image-lightbox" {...overlayPressClose}>
       <div className="qa-workspace-image-lightbox-frame" onClick={(e) => e.stopPropagation()}>
         <button
@@ -28,6 +32,7 @@ export default function ImageLightbox({ url, alt = '', onClose }: ImageLightboxP
         </button>
         <img src={url} alt={alt} className="qa-workspace-image-lightbox-img" />
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

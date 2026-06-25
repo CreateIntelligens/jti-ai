@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { getHciotImageUrl } from '../../utils/hciotImage';
+import ImageLightbox from '../_shared/qaKnowledgeWorkspace/ImageLightbox';
 
 interface HciotImageAttachmentProps {
   imageId: string;
@@ -7,29 +9,32 @@ interface HciotImageAttachmentProps {
 
 export default function HciotImageAttachment({ imageId, alt }: HciotImageAttachmentProps) {
   const imageUrl = getHciotImageUrl(imageId);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
 
   if (!imageUrl) {
     return null;
   }
 
+  const altText = alt || `HCIoT reference image ${imageId}`;
+
   return (
     <figure className="qa-image-attachment">
-      <a
+      <button
+        type="button"
         className="qa-image-link"
-        href={imageUrl}
-        target="_blank"
-        rel="noreferrer"
-        title={`Open image ${imageId}`}
+        onClick={() => setLightboxUrl(imageUrl)}
+        title={`放大圖片 ${imageId}`}
       >
         <img
           className="qa-image-preview"
           src={imageUrl}
-          alt={alt || `HCIoT reference image ${imageId}`}
+          alt={altText}
           loading="lazy"
           decoding="async"
         />
-      </a>
+      </button>
       <figcaption className="qa-image-caption">Image ID: {imageId}</figcaption>
+      <ImageLightbox url={lightboxUrl} alt={altText} onClose={() => setLightboxUrl(null)} />
     </figure>
   );
 }

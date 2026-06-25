@@ -36,6 +36,18 @@ export default function QaTopicGrid({
     ? topics.find((topic) => topic.id === selectedTopicId) ?? null
     : null;
 
+  // 送出問題時帶上層級路徑前綴（分類/主題：問題），讓 AI 有完整脈絡。
+  // category 從 topic 反查（QaTopic 不帶 categoryId，且分類下拉可停在「全部科別」，
+  // 不能用畫面篩選值）。降級：無分類→主題：問題；無主題→純問題。
+  const buildQuestionText = (question: string): string => {
+    if (!selectedTopic) return question;
+    const owningCategory = categories.find((category) =>
+      category.topics.some((topic) => topic.id === selectedTopic.id),
+    );
+    const prefix = [owningCategory?.label, selectedTopic.label].filter(Boolean).join('/');
+    return prefix ? `${prefix}：${question}` : question;
+  };
+
   const handleCategoryChange = (value: string) => {
     onSelectCategory?.(value === ALL_CATEGORIES_VALUE ? null : value);
   };
@@ -92,7 +104,7 @@ export default function QaTopicGrid({
                 key={`${selectedTopic.id}-${index}`}
                 type="button"
                 className="qa-topic-question-chip"
-                onClick={() => onSelectQuestion(question)}
+                onClick={() => onSelectQuestion(buildQuestionText(question))}
                 disabled={disabled}
               >
                 <span className="qa-topic-question-index">{index + 1}</span>

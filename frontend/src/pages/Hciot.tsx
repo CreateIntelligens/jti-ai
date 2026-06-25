@@ -37,6 +37,7 @@ import '../styles/qaWorkspace/components-topic.css';
 import '../styles/qaWorkspace/workspace.css';
 import '../styles/qaWorkspace/workspace-upload.css';
 import '../styles/qaWorkspace/workspace-upload-images.css';
+import '../styles/qaWorkspace/workspace-images.css';
 import '../styles/qaWorkspace/workspace-upload-enhancements.css';
 import '../styles/qaWorkspace/workspace-upload-preview.css';
 import '../styles/qaWorkspace/workspace-upload-edit.css';
