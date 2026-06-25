@@ -42,6 +42,35 @@ services:
       start_period: 5s
     restart: unless-stopped
 
+  # GPU embedding 從 backend request path 抽出獨立 process，避免並發下
+  # GPU batch 與 backend 的 DB/Gemini 工作互相序列化（~1.9s 懲罰）。
+  # backend→embedding 走 Docker service DNS 內部流量（http://embedding:8009），不經 nginx。
+  embedding:
+    build:
+      context: .
+      dockerfile: docker/embedding/Dockerfile
+    volumes:
+      - ./.hf_cache:/home/appuser/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    expose:
+      - "8009"
+    environment:
+      - HF_HOME=/home/appuser/.cache/huggingface
+      - TZ=Asia/Taipei
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8009/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+
   backend:
     build:
       context: .
@@ -63,7 +92,6 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./docker:/app/docker:ro
-      - ./.hf_cache:/home/appuser/.cache/huggingface
       # DocumentDB TLS CA（連 DocumentDB 時 MONGODB_URI 以 tlsCAFile 指向此路徑）
       - ./global-bundle.pem:/app/global-bundle.pem:ro
     depends_on:
@@ -73,13 +101,10 @@ services:
         condition: service_started
       redis:
         condition: service_started
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
+      embedding:
+        condition: service_started
+    # GPU embedding 已抽到獨立的 embedding 服務，backend 不再載模型、不需 GPU，
+    # 一律經 EMBEDDING_SERVICE_URL 走 HTTP（無本地 fallback，embedding 必須在線）。
     expose:
       - "${PORT:-8008}"
     environment:
@@ -87,8 +112,8 @@ services:
       - MODE=${MODE:-prod}
       - BACKEND_PORT=${PORT:-8008}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      - EMBEDDING_SERVICE_URL=http://embedding:8009
       - TZ=Asia/Taipei
-      - HF_HOME=/home/appuser/.cache/huggingface
     # 不帶 command：由 entrypoint 依 MODE 推導 uvicorn 參數（dev=--reload / prod=--workers 2）
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-8008}/health')"]

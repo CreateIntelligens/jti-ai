@@ -1,0 +1,5 @@
+# 重依賴（torch / transformers / FlagEmbedding 等）單一來源在
+# docker/embedding/Dockerfile 的 heredoc，與 backend 逐字一致；此處只列
+# 服務自身相依，避免版本 pin 分散兩處而漂移。
+fastapi>=0.115.0
+uvicorn[standard]>=0.32.0

@@ -1,7 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
 # ---------- Stage 1: builder ----------
-# 編譯/產生 wheels（含 build toolchain，不進最終映像）
 FROM python:3.12-slim AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
@@ -17,50 +16,47 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /build
 
 # ---- 重 & 穩定相依（ML/RAG）：版本鎖死、極少變動 ----
-# 獨立成一層，放在 requirements.txt 之前。
-# 之後只改輕量套件時，這層命中 cache，跳過長時間的 wheel 編譯。
-# torch / transformers / FlagEmbedding 等 GPU embedding 相依已移到獨立的
-# embedding 服務（docker/embedding/）。backend 改走 HTTP，不再載模型；
-# 此處只留向量處理（numpy）與 LanceDB 寫入（pandas）仍需的數值相依。
-COPY <<EOF backend-heavy-requirements.txt
+# 與 docker/backend.Dockerfile 逐字一致：query 端與 backfill 端必須同模型同版本，
+# 否則向量空間錯位、檢索靜默回錯結果。獨立成一層命中 build cache。
+COPY <<EOF embedding-heavy-requirements.txt
+torch==2.5.1
+transformers==4.46.3
+accelerate==0.34.2
+sentence-transformers==3.3.1
+FlagEmbedding==1.3.5
 numpy==2.4.6
-pandas==3.0.3
 EOF
 
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip wheel --wheel-dir=/wheels -r backend-heavy-requirements.txt
+    pip wheel --wheel-dir=/wheels -r embedding-heavy-requirements.txt
 
-# ---- 輕 & 易變相依：改動頻繁，放在重相依之後 ----
-COPY requirements.txt .
+COPY docker/embedding/requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip wheel --wheel-dir=/wheels -r requirements.txt
 
 # ---------- Stage 2: deps ----------
-# 從 wheels 安裝到獨立 prefix，之後整包 copy 到 runner
 FROM python:3.12-slim AS deps
 
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
 COPY --from=builder /wheels /wheels
-COPY --from=builder /build/backend-heavy-requirements.txt /tmp/backend-heavy-requirements.txt
+COPY --from=builder /build/embedding-heavy-requirements.txt /tmp/embedding-heavy-requirements.txt
 COPY --from=builder /build/requirements.txt /tmp/requirements.txt
 # /wheels may contain multiple versions of the same transitive package when
 # cached layers were built at different times. Install requirement roots from
-# the local wheelhouse so pip resolves one compatible candidate instead of
-# treating every wheel file as an explicit install target.
+# the local wheelhouse so pip resolves one compatible candidate.
 RUN pip install --no-index --find-links=/wheels --prefix=/install \
-        -r /tmp/backend-heavy-requirements.txt \
+        -r /tmp/embedding-heavy-requirements.txt \
         -r /tmp/requirements.txt \
-    && rm -rf /wheels /tmp/backend-heavy-requirements.txt /tmp/requirements.txt
+    && rm -rf /wheels /tmp/embedding-heavy-requirements.txt /tmp/requirements.txt
 
 # ---------- Stage 3: runner ----------
-# 最終 runtime：無 compiler、非 root、只帶執行期所需 lib
 FROM python:3.12-slim AS runner
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    BACKEND_PORT=8008
+    HF_HOME=/home/appuser/.cache/huggingface
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -73,11 +69,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=deps /install /usr/local
 
 WORKDIR /app
-RUN mkdir -p /app/data/lancedb /app/logs /home/appuser/.cache/huggingface \
+COPY docker/embedding/app.py /app/app.py
+COPY docker/embedding/entrypoint.sh /usr/local/bin/embedding-entrypoint.sh
+RUN chmod +x /usr/local/bin/embedding-entrypoint.sh \
+    && mkdir -p /home/appuser/.cache/huggingface \
     && chown -R appuser:appuser /app /home/appuser/.cache
 
-COPY docker/backend/entrypoint.sh /usr/local/bin/backend-entrypoint.sh
-RUN chmod +x /usr/local/bin/backend-entrypoint.sh
-
-ENTRYPOINT ["/usr/local/bin/backend-entrypoint.sh"]
-# 不帶 CMD：entrypoint 依 $MODE 決定 uvicorn 參數（dev=--reload / prod=--workers 2）
+ENTRYPOINT ["/usr/local/bin/embedding-entrypoint.sh"]
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8009"]

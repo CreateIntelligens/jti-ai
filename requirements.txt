@@ -10,6 +10,7 @@ pydantic>=2.0.0
 pydantic-settings>=2.0.0
 opencc-python-reimplemented>=0.1.7
 lancedb>=0.12.0
+httpx>=0.27.0
 bcrypt>=4.0.0
 PyJWT>=2.8.0
 cryptography>=42.0.0
@@ -18,7 +19,7 @@ cryptography>=42.0.0
 pytest>=8.0.0
 pytest-mock>=3.14.0
 
-# 注意：重相依（torch / transformers / accelerate / sentence-transformers /
-# FlagEmbedding / tf-keras）已移到 docker/backend.Dockerfile 的獨立 RUN 層，
-# 放在 COPY requirements.txt 之前以保住 build cache。
-# 若改用非 Docker 環境，請另行安裝這些套件。
+# 注意：GPU embedding 相依（torch / transformers / accelerate /
+# sentence-transformers / FlagEmbedding / tf-keras）已移到獨立的 embedding
+# 服務（docker/embedding/）。backend 經 HTTP 呼叫，不再安裝這些套件。
+# 數值處理用的 numpy / pandas 仍在 docker/backend/Dockerfile 的獨立 RUN 層。
