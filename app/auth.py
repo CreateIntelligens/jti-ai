@@ -16,6 +16,7 @@ from app.security.tokens import decode_session_token
 
 ADMIN_ROLES = {"admin", "super_admin"}
 KB_ACCESS_DENIED_DETAIL = "Insufficient permission for this knowledge base"
+KEY_SCOPE_PREFIX = "key_name:"
 
 
 def _extract_bearer_token(request: Request) -> str | None:
@@ -151,13 +152,39 @@ def require_admin(auth_info: dict) -> None:
         raise HTTPException(status_code=403, detail="Admin access required")
 
 
+def _key_scope_owns_app_kb(scope: str, app: str) -> bool:
+    """key_name:<name> scope 是否擁有該 app 的知識庫 store。"""
+    try:
+        # 延遲 import：避免 auth 與 general stores 形成載入期循環依賴。
+        from app.routers.general.stores import (
+            MANAGED_STORES,
+            store_config_matches_scope,
+        )
+    except Exception:
+        return False
+
+    normalized_app = app.lower()
+    return any(
+        config.managed_app
+        and config.managed_app.lower() == normalized_app
+        and store_config_matches_scope(config, scope)
+        for config in MANAGED_STORES
+    )
+
+
 def can_access_kb(auth_info: dict, app: str) -> bool:
     """Return whether auth_info may manage the app knowledge workspace."""
     role = auth_info.get("role")
     if role in ADMIN_ROLES:
         return True
-    if role == "user":
-        return auth_info.get("scope") == app
+    if role != "user":
+        return False
+
+    scope = auth_info.get("scope")
+    if scope == app:
+        return True
+    if isinstance(scope, str) and scope.startswith(KEY_SCOPE_PREFIX):
+        return _key_scope_owns_app_kb(scope, app)
     return False
 
 
