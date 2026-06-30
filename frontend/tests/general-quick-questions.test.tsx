@@ -72,5 +72,7 @@ describe('General quick questions', () => {
     fireEvent.click(within(sidebar).getByRole('button', { name: /顯示問題/ }));
 
     expect(onSendMessage).toHaveBeenCalledWith('顯示問題');
+    expect(screen.getByRole('complementary', { name: '常見問題' })).toBeTruthy();
+    expect(within(sidebar).getByText('顯示問題')).toBeTruthy();
   });
 });

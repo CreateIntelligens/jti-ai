@@ -121,7 +121,6 @@ export default function General({ storeName, appTarget, appLanguage, ...chatProp
   const selectQuestion = (question: string) => {
     if (chatProps.disabled || chatProps.loading) return;
     chatProps.onSendMessage(question);
-    setTopicsOpen(false);
   };
 
   const suggestSidebar = topicsOpen ? (

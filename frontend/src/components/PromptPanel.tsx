@@ -21,6 +21,7 @@ type RuleSectionKey = 'role_scope' | 'scope_limits' | 'response_style' | 'knowle
 type PromptLanguage = 'zh' | 'en';
 
 const NEW_PROMPT_ID = '__new__';
+const ENGLISH_MANAGED_STORE_SUFFIX = '__en';
 const RULE_SECTION_KEYS: RuleSectionKey[] = [
   'role_scope',
   'scope_limits',
@@ -130,7 +131,7 @@ function buildSectionsPayload(draft: DraftState): { zh?: RuleSections; en?: Rule
 }
 
 function resolvePromptLanguage(currentStore: string | null): PromptLanguage {
-  return currentStore === '__jti__en' || currentStore === '__hciot__en' ? 'en' : 'zh';
+  return currentStore?.endsWith(ENGLISH_MANAGED_STORE_SUFFIX) ? 'en' : 'zh';
 }
 
 function promptPreviewContent(prompt: Prompt, language: PromptLanguage): string {
