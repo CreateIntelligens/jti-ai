@@ -73,10 +73,14 @@ Expected: 三條都成功、無 resolution error。第二條的輸出含 `torch`
 
 Run:
 ```bash
-uv sync --frozen
-uv run python -c "import pytest, fastapi, lancedb, google.genai; print('ok')"
+uv sync --frozen --all-groups
+uv run python -c "import pandas, pytest, fastapi, lancedb, google.genai; print('ok')"
 ```
 Expected: 印 `ok`。
+
+> 注意：必須用 `--all-groups`（不可只 `uv sync --frozen`）。app 程式碼 import pandas
+> （在 `backend-heavy` group），測試會連帶載入；裸 `uv sync` 不裝 backend-heavy 與 dev，
+> 會在 pytest collection 階段 `ModuleNotFoundError: No module named 'pandas'`。
 
 - [ ] **Step 5: Commit**
 
