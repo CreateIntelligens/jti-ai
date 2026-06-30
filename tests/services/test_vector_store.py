@@ -1,21 +1,26 @@
-import unittest
-from unittest.mock import MagicMock, patch
-import numpy as np
+import importlib
 import os
 import sys
+import unittest
+from unittest.mock import MagicMock, patch
 
-# Ensure app is in path
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
+import numpy as np
 
-# Mock lancedb before imports
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "../.."))
+LEGACY_TABLE_NAME_ENV = "LANCEDB_" + "TABLE_NAME"
+
+sys.path.append(REPO_ROOT)
 mock_lancedb = MagicMock()
-sys.modules['lancedb'] = mock_lancedb
+sys.modules["lancedb"] = mock_lancedb
 
-import app.services.vector_store.lancedb as lancedb_module
-from app.services.vector_store.lancedb import LanceDBStore
+lancedb_module = importlib.import_module("app.services.vector_store.lancedb")
+LanceDBStore = lancedb_module.LanceDBStore
+
 
 class TestVectorStore(unittest.TestCase):
     def setUp(self):
+        lancedb_module._lancedb_store = None
+        self.addCleanup(setattr, lancedb_module, "_lancedb_store", None)
         self.lancedb_patcher = patch.object(lancedb_module, "lancedb", mock_lancedb)
         self.lancedb_patcher.start()
         self.addCleanup(self.lancedb_patcher.stop)
@@ -27,25 +32,28 @@ class TestVectorStore(unittest.TestCase):
         mock_db.list_tables.return_value.tables = ["knowledge"]
         mock_table = MagicMock()
         mock_db.open_table.return_value = mock_table
-        
+
         store = LanceDBStore(uri="memory://", table_name="knowledge")
-        
-        # Test insert
         chunks = [
-            {"text": "hello", "vector": [0.1]*1024, "file_id": "f1", "source_language": "zh", "chunk_index": 0},
+            {
+                "text": "hello",
+                "vector": [0.1] * 1024,
+                "file_id": "f1",
+                "source_language": "zh",
+                "chunk_index": 0,
+            },
         ]
         store.insert_chunks(chunks)
         mock_table.add.assert_called_once()
-        
-        # Test search
+
         mock_query = MagicMock()
         mock_table.search.return_value = mock_query
         mock_query.distance_type.return_value = mock_query
         mock_query.where.return_value = mock_query
         mock_query.limit.return_value = mock_query
         mock_query.to_list.return_value = [{"text": "hello"}]
-        
-        results = store.search(np.array([0.1]*1024), language="zh", top_k=1)
+
+        results = store.search(np.array([0.1] * 1024), language="zh", top_k=1)
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["text"], "hello")
 
@@ -82,5 +90,15 @@ class TestVectorStore(unittest.TestCase):
         store = LanceDBStore(uri="memory://", table_name="knowledge")
         self.assertEqual(store.get_all_fingerprints("knowledge_jti", "en"), {})
 
-if __name__ == '__main__':
+    def test_get_lancedb_store_ignores_legacy_table_name_env(self):
+        with patch.dict(
+            os.environ,
+            {"LANCEDB_PATH": "memory://", LEGACY_TABLE_NAME_ENV: "legacy_name"},
+        ):
+            store = lancedb_module.get_lancedb_store()
+
+        self.assertEqual(store.table_name, "knowledge")
+
+
+if __name__ == "__main__":
     unittest.main()

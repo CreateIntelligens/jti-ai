@@ -144,7 +144,6 @@ table.search(query_embedding) \
 ```python
 # .env
 LANCEDB_PATH=/data/lancedb           # Local LanceDB directory
-LANCEDB_TABLE_NAME=knowledge         # Table name in LanceDB
 MONGODB_BACKUP_ENABLED=true          # Enable MongoDB sync
 MONGODB_BACKUP_SYNC_INTERVAL=3600    # Sync every hour
 VECTOR_SEARCH_TOP_K=5

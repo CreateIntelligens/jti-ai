@@ -186,7 +186,6 @@ HCIOT_KNOWLEDGE_PATH=/data/hciot_knowledge
 
 # LanceDB
 LANCEDB_PATH=/data/lancedb
-LANCEDB_TABLE_NAME=knowledge
 
 # MongoDB backup
 MONGODB_BACKUP_ENABLED=true

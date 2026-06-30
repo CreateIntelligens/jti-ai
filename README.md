@@ -93,7 +93,6 @@ EMBEDDING_MODEL=BAAI/bge-m3
 EMBEDDING_DEVICE=cuda
 EMBEDDING_BATCH_SIZE=32
 LANCEDB_PATH=data/lancedb
-LANCEDB_TABLE_NAME=knowledge
 RAG_DISTANCE_THRESHOLD=0.85
 
 # Frontend page gate for restricted hosts

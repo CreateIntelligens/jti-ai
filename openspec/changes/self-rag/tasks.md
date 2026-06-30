@@ -109,7 +109,6 @@
   - [ ] `EMBEDDING_BATCH_SIZE=32`
   - [ ] `EMBEDDING_DEVICE=cuda` (or cpu)
   - [ ] `LANCEDB_PATH=/data/lancedb`
-  - [ ] `LANCEDB_TABLE_NAME=knowledge`
   - [ ] `MONGODB_BACKUP_ENABLED=true`
   - [ ] `MONGODB_BACKUP_SYNC_INTERVAL=3600`
   - [ ] `RAG_TOP_K=5`

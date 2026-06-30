@@ -1,13 +1,14 @@
-import threading
+import logging
 import os
+import threading
+from typing import Any, Dict, List, Optional
 
 import lancedb
-import pandas as pd
 import numpy as np
-import logging
-from typing import List, Dict, Any, Optional
+import pandas as pd
 
 logger = logging.getLogger(__name__)
+
 
 class LanceDBStore:
     def __init__(self, uri: str = "data/shared/lancedb", table_name: str = "knowledge"):
@@ -219,11 +220,11 @@ class LanceDBStore:
 
 _lancedb_store: Optional[LanceDBStore] = None
 
+
 def get_lancedb_store() -> LanceDBStore:
     global _lancedb_store
     if _lancedb_store is None:
         _lancedb_store = LanceDBStore(
             uri=os.getenv("LANCEDB_PATH", "data/shared/lancedb"),
-            table_name=os.getenv("LANCEDB_TABLE_NAME", "knowledge"),
         )
     return _lancedb_store
