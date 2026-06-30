@@ -1,66 +1,30 @@
 # syntax=docker/dockerfile:1.7
 
-# ---------- Stage 1: builder ----------
-# 編譯/產生 wheels（含 build toolchain，不進最終映像）
+# ---------- builder ----------
 FROM python:3.12-slim AS builder
+COPY --from=ghcr.io/astral-sh/uv:0.11.21 /uv /usr/local/bin/uv
 
-ENV PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PYTHONDONTWRITEBYTECODE=1
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_PYTHON_DOWNLOADS=0
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-        build-essential \
-        libssl-dev \
-        ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
 
-WORKDIR /build
+# 只 copy lock 元資料 → 依賴層與 app 原始碼解耦，命中 build cache。
+# backend 範圍：主 deps + backend-heavy（numpy/pandas），不含 dev/torch。
+# torch / transformers / FlagEmbedding 等 GPU embedding 相依在獨立的 embedding
+# 服務（docker/embedding/）；backend 經 HTTP 呼叫，不載模型。
+COPY pyproject.toml uv.lock ./
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-install-project --no-default-groups --group backend-heavy
 
-# ---- 重 & 穩定相依（ML/RAG）：版本鎖死、極少變動 ----
-# 獨立成一層，放在 requirements.txt 之前。
-# 之後只改輕量套件時，這層命中 cache，跳過長時間的 wheel 編譯。
-# torch / transformers / FlagEmbedding 等 GPU embedding 相依已移到獨立的
-# embedding 服務（docker/embedding/）。backend 改走 HTTP，不再載模型；
-# 此處只留向量處理（numpy）與 LanceDB 寫入（pandas）仍需的數值相依。
-COPY <<EOF backend-heavy-requirements.txt
-numpy==2.4.6
-pandas==3.0.3
-EOF
-
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip wheel --wheel-dir=/wheels -r backend-heavy-requirements.txt
-
-# ---- 輕 & 易變相依：改動頻繁，放在重相依之後 ----
-COPY requirements.txt .
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip wheel --wheel-dir=/wheels -r requirements.txt
-
-# ---------- Stage 2: deps ----------
-# 從 wheels 安裝到獨立 prefix，之後整包 copy 到 runner
-FROM python:3.12-slim AS deps
-
-ENV PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1
-
-COPY --from=builder /wheels /wheels
-COPY --from=builder /build/backend-heavy-requirements.txt /tmp/backend-heavy-requirements.txt
-COPY --from=builder /build/requirements.txt /tmp/requirements.txt
-# /wheels may contain multiple versions of the same transitive package when
-# cached layers were built at different times. Install requirement roots from
-# the local wheelhouse so pip resolves one compatible candidate instead of
-# treating every wheel file as an explicit install target.
-RUN pip install --no-index --find-links=/wheels --prefix=/install \
-        -r /tmp/backend-heavy-requirements.txt \
-        -r /tmp/requirements.txt \
-    && rm -rf /wheels /tmp/backend-heavy-requirements.txt /tmp/requirements.txt
-
-# ---------- Stage 3: runner ----------
-# 最終 runtime：無 compiler、非 root、只帶執行期所需 lib
+# ---------- runner ----------
 FROM python:3.12-slim AS runner
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    BACKEND_PORT=8008
+    BACKEND_PORT=8008 \
+    PATH="/app/.venv/bin:$PATH"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
@@ -70,7 +34,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && groupadd -g 1000 appuser \
     && useradd -m -u 1000 -g appuser appuser
 
-COPY --from=deps /install /usr/local
+COPY --from=builder /app/.venv /app/.venv
 
 WORKDIR /app
 RUN mkdir -p /app/data/lancedb /app/logs /home/appuser/.cache/huggingface \
