@@ -19,7 +19,15 @@ ESG_KEY_SCOPE = "key_name:%E5%92%8C%E6%B3%B0%E6%B1%BD%E8%BB%8A"
         ({"role": "user", "scope": ESG_KEY_SCOPE}, "jti", False),
     ],
 )
-def test_can_access_kb(auth: dict, app: str, expected: bool):
+def test_can_access_kb(monkeypatch, auth: dict, app: str, expected: bool):
+    from app.routers.general import stores
+
+    monkeypatch.setattr(
+        stores.app_key_map,
+        "load_app_key_map",
+        lambda: {"esg": "和泰汽車"},
+    )
+
     assert can_access_kb(auth, app) is expected
 
 

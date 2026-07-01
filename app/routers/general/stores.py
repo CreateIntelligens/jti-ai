@@ -209,8 +209,8 @@ MANAGED_STORES: tuple[ManagedStoreConfig, ...] = (
     ManagedStoreConfig("__jti__en", "JTI English", "jti", "en"),
     ManagedStoreConfig("__hciot__", "HCIoT 中文", "hciot", "zh"),
     ManagedStoreConfig("__hciot__en", "HCIoT English", "hciot", "en"),
-    ManagedStoreConfig("__esg__", "ESG 中文", "esg", "zh", key_name="和泰汽車"),
-    ManagedStoreConfig("__esg__en", "ESG English", "esg", "en", key_name="和泰汽車"),
+    ManagedStoreConfig("__esg__", "ESG 中文", "esg", "zh"),
+    ManagedStoreConfig("__esg__en", "ESG English", "esg", "en"),
 )
 
 _STORE_ALIASES: dict[str, str] = {
@@ -429,7 +429,10 @@ def store_config_matches_scope(config: ManagedStoreConfig, scope: str | None) ->
         return True
     key_name = _key_name_from_scope(normalized)
     if key_name is not None:
-        return _normalize_key_name(config.key_name) == _normalize_key_name(key_name)
+        if config.key_name:
+            return _normalize_key_name(config.key_name) == _normalize_key_name(key_name)
+        mapped_app = app_key_map.resolve_app_for_key_name(key_name)
+        return mapped_app != "general" and config.managed_app == mapped_app
     return bool(config.managed_app) and config.managed_app.lower() == normalized
 
 

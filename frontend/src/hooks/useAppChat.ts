@@ -229,6 +229,7 @@ export function useAppChat(isAdmin: boolean = false) {
     localStorage.setItem('lastStore', target.storeName);
     try {
       const result = await api.startChat(target.storeName);
+      if (currentTargetIdRef.current !== target.id) return;
       if (result.prompt_applied) {
         showStatus('✅ 已套用自訂 Prompt');
       }

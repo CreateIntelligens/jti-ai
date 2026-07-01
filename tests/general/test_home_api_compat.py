@@ -1,5 +1,6 @@
 import hashlib
 import logging
+from dataclasses import replace
 from types import SimpleNamespace
 from urllib.parse import quote
 
@@ -703,6 +704,21 @@ def test_user_key_name_scope_survives_key_order_changes(monkeypatch):
     # identity/order, so pin file listings to empty — otherwise the count leaks
     # real seed data (e.g. the ESG KB) and varies with test ordering.
     monkeypatch.setattr(store_routes, "_list_store_files", lambda config: [])
+    monkeypatch.setattr(
+        store_routes,
+        "MANAGED_STORES",
+        tuple(
+            replace(config, key_name=None)
+            if config.managed_app == "esg"
+            else config
+            for config in store_routes.MANAGED_STORES
+        ),
+    )
+    monkeypatch.setattr(
+        store_routes.app_key_map,
+        "load_app_key_map",
+        lambda: {"esg": "和泰汽車"},
+    )
 
     scope = f"key_name:{quote('和泰汽車')}"
     original_verify_auth = app.dependency_overrides.get(verify_auth)
