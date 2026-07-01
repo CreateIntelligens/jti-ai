@@ -57,12 +57,8 @@ def init_managers():
         get_managed_tts_job_manager("esg")
         get_managed_tts_job_manager("general")
 
-        # === Module-specific startup hooks ===
-        from .services.jti.startup import jti_startup
-        jti_startup(prompt_manager)
-
-        from .services.hciot.startup import hciot_startup
-        hciot_startup()
+        from .services.jti.startup import jti_core_startup
+        jti_core_startup(prompt_manager)
 
         storage = "MongoDB" if general_session_manager else "in-memory"
         logger.info("[Startup] Managers ready (storage=%s)", storage)

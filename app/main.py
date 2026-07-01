@@ -1,14 +1,15 @@
 """ai360 km api FastAPI backend (RAG-based)."""
 
-from contextlib import asynccontextmanager
 import asyncio
+from collections.abc import Callable
+from contextlib import asynccontextmanager
+from datetime import datetime
 import logging
 import os
 import time
+from typing import Optional
 import uuid
 import warnings
-from datetime import datetime
-from typing import Optional
 
 import uvicorn.logging
 
@@ -162,6 +163,13 @@ from .routers.jti import topics_admin as jti_topics_admin
 import app.deps as deps
 
 logger = logging.getLogger(__name__)
+_BACKGROUND_TASKS = set()
+
+
+def _schedule_background_task(coro) -> None:
+    task = asyncio.create_task(coro)
+    _BACKGROUND_TASKS.add(task)
+    task.add_done_callback(_BACKGROUND_TASKS.discard)
 
 
 @asynccontextmanager
@@ -169,9 +177,11 @@ async def lifespan(_: FastAPI):
     """Initialize managers and background backfill on application startup."""
     deps.init_managers()
 
+    _schedule_background_task(_run_module_startup_tasks())
+
     try:
         from app.services.rag.backfill import get_backfill_service
-        asyncio.create_task(_run_rag_backfill(get_backfill_service()))
+        _schedule_background_task(_run_rag_backfill(get_backfill_service()))
     except Exception as e:
         logger.error(f"[RAG] Failed to init backfill: {e}")
 
@@ -205,6 +215,43 @@ def _build_rag_backfill_jobs(general_store_names: list[str]) -> list[tuple[str, 
     jobs = list(_FIXED_RAG_BACKFILL_JOBS)
     jobs.extend(("general", store_name) for store_name in general_store_names)
     return jobs
+
+
+async def _run_module_startup_tasks() -> None:
+    """Run non-critical app startup work after readiness is unblocked."""
+    jobs = (
+        ("JTI quiz seed", _run_jti_background_startup),
+        ("HCIoT local backup", _run_hciot_background_startup),
+    )
+    for label, job in jobs:
+        await _run_background_startup_job(label, job)
+
+
+async def _run_background_startup_job(label: str, job: Callable[[], None]) -> None:
+    loop = asyncio.get_running_loop()
+    started = time.time()
+    try:
+        await loop.run_in_executor(None, job)
+    except Exception as e:
+        logger.warning("[Startup] Background %s failed: %s", label, e)
+        return
+    logger.info(
+        "[Startup] Background %s complete in %.1fs",
+        label,
+        time.time() - started,
+    )
+
+
+def _run_jti_background_startup() -> None:
+    from app.services.jti.startup import jti_background_startup
+
+    jti_background_startup()
+
+
+def _run_hciot_background_startup() -> None:
+    from app.services.hciot.startup import hciot_startup
+
+    hciot_startup()
 
 
 async def _run_rag_backfill(backfill):

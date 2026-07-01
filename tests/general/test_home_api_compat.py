@@ -208,6 +208,17 @@ def test_home_can_load_knowledge_store_list():
     assert [store["key_index"] for store in stores] == [2, 2, 3, 3, 4, 4]
 
 
+def test_store_name_normalization_keeps_frontend_store_id_exact():
+    from app.routers.general import stores as store_routes
+
+    assert store_routes.normalize_store_name(None) == ""
+    assert store_routes.normalize_store_name("  ") == ""
+    assert store_routes.normalize_store_name(" esg-en ") == "esg-en"
+    assert store_routes.resolve_managed_store(None) is None
+    assert store_routes.resolve_managed_store("esg-en") is None
+    assert store_routes.resolve_managed_store("__esg__en").name == "__esg__en"
+
+
 def test_managed_store_key_resolution_warns_and_falls_back(monkeypatch, caplog):
     from app.routers.general import stores as store_routes
 

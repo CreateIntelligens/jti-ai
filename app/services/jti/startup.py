@@ -17,8 +17,18 @@ JTI_STORES = ("__jti__", "__jti__en")
 
 def jti_startup(prompt_manager) -> None:
     """Run all JTI-specific initialization tasks."""
+    jti_core_startup(prompt_manager)
+    jti_background_startup()
+
+
+def jti_core_startup(prompt_manager) -> None:
+    """Run JTI initialization tasks required before serving traffic."""
     _init_jti_default_prompt(prompt_manager)
     _migrate_jti_profile_storage(prompt_manager)
+
+
+def jti_background_startup() -> None:
+    """Run JTI initialization tasks that can complete after readiness."""
     _seed_quiz_data()
 
 

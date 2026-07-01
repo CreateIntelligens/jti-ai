@@ -213,30 +213,8 @@ MANAGED_STORES: tuple[ManagedStoreConfig, ...] = (
     ManagedStoreConfig("__esg__en", "ESG English", "esg", "en"),
 )
 
-_STORE_ALIASES: dict[str, str] = {
-    "jti": "__jti__",
-    "jti-zh": "__jti__",
-    "jti_zh": "__jti__",
-    "jti-en": "__jti__en",
-    "jti_en": "__jti__en",
-    "hciot": "__hciot__",
-    "hciot-zh": "__hciot__",
-    "hciot_zh": "__hciot__",
-    "hciot-en": "__hciot__en",
-    "hciot_en": "__hciot__en",
-    "esg": "__esg__",
-    "esg-zh": "__esg__",
-    "esg_zh": "__esg__",
-    "esg-en": "__esg__en",
-    "esg_en": "__esg__en",
-}
-
-
 def normalize_store_name(store_name: str | None) -> str:
-    normalized = (store_name or "").strip()
-    if not normalized:
-        return "__jti__"
-    return _STORE_ALIASES.get(normalized.lower(), normalized)
+    return (store_name or "").strip()
 
 
 def resolve_managed_store(store_name: str | None) -> ManagedStoreConfig | None:
