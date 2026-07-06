@@ -5,7 +5,8 @@ app/services/db_names.py),因此同步可限定範圍:
 
 - jti    → jti_app
 - hciot  → hciot_app
-- general→ 全域:jti_app + hciot_app + general_app + system_config(控制面)
+- esg    → esg_app
+- general→ 全域:jti_app + hciot_app + esg_app + general_app + system_config(控制面)
 
 控制面(帳號/金鑰/提示詞/知識庫註冊表)只在 general 全域同步時帶,
 單一 app 同步不碰控制面(職責清楚、避免重複同步)。
@@ -25,6 +26,7 @@ from typing import Literal
 from app.auth import require_role
 from app.services.db_names import (
     CONTROL_PLANE_DB_NAME,
+    ESG_DB_NAME,
     GENERAL_DB_NAME,
     HCIOT_DB_NAME,
     JTI_DB_NAME,
@@ -47,8 +49,9 @@ require_super_admin_dep = require_role("super_admin")
 _APP_DB_ALLOWLIST: dict[str, set[str]] = {
     "jti": {JTI_DB_NAME},
     "hciot": {HCIOT_DB_NAME},
-    # general 視為全域入口:四個庫(含跨 app 共用的控制面)。
-    "general": {JTI_DB_NAME, HCIOT_DB_NAME, GENERAL_DB_NAME, CONTROL_PLANE_DB_NAME},
+    "esg": {ESG_DB_NAME},
+    # general 視為全域入口:五個庫(含跨 app 共用的控制面)。
+    "general": {JTI_DB_NAME, HCIOT_DB_NAME, ESG_DB_NAME, GENERAL_DB_NAME, CONTROL_PLANE_DB_NAME},
 }
 
 # 確保同時只跑一個同步(整庫 upsert 不宜並發)。
@@ -56,7 +59,7 @@ _sync_lock = asyncio.Lock()
 
 
 class DbSyncRequest(BaseModel):
-    app: Literal["jti", "hciot", "general"]
+    app: Literal["jti", "hciot", "esg", "general"]
     # forward = DocumentDB → Atlas(平時備份);reverse = Atlas → DocumentDB(災後補回)。
     direction: Literal["forward", "reverse"] = "forward"
     dry_run: bool = False

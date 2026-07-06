@@ -33,6 +33,7 @@ from app.services.time_context import format_current_utc8_datetime
 from app.services.tts_text import prepare_tts_text
 
 _LINE_URL = "https://page.line.me/281soitv?openQrModal=true/"
+_LINE_QR_IMAGE_ID = "A1"
 
 
 def _get_session_manager() -> Any:
@@ -144,10 +145,12 @@ def _post_process_chat_result(
     extra_meta: dict[str, Any],
 ) -> dict[str, Any]:
     url = extra_meta.get("url")
-    if not url and "官方LINE" in response_text.replace(" ", ""):
+    image_id = extra_meta.get("image_id")
+    if not url and not image_id and "官方LINE" in response_text.replace(" ", ""):
         url = _LINE_URL
+        image_id = _LINE_QR_IMAGE_ID
     return {
-        "image_id": extra_meta.get("image_id"),
+        "image_id": image_id,
         "url": url,
         "tts_text": prepare_tts_text(response_text, session.language),
     }
