@@ -19,9 +19,7 @@ import type { QaWorkspaceApiClient } from '../QaKnowledgeWorkspace';
 import {
   MAX_FILE_SIZE_BYTES,
   MAX_TEXT_LENGTH,
-  POLLING_INTERVAL_MS,
   SUPPORTED_EXTS,
-  TIMEOUT_MS,
   type DocFileItem,
   type DocumentSourceMode,
   type DocumentToQaStatus,
@@ -46,9 +44,6 @@ interface DocumentToQaTabProps {
     topicId?: string | null,
   ) => Promise<void>;
   api: QaWorkspaceApiClient;
-  /** When true, pasted text and uploaded docs are saved directly (chunked by
-   * the RAG backfill) instead of going through AI Q&A extraction. */
-  disableAiQaExtraction?: boolean;
   // Hide the HCIoT-only img/url columns in the CSV format example / download.
   disableImages?: boolean;
   availableImages: QaImage[];
@@ -57,7 +52,6 @@ interface DocumentToQaTabProps {
   onDeleteImage?: DeleteImageHandler;
 }
 
-type PendingAiSource = { kind: 'file'; file: File } | { kind: 'text'; text: string };
 type UploadFileResult = { name: string };
 const CLOSE_AFTER_SUCCESS_MS = 1200;
 const HIDDEN_DISPLAY_VALUES = new Set(['false', '0', '否', 'n']);
@@ -67,8 +61,8 @@ function fileExtension(file: File): string | undefined {
 }
 
 function toHiddenPreviewRows(pairs: QaPair[]): QARow[] {
-  // `display` may be absent (AI-extracted pairs) — default to hidden in that
-  // case, matching the previous behavior; honor it when the CSV provided one.
+  // `display` may be absent in older CSV rows. Default to hidden, and honor it
+  // when the CSV provides one.
   const rows = pairs.map((pair): QARow => ({
     ...createEmptyRow(),
     index: pair.index || '',
@@ -104,16 +98,6 @@ function getHiddenQuestions(rows: QARow[]): string[] {
   return Array.from(new Set(hiddenQuestions));
 }
 
-function toPlainQaPairs(rows: QARow[]): QaPair[] {
-  return rows.map(({ index, q, a, img, url }) => {
-    const pair: QaPair = { q, a };
-    if (index) pair.index = index;
-    if (img) pair.img = img;
-    if (url) pair.url = url;
-    return pair;
-  });
-}
-
 function escapeCsvCell(value: string): string {
   return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
 }
@@ -130,19 +114,6 @@ function buildQaCsv(rows: QARow[]): string {
   ].join('\n');
 }
 
-function isUnrecognizedFormatError(error: unknown): boolean {
-  try {
-    const parsed = JSON.parse(toErrorMessage(error)) as {
-      error_code?: string;
-      detail?: { error_code?: string };
-    };
-    return parsed.error_code === 'unrecognized_format'
-      || parsed.detail?.error_code === 'unrecognized_format';
-  } catch {
-    return false;
-  }
-}
-
 export default function DocumentToQaTab({
   open,
   language,
@@ -153,7 +124,6 @@ export default function DocumentToQaTab({
   onUploadFile,
   onUploadComplete,
   api,
-  disableAiQaExtraction = false,
   disableImages = false,
   availableImages,
   resolveImageUrl,
@@ -167,12 +137,9 @@ export default function DocumentToQaTab({
   const [text, setText] = useState('');
   const [dragOver, setDragOver] = useState(false);
   const [status, setStatus] = useState<DocumentToQaStatus>('idle');
-  const [jobId, setJobId] = useState<string | null>(null);
   const [qaPairs, setQaPairs] = useState<QARow[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const pollingTimerRef = useRef<number | null>(null);
-  const startTimeRef = useRef<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const completeSingleFileUpload = async (result: UploadFileResult, topicId?: string | null) => {
@@ -207,18 +174,11 @@ export default function DocumentToQaTab({
       setFile(null);
       setText('');
       setStatus('idle');
-      setJobId(null);
       setQaPairs([]);
       setError(null);
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   }, [open]);
-
-  useEffect(() => () => {
-    if (pollingTimerRef.current !== null) {
-      window.clearInterval(pollingTimerRef.current);
-    }
-  }, []);
 
   const validateFile = (selectedFile: File): string | null => {
     const ext = fileExtension(selectedFile);
@@ -243,17 +203,7 @@ export default function DocumentToQaTab({
     setFile({ file: selected });
   };
 
-  const stopPolling = () => {
-    if (pollingTimerRef.current !== null) {
-      window.clearInterval(pollingTimerRef.current);
-      pollingTimerRef.current = null;
-    }
-  };
-
-  const showPreviewRows = (rows: QARow[], options: { clearJobId?: boolean } = {}) => {
-    if (options.clearJobId) {
-      setJobId(null);
-    }
+  const showPreviewRows = (rows: QARow[]) => {
     setQaPairs(rows);
     setStatus('preview');
   };
@@ -264,38 +214,11 @@ export default function DocumentToQaTab({
       if (!parsed || parsedPairs.length === 0) {
         return false;
       }
-      showPreviewRows(toHiddenPreviewRows(parsedPairs), { clearJobId: true });
+      showPreviewRows(toHiddenPreviewRows(parsedPairs));
       return true;
     } catch {
       return false;
     }
-  };
-
-  const startPolling = (id: string) => {
-    if (pollingTimerRef.current !== null) {
-      window.clearInterval(pollingTimerRef.current);
-    }
-    pollingTimerRef.current = window.setInterval(async () => {
-      try {
-        if (Date.now() - startTimeRef.current > TIMEOUT_MS) {
-          stopPolling();
-          setError('分析逾時，請稍後再試。');
-          setStatus('error');
-          return;
-        }
-        const res = await api.getQaExtractJob(id);
-        if (res.status === 'done' && res.qa_pairs) {
-          stopPolling();
-          showPreviewRows(toHiddenPreviewRows(res.qa_pairs));
-        } else if (res.status === 'failed') {
-          stopPolling();
-          setError(res.error || '問答擷取失敗。');
-          setStatus('error');
-        }
-      } catch (err) {
-        console.error('Polling error:', err);
-      }
-    }, POLLING_INTERVAL_MS);
   };
 
   const startExtraction = async () => {
@@ -314,11 +237,7 @@ export default function DocumentToQaTab({
 
       const ext = fileExtension(file.file);
       if (ext === 'docx' || ext === 'txt' || ext === 'md') {
-        if (disableAiQaExtraction) {
-          await saveFileDirect(file.file);
-        } else {
-          await startAiExtraction({ kind: 'file', file: file.file });
-        }
+        await saveFileDirect(file.file);
         return;
       }
 
@@ -338,10 +257,6 @@ export default function DocumentToQaTab({
           await completeSingleFileUpload(res, resolvedTopic.fullTopicId);
           closeAfterSuccess();
         } catch (err: unknown) {
-          if (isUnrecognizedFormatError(err)) {
-            await startAiExtraction({ kind: 'file', file: file.file });
-            return;
-          }
           setError(toErrorMessage(err));
           setStatus('error');
         }
@@ -364,41 +279,8 @@ export default function DocumentToQaTab({
       return;
     }
 
-    if (disableAiQaExtraction) {
-      const mdFile = new File([trimmed], `pasted-${Date.now()}.md`, { type: 'text/markdown' });
-      await saveFileDirect(mdFile);
-      return;
-    }
-    await startAiExtraction({ kind: 'text', text: trimmed });
-  };
-
-  const startAiExtraction = async (source: PendingAiSource) => {
-    if (!resolvedTopic) return;
-    setStatus('uploading');
-
-    const topicParts = resolvedTopic.fullTopicId.split('/');
-    const categoryId = topicParts[0];
-    const topicId = resolvedTopic.fullTopicId;
-    const categoryLabel = resolvedTopic.labels.categoryLabel;
-    const topicLabel = resolvedTopic.labels.topicLabel;
-
-    try {
-      const res = await api.createQaExtractJob(
-        language,
-        source.kind === 'file' ? { file: source.file } : { text: source.text },
-        categoryId,
-        topicId,
-        categoryLabel,
-        topicLabel,
-      );
-      setJobId(res.job_id);
-      setStatus('extracting');
-      startTimeRef.current = Date.now();
-      startPolling(res.job_id);
-    } catch (err) {
-      setError(toErrorMessage(err));
-      setStatus('error');
-    }
+    const mdFile = new File([trimmed], `pasted-${Date.now()}.md`, { type: 'text/markdown' });
+    await saveFileDirect(mdFile);
   };
 
   /** Upload images staged on preview rows, returning rows with `img` filled in.
@@ -446,24 +328,17 @@ export default function DocumentToQaTab({
     if (!preparedRows) return;
     setQaPairs(preparedRows);
     const hiddenQuestions = getHiddenQuestions(preparedRows);
-    const plainPairs = toPlainQaPairs(preparedRows);
     try {
-      if (jobId) {
-        const res = await api.importQaExtractJob(jobId, language, plainPairs, hiddenQuestions);
-        setStatus('success');
-        await onUploadComplete(res.filename, res.imported_count, res.topic_id ?? resolvedTopic?.fullTopicId ?? null);
-      } else {
-        if (!resolvedTopic) {
-          setError('請先選擇科別與主題。');
-          setStatus('preview');
-          return;
-        }
-        const csv = buildQaCsv(preparedRows);
-        const csvFile = new File([csv], `pasted-${Date.now()}.csv`, { type: 'text/csv' });
-        const res = await onUploadFile(csvFile, resolvedTopic.fullTopicId, resolvedTopic.labels, hiddenQuestions);
-        setStatus('success');
-        await completeSingleFileUpload(res, resolvedTopic.fullTopicId);
+      if (!resolvedTopic) {
+        setError('請先選擇科別與主題。');
+        setStatus('preview');
+        return;
       }
+      const csv = buildQaCsv(preparedRows);
+      const csvFile = new File([csv], `pasted-${Date.now()}.csv`, { type: 'text/csv' });
+      const res = await onUploadFile(csvFile, resolvedTopic.fullTopicId, resolvedTopic.labels, hiddenQuestions);
+      setStatus('success');
+      await completeSingleFileUpload(res, resolvedTopic.fullTopicId);
       closeAfterSuccess();
     } catch (err) {
       setError(toErrorMessage(err));
@@ -472,17 +347,15 @@ export default function DocumentToQaTab({
   };
 
   const handleReset = () => {
-    stopPolling();
     setFile(null);
     setText('');
-    setJobId(null);
     setQaPairs([]);
     setError(null);
     setStatus('idle');
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
-  const isUploading = status === 'uploading' || status === 'extracting' || status === 'importing';
+  const isUploading = status === 'uploading' || status === 'importing';
 
   if (isUploading || status === 'success' || status === 'error') {
     return (
@@ -491,7 +364,6 @@ export default function DocumentToQaTab({
         isEn={isEn}
         error={error}
         qaPairCount={qaPairs.length}
-        directSave={disableAiQaExtraction}
         onReset={handleReset}
       />
     );
@@ -528,7 +400,6 @@ export default function DocumentToQaTab({
       dragOver={dragOver}
       fileInputRef={fileInputRef}
       canSubmit={canSubmit}
-      disableAiQaExtraction={disableAiQaExtraction}
       disableImages={disableImages}
       onModeChange={(nextMode) => {
         setMode(nextMode);

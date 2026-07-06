@@ -1,7 +1,7 @@
 import * as esg from '../../services/api/esg';
 import { createFixedAppWorkspace } from '../_shared/qaKnowledgeWorkspace/createFixedAppWorkspace';
 
-// ESG 是「標準」固定庫工作區：與 general 相同，但停用圖片與 AI Q&A 抽取。
+// ESG 是「標準」固定庫工作區：與 general 相同，但停用圖片。
 // 與 JTI 對稱，僅 api 來源與 sourceType 不同，故共用 factory 產生。
 const EsgKnowledgeWorkspace = createFixedAppWorkspace({
   sourceType: 'esg',

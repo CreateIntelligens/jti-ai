@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any
 
 from google.genai import types
@@ -18,6 +17,8 @@ from app.services.esg.agent_prompts import (
 )
 from app.services.esg.runtime_settings import load_runtime_settings_from_prompt_manager
 from app.services.general.managed_agent import ManagedAppAgent, ManagedAppAgentConfig
+from app.services.time_context import format_current_utc8_datetime
+from app.services.tts_text import prepare_tts_text
 
 _SEARCH_KNOWLEDGE_DECL = build_search_knowledge_decl(
     domain_description=(
@@ -44,7 +45,7 @@ def _build_session_state(session: Session) -> str:
         session.language,
         SESSION_STATE_TEMPLATES["zh"],
     )
-    now = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M")
+    now = format_current_utc8_datetime(session.language)
     return template.format(now=now)
 
 
@@ -52,6 +53,15 @@ def _fallback_message(language: str) -> str:
     if normalize_language(language) == "en":
         return "The assistant is temporarily unavailable. Please try again later."
     return "目前無法取得回覆，請稍後再試。"
+
+
+def _post_process_chat_result(
+    session: Session,
+    response_text: str,
+    _citations: list[dict] | None,
+    _extra_meta: dict[str, Any],
+) -> dict[str, Any]:
+    return {"tts_text": prepare_tts_text(response_text, session.language)}
 
 
 ESG_AGENT_CONFIG = ManagedAppAgentConfig(
@@ -68,6 +78,7 @@ ESG_AGENT_CONFIG = ManagedAppAgentConfig(
     load_runtime_settings=load_runtime_settings_from_prompt_manager,
     build_session_state=_build_session_state,
     fallback_message=_fallback_message,
+    post_process_chat_result=_post_process_chat_result,
 )
 
 

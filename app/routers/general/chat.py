@@ -494,6 +494,7 @@ def get_general_conversations(
     store_name: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    search: Optional[str] = None,
     page: int = 1,
     page_size: int = 20,
     auth: dict = Depends(verify_auth),
@@ -512,6 +513,7 @@ def get_general_conversations(
                 {"store_name": store_name},
                 {"session_snapshot.store": store_name},
             ]},
+            search=search,
         )
 
         page, page_size = normalize_history_pagination(page, page_size)

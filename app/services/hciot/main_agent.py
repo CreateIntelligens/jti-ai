@@ -6,33 +6,38 @@ knowledge base via a `search_knowledge` tool, so the query naturally
 includes conversational context.
 """
 
-import logging
+from __future__ import annotations
+
 import os
 import time
 from typing import Any
 
 from google.genai import types
-import app.deps as deps
 
+import app.deps as deps
 from app.models.session import Session
+from app.models_config import CHAT_MODEL as _DEFAULT_CHAT_MODEL
 from app.services.agent_utils import build_search_knowledge_decl, normalize_language
-from app.services.base_agent import BaseAgent
+from app.services.general.managed_agent import ManagedAppAgent, ManagedAppAgentConfig
 from app.services.hciot.agent_prompts import (
     PERSONA,
     SESSION_STATE_TEMPLATES,
     build_system_instruction,
 )
+from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.hciot.runtime_settings import (
     HCIOT_STORE_NAME,
     load_runtime_settings_from_prompt_manager,
 )
-from app.services.hciot.knowledge_store import get_hciot_knowledge_store
+from app.services.time_context import format_current_utc8_datetime
 from app.services.tts_text import prepare_tts_text
-logger = logging.getLogger(__name__)
+
+_LINE_URL = "https://page.line.me/281soitv?openQrModal=true/"
 
 
-def _get_session_manager():
+def _get_session_manager() -> Any:
     return deps.get_hciot_session_manager()
+
 
 # ---------------------------------------------------------------------------
 # RAG function declaration for Gemini function calling
@@ -78,119 +83,125 @@ def invalidate_hciot_file_map(language: str | None = None) -> None:
         _file_map_cache.pop(normalize_language(language), None)
 
 
-from app.models_config import CHAT_MODEL as _DEFAULT_CHAT_MODEL
+def _store_name_for_language(language: str) -> str:
+    return "__hciot__en" if normalize_language(language) == "en" else HCIOT_STORE_NAME
 
 
-class MainAgent(BaseAgent):
+def _build_session_state(session: Session) -> str:
+    template = SESSION_STATE_TEMPLATES.get(session.language, SESSION_STATE_TEMPLATES["zh"])
+    now = format_current_utc8_datetime(session.language)
+    return template.format(step_value=session.step.value, now=now)
+
+
+def _extract_image_id(citations: list[dict] | None) -> str | None:
+    """Return image_id only if the top-ranked citation carries one."""
+    if not citations:
+        return None
+    return citations[0].get("image_id") or None
+
+
+def _extract_url(citations: list[dict] | None) -> str | None:
+    """Return url only if the top-ranked citation carries one."""
+    if not citations:
+        return None
+    return citations[0].get("url") or None
+
+
+def _localize_citations(language: str, citations: list[dict] | None) -> list[dict] | None:
+    """Replace filenames with display names from the knowledge store."""
+    if not citations:
+        return citations
+
+    file_map = _get_file_map(language)
+
+    localized = []
+    for c in citations:
+        target = dict(c)
+        for key in ("title", "uri"):
+            raw = (target.get(key) or "").strip()
+            name = os.path.basename(raw).lower()
+            if name in file_map:
+                target["title"] = file_map[name]
+                break
+        localized.append(target)
+    return localized
+
+
+def _preprocess_chat_data(
+    session: Session,
+    citations: list[dict] | None,
+) -> tuple[list[dict] | None, dict[str, Any]]:
+    localized = _localize_citations(session.language, citations)
+    image_id = _extract_image_id(localized)
+    url = _extract_url(localized)
+    return localized, {"image_id": image_id, "url": url}
+
+
+def _post_process_chat_result(
+    session: Session,
+    response_text: str,
+    _citations: list[dict] | None,
+    extra_meta: dict[str, Any],
+) -> dict[str, Any]:
+    url = extra_meta.get("url")
+    if not url and "官方LINE" in response_text.replace(" ", ""):
+        url = _LINE_URL
+    return {
+        "image_id": extra_meta.get("image_id"),
+        "url": url,
+        "tts_text": prepare_tts_text(response_text, session.language),
+    }
+
+
+def _fallback_message(_language: str) -> str:
+    return "目前無法回應，請稍後再試。"
+
+
+def _rag_search_language(session: Session) -> str | None:
+    return normalize_language(session.language)
+
+
+def _build_system_instruction_adapter(
+    persona: str,
+    language: str,
+    response_rule_sections: dict,
+    max_response_chars: int,
+) -> str:
+    return build_system_instruction(
+        persona=persona,
+        language=language,
+        response_rule_sections=response_rule_sections,
+        limit=max_response_chars,
+    )
+
+
+HCIOT_AGENT_CONFIG = ManagedAppAgentConfig(
+    app="hciot",
+    model_name=_DEFAULT_CHAT_MODEL,
+    session_manager_getter=_get_session_manager,
+    persona_map_attr="hciot_persona_by_prompt",
+    active_prompt_id_attr="hciot_active_prompt_id",
+    store_name_for_language=_store_name_for_language,
+    rag_source_type="hciot_knowledge",
+    rag_tool_declaration=_RAG_TOOL,
+    persona=PERSONA,
+    build_system_instruction=_build_system_instruction_adapter,
+    load_runtime_settings=load_runtime_settings_from_prompt_manager,
+    build_session_state=_build_session_state,
+    fallback_message=_fallback_message,
+    post_process_chat_result=_post_process_chat_result,
+    rag_search_language=_rag_search_language,
+    preprocess_chat_data=_preprocess_chat_data,
+)
+
+
+class MainAgent(ManagedAppAgent):
+    """HCIoT's fixed-app shell over the shared managed-agent runtime."""
+
     CHAT_MODEL = _DEFAULT_CHAT_MODEL
 
-    def __init__(self):
-        super().__init__(model_name=self.CHAT_MODEL)
-
-    @property
-    def _session_manager(self):
-        return _get_session_manager()
-
-    @property
-    def _persona_map_attr(self) -> str:
-        return "hciot_persona_by_prompt"
-
-    @property
-    def _active_prompt_id_attr(self) -> str:
-        return "hciot_active_prompt_id"
-
-    @staticmethod
-    def _get_store_name_for_language(language: str) -> str:
-        return "__hciot__en" if normalize_language(language) == "en" else HCIOT_STORE_NAME
-
-    @property
-    def _rag_source_type(self) -> str:
-        return "hciot_knowledge"
-
-    def _get_rag_source_type_for_session(self, session: Session) -> list[str]:
-        return ["hciot_knowledge"]
-
-    def _get_rag_search_language_for_session(self, session: Session) -> str | None:
-        return normalize_language(session.language)
-
-    @property
-    def _rag_tool_declaration(self) -> types.Tool | None:
-        return _RAG_TOOL
-
-    def _get_default_persona(self, language: str) -> str:
-        return PERSONA.get(language, PERSONA["zh"])
-
-    def _build_system_instruction(self, persona, language, response_rule_sections, max_response_chars):
-        return build_system_instruction(
-            persona=persona, language=language,
-            response_rule_sections=response_rule_sections,
-            limit=max_response_chars,
-        )
-
-    def _load_runtime_settings(self, prompt_manager, prompt_id, store_name):
-        return load_runtime_settings_from_prompt_manager(prompt_manager, prompt_id, store_name=store_name)
-
-    def _load_default_runtime_settings(self):
-        return load_runtime_settings_from_prompt_manager(None)
-
-    def _get_session_state(self, session: Session) -> str:
-        from datetime import datetime, timezone
-        template = SESSION_STATE_TEMPLATES.get(session.language, SESSION_STATE_TEMPLATES["zh"])
-        now = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M")
-        return template.format(step_value=session.step.value, now=now)
-
-    @staticmethod
-    def _extract_image_id(citations: list[dict] | None) -> str | None:
-        """Return image_id only if the top-ranked citation carries one."""
-        if not citations:
-            return None
-        return citations[0].get("image_id") or None
-
-    @staticmethod
-    def _extract_url(citations: list[dict] | None) -> str | None:
-        """Return url only if the top-ranked citation carries one."""
-        if not citations:
-            return None
-        return citations[0].get("url") or None
-
-    @staticmethod
-    def _localize_citations(language: str, citations: list[dict] | None) -> list[dict] | None:
-        """Replace filenames with display names from the knowledge store."""
-        if not citations:
-            return citations
-
-        file_map = _get_file_map(language)
-
-        localized = []
-        for c in citations:
-            target = dict(c)
-            for key in ("title", "uri"):
-                raw = (target.get(key) or "").strip()
-                name = os.path.basename(raw).lower()
-                if name in file_map:
-                    target["title"] = file_map[name]
-                    break
-            localized.append(target)
-        return localized
-
-    # ------------------------------------------------------------------
-    # Function-calling chat loop
-    # ------------------------------------------------------------------
-    def _preprocess_chat_data(self, session: Session, citations: list[dict] | None) -> tuple[list[dict] | None, dict[str, Any]]:
-        localized = self._localize_citations(session.language, citations)
-        image_id = self._extract_image_id(localized)
-        url = self._extract_url(localized)
-        return localized, {"image_id": image_id, "url": url}
-
-    def _post_process_chat_result(self, session: Session, response_text: str, citations: list[dict] | None, extra_meta: dict[str, Any]) -> dict[str, Any]:
-        return {
-            "image_id": extra_meta.get("image_id"),
-            "url": extra_meta.get("url"),
-            "tts_text": prepare_tts_text(response_text, session.language),
-        }
-
-    def _get_chat_fallback_message(self, language: str) -> str:
-        return "目前無法回應，請稍後再試。"
+    def __init__(self) -> None:
+        super().__init__(HCIOT_AGENT_CONFIG)
 
 
 main_agent = MainAgent()

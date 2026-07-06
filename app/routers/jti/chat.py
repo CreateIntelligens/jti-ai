@@ -152,6 +152,7 @@ async def get_conversations(
     session_id: Optional[str] = None,
     date_from: Optional[str] = None,
     date_to: Optional[str] = None,
+    search: Optional[str] = None,
     page: int = 1,
     page_size: int = 20,
 ):
@@ -166,7 +167,7 @@ async def get_conversations(
             return {"session_id": session_id, "mode": mode, "conversations": conversations, "total": len(conversations)}
         else:
             page, page_size = normalize_history_pagination(page, page_size)
-            query = build_date_query(mode, date_from, date_to)
+            query = build_date_query(mode, date_from, date_to, search=search)
             session_ids, total_sessions = conversation_logger.get_paginated_session_ids(
                 query=query, page=page, page_size=page_size
             )

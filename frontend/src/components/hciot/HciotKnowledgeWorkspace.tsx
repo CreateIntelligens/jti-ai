@@ -37,20 +37,13 @@ const hciotQaWorkspaceApi: QaWorkspaceApiClient = {
   downloadKnowledgeFile: api.downloadHciotKnowledgeFile,
   getTopicMergedCsv: api.getHciotTopicMergedCsv,
   saveTopicMergedCsv: api.saveHciotTopicMergedCsv,
-  createQaExtractJob: api.createQaExtractJob,
   parseQaCsvText: api.parseQaCsvText,
-  getQaExtractJob: api.getQaExtractJob,
-  importQaExtractJob: api.importQaExtractJob,
 };
 
 const hciotQaWorkspaceConfig: QaWorkspaceConfig = {
   sourceType: 'hciot',
   api: hciotQaWorkspaceApi,
   text: (_language, zh) => zh,
-  // HCIoT saves pasted text / uploaded docs directly (chunked by RAG backfill)
-  // instead of using AI Q&A extraction. The extraction capability stays intact
-  // for other sub-apps.
-  disableAiQaExtraction: true,
 };
 
 export default function HciotKnowledgeWorkspace(props: HciotKnowledgeWorkspaceProps) {

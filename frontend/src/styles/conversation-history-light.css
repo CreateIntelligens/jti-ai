@@ -3,7 +3,7 @@
    Only overrides needed for [data-theme="dark"] are listed here. */
 
 [data-theme="dark"] .conversation-history-overlay {
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.75);
 }
 
 /* Dark: modal background uses the dark surface token — no special override needed

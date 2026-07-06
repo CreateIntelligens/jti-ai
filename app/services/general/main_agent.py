@@ -11,8 +11,6 @@ Architecture:
 """
 
 import logging
-from datetime import datetime, timezone
-from typing import Any
 
 from google.genai import types
 
@@ -29,6 +27,7 @@ from app.services.general.agent_prompts import (
 from app.services.general.runtime_settings import (
     load_runtime_settings_from_prompt_manager,
 )
+from app.services.time_context import format_current_utc8_datetime
 
 logger = logging.getLogger(__name__)
 
@@ -165,7 +164,7 @@ class MainAgent(BaseAgent):
 
     def _get_session_state(self, session: Session) -> str:
         template = SESSION_STATE_TEMPLATES.get(session.language, SESSION_STATE_TEMPLATES["zh"])
-        now = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M")
+        now = format_current_utc8_datetime(session.language)
         return template.format(now=now)
 
     def _get_question_label(self, language: str) -> str:

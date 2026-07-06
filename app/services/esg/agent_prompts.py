@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Dict, Optional
 
 from app.services._shared.agent_prompts_base import AgentPrompts, RuleHeaders
+from app.services.time_context import DATE_REASONING_HINT_EN, DATE_REASONING_HINT_ZH
 
 DEFAULT_MAX_RESPONSE_CHARS = 0
 
@@ -50,13 +51,15 @@ WELCOME_TEXT: Dict[str, Dict[str, str]] = {
 }
 
 SESSION_STATE_TEMPLATES: Dict[str, str] = {
-    "zh": """<內部狀態資訊 - 不要在回應中提及>
+    "zh": f"""<內部狀態資訊 - 不要在回應中提及>
 目前模式: ESG 知識庫問答
-現在時間: {now}
+目前日期時間（UTC+8）: {{now}}
+{DATE_REASONING_HINT_ZH}
 </內部狀態資訊>""",
-    "en": """<Internal State Info - Do not mention in response>
+    "en": f"""<Internal State Info - Do not mention in response>
 Current Mode: ESG knowledge base Q&A
-Current time: {now}
+Current date/time (UTC+8): {{now}}
+{DATE_REASONING_HINT_EN}
 </Internal State Info>""",
 }
 

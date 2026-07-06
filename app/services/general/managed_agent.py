@@ -32,6 +32,10 @@ class ManagedAppAgentConfig:
         dict[str, Any],
     ] | None = None
     rag_search_language: Callable[[Session], str | None] | None = None
+    preprocess_chat_data: Callable[
+        [Session, list[dict] | None],
+        tuple[list[dict] | None, dict[str, Any]],
+    ] | None = None
 
 
 class ManagedAppAgent(BaseAgent):
@@ -101,6 +105,15 @@ class ManagedAppAgent(BaseAgent):
 
     def _get_question_label(self, language: str) -> str:
         return "User question:" if language == "en" else "使用者問題："
+
+    def _preprocess_chat_data(
+        self,
+        session: Session,
+        citations: list[dict] | None,
+    ) -> tuple[list[dict] | None, dict[str, Any]]:
+        if self.config.preprocess_chat_data is None:
+            return super()._preprocess_chat_data(session, citations)
+        return self.config.preprocess_chat_data(session, citations)
 
     def _post_process_chat_result(
         self,

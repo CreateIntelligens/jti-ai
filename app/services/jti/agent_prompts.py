@@ -16,6 +16,7 @@ from app.services._shared.agent_prompts_base import (
     AgentPrompts,
     RuleHeaders,
 )
+from app.services.time_context import DATE_REASONING_HINT_EN, DATE_REASONING_HINT_ZH
 
 DEFAULT_MAX_RESPONSE_CHARS = 60
 
@@ -91,19 +92,21 @@ WELCOME_TEXT: Dict[str, Dict[str, str]] = {
 }
 
 SESSION_STATE_TEMPLATES: Dict[str, str] = {
-    "zh": """<內部狀態資訊 - 不要在回應中提及>
-目前階段: {step_value}
-測驗進度: {answers_count}/4 題
-測驗結果: {quiz_result}
-現在時間: {now}
+    "zh": f"""<內部狀態資訊 - 不要在回應中提及>
+目前階段: {{step_value}}
+測驗進度: {{answers_count}}/4 題
+測驗結果: {{quiz_result}}
+目前日期時間（UTC+8）: {{now}}
+{DATE_REASONING_HINT_ZH}
 
 ⚠️ 重要：必須使用繁體中文回應所有內容，即使使用者用英文提問
 </內部狀態資訊>""",
-    "en": """<Internal State Info - Do not mention in response>
-Current Stage: {step_value}
-Quiz Progress: {answers_count}/4 questions
-Quiz Result: {quiz_result}
-Current time: {now}
+    "en": f"""<Internal State Info - Do not mention in response>
+Current Stage: {{step_value}}
+Quiz Progress: {{answers_count}}/4 questions
+Quiz Result: {{quiz_result}}
+Current date/time (UTC+8): {{now}}
+{DATE_REASONING_HINT_EN}
 
 ⚠️ CRITICAL: You MUST respond in English only, even if user writes in Chinese
 </Internal State Info>""",

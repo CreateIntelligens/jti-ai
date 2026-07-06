@@ -1,7 +1,7 @@
 import * as jti from '../../services/api/jti';
 import { createFixedAppWorkspace } from '../_shared/qaKnowledgeWorkspace/createFixedAppWorkspace';
 
-// JTI 是「標準」固定庫工作區：與 general 相同，但停用圖片與 AI Q&A 抽取。
+// JTI 是「標準」固定庫工作區：與 general 相同，但停用圖片。
 // 與 ESG 對稱，僅 api 來源與 sourceType 不同，故共用 factory 產生。
 const JtiKnowledgeWorkspace = createFixedAppWorkspace({
   sourceType: 'jti',

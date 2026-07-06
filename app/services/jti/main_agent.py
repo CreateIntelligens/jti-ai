@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any
 
 from google.genai import types
@@ -18,6 +17,7 @@ from app.services.jti.agent_prompts import (
     build_system_instruction,
 )
 from app.services.jti.runtime_settings import load_runtime_settings_from_prompt_manager
+from app.services.time_context import format_current_utc8_datetime
 from app.services.tts_text import prepare_tts_text
 
 
@@ -51,7 +51,7 @@ def _build_session_state(session: Session) -> str:
         SESSION_STATE_TEMPLATES["zh"],
     )
     not_yet = "Not calculated yet" if session.language == "en" else "尚未計算"
-    now = datetime.now(timezone.utc).astimezone().strftime("%Y-%m-%d %H:%M")
+    now = format_current_utc8_datetime(session.language)
     return template.format(
         step_value=session.step.value,
         answers_count=len(session.answers),

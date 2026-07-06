@@ -3,7 +3,6 @@
 Reuses build_qa_kb_router; the shared router keys data by its ``language`` field,
 which general repurposes to carry ``store_name`` (general's RAG-keying convention,
 matching app/routers/general/stores.py's ``sync_to_rag(GENERAL_NAMESPACE, store_name, ...)``).
-AI Q&A extraction is disabled (include_extract=False).
 """
 
 from __future__ import annotations
@@ -50,7 +49,11 @@ def _make_config() -> QaKbRouterConfig:
     )
 
 
-router = build_qa_kb_router(_make_config(), include_knowledge=True, include_extract=False)
+router = build_qa_kb_router(
+    _make_config(),
+    include_knowledge=True,
+    include_csv_parse=True,
+)
 
 
 # ── Per-store RAG reindex ────────────────────────────────────────────────

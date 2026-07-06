@@ -30,7 +30,7 @@ def _build_client(knowledge_store: MagicMock, topic_store: MagicMock) -> TestCli
         "app.routers._shared.qa_kb_router.require_kb_access",
         return_value=lambda: {"role": "admin"},
     ):
-        router = build_qa_kb_router(config, include_knowledge=True, include_extract=False)
+        router = build_qa_kb_router(config, include_knowledge=True)
     app = FastAPI()
     app.include_router(router, prefix="/knowledge")
     return TestClient(app)

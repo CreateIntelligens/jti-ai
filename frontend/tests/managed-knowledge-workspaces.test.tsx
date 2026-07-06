@@ -25,7 +25,6 @@ describe('managed fixed-app knowledge workspaces', () => {
         language: 'zh',
         config: expect.objectContaining({
           sourceType: 'jti',
-          disableAiQaExtraction: true,
           disableImages: true,
         }),
       }),
@@ -41,7 +40,6 @@ describe('managed fixed-app knowledge workspaces', () => {
         language: 'en',
         config: expect.objectContaining({
           sourceType: 'esg',
-          disableAiQaExtraction: true,
           disableImages: true,
         }),
       }),

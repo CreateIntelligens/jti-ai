@@ -20,7 +20,6 @@ interface DocumentToQaSourceFormProps {
   dragOver: boolean;
   fileInputRef: RefObject<HTMLInputElement | null>;
   canSubmit: boolean;
-  disableAiQaExtraction?: boolean;
   disableImages?: boolean;
   onModeChange: (mode: DocumentSourceMode) => void;
   onTextChange: (text: string) => void;
@@ -119,7 +118,6 @@ export default function DocumentToQaSourceForm({
   dragOver,
   fileInputRef,
   canSubmit,
-  disableAiQaExtraction = false,
   disableImages = false,
   onModeChange,
   onTextChange,
@@ -133,11 +131,8 @@ export default function DocumentToQaSourceForm({
   const ext = getFileExtension(selectedFile);
   const isCsvOrXlsx = ext === 'csv' || ext === 'xlsx';
 
-  const extractionLabel = disableAiQaExtraction ? '開始上傳' : '開始 AI 擷取';
-  const uploadLabel = isCsvOrXlsx ? '開始上傳' : extractionLabel;
-  const textPlaceholder = disableAiQaExtraction
-    ? '在此貼上文字內容，將直接儲存並建立索引。'
-    : '在此貼上文章內容，AI 會自動分析並擷取問答對。';
+  const uploadLabel = isCsvOrXlsx ? '開始上傳' : '開始儲存';
+  const textPlaceholder = '在此貼上 CSV 內容，或貼上文字內容直接儲存並建立索引。';
 
   return (
     <div className="qa-doc-source-tab">
@@ -250,7 +245,7 @@ export default function DocumentToQaSourceForm({
                 disabled={!canSubmit}
                 onClick={onStartExtraction}
               >
-                {extractionLabel}
+                開始儲存
               </button>
             </div>
           </div>

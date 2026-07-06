@@ -6,8 +6,6 @@ import type {
   QaKnowledgeFile,
   QaMergedCsvRow,
   QaPair,
-  QaExtractJobResponse,
-  QaImportResponse,
   SaveTopicCsvMergedPayload,
 } from '../../../services/api/_shared/qaKnowledge';
 import ExplorerSidebar from './explorer/ExplorerSidebar';
@@ -92,31 +90,13 @@ export interface QaWorkspaceApiClient {
     payload: SaveTopicCsvMergedPayload,
     language: QaLanguage,
   ): Promise<{ message: string; topic_synced: boolean }>;
-  createQaExtractJob(
-    language: QaLanguage,
-    source: { file: File } | { text: string },
-    categoryId: string,
-    topicId: string,
-    categoryLabel: string,
-    topicLabel: string,
-  ): Promise<{ job_id: string; status: string }>;
   parseQaCsvText(text: string): Promise<{ parsed: boolean; qa_pairs: QaPair[] }>;
-  getQaExtractJob(jobId: string): Promise<QaExtractJobResponse>;
-  importQaExtractJob(
-    jobId: string,
-    language: QaLanguage,
-    qaPairs: QaPair[],
-    hiddenQuestions?: string[],
-  ): Promise<QaImportResponse>;
 }
 
 export interface QaWorkspaceConfig {
   sourceType: QaWorkspaceSourceType;
   api: QaWorkspaceApiClient;
   text?: (language: QaLanguage, zh: string, en: string) => string;
-  /** When true, pasted text and uploaded docs are saved directly (and chunked
-   * by the RAG backfill) instead of going through AI Q&A extraction. */
-  disableAiQaExtraction?: boolean;
   /** When true, this app has no image/url support (HCIoT-only feature). The
    * image upload tab and "manage images" affordances are hidden; the client's
    * image methods are expected to be no-ops returning empty results. */
@@ -404,7 +384,6 @@ export default function QaKnowledgeWorkspace({
         onUploadComplete={handleUploadComplete}
         onSubmitQA={handleQASubmit}
         api={api}
-        disableAiQaExtraction={config.disableAiQaExtraction}
         disableImages={config.disableImages}
         resolveImageUrl={resolveImageUrl}
         onUploadImage={api.uploadImage}

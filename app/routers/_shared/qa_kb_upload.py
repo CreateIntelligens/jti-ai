@@ -5,19 +5,15 @@ from __future__ import annotations
 import csv
 import io
 import json
-import logging
-import uuid
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 from fastapi import BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
 
 from app.routers.knowledge_utils import (
     delete_from_rag,
-    extract_docx_text,
     sync_to_rag,
-    xlsx_to_csv_bytes,
 )
 from app.routers._shared.qa_kb_sync import (
     _existing_topic_questions,
@@ -33,14 +29,7 @@ from app.services._shared.qa_kb.csv_utils import (
 )
 
 if TYPE_CHECKING:
-    from app.routers._shared.qa_kb_router import (
-        ImportQaRequest,
-        QaKbRouterConfig,
-        QaPairImport,
-    )
-
-logger = logging.getLogger(__name__)
-_QA_PAIR_CSV_FIELDS = ["index", "q", "a", "img", "url", "display"]
+    from app.routers._shared.qa_kb_router import QaKbRouterConfig
 
 
 def _schedule_rag_sync(
@@ -319,12 +308,6 @@ def _rewrite_csv_file_with_split_uploads(
         _schedule_rag_sync(config, background_tasks, language, saved["name"], upload_bytes)
 
 
-def _required(value: Any, name: str) -> Any:
-    if value is None:
-        raise RuntimeError(f"QaKbRouterConfig.{name} is required for this route")
-    return value
-
-
 def _prepare_csv_bytes(file_bytes: bytes) -> bytes:
     try:
         validate_supported_hciot_csv(file_bytes)
@@ -333,13 +316,12 @@ def _prepare_csv_bytes(file_bytes: bytes) -> bytes:
     return normalize_qa_csv_rows(file_bytes) or file_bytes
 
 
-def _fallback_upload_error_response(detail: object) -> JSONResponse:
+def _unsupported_upload_error_response(detail: object) -> JSONResponse:
     return JSONResponse(
         status_code=400,
         content={
             "detail": detail,
             "error_code": "unrecognized_format",
-            "can_fallback_to_ai": True,
         },
     )
 
@@ -364,93 +346,3 @@ def _parse_hidden_questions(raw: str | None) -> list[str] | None:
         if stripped:
             hidden.append(stripped)
     return hidden
-
-
-def _extract_text_from_upload(file_bytes: bytes, filename: str) -> str:
-    ext = Path(filename).suffix.lower()
-    if ext == ".docx":
-        text = extract_docx_text(file_bytes)
-    elif ext in (".txt", ".md", ".csv"):
-        text = file_bytes.decode("utf-8", errors="ignore")
-    elif ext == ".xlsx":
-        csv_bytes = xlsx_to_csv_bytes(file_bytes)
-        text = csv_bytes.decode("utf-8", errors="ignore")
-    else:
-        raise ValueError(f"不支援的副檔名: {ext}")
-
-    if not text.strip():
-        raise ValueError("文件內容為空，無法進行問答擷取")
-    return text
-
-
-async def run_extract_job_from_text(
-    config: QaKbRouterConfig,
-    job_id: str,
-    text: str,
-    language: str,
-) -> None:
-    update_job = _required(config.update_job, "update_job")
-    persona_loader = _required(config.persona_loader, "persona_loader")
-    qa_extractor = _required(config.qa_extractor, "qa_extractor")
-    try:
-        update_job(job_id, status="running")
-        persona_text, role_scope_text = persona_loader(language)
-        qa_pairs = await qa_extractor(
-            text=text,
-            language=language,
-            persona_text=persona_text,
-            role_scope_text=role_scope_text,
-        )
-        if not qa_pairs:
-            raise ValueError("未能從文件擷取任何 Q&A")
-        update_job(job_id, status="done", qa_pairs=qa_pairs)
-    except Exception as error:
-        logger.error("[QA Extract Job] Job %s failed: %s", job_id, error)
-        update_job(job_id, status="failed", error=str(error))
-
-
-def _create_pending_job(
-    config: QaKbRouterConfig,
-    *,
-    category_id: str | None,
-    topic_id: str | None,
-    category_label: str | None,
-    topic_label: str | None,
-    language: str,
-) -> str:
-    create_job = _required(config.create_job, "create_job")
-    job_id = str(uuid.uuid4())
-    create_job(
-        job_id=job_id,
-        category_id=category_id,
-        topic_id=topic_id,
-        category_label=category_label,
-        topic_label=topic_label,
-        language=language,
-    )
-    return job_id
-
-
-def _qa_pairs_to_csv_bytes(qa_pairs: list[QaPairImport]) -> bytes:
-    output = io.StringIO()
-    # Carry `display` through so the backend's display→hidden authority
-    # (extract_hidden_from_csv in save_qa_csv_to_topic) sees it on the paste/
-    # import path too, not just direct CSV uploads.
-    writer = csv.DictWriter(output, fieldnames=_QA_PAIR_CSV_FIELDS, lineterminator="\n")
-    writer.writeheader()
-    for pair in qa_pairs:
-        writer.writerow({
-            "index": (pair.index or "").strip(),
-            "q": pair.q.strip(),
-            "a": pair.a.strip(),
-            "img": (pair.img or "").strip(),
-            "url": (pair.url or "").strip(),
-            "display": (pair.display or "").strip(),
-        })
-    return output.getvalue().encode("utf-8")
-
-
-def _hidden_questions_for_import(req: ImportQaRequest) -> list[str]:
-    if req.hidden_questions is not None:
-        return req.hidden_questions
-    return [pair.q.strip() for pair in req.qa_pairs if pair.q.strip()]

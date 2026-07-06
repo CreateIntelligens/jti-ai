@@ -63,21 +63,6 @@ export interface QaPair {
   display?: string;
 }
 
-export interface QaExtractJobResponse {
-  job_id: string;
-  status: 'pending' | 'running' | 'done' | 'failed';
-  qa_pairs?: QaPair[];
-  error?: string;
-}
-
-export interface QaImportResponse {
-  imported_count: number;
-  filename: string;
-  topic_synced: boolean;
-  skipped_all_duplicates?: boolean;
-  topic_id?: string | null;
-}
-
 export interface SaveTopicCsvMergedPayload {
   files: Array<{ filename: string; content: string }>;
   delete_files?: string[];
@@ -106,22 +91,7 @@ export interface QaKnowledgeApi {
     payload: SaveTopicCsvMergedPayload,
     language?: string,
   ): Promise<{ message: string; topic_synced: boolean }>;
-  createQaExtractJob(
-    language: string,
-    source: { file: File } | { text: string },
-    categoryId: string,
-    topicId: string,
-    categoryLabel: string,
-    topicLabel: string,
-  ): Promise<{ job_id: string; status: string }>;
   parseQaCsvText(text: string): Promise<{ parsed: boolean; qa_pairs: QaPair[] }>;
-  getQaExtractJob(jobId: string): Promise<QaExtractJobResponse>;
-  importQaExtractJob(
-    jobId: string,
-    language: string,
-    qaPairs: QaPair[],
-    hiddenQuestions?: string[],
-  ): Promise<QaImportResponse>;
 }
 
 function jsonRequest(method: 'POST' | 'PUT', body: unknown): RequestInit {
@@ -235,50 +205,12 @@ export function createQaKnowledgeApi(
       );
     },
 
-    createQaExtractJob(language, source, categoryId, topicId, categoryLabel, topicLabel) {
-      const formData = new FormData();
-      if ('file' in source) {
-        formData.append('file', source.file);
-      } else {
-        formData.append('text_input', source.text);
-      }
-      formData.append('category_id', categoryId);
-      formData.append('topic_id', topicId);
-      formData.append('category_label', categoryLabel);
-      formData.append('topic_label', topicLabel);
-      formData.append('language', normalizeLanguage(language));
-
-      return fetchJson<{ job_id: string; status: string }>('/qa-extract', {
-        method: 'POST',
-        body: formData,
-      });
-    },
-
     parseQaCsvText(text: string) {
       return fetchJson<{ parsed: boolean; qa_pairs: QaPair[] }>('/qa-parse-csv', {
         method: 'POST',
         headers: JSON_HEADERS,
         body: JSON.stringify({ text }),
       });
-    },
-
-    getQaExtractJob(jobId: string) {
-      return fetchJson<QaExtractJobResponse>(`/qa-extract/${encodeURIComponent(jobId)}`);
-    },
-
-    importQaExtractJob(jobId, language, qaPairs, hiddenQuestions) {
-      return fetchJson<QaImportResponse>(
-        `/qa-extract/${encodeURIComponent(jobId)}/import`,
-        {
-          method: 'POST',
-          headers: JSON_HEADERS,
-          body: JSON.stringify({
-            qa_pairs: qaPairs,
-            ...(hiddenQuestions !== undefined ? { hidden_questions: hiddenQuestions } : {}),
-          }),
-        },
-        { language: normalizeLanguage(language) },
-      );
     },
   };
 }

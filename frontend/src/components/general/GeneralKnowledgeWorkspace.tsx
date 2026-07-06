@@ -23,12 +23,8 @@ interface GeneralKnowledgeWorkspaceProps {
 
 // Build a workspace API client bound to one general store. The shared workspace
 // passes a `language` arg into every method; general ignores it (the store is
-// fixed by closure) and routes by store_name instead. AI Q&A extraction is
-// disabled, so those methods are never called — they reject defensively.
+// fixed by closure) and routes by store_name instead.
 function makeApi(storeName: string): QaWorkspaceApiClient {
-  const extractionDisabled = () =>
-    Promise.reject(new Error('QA extraction is disabled for general stores'));
-
   return {
     listKnowledgeFiles: () => gapi.listGeneralKnowledgeFiles(storeName),
     listTopicsAdmin: () => gapi.listGeneralTopicsAdmin(storeName),
@@ -66,9 +62,6 @@ function makeApi(storeName: string): QaWorkspaceApiClient {
     saveTopicMergedCsv: (topicId, payload) =>
       gapi.saveGeneralTopicMergedCsv(topicId, payload, storeName),
     parseQaCsvText: (text) => gapi.parseGeneralQaCsvText(text),
-    createQaExtractJob: extractionDisabled,
-    getQaExtractJob: extractionDisabled,
-    importQaExtractJob: extractionDisabled,
   };
 }
 
@@ -85,7 +78,6 @@ export default function GeneralKnowledgeWorkspace({
     sourceType: 'general',
     api,
     text: (_language, zh) => zh,
-    disableAiQaExtraction: true,
     // 圖片 (IMG) / 網址 (URL) 為 HCIoT 特例；其餘 app（含 general）不提供，
     // 隱藏 image 上傳分頁與 URL 欄位（與 JTI/ESG 一致）。
     disableImages: true,

@@ -49,10 +49,9 @@ export interface FixedAppWorkspaceOptions extends FixedAppWorkspaceFns {
 
 /**
  * Build a "standard" fixed-app knowledge-workspace component (jti / esg):
- * identical to general, but with image support and AI Q&A extraction fully
- * disabled (images are an HCIoT-only feature). Image methods are no-ops
- * returning empty results so the shared workspace never hits the network for
- * them; extraction methods reject defensively. jti and esg are identical apart
+ * identical to general, but with image support disabled (images are an
+ * HCIoT-only feature). Image methods are no-ops returning empty results so the
+ * shared workspace never hits the network for them. jti and esg are identical apart
  * from their api functions and `sourceType`, so they are produced here rather
  * than copy-pasted.
  */
@@ -69,16 +68,12 @@ export function createFixedAppWorkspace({ sourceType, ...fns }: FixedAppWorkspac
     deleteImage: () => Promise.reject(new Error(`Image management is disabled for ${appLabel}`)),
     deleteUnusedImages: () =>
       Promise.resolve({ deleted_count: 0, deleted_image_ids: [] as string[] }),
-    createQaExtractJob: () => Promise.reject(new Error(`QA extraction is disabled for ${appLabel}`)),
-    getQaExtractJob: () => Promise.reject(new Error(`QA extraction is disabled for ${appLabel}`)),
-    importQaExtractJob: () => Promise.reject(new Error(`QA extraction is disabled for ${appLabel}`)),
   };
 
   const config: QaWorkspaceConfig = {
     sourceType,
     api,
     text: (_language, zh) => zh,
-    disableAiQaExtraction: true,
     disableImages: true,
   };
 

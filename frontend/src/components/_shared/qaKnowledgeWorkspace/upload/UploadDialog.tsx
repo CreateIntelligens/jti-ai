@@ -52,7 +52,6 @@ interface UploadDialogProps {
     hiddenQuestions: string[],
   ) => Promise<{ name: string; uploaded_count: number }>;
   api: QaWorkspaceApiClient;
-  disableAiQaExtraction?: boolean;
   // HCIoT-only feature: hide the 上傳圖片 tab and img/url example columns elsewhere.
   disableImages?: boolean;
   resolveImageUrl?: (imageId?: string) => string | null;
@@ -72,7 +71,6 @@ export default function UploadDialog({
   onUploadComplete,
   onSubmitQA,
   api,
-  disableAiQaExtraction,
   disableImages = false,
   resolveImageUrl,
   onUploadImage,
@@ -138,7 +136,6 @@ export default function UploadDialog({
             onUploadFile={onUploadFile}
             onUploadComplete={onUploadComplete}
             api={api}
-            disableAiQaExtraction={disableAiQaExtraction}
             disableImages={disableImages}
             availableImages={availableImages}
             resolveImageUrl={resolveImageUrl}

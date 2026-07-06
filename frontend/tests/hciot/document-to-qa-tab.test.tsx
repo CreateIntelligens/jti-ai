@@ -6,9 +6,6 @@ import * as api from '../../src/services/api';
 
 vi.mock('../../src/services/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../src/services/api')>()),
-  createQaExtractJob: vi.fn(),
-  getQaExtractJob: vi.fn(),
-  importQaExtractJob: vi.fn(),
   parseQaCsvText: vi.fn(),
 }));
 
@@ -26,13 +23,9 @@ describe('DocumentToQaTab', () => {
     vi.clearAllMocks();
   });
 
-  it('routes TXT files directly to the AI extraction endpoint', async () => {
-    vi.mocked(api.createQaExtractJob).mockResolvedValue({
-      job_id: 'job-1',
-      status: 'pending',
-    });
-
+  it('saves TXT files directly without creating an extraction job', async () => {
     const onUploadFile = vi.fn().mockResolvedValue({ name: 'direct.csv' });
+    const onUploadComplete = vi.fn();
 
     render(
       <DocumentToQaTab
@@ -43,7 +36,7 @@ describe('DocumentToQaTab', () => {
         topicSelectionIncomplete={false}
         onClose={() => {}}
         onUploadFile={onUploadFile}
-        onUploadComplete={async () => {}}
+        onUploadComplete={onUploadComplete}
         api={api}
       />,
     );
@@ -52,19 +45,12 @@ describe('DocumentToQaTab', () => {
     const file = new File(['hello'], 'notes.txt', { type: 'text/plain' });
 
     fireEvent.change(input, { target: { files: [file] } });
-    fireEvent.click(screen.getByRole('button', { name: /開始 AI 擷取/ }));
+    fireEvent.click(screen.getByRole('button', { name: /開始儲存/ }));
 
     await waitFor(() => {
-      expect(api.createQaExtractJob).toHaveBeenCalledWith(
-        'zh',
-        { file },
-        'cat-1',
-        'cat-1/topic-1',
-        'Cat 1',
-        'Topic 1',
-      );
+      expect(onUploadFile).toHaveBeenCalledWith(file, 'cat-1/topic-1', resolvedTopic.labels);
     });
-    expect(onUploadFile).not.toHaveBeenCalled();
+    expect(onUploadComplete).toHaveBeenCalledWith('direct.csv', 1, 'cat-1/topic-1');
   });
 
   it('opens CSV files with display values in preview before importing', async () => {

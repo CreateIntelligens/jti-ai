@@ -78,4 +78,4 @@ def _sync_topic_questions_from_store(
     )
 
 
-router = build_qa_kb_router(_make_config(), include_knowledge=True, include_extract=False)
+router = build_qa_kb_router(_make_config(), include_knowledge=True, include_csv_parse=True)

@@ -368,11 +368,21 @@ export default function ConversationHistoryModal({
   // Reset page when context or date filter changes
   const activeDateFrom = /^\d{4}-\d{2}-\d{2}$/.test(dateFrom) ? dateFrom : '';
   const activeDateTo = /^\d{4}-\d{2}-\d{2}$/.test(dateTo) ? dateTo : '';
+
+  // Debounce 搜尋關鍵字：避免每個字都打後端 API
+  const [activeSearchQuery, setActiveSearchQuery] = useState('');
+  useEffect(() => {
+    const handle = setTimeout(() => {
+      setActiveSearchQuery(searchQuery.trim());
+    }, 400);
+    return () => clearTimeout(handle);
+  }, [searchQuery]);
+
   useEffect(() => {
     if (isOpen) {
       setCurrentPage(1);
     }
-  }, [isOpen, sessionId, storeName, mode, activeDateFrom, activeDateTo]);
+  }, [isOpen, sessionId, storeName, mode, activeDateFrom, activeDateTo, activeSearchQuery]);
 
   useEffect(() => {
     setPageJumpValue(String(pageInfo.page || currentPage));
@@ -391,6 +401,7 @@ export default function ConversationHistoryModal({
           page_size: pageSize,
           date_from: activeDateFrom || undefined,
           date_to: activeDateTo || undefined,
+          search: activeSearchQuery || undefined,
         };
         const url = buildHistoryListUrl(mode, storeName, params);
         const response = await getHistoryFetcher(mode)(url);
@@ -424,7 +435,7 @@ export default function ConversationHistoryModal({
     };
 
     fetchConversations();
-  }, [isOpen, sessionId, storeName, mode, activeDateFrom, activeDateTo, currentPage, pageSize]);
+  }, [isOpen, sessionId, storeName, mode, activeDateFrom, activeDateTo, activeSearchQuery, currentPage, pageSize]);
 
   useEscapeKey(() => {
     if (openCal) { setOpenCal(null); return; }
@@ -442,49 +453,27 @@ export default function ConversationHistoryModal({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen, openCal]);
 
+  // 關鍵字搜尋已改由後端處理（見 fetchConversations 的 search 參數），
+  // sessions 本身已是篩選後的結果；這裡只需要再套用日期的即時本地篩選
+  // （dateFrom/dateTo 在輸入過程中比 activeDateFrom/activeDateTo 更即時）。
   useEffect(() => {
-    const query = searchQuery.trim().toLowerCase();
     const fromDate = dateFrom ? new Date(dateFrom + 'T00:00:00') : null;
     const toDate = dateTo ? new Date(dateTo + 'T23:59:59') : null;
-
-    const hasTextFilter = !!query;
     const hasDateFilter = !!(fromDate || toDate);
 
-    // 日期篩選 helper
-    const sessionInDateRange = (s: SessionSummary | Session) => {
-      if (!hasDateFilter) return true;
-      const t = new Date(s.first_message_time);
-      if (fromDate && t < fromDate) return false;
-      if (toDate && t > toDate) return false;
-      return true;
-    };
-
-    if (!hasTextFilter && !hasDateFilter) {
+    if (!hasDateFilter) {
       setFilteredSessions(sessions);
       return;
     }
 
     const filtered = sessions.filter((session) => {
-      if (!sessionInDateRange(session)) return false;
-      if (!hasTextFilter) return true;
-
-      const cachedConversations = detailCache[session.session_id] || (session as unknown as Session).conversations || [];
-      return (
-        (session.preview && session.preview.toLowerCase().includes(query)) ||
-        session.session_id.toLowerCase().includes(query) ||
-        cachedConversations.some((conv) => (
-          conv.user_message.toLowerCase().includes(query) ||
-          conv.agent_response.toLowerCase().includes(query) ||
-          conv.tool_calls?.some(
-            (tc) =>
-              (tc.tool_name || tc.tool || '').toLowerCase().includes(query) ||
-              JSON.stringify(tc.result || {}).toLowerCase().includes(query)
-          )
-        ))
-      );
+      const t = new Date(session.first_message_time);
+      if (fromDate && t < fromDate) return false;
+      if (toDate && t > toDate) return false;
+      return true;
     });
     setFilteredSessions(filtered);
-  }, [searchQuery, dateFrom, dateTo, sessions, detailCache]);
+  }, [dateFrom, dateTo, sessions]);
 
   const handleExpandSession = async (sid: string) => {
     if (expandedSessionId === sid) {

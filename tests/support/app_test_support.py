@@ -20,7 +20,6 @@ _MODULES_TO_RESET = (
     "app.routers.hciot.chat",
     "app.routers.general.stores",
     "app.routers.general.chat",
-    "app.routers.hciot.qa_extract",
     "app.services.session.mongo_session_manager",
     "app.services.logging.mongo_conversation_logger",
     "app.services.session.session_manager_factory",

@@ -12,7 +12,7 @@ import logging
 from typing import Dict, Optional
 
 from app.services._shared.agent_prompts_base import AgentPrompts
-from app.services._shared.qa_kb.prompts_loader import load_active_persona_and_role_scope
+from app.services.time_context import DATE_REASONING_HINT_EN, DATE_REASONING_HINT_ZH
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +48,7 @@ DEFAULT_RESPONSE_RULE_SECTIONS: Dict[str, Dict[str, str]] = {
 - 風格：簡潔、穩定、好理解，避免過度口語或浮誇
 - 格式：不要使用表情符號 emoji、不要用特殊符號、不要用 markdown 格式、不要用列表或換行分點
 - 如果知識不足或資料沒有提到，請直接說明不知道，不要猜測
+- LINE連結：當回覆中提到「官方LINE」或「LINE詢問/洽詢」時，必須在後方附上官方LINE網址（https://page.line.me/281soitv?openQrModal=true/）
 - 敏感議題例外：當回答落入「敏感議題處理」章節時，字數上限可略為放寬，優先完整表達關懷、共情與求助資源，避免因為字數壓縮而變得冷淡或指令化""",
         "knowledge_rules": """- 優先依據醫院提供的衛教資料回答，不可憑印象補充未被資料支持的醫療內容
 - 若使用者追問的是前一輪已查到且一致的衛教資訊，可直接承接上下文回答
@@ -85,15 +86,17 @@ WELCOME_TEXT: Dict[str, Dict[str, str]] = {
 }
 
 SESSION_STATE_TEMPLATES: Dict[str, str] = {
-    "zh": """<內部狀態資訊 - 不要在回應中提及>
+    "zh": f"""<內部狀態資訊 - 不要在回應中提及>
 目前模式: 衛教問答
-現在時間: {now}
+目前日期時間（UTC+8）: {{now}}
+{DATE_REASONING_HINT_ZH}
 
 ⚠️ 重要：必須使用繁體中文回應所有內容，即使使用者用英文提問
 </內部狀態資訊>""",
-    "en": """<Internal State Info - Do not mention in response>
+    "en": f"""<Internal State Info - Do not mention in response>
 Current Mode: Patient education chat
-Current time: {now}
+Current date/time (UTC+8): {{now}}
+{DATE_REASONING_HINT_EN}
 
 ⚠️ CRITICAL: You MUST respond in English only, even if user writes in Chinese
 </Internal State Info>""",
@@ -119,29 +122,6 @@ prompts = _HciotAgentPrompts(
     session_state_templates=SESSION_STATE_TEMPLATES,
     default_max_response_chars=DEFAULT_MAX_RESPONSE_CHARS,
 )
-
-
-def get_active_persona_and_role_scope(language: str) -> tuple[str, str]:
-    """Return (persona, role_scope) for the currently-active HCIoT prompt profile.
-
-    Reads PromptManager runtime state (the same source main_agent uses for chat) so
-    QA extraction picks up admin-edited persona/scope without hard-coding fallbacks.
-    Falls back to the module-level PERSONA / DEFAULT_RESPONSE_RULE_SECTIONS when no
-    active profile is configured or anything goes wrong.
-    """
-    fallback_persona = PERSONA.get(language, PERSONA["zh"])
-    fallback_sections = DEFAULT_RESPONSE_RULE_SECTIONS.get(language, DEFAULT_RESPONSE_RULE_SECTIONS["zh"])
-    fallback_role_scope = fallback_sections.get("role_scope", "")
-    return load_active_persona_and_role_scope(
-        language=language,
-        store_name_for_language=lambda lang: "__hciot__en" if lang == "en" else "__hciot__",
-        active_id_attr="hciot_active_prompt_id",
-        persona_map_attr="hciot_persona_by_prompt",
-        runtime_map_attr="hciot_runtime_settings_by_prompt",
-        fallback_persona=fallback_persona,
-        fallback_role_scope=fallback_role_scope,
-        log_label="HCIoT prompts",
-    )
 
 
 def build_system_instruction(

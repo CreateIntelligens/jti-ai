@@ -2,6 +2,7 @@
 共用工具函數
 """
 
+import re
 from datetime import datetime
 from math import ceil
 from typing import Optional
@@ -85,8 +86,14 @@ def build_date_query(
     date_from: Optional[str],
     date_to: Optional[str],
     extras: Optional[dict] = None,
+    search: Optional[str] = None,
 ) -> dict:
-    """Build a MongoDB query dict filtered by mode and optional date range."""
+    """Build a MongoDB query dict filtered by mode, optional date range, and optional keyword search.
+
+    search 對 user_message / agent_response 做不分大小寫的子字串比對（$regex）。
+    DocumentDB 不支援 $text 索引，故以 regex 取代；輸入先 re.escape 避免特殊字元
+    被當成 regex 語法解讀。
+    """
     query: dict = {"mode": mode}
     if extras:
         query.update(extras)
@@ -97,6 +104,20 @@ def build_date_query(
         if date_to:
             ts_filter["$lte"] = datetime.strptime(date_to + " 23:59:59", "%Y-%m-%d %H:%M:%S")
         query["timestamp"] = ts_filter
+    if search and search.strip():
+        pattern = re.compile(re.escape(search.strip()), re.IGNORECASE)
+        search_or = [
+            {"user_message": pattern},
+            {"agent_response": pattern},
+        ]
+        # extras 可能已帶自己的 $or（例如 general 用 $or 比對 store_name /
+        # session_snapshot.store）；直接覆寫會讓那個過濾條件消失，改用 $and
+        # 讓兩組 $or 同時成立。
+        existing_or = query.pop("$or", None)
+        if existing_or:
+            query["$and"] = [{"$or": existing_or}, {"$or": search_or}]
+        else:
+            query["$or"] = search_or
     return query
 
 

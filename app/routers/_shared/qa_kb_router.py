@@ -4,56 +4,47 @@ from __future__ import annotations
 
 import logging
 import mimetypes
-import time
 import uuid
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, Request
-from fastapi.responses import JSONResponse, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from app.auth import require_kb_access
 from app.routers.knowledge_utils import (
     EDITABLE_EXTENSIONS,
     TEXT_PREVIEW_EXTENSIONS,
+    check_upload_rate_limit,
     extract_docx_text,
     safe_filename,
+    validate_upload_limits,
     write_docx_text,
     xlsx_to_csv_bytes,
-    check_upload_rate_limit,
-    validate_upload_limits,
 )
 from app.routers._shared.qa_kb_sync import (
     _sync_topic_questions_for_doc,
     _sync_topic_questions_from_store,
 )
 from app.routers._shared.qa_kb_upload import (
-    _create_pending_job,
-    _extract_text_from_upload,
-    _fallback_upload_error_response,
-    _hidden_questions_for_import,
     _insert_uploaded_file,
     _parse_hidden_questions,
     _prepare_csv_bytes,
-    _qa_pairs_to_csv_bytes,
-    _required,
     _rewrite_csv_file_with_split_uploads,
     _schedule_rag_delete,
     _schedule_rag_sync,
-    run_extract_job_from_text,
+    _unsupported_upload_error_response,
     save_qa_csv_to_topic,
 )
 from app.services._shared.qa_kb.csv_utils import _parse_csv_rows, merge_csv_files
 
 logger = logging.getLogger(__name__)
 
-SUPPORTED_EXTRACT_EXTENSIONS = {".docx", ".txt", ".md", ".csv", ".xlsx"}
-MAX_QA_EXTRACT_FILE_SIZE_BYTES = 5 * 1024 * 1024
-MAX_QA_EXTRACT_TEXT_LENGTH = 30000
+MAX_QA_PARSE_TEXT_LENGTH = 30000
 
 
 @dataclass(frozen=True)
@@ -65,14 +56,6 @@ class QaKbRouterConfig:
     rag_source_type: str
     invalidate_cache: Callable[[str | None], None]
     other_language: Callable[[str], str]
-    extract_text_from_upload: Callable[[bytes, str], str] | None = None
-    run_extract_job_from_text: Callable[[str, str, str], Awaitable[None]] | None = None
-    create_job: Callable[..., Any] | None = None
-    get_job: Callable[[str], Any] | None = None
-    update_job: Callable[..., Any] | None = None
-    delete_job: Callable[[str], Any] | None = None
-    persona_loader: Callable[[str], tuple[str, str]] | None = None
-    qa_extractor: Callable[..., Awaitable[list[dict[str, str]]]] | None = None
 
 
 class UpdateContentRequest(BaseModel):
@@ -83,20 +66,6 @@ class UpdateFileMetadataRequest(BaseModel):
     topic_id: str | None = None
     category_label: str | None = None
     topic_label: str | None = None
-
-
-class QaPairImport(BaseModel):
-    index: str | None = None
-    q: str
-    a: str
-    img: str | None = None
-    url: str | None = None
-    display: str | None = None
-
-
-class ImportQaRequest(BaseModel):
-    qa_pairs: list[QaPairImport]
-    hidden_questions: list[str] | None = None
 
 
 class ParseCsvTextRequest(BaseModel):
@@ -112,12 +81,6 @@ class SaveTopicCsvMergedRequest(BaseModel):
     files: list[SaveTopicCsvFile]
     delete_files: list[str] = []
     hidden_questions: list[str] | None = None
-
-
-def _required(value: Any, name: str) -> Any:
-    if value is None:
-        raise RuntimeError(f"QaKbRouterConfig.{name} is required for this route")
-    return value
 
 
 def _build_merged_topic_id(category_id: str | None, topic_id: str | None) -> str | None:
@@ -277,7 +240,7 @@ def _add_knowledge_routes(router: APIRouter, config: QaKbRouterConfig) -> None:
             try:
                 file_bytes = xlsx_to_csv_bytes(file_bytes)
             except Exception as error:
-                return _fallback_upload_error_response(f"XLSX 轉檔失敗: {error}")
+                return _unsupported_upload_error_response(f"XLSX 轉檔失敗: {error}")
             safe_name = Path(safe_name).with_suffix(".csv").name
             ext = ".csv"
 
@@ -298,7 +261,7 @@ def _add_knowledge_routes(router: APIRouter, config: QaKbRouterConfig) -> None:
                     raise HTTPException(status_code=400, detail="CSV 格式無法識別 q/a 欄位")
                 file_bytes = _prepare_csv_bytes(file_bytes)
             except HTTPException as error:
-                return _fallback_upload_error_response(getattr(error, "detail", str(error)))
+                return _unsupported_upload_error_response(getattr(error, "detail", str(error)))
 
         merged_topic_id = _build_merged_topic_id(category_id, topic_id)
         parsed_hidden = _parse_hidden_questions(hidden_questions)
@@ -458,14 +421,12 @@ def _add_knowledge_routes(router: APIRouter, config: QaKbRouterConfig) -> None:
         return {"message": "已更新", "topic_synced": topic_synced}
 
 
-def _add_extract_routes(router: APIRouter, config: QaKbRouterConfig) -> None:
+def _add_csv_parse_route(router: APIRouter, config: QaKbRouterConfig) -> None:
     @router.post("/qa-parse-csv")
     def parse_csv_text(req: ParseCsvTextRequest):
         """Parse pasted CSV text into Q&A pairs using the canonical header
-        aliases. Returns ``parsed=False`` when the text has no recognizable
-        question/answer columns, signalling the caller to fall back to AI
-        extraction. Does not run AI or write to storage."""
-        if len(req.text) > MAX_QA_EXTRACT_TEXT_LENGTH:
+        aliases. Does not run AI or write to storage."""
+        if len(req.text) > MAX_QA_PARSE_TEXT_LENGTH:
             raise HTTPException(status_code=400, detail="text_too_long")
         parsed = _parse_csv_rows(req.text.encode("utf-8"))
         if parsed is None:
@@ -498,123 +459,16 @@ def _add_extract_routes(router: APIRouter, config: QaKbRouterConfig) -> None:
 
         return {"parsed": bool(qa_pairs), "qa_pairs": qa_pairs}
 
-    @router.post("/qa-extract")
-    async def start_qa_extraction(
-        background_tasks: BackgroundTasks,
-        file: UploadFile | None = File(None),
-        text_input: str | None = Form(None),
-        category_id: str | None = Form(None),
-        topic_id: str | None = Form(None),
-        category_label: str | None = Form(None),
-        topic_label: str | None = Form(None),
-        language: str = Form("zh"),
-    ):
-        if file is not None:
-            display_name = file.filename or "uploaded_document"
-            safe_name = safe_filename(display_name)
-            ext = Path(safe_name).suffix.lower()
-            if ext not in SUPPORTED_EXTRACT_EXTENSIONS:
-                raise HTTPException(status_code=400, detail="不支援的檔案格式，僅支援 .docx, .txt, .md, .csv, .xlsx")
-
-            file_bytes = await file.read()
-            if len(file_bytes) > MAX_QA_EXTRACT_FILE_SIZE_BYTES:
-                raise HTTPException(status_code=400, detail="檔案大小不可超過 5 MB")
-
-            try:
-                extract_text = config.extract_text_from_upload or _extract_text_from_upload
-                text = extract_text(file_bytes, safe_name)
-            except ValueError as e:
-                raise HTTPException(status_code=400, detail=str(e)) from e
-        elif text_input is not None and text_input.strip():
-            text = text_input
-        else:
-            raise HTTPException(status_code=400, detail="必須提供 file 或 text_input")
-
-        if len(text) > MAX_QA_EXTRACT_TEXT_LENGTH:
-            raise HTTPException(status_code=400, detail="text_too_long")
-
-        job_id = _create_pending_job(
-            config,
-            category_id=category_id,
-            topic_id=_build_merged_topic_id(category_id, topic_id),
-            category_label=category_label,
-            topic_label=topic_label,
-            language=language,
-        )
-        run_job = _required(config.run_extract_job_from_text, "run_extract_job_from_text")
-        background_tasks.add_task(run_job, job_id, text, language)
-
-        return {"job_id": job_id, "status": "pending"}
-
-    @router.get("/qa-extract/{job_id}")
-    def check_qa_extraction_status(job_id: str):
-        get_job = _required(config.get_job, "get_job")
-        job = get_job(job_id)
-        if not job:
-            raise HTTPException(status_code=404, detail="工作不存在或已過期")
-
-        result: dict[str, object] = {
-            "job_id": job.job_id,
-            "status": job.status,
-        }
-        if job.status == "done":
-            result["qa_pairs"] = job.qa_pairs
-        elif job.status == "failed":
-            result["error"] = job.error
-        return result
-
-    @router.post("/qa-extract/{job_id}/import")
-    async def import_extracted_qa(
-        job_id: str,
-        req: ImportQaRequest,
-        background_tasks: BackgroundTasks,
-        language: str = "zh",
-    ):
-        get_job = _required(config.get_job, "get_job")
-        delete_job = _required(config.delete_job, "delete_job")
-        job = get_job(job_id)
-        if not job:
-            raise HTTPException(status_code=404, detail="工作不存在或已過期")
-
-        if not req.qa_pairs:
-            raise HTTPException(status_code=400, detail="qa_pairs 陣列不可為空")
-
-        csv_bytes = _qa_pairs_to_csv_bytes(req.qa_pairs)
-        filename = f"extracted-{int(time.time())}.csv"
-        result = save_qa_csv_to_topic(
-            config=config,
-            background_tasks=background_tasks,
-            language=language,
-            csv_bytes=csv_bytes,
-            filename=filename,
-            content_type="text/csv",
-            editable=True,
-            topic_id=job.topic_id,
-            category_label=job.category_label,
-            topic_label=job.topic_label,
-            hidden_questions=_hidden_questions_for_import(req),
-        )
-
-        delete_job(job_id)
-
-        return {
-            "imported_count": result.get("imported_count", 0),
-            "filename": result["name"],
-            "topic_synced": result["topic_synced"],
-            "skipped_all_duplicates": result.get("skipped_all_duplicates", False),
-            "topic_id": job.topic_id,
-        }
-
 
 def build_qa_kb_router(
     config: QaKbRouterConfig,
     *,
     include_knowledge: bool = True,
-    include_extract: bool = True,
+    include_csv_parse: bool = False,
 ) -> APIRouter:
     router = APIRouter(tags=[config.tag], dependencies=[Depends(require_kb_access(config.app))])
     if include_knowledge:
         _add_knowledge_routes(router, config)
-    if include_extract:
-        _add_extract_routes(router, config)
+    if include_csv_parse:
+        _add_csv_parse_route(router, config)
     return router

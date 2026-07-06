@@ -54,10 +54,7 @@ function createApi(overrides: Record<string, unknown> = {}) {
     updateKnowledgeFileContent: vi.fn(),
     downloadKnowledgeFile: vi.fn(),
     getTopicMergedCsv: vi.fn(),
-    createQaExtractJob: vi.fn(),
     parseQaCsvText: vi.fn(),
-    getQaExtractJob: vi.fn(),
-    importQaExtractJob: vi.fn(),
     ...overrides,
   };
 }

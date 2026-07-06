@@ -148,7 +148,6 @@ from .routers.hciot import (
     images as hciot_images,
     knowledge as hciot_knowledge,
     prompts as hciot_prompts,
-    qa_extract as hciot_qa_extract,
 )
 from .routers.hciot import topics_admin as hciot_topics_admin
 from .routers.jti import (
@@ -549,8 +548,6 @@ app.include_router(esg_topics_admin.public_router, prefix="/api/esg")
 app.include_router(esg_topics_admin.router, prefix="/api/esg-admin/topics")
 app.include_router(esg_quiz_bank.router, prefix="/api/esg-admin/quiz-bank")
 app.include_router(esg_quiz_bank.router, prefix="/api/esg/quiz-bank", include_in_schema=False)
-app.include_router(hciot_qa_extract.router, prefix="/api/hciot-admin/knowledge")
-app.include_router(hciot_qa_extract.router, prefix="/api/hciot/knowledge", include_in_schema=False)
 app.include_router(hciot_images.router, prefix="/api/hciot")
 app.include_router(hciot_images.admin_router, prefix="/api/hciot-admin/images")
 app.include_router(hciot_topics_admin.public_router, prefix="/api/hciot")

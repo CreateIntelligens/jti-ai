@@ -5,8 +5,6 @@ import { API_BASE, fetchAsAdmin, fetchWithApiKey, handleResponse, normLang, buil
 import {
   createQaKnowledgeApi,
   type QaImage,
-  type QaExtractJobResponse as SharedQaExtractJobResponse,
-  type QaImportResponse as SharedQaImportResponse,
   type QaKnowledgeUploadWithTopicOptions,
   type QaMergedCsvResponse,
   type QaMergedCsvRow,
@@ -405,45 +403,10 @@ export async function saveHciotTopicMergedCsv(
   return hciotQaKnowledgeApi.saveTopicMergedCsv(topicId, payload, language);
 }
 
-// ========== Document to Q&A Extraction API ==========
+// ========== QA CSV Parse API ==========
 
 export type HciotQaPair = QaPair;
 
-export type QaExtractJobResponse = SharedQaExtractJobResponse;
-
-export type QaImportResponse = SharedQaImportResponse;
-
-export async function createQaExtractJob(
-  language: string,
-  source: { file: File } | { text: string },
-  categoryId: string,
-  topicId: string,
-  categoryLabel: string,
-  topicLabel: string,
-): Promise<{ job_id: string; status: string }> {
-  return hciotQaKnowledgeApi.createQaExtractJob(
-    language,
-    source,
-    categoryId,
-    topicId,
-    categoryLabel,
-    topicLabel,
-  );
-}
-
 export async function parseQaCsvText(text: string): Promise<{ parsed: boolean; qa_pairs: HciotQaPair[] }> {
   return hciotQaKnowledgeApi.parseQaCsvText(text);
-}
-
-export async function getQaExtractJob(jobId: string): Promise<QaExtractJobResponse> {
-  return hciotQaKnowledgeApi.getQaExtractJob(jobId);
-}
-
-export async function importQaExtractJob(
-  jobId: string,
-  language: string,
-  qaPairs: HciotQaPair[],
-  hiddenQuestions?: string[],
-): Promise<QaImportResponse> {
-  return hciotQaKnowledgeApi.importQaExtractJob(jobId, language, qaPairs, hiddenQuestions);
 }
