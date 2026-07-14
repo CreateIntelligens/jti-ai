@@ -27,6 +27,24 @@ class TestHciotAgentPrompts(unittest.TestCase):
             else:
                 self.assertIn("Xiaoyuan", instruction)
 
+    def test_hciot_safety_requires_explicit_risk_signal(self):
+        instruction = build_system_instruction(PERSONA["zh"], "zh")
+
+        self.assertIn("相關字眼", instruction)
+        self.assertIn("諧音", instruction)
+        self.assertIn("我是", instruction)
+        self.assertIn("正常自我介紹", instruction)
+        self.assertIn("不得觸發", instruction)
+        self.assertIn("害怕、難過、焦慮、壓力大、疲憊或心情不好", instruction)
+        self.assertNotIn("自我傷害 / 強烈負面情緒", instruction)
+
+    def test_hciot_safety_uses_non_commanding_crisis_tone(self):
+        instruction = build_system_instruction(PERSONA["zh"], "zh")
+
+        self.assertIn("非命令式", instruction)
+        self.assertIn("不要自動假設使用者正處於立即危險", instruction)
+        self.assertIn("避免使用「請一定」「務必」", instruction)
+
 
 if __name__ == "__main__":
     unittest.main()

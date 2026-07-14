@@ -68,7 +68,7 @@ _HEADERS_ZH = RuleHeaders(
     scope="",
     rules="## 回應規則",
     kb="## 知識庫使用規則",
-    sensitive="",
+    sensitive="## 敏感議題處理",
 )
 
 _HEADERS_EN = RuleHeaders(
@@ -76,7 +76,7 @@ _HEADERS_EN = RuleHeaders(
     scope="",
     rules="## Response Rules",
     kb="## Knowledge Base Usage",
-    sensitive="",
+    sensitive="## Sensitive Topics",
 )
 
 
@@ -85,7 +85,9 @@ class _EsgAgentPrompts(AgentPrompts):
         if not max_response_chars or max_response_chars <= 0:
             return ""
         if language == "en":
-            return f"- Length: keep each response within {max_response_chars} characters"
+            return (
+                f"- Length: keep each response within {max_response_chars} characters"
+            )
         return f"- 字數：每次回覆不超過{max_response_chars}字"
 
 
@@ -98,8 +100,6 @@ prompts = _EsgAgentPrompts(
     headers_zh=_HEADERS_ZH,
     headers_en=_HEADERS_EN,
     include_scope=False,
-    include_sensitive=False,
-    include_safety_wrap=False,
     omit_length_when_unlimited=True,
 )
 

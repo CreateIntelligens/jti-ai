@@ -1,9 +1,8 @@
 """
 General Knowledge Base Agent Prompts.
 
-Simpler than JTI/HCIoT (no quiz/TTS/safety filter; persona comes from
-prompt_manager's active prompt), 但仍透過共用 `AgentPrompts` base 組裝，
-只是關閉了 safety wrap、scope 段與敏感議題段。
+Simpler than JTI/HCIoT (no quiz/TTS; persona comes from prompt_manager's active
+prompt), 但仍透過共用 `AgentPrompts` base 組裝，並套用共用安全規則。
 """
 
 from __future__ import annotations
@@ -67,13 +66,13 @@ Current date/time (UTC+8): {{now}}
 </Internal State Info>""",
 }
 
-# General 不顯示「範圍限制」與「敏感議題」段，header 只用到 role/rules/kb。
+# General 不顯示「範圍限制」段。
 _GENERAL_HEADERS_ZH = RuleHeaders(
     role="## 你的角色",
     scope="",
     rules="## 回應規則",
     kb="## 知識庫使用規則",
-    sensitive="",
+    sensitive="## 敏感議題處理",
 )
 
 _GENERAL_HEADERS_EN = RuleHeaders(
@@ -81,7 +80,7 @@ _GENERAL_HEADERS_EN = RuleHeaders(
     scope="",
     rules="## Response Rules",
     kb="## Knowledge Base Usage",
-    sensitive="",
+    sensitive="## Sensitive Topics",
 )
 
 
@@ -108,8 +107,6 @@ prompts = _GeneralAgentPrompts(
     headers_zh=_GENERAL_HEADERS_ZH,
     headers_en=_GENERAL_HEADERS_EN,
     include_scope=False,
-    include_sensitive=False,
-    include_safety_wrap=False,
     omit_length_when_unlimited=True,
 )
 
