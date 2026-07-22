@@ -2,7 +2,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from app import models_config
 from app.models.session import Session
+from app.services import base_agent as base_agent_module
 from app.services.base_agent import BaseAgent
 
 
@@ -51,6 +53,36 @@ class FakeChatSession:
         self._curated_history.append(SimpleNamespace(role="user", parts=[]))
         self._curated_history.append(SimpleNamespace(role="model", parts=[]))
         return _text_response("PRP 是使用自體血液取得血小板濃縮液的治療。")
+
+
+class ResultChatSession:
+    def __init__(self, result):
+        self.result = result
+        self.sent_configs = []
+
+    def send_message(self, _message, config=None):
+        self.sent_configs.append(config)
+        if isinstance(self.result, Exception):
+            raise self.result
+        return self.result
+
+
+def _configure_model_fallback(monkeypatch, model_chain):
+    monkeypatch.setattr(
+        models_config,
+        "fallback_chain",
+        lambda _model, _client: model_chain,
+    )
+    monkeypatch.setattr(
+        base_agent_module,
+        "get_client_by_index",
+        lambda _index: object(),
+    )
+    monkeypatch.setattr(
+        base_agent_module,
+        "resolve_key_index_for_store",
+        lambda _store: 0,
+    )
 
 
 class FakeAgent(BaseAgent):
@@ -120,6 +152,69 @@ class FakeAgent(BaseAgent):
 @pytest.fixture
 def anyio_backend():
     return "asyncio"
+
+
+@pytest.mark.anyio
+async def test_model_fallback_rebuilds_thinking_config(monkeypatch):
+    session = Session(metadata={"model": "gemini-2.5-flash-lite"})
+    session_manager = FakeSessionManager(session)
+    fallback_response = _text_response("OK")
+    fallback_chat = ResultChatSession(fallback_response)
+    initial_chat = ResultChatSession(RuntimeError("404 model not found"))
+    agent = FakeAgent(session_manager, fallback_chat)
+
+    _configure_model_fallback(
+        monkeypatch,
+        (
+            "gemini-2.5-flash-lite",
+            "gemini-3.5-flash-lite",
+        ),
+    )
+    initial_config = agent._get_force_tool_config(session)
+
+    _, response = await BaseAgent._send_enriched_with_model_fallback(
+        agent,
+        initial_chat,
+        "question",
+        initial_config,
+        session,
+    )
+
+    assert response is fallback_response
+    assert session.metadata["model"] == "gemini-3.5-flash-lite"
+    assert initial_config.thinking_config.thinking_budget == 0
+    assert fallback_chat.sent_configs[0].thinking_config is None
+
+
+@pytest.mark.anyio
+async def test_invalid_argument_does_not_trigger_model_fallback(monkeypatch):
+    session = Session(metadata={"model": "gemini-flash-lite-latest"})
+    session_manager = FakeSessionManager(session)
+    initial_chat = ResultChatSession(RuntimeError("400 INVALID_ARGUMENT"))
+    agent = FakeAgent(session_manager, ResultChatSession(_text_response("unused")))
+
+    _configure_model_fallback(
+        monkeypatch,
+        (
+            "gemini-flash-lite-latest",
+            "gemini-3.5-flash-lite",
+        ),
+    )
+    initial_config = agent._get_force_tool_config(session)
+
+    assert initial_config.thinking_config is None
+
+    with pytest.raises(RuntimeError, match="400 INVALID_ARGUMENT"):
+        await BaseAgent._send_enriched_with_model_fallback(
+            agent,
+            initial_chat,
+            "question",
+            initial_config,
+            session,
+        )
+
+    assert session.metadata["model"] == "gemini-flash-lite-latest"
+    assert session_manager.updated == []
 
 
 @pytest.mark.anyio

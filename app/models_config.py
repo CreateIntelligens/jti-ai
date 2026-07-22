@@ -4,6 +4,8 @@ import logging
 import os
 from typing import Any
 
+from google.genai import types
+
 GEMINI_MODEL_NAME = os.getenv("GEMINI_MODEL_NAME", "gemini-flash-lite-latest")
 
 CHAT_MODEL = GEMINI_MODEL_NAME
@@ -26,6 +28,16 @@ FALLBACK_MODELS: tuple[str, ...] = (
     "gemini-2.5-flash-lite",
     "gemini-2.5-flash",
 )
+
+
+def thinking_config_for_model(model_name: str) -> types.ThinkingConfig | None:
+    """Disable thinking only for model families known to accept a zero budget."""
+    normalized_name = model_name.removeprefix("models/").lower()
+    if normalized_name == "gemini-2.5-flash" or normalized_name.startswith(
+        "gemini-2.5-flash-"
+    ):
+        return types.ThinkingConfig(thinking_budget=0)
+    return None
 
 
 def fallback_chain(primary: str, client: Any = None) -> tuple[str, ...]:

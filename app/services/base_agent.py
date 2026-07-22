@@ -18,6 +18,7 @@ from google.genai import types
 
 import app.services.gemini_service as _gemini_service
 from app.models.session import Session
+from app.models_config import thinking_config_for_model
 from app.routers.general.stores import resolve_key_index_for_store
 from app.services.agent_utils import (
     build_chat_history,
@@ -191,13 +192,10 @@ class BaseAgent:
     def _make_chat_config(self, session: Session) -> types.GenerateContentConfig:
         tool = self._get_rag_tool_declaration_for_session(session)
         model_name = session.metadata.get("model") or self.model_name
-        name_lower = model_name.lower()
-        is_thinking_model = "thinking" in name_lower or "gemini-3" in name_lower
-        thinking_config = None if is_thinking_model else types.ThinkingConfig(thinking_budget=0)
 
         return types.GenerateContentConfig(
             system_instruction=[types.Part.from_text(text=self._get_system_instruction(session))],
-            thinking_config=thinking_config,
+            thinking_config=thinking_config_for_model(model_name),
             tools=[tool] if tool else None,
             temperature=0.7,
         )
@@ -365,6 +363,7 @@ class BaseAgent:
                 self._session_manager.update_session(session)
                 self._chat_sessions.pop(session.session_id, None)
                 chat_session = self._get_or_create_chat_session(session)
+                force_config = self._get_force_tool_config(session)
 
         raise RuntimeError("model fallback send exited unexpectedly")
 

@@ -310,7 +310,11 @@ app.add_middleware(
 )
 
 
-from app.models_config import DEFAULT_MODEL, fallback_chain  # noqa: E402
+from app.models_config import (  # noqa: E402
+    DEFAULT_MODEL,
+    fallback_chain,
+    thinking_config_for_model,
+)
 
 
 class OpenAIChatMessage(BaseModel):
@@ -422,14 +426,11 @@ async def openai_chat_completions(
             config_kwargs["system_instruction"] = system_prompt
 
         def generate_with_model(m):
-            name_lower = m.lower()
-            is_thinking_model = "thinking" in name_lower or "gemini-3" in name_lower
-            thinking_config = None if is_thinking_model else types.ThinkingConfig(thinking_budget=0)
             return gemini_client.models.generate_content(
                 model=m,
                 contents=contents,
                 config=types.GenerateContentConfig(
-                    thinking_config=thinking_config,
+                    thinking_config=thinking_config_for_model(m),
                     **config_kwargs,
                 ),
             )

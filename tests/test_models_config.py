@@ -1,7 +1,32 @@
 from types import SimpleNamespace
 
+import pytest
+
 from app import models_config
 from app.services import model_discovery
+
+
+@pytest.mark.parametrize(
+    ("model_name", "expected_budget"),
+    (
+        ("gemini-flash-lite-latest", None),
+        ("gemini-3.5-flash-lite", None),
+        ("gemini-3.1-flash-lite", None),
+        ("gemini-future-alias", None),
+        ("gemini-2.5-flash", 0),
+        ("gemini-2.5-flash-lite", 0),
+        ("models/gemini-2.5-flash-lite-preview-06-17", 0),
+    ),
+)
+def test_thinking_config_matches_model_capability(model_name, expected_budget):
+    config = models_config.thinking_config_for_model(model_name)
+
+    if expected_budget is None:
+        assert config is None
+        return
+
+    assert config is not None
+    assert config.thinking_budget == expected_budget
 
 
 def test_fallback_chain_prioritizes_supported_models(monkeypatch):
