@@ -14,6 +14,7 @@ import {
   Moon,
   PanelLeftClose,
   RefreshCw,
+  RotateCcw,
   Settings,
   Sun,
   Users,
@@ -38,7 +39,7 @@ interface HeaderProps {
   onOpenApiKeysPanel: () => void;
   onOpenExtKeysPanel: () => void;
   onOpenPromptPanel?: () => void;
-  onRefresh?: () => void | Promise<void>;
+  onRestartChat?: () => void | Promise<void>;
   onShowStatus: (msg: string) => void;
   userProfile?: api.UserProfile | null;
   onOpenUsersPanel?: () => void;
@@ -71,7 +72,7 @@ export default function Header({
   onOpenApiKeysPanel,
   onOpenExtKeysPanel,
   onOpenPromptPanel,
-  onRefresh,
+  onRestartChat,
   onShowStatus,
   userProfile,
   onOpenUsersPanel,
@@ -86,7 +87,7 @@ export default function Header({
   ));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isReindexing, setIsReindexing] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isRestartingChat, setIsRestartingChat] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -138,16 +139,15 @@ export default function Header({
     setSettingsOpen(false);
   };
 
-  const handleRefresh = async () => {
-    if (!onRefresh || isRefreshing) return;
-    setIsRefreshing(true);
+  const handleRestartChat = async () => {
+    if (!onRestartChat || isRestartingChat) return;
+    setIsRestartingChat(true);
     try {
-      await onRefresh();
-      onShowStatus('✅ 知識庫已重新整理');
+      await onRestartChat();
     } catch (error) {
-      onShowStatus(error instanceof Error ? error.message : '重新整理失敗');
+      onShowStatus(error instanceof Error ? error.message : '重新啟動失敗');
     } finally {
-      setIsRefreshing(false);
+      setIsRestartingChat(false);
     }
   };
 
@@ -263,12 +263,13 @@ export default function Header({
           <History size={18} />
         </button>
         <button
-          className={`icon-btn${isRefreshing ? ' is-spinning' : ''}`}
-          onClick={() => void handleRefresh()}
-          title="重新整理知識庫"
-          disabled={!onRefresh || isRefreshing}
+          className="icon-btn"
+          onClick={() => void handleRestartChat()}
+          title="重新開始對話"
+          aria-label="重新開始對話"
+          disabled={!canOpenConversationHistory || !onRestartChat || isRestartingChat}
         >
-          <RefreshCw size={18} />
+          <RotateCcw size={18} className={isRestartingChat ? 'animate-spin' : ''} />
         </button>
         <button
           className="icon-btn"

@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -17,7 +17,7 @@ const baseHeaderProps = {
   onOpenApiKeysPanel: vi.fn(),
   onOpenExtKeysPanel: vi.fn(),
   onOpenPromptPanel: vi.fn(),
-  onRefresh: vi.fn(),
+  onRestartChat: vi.fn(),
   onShowStatus: vi.fn(),
 };
 
@@ -27,6 +27,22 @@ afterEach(() => {
 });
 
 describe('General redesign stages 3 and 4', () => {
+  it('restarts the active conversation from the header', async () => {
+    const onRestartChat = vi.fn().mockResolvedValue(undefined);
+
+    render(
+      <MemoryRouter>
+        <div className="app-shell">
+          <Header {...baseHeaderProps} onRestartChat={onRestartChat} />
+        </div>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '重新開始對話' }));
+
+    await waitFor(() => expect(onRestartChat).toHaveBeenCalledOnce());
+  });
+
   it('groups the header settings menu around the five primary design actions', () => {
     render(
       <MemoryRouter>

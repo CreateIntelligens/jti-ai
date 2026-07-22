@@ -3,6 +3,7 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
+  DatabaseZap,
   FileText,
   Folder,
   FolderOpen,
@@ -66,6 +67,8 @@ interface ExplorerSidebarProps {
   onSelectMergedCsv: (topicId: string) => void;
   onOpenUploadDialog: () => void;
   onOpenManageDialog: () => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
   onDeleteTopic?: (topicId: string, topicLabel: string) => void;
   onReindex?: () => void;
   reindexing?: boolean;
@@ -134,6 +137,8 @@ export default function ExplorerSidebar({
   onSelectMergedCsv,
   onOpenUploadDialog,
   onOpenManageDialog,
+  onRefresh,
+  refreshing,
   onDeleteTopic,
   onReindex,
   reindexing,
@@ -197,6 +202,19 @@ export default function ExplorerSidebar({
             <Settings size={16} />
           </button>
 
+          {onRefresh && (
+            <button
+              type="button"
+              className="qa-workspace-explorer-icon-button"
+              onClick={onRefresh}
+              disabled={refreshing}
+              title="重新載入知識庫"
+              aria-label="重新載入知識庫"
+            >
+              <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+            </button>
+          )}
+
           {onReindex && (
             <button
               type="button"
@@ -206,7 +224,7 @@ export default function ExplorerSidebar({
               title="重新索引 RAG (暫停約 1 分鐘)"
               aria-label="重新索引 RAG"
             >
-              <RefreshCw size={16} className={reindexing ? 'animate-spin' : ''} />
+              <DatabaseZap size={16} className={reindexing ? 'animate-spin' : ''} />
             </button>
           )}
 

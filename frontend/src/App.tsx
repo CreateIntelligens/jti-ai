@@ -266,7 +266,7 @@ function HomeShell({ canShow }: { canShow: (page: string) => boolean }) {
           onOpenApiKeysPanel={() => openPanel('apikeys')}
           onOpenExtKeysPanel={() => openPanel('extkeys')}
           onOpenPromptPanel={() => openPanel('prompt')}
-          onRefresh={handleRefreshKnowledge}
+          onRestartChat={handleRestartChat}
           onShowStatus={showStatus}
           userProfile={profile}
           canShow={canShow}

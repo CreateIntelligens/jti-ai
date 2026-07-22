@@ -354,6 +354,8 @@ export default function QaKnowledgeWorkspace({
         onSelectMergedCsv={handleSelectMergedCsv}
         onOpenUploadDialog={() => setQaDialogOpen(true)}
         onOpenManageDialog={() => setManageDialogOpen(true)}
+        onRefresh={() => void workspaceData.refreshWorkspace()}
+        refreshing={workspaceData.loadingWorkspace}
         onDeleteTopic={topicMutations.handleDeleteTopic}
         onReindex={reindexData.handleReindex}
         reindexing={reindexData.reindexing}

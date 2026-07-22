@@ -84,6 +84,19 @@ afterEach(() => {
 });
 
 describe('VisibilityOrderModal', () => {
+  it('reloads workspace data from the explorer toolbar', async () => {
+    const api = renderWorkspace();
+
+    await waitFor(() => expect(api.listKnowledgeFiles).toHaveBeenCalledOnce());
+    vi.clearAllMocks();
+
+    fireEvent.click(screen.getByRole('button', { name: '重新載入知識庫' }));
+
+    await waitFor(() => expect(api.listKnowledgeFiles).toHaveBeenCalledOnce());
+    expect(api.listTopicsAdmin).toHaveBeenCalledOnce();
+    expect(api.listImages).toHaveBeenCalledOnce();
+  });
+
   it('limits drag collision candidates to the active management lane', () => {
     const droppableIds = [
       'category:ortho',

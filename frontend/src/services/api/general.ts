@@ -173,7 +173,7 @@ export async function fetchModels(): Promise<ModelsResponse> {
 // ========== Chat ==========
 
 function getSelectedModel(): string {
-  return localStorage.getItem('selectedModel') || 'gemini-2.5-flash-lite';
+  return localStorage.getItem('selectedModel') || 'gemini-flash-lite-latest';
 }
 
 export async function startChat(storeName: string, previousSessionId?: string | null): Promise<StartChatResponse> {
