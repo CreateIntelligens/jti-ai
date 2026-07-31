@@ -1,15 +1,15 @@
 """ai360 km api FastAPI backend (RAG-based)."""
 
 import asyncio
-from collections.abc import Callable
-from contextlib import asynccontextmanager
-from datetime import datetime
 import logging
 import os
 import time
-from typing import Optional
 import uuid
 import warnings
+from collections.abc import Callable
+from contextlib import asynccontextmanager
+from datetime import datetime
+from typing import Any, Optional
 
 import uvicorn.logging
 
@@ -22,6 +22,20 @@ RESET = "\033[0m"
 _NOISY_LOGGERS = ("httpx", "google")
 _UVICORN_LOGGERS = ("uvicorn", "uvicorn.access", "uvicorn.error")
 _AFC_WARNING_PATTERNS = (".*automatic function calling.*", ".*AFC.*")
+_RAG_BACKFILL_LOCK_KEY = "rag:backfill:startup"
+# Backfill 可能耗時數分鐘；TTL 需涵蓋正常執行時間，也要允許崩潰後復原。
+_RAG_BACKFILL_LOCK_TTL_SECONDS = 30 * 60
+_RAG_BACKFILL_WAIT_TIMEOUT_SECONDS = 30 * 60
+_RAG_BACKFILL_LOCK_POLL_SECONDS = 2
+# Redis 不可用時的哨兵：照常索引，但不要去刪別人的鎖。
+_RAG_BACKFILL_LOCK_UNHELD_TOKEN = ""
+# 只在 value 仍等於自己的 token 時才刪，避免 TTL 過期換手後誤刪新持有者的鎖。
+_RELEASE_LOCK_IF_OWNED = """
+if redis.call('get', KEYS[1]) == ARGV[1] then
+    return redis.call('del', KEYS[1])
+end
+return 0
+"""
 _FIXED_RAG_BACKFILL_JOBS = (
     ("jti", "zh"),
     ("jti", "en"),
@@ -253,15 +267,139 @@ def _run_hciot_background_startup() -> None:
     hciot_startup()
 
 
-async def _run_rag_backfill(backfill):
+def _build_backfill_lock_client() -> Any | None:
+    """Redis client for the cross-process startup-backfill lock, or None.
+
+    uvicorn runs multiple workers as separate processes, so LanceDBStore's
+    threading lock cannot serialize them: two workers that both pass the
+    fingerprint check before either writes will each index the same file,
+    producing exact-duplicate chunks. Redis gives us a lock that spans
+    processes. Without it we fall back to letting every worker index (the
+    pre-existing behaviour) rather than skipping indexing entirely.
+    """
+    redis_url = os.getenv("REDIS_URL")
+    if not redis_url:
+        return None
+
+    try:
+        import redis
+    except Exception as exc:
+        logger.warning("[RAG] Backfill lock disabled: redis package unavailable (%s)", exc)
+        return None
+
+    try:
+        client = redis.Redis.from_url(
+            redis_url,
+            decode_responses=True,
+            socket_connect_timeout=1,
+            socket_timeout=1,
+        )
+        client.ping()
+        return client
+    except Exception as exc:
+        logger.warning("[RAG] Backfill lock disabled: %s", exc)
+        return None
+
+
+def _acquire_backfill_lock(client: Any) -> str | None:
+    """Token of the acquired lock, or None if another worker holds it.
+
+    Returns a sentinel token when Redis itself is unreachable so indexing still
+    runs (duplicate chunks beat an unindexed store).
+    """
+    token = uuid.uuid4().hex
+    try:
+        acquired = client.set(
+            _RAG_BACKFILL_LOCK_KEY,
+            token,
+            nx=True,
+            ex=_RAG_BACKFILL_LOCK_TTL_SECONDS,
+        )
+    except Exception as exc:
+        # A Redis hiccup must not stop indexing — fall back to running it.
+        logger.warning("[RAG] Backfill lock unavailable, indexing anyway: %s", exc)
+        return _RAG_BACKFILL_LOCK_UNHELD_TOKEN
+    return token if acquired else None
+
+
+def _wait_for_backfill_lock_release(client: Any) -> bool:
+    """Return whether this worker observed the current lock being released."""
+    deadline = time.time() + _RAG_BACKFILL_WAIT_TIMEOUT_SECONDS
+    while time.time() < deadline:
+        try:
+            if not client.exists(_RAG_BACKFILL_LOCK_KEY):
+                return True
+        except Exception as exc:
+            logger.warning("[RAG] Backfill lock poll failed: %s", exc)
+            return False
+        time.sleep(_RAG_BACKFILL_LOCK_POLL_SECONDS)
+    logger.warning("[RAG] Timed out waiting for the indexing worker to finish")
+    return False
+
+
+def _release_backfill_lock(client: Any, token: str) -> None:
+    """Delete the lock only if this worker still holds it.
+
+    A plain DELETE is unsafe: if the backfill outran the TTL, the key may
+    already belong to the next worker, and deleting it would let a third worker
+    index concurrently. The compare-and-delete runs as one Lua script so the
+    check and the delete cannot interleave.
+    """
+    if token == _RAG_BACKFILL_LOCK_UNHELD_TOKEN:
+        return
+    try:
+        client.eval(_RELEASE_LOCK_IF_OWNED, 1, _RAG_BACKFILL_LOCK_KEY, token)
+    except Exception as exc:
+        logger.warning("[RAG] Failed to release backfill lock: %s", exc)
+
+
+async def _run_rag_backfill(backfill: Any) -> None:
     """Background task to warm up embedding model and index knowledge files."""
     loop = asyncio.get_running_loop()
-    t0 = time.time()
+    started_at = time.time()
     try:
         await loop.run_in_executor(None, backfill.embedding_service.encode, "warmup")
-    except Exception as e:
-        logger.error("[RAG] Embedding warmup failed: %s", e)
+    except Exception as exc:
+        logger.error("[RAG] Embedding warmup failed: %s", exc)
         return
+
+    lock_client = _build_backfill_lock_client()
+    lock_token: str | None = None
+    if lock_client is not None:
+        while lock_token is None:
+            lock_token = await loop.run_in_executor(
+                None,
+                _acquire_backfill_lock,
+                lock_client,
+            )
+            # 空字串是 Redis 不可用的哨兵，仍要索引。
+            if lock_token is not None:
+                break
+
+            logger.info("[RAG] Another worker is indexing; waiting for it to finish")
+            lock_released = await loop.run_in_executor(
+                None,
+                _wait_for_backfill_lock_release,
+                lock_client,
+            )
+            if lock_released:
+                # 鎖消失可能是成功、失敗或 process 崩潰；重新競爭並跑冪等
+                # backfill，才能確保失敗持有者留下的部分索引會被補齊。
+                continue
+
+            # Polling 失敗或逾時後再試一次：Redis 故障會回傳 fail-open
+            # sentinel；若鎖仍存在，交由目前持有者繼續，且不謊報 ready。
+            lock_token = await loop.run_in_executor(
+                None,
+                _acquire_backfill_lock,
+                lock_client,
+            )
+            if lock_token is None:
+                logger.warning(
+                    "[RAG] Backfill lock still held after wait; "
+                    "startup backfill deferred in this worker"
+                )
+                return
 
     try:
         general_store_names = _list_general_store_names()
@@ -271,13 +409,19 @@ async def _run_rag_backfill(backfill):
             )
 
         total = backfill.lancedb_store.get_stats().get("count", 0)
-        elapsed = time.time() - t0
+        elapsed = time.time() - started_at
         logger.info(
             "[RAG] Ready — %d chunks indexed in %.1fs (%d general stores)",
-            total, elapsed, len(general_store_names),
+            total,
+            elapsed,
+            len(general_store_names),
         )
-    except Exception as e:
-        logger.error("[RAG] Backfill failed: %s", e)
+    except Exception as exc:
+        logger.error("[RAG] Backfill failed: %s", exc)
+    finally:
+        # 已處理的失敗要立即釋放，避免其他 worker 等完整段 TTL。
+        if lock_client is not None and lock_token is not None:
+            _release_backfill_lock(lock_client, lock_token)
 
 
 app = FastAPI(title="ai360 km api", lifespan=lifespan)

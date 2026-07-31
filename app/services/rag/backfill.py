@@ -197,6 +197,9 @@ class BackfillService:
     def _build_topic_prefix(topic_info: dict[str, str]) -> str:
         topic_label = topic_info.get("topic_label") or ""
         category_label = topic_info.get("category_label") or ""
+        # Plain-topics app 使用同名的合成分類與 topic，重複前綴不提供檢索訊號。
+        if category_label == topic_label:
+            return ""
         if topic_label and category_label:
             return f"【{category_label} / {topic_label}】"
         if topic_label:

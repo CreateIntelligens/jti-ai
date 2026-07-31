@@ -216,5 +216,21 @@ class TestRAGPipeline(unittest.TestCase):
         self.assertIs(result, topic_info)
         get_topic_store.assert_not_called()
 
+    def test_plain_app_same_category_and_topic_yields_no_prefix(self):
+        """JTI/ESG 的假 topic（category 與 topic 同名）不該產生前綴。"""
+        for label in ("常見問題", "FAQ"):
+            with self.subTest(label=label):
+                prefix = BackfillService._build_topic_prefix(
+                    {"category_label": label, "topic_label": label}
+                )
+                self.assertEqual(prefix, "")
+
+    def test_distinct_category_and_topic_still_prefixed(self):
+        """HCIoT 的真實分類仍要帶前綴。"""
+        prefix = BackfillService._build_topic_prefix(
+            {"category_label": "骨科", "topic_label": "痛風"}
+        )
+        self.assertEqual(prefix, "【骨科 / 痛風】")
+
 if __name__ == '__main__':
     unittest.main()
