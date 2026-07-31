@@ -13,16 +13,19 @@ import os
 import re
 import time
 import unicodedata
-from contextlib import contextmanager
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Literal
+from threading import Lock
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.auth import require_kb_access
+from app.services._shared import topics_cache
 from app.services._shared.qa_kb.csv_utils import (
     _parse_csv_rows,
     extract_questions_from_csv,
@@ -37,6 +40,20 @@ Lang = Literal["zh", "en"]
 # 設 PLAIN_TOPICS_TIMING=1 才會逐段量 perf_counter 並 log，用來定位瓶頸而不臆測。
 # 這是診斷工具，不改任何行為。
 _TIMING_ENABLED = os.getenv("PLAIN_TOPICS_TIMING") == "1"
+
+# Seed 檢查需要多次遠端 DB 往返，每個 app/language 在單一 process 只需執行一次。
+_SEEDED_TOPIC_PARTITIONS: set[tuple[str, Lang]] = set()
+_SEED_TOPICS_LOCK = Lock()
+
+
+def reset_seed_guard() -> None:
+    """清掉「已 seed」記錄，讓下次讀取重跑 seed 檢查。
+
+    測試專用：每個測試都是獨立的 store fixture，殘留的旗標會讓後續測試
+    跳過它要驗證的 seed/adopt 行為。
+    """
+    with _SEED_TOPICS_LOCK:
+        _SEEDED_TOPIC_PARTITIONS.clear()
 
 
 @contextmanager
@@ -363,14 +380,44 @@ def build_plain_topics_admin(
                 elif seed.topic_id in existing_topic_ids:
                     _seed_knowledge_csv(language, seed)
 
+    def ensure_seed_topics_once(language: Lang, store) -> None:
+        """每個 app/language 在本 process 只執行一次 seed 檢查。"""
+        seed_key = (app, language)
+        if seed_key in _SEEDED_TOPIC_PARTITIONS:
+            return
+        with _SEED_TOPICS_LOCK:
+            if seed_key in _SEEDED_TOPIC_PARTITIONS:
+                return
+            ensure_seed_topics(language, store)
+            _SEEDED_TOPIC_PARTITIONS.add(seed_key)
+
     def build_categories(language: Lang, filter_hidden: bool) -> list[dict]:
-        with _timed("build_categories.total", app=app, lang=language, filter_hidden=filter_hidden):
-            store = get_topic_store(language)
-            with _timed("ensure_seed_topics", app=app, lang=language):
-                ensure_seed_topics(language, store)
-            with _timed("read_category_inputs", app=app, lang=language):
-                category_meta, raw_categories = _read_category_inputs(store)
-            return _build_categories_inner(language, filter_hidden, category_meta, raw_categories)
+        with _timed(
+            "build_categories.total",
+            app=app,
+            lang=language,
+            filter_hidden=filter_hidden,
+        ):
+            def compute_categories() -> list[dict]:
+                store = get_topic_store(language)
+                with _timed("ensure_seed_topics", app=app, lang=language):
+                    ensure_seed_topics_once(language, store)
+                with _timed("read_category_inputs", app=app, lang=language):
+                    category_meta, raw_categories = _read_category_inputs(store)
+                return _build_categories_inner(
+                    language,
+                    filter_hidden,
+                    category_meta,
+                    raw_categories,
+                )
+
+            variant = "slim" if filter_hidden else "all"
+            return topics_cache.get_or_compute(
+                app,
+                language,
+                variant,
+                compute_categories,
+            )
 
     def _build_categories_inner(
         language: Lang,
@@ -431,23 +478,29 @@ def build_plain_topics_admin(
                 "hidden": False,
             },
         )
+        topics_cache.invalidate(app)
         return store.get_topic(request.topic_id)
 
     @router.put("/{language}/reorder")
     def reorder_topics(language: Lang, request: ReorderTopicsRequest):
         store = get_topic_store(_to_lang(language))
-        return {"updated": store.reorder_topics(request.topic_ids)}
+        updated = store.reorder_topics(request.topic_ids)
+        topics_cache.invalidate(app)
+        return {"updated": updated}
 
     @router.post("/{language}/delete-batch")
     def delete_topics_batch(language: Lang, request: DeleteTopicsRequest):
         store = get_topic_store(_to_lang(language))
-        return {"deleted": store.delete_topics(request.topic_ids)}
+        deleted = store.delete_topics(request.topic_ids)
+        topics_cache.invalidate(app)
+        return {"deleted": deleted}
 
     @router.put("/categories/{language}/{category_id}/visibility")
     def update_category_visibility(language: Lang, category_id: str, request: UpdateCategoryVisibilityRequest):
         store = get_topic_store(_to_lang(language))
         if not store.set_category_hidden(category_id, request.hidden):
             raise HTTPException(status_code=404, detail=f"Category '{category_id}' not found")
+        topics_cache.invalidate(app)
         return {"category_id": category_id, "hidden": request.hidden}
 
     @router.put("/{language}/{topic_id:path}")
@@ -468,6 +521,7 @@ def build_plain_topics_admin(
             raise HTTPException(status_code=400, detail="No fields to update")
         if not store.update_topic(topic_id, update_data):
             raise HTTPException(status_code=404, detail=f"Topic '{topic_id}' not found")
+        topics_cache.invalidate(app)
         return store.get_topic(topic_id)
 
     @router.delete("/{language}/{topic_id:path}")
@@ -475,6 +529,7 @@ def build_plain_topics_admin(
         store = get_topic_store(_to_lang(language))
         if not store.delete_topic(topic_id):
             raise HTTPException(status_code=404, detail=f"Topic '{topic_id}' not found")
+        topics_cache.invalidate(app)
         return {"message": f"Topic '{topic_id}' deleted"}
 
     return PlainTopicsAdmin(

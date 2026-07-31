@@ -8,12 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.auth import require_kb_access
+from app.services._shared import topics_cache
 from app.services.hciot.topic_store import Language, get_hciot_topic_store
 from app.utils import get_other_language
 
 router = APIRouter(tags=["HCIoT Topics"], dependencies=[Depends(require_kb_access("hciot"))])
 
 Lang = Language
+_TOPICS_CACHE_APP = "hciot"
 
 public_router = APIRouter(tags=["HCIoT Topics"])
 
@@ -127,13 +129,25 @@ def _build_categories(language: Lang, filter_hidden: bool = True) -> list[dict]:
 @public_router.get("/topics/{lang}")
 def list_topics_slim(lang: Lang):
     """Public topic listing — always filters hidden questions."""
-    return {"categories": _build_categories(lang, filter_hidden=True)}
+    categories = topics_cache.get_or_compute(
+        _TOPICS_CACHE_APP,
+        lang,
+        "slim",
+        lambda: _build_categories(lang, filter_hidden=True),
+    )
+    return {"categories": categories}
 
 
 @public_router.get("/topics/{lang}/all")
 def list_topics_all(lang: Lang):
     """Unfiltered topic listing — returns all questions plus hidden_questions."""
-    return {"categories": _build_categories(lang, filter_hidden=False)}
+    categories = topics_cache.get_or_compute(
+        _TOPICS_CACHE_APP,
+        lang,
+        "all",
+        lambda: _build_categories(lang, filter_hidden=False),
+    )
+    return {"categories": categories}
 
 
 def _partitioned_label(value: str, language: Lang) -> dict[str, str]:
@@ -188,6 +202,7 @@ def create_topic(language: Lang, request: CreateTopicRequest):
         "hidden": False,
     }
     store.upsert_topic(request.topic_id, data)
+    topics_cache.invalidate(_TOPICS_CACHE_APP)
     return store.get_topic(request.topic_id)
 
 
@@ -200,6 +215,7 @@ def reorder_topics(language: Lang, request: ReorderTopicsRequest):
     """
     store = get_hciot_topic_store(language)
     updated = store.reorder_topics(request.topic_ids)
+    topics_cache.invalidate(_TOPICS_CACHE_APP)
     return {"updated": updated}
 
 
@@ -212,6 +228,7 @@ def delete_topics_batch(language: Lang, request: DeleteTopicsRequest):
     """
     store = get_hciot_topic_store(language)
     deleted = store.delete_topics(request.topic_ids)
+    topics_cache.invalidate(_TOPICS_CACHE_APP)
     return {"deleted": deleted}
 
 
@@ -221,6 +238,7 @@ def update_category_visibility(language: Lang, category_id: str, request: Update
     success = store.set_category_hidden(category_id, request.hidden)
     if not success:
         raise HTTPException(status_code=404, detail=f"Category '{category_id}' not found")
+    topics_cache.invalidate(_TOPICS_CACHE_APP)
     return {"category_id": category_id, "hidden": request.hidden}
 
 
@@ -243,6 +261,7 @@ def update_topic(language: Lang, topic_id: str, request: UpdateTopicRequest):
     success = store.update_topic(topic_id, update_data)
     if not success:
         raise HTTPException(status_code=404, detail=f"Topic '{topic_id}' not found")
+    topics_cache.invalidate(_TOPICS_CACHE_APP)
     return store.get_topic(topic_id)
 
 
@@ -252,4 +271,5 @@ def delete_topic(language: Lang, topic_id: str):
     deleted = store.delete_topic(topic_id)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Topic '{topic_id}' not found")
+    topics_cache.invalidate(_TOPICS_CACHE_APP)
     return {"message": f"Topic '{topic_id}' deleted"}
