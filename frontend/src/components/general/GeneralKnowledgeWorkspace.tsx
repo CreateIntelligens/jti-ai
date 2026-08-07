@@ -78,9 +78,9 @@ export default function GeneralKnowledgeWorkspace({
     sourceType: 'general',
     api,
     text: (_language, zh) => zh,
-    // 圖片 (IMG) / 網址 (URL) 為 HCIoT 特例；其餘 app（含 general）不提供，
-    // 隱藏 image 上傳分頁與 URL 欄位（與 JTI/ESG 一致）。
-    disableImages: true,
+    // general 動態知識庫的 Q&A 也會帶圖與參考連結（醫療衛教等情境），
+    // 因此開放圖片 (IMG) / 網址 (URL) 欄位；沒有圖的列留白即可。
+    disableImages: false,
     resolveImageUrl: (imageId) => gapi.getGeneralImageUrl(storeName, imageId),
   }), [api, storeName]);
   return (

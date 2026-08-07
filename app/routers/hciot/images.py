@@ -1,13 +1,13 @@
 """HCIoT image serving from MongoDB."""
 
 import mimetypes
-import re
 from pathlib import PurePosixPath
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import Response
 
 from app.auth import require_kb_access
+from app.routers._shared.image_ids import candidate_image_ids, canonicalize_image_id
 from app.services.hciot.csv_utils import _parse_csv_rows
 from app.services.hciot.image_store import get_hciot_image_store
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
@@ -20,32 +20,8 @@ _EXTENSIONS = (".jpg", ".jpeg", ".png", ".gif", ".webp")
 _KNOWLEDGE_LANGUAGES = ("zh", "en")
 
 
-def _canonicalize_image_id(image_id: str) -> str:
-    """Single source of truth for image_id normalization, shared by GET-image
-    lookup and reference counting so the two stay in sync."""
-    return PurePosixPath(image_id).stem.replace(" ", "")
-
-
-def _candidate_image_ids(image_id: str) -> list[str]:
-    normalized = PurePosixPath(image_id).stem
-    canonical = _canonicalize_image_id(image_id)
-    # also try inserting a space before opening parenthesis: PRP(1) -> PRP (1)
-    spaced = re.sub(r"(\S)\(", r"\1 (", canonical)
-
-    seen: set[str] = set()
-    candidate_ids: list[str] = []
-
-    for candidate in [normalized, canonical, spaced]:
-        if candidate and candidate not in seen:
-            seen.add(candidate)
-            candidate_ids.append(candidate)
-
-        stripped = candidate[4:] if candidate.upper().startswith("IMG_") and len(candidate) > 4 else None
-        if stripped and stripped not in seen:
-            seen.add(stripped)
-            candidate_ids.append(stripped)
-
-    return candidate_ids
+_canonicalize_image_id = canonicalize_image_id
+_candidate_image_ids = candidate_image_ids
 
 
 def _normalize_csv_image_reference(raw: str) -> str | None:

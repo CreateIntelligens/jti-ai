@@ -626,7 +626,9 @@ export function setGeneralCategoryHidden(
 export function getGeneralImageUrl(storeName: string, imageId?: string): string | null {
   const normalized = normalizeImageId(imageId);
   if (!normalized) return null;
-  return `${GENERAL_ADMIN_BASE}/stores/${encodeURIComponent(storeName)}/images/${encodeURIComponent(normalized)}`;
+  // 取圖走公開掛載點：general-admin 底下只有 list/upload/delete，沒有 GET
+  // 單張圖（打過去會是 405），圖片本身掛在 /api/general。
+  return `${API_BASE}/general/stores/${encodeURIComponent(storeName)}/images/${encodeURIComponent(normalized)}`;
 }
 
 export function listGeneralImages(storeName: string): Promise<{ images: QaImage[] }> {

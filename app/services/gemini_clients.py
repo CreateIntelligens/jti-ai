@@ -13,8 +13,26 @@ import os
 from collections import OrderedDict
 
 from google import genai
+from google.genai import types
 
 logger = logging.getLogger(__name__)
+
+# nen（https://nen.com.tw）代理平台的 key 以 sk- 開頭，與 Google 官方的 AIza
+# 前綴不會衝突，因此用前綴判斷該把 key 要打哪個端點。base_url 不含 /v1：
+# google-genai 走原生路徑時會自己接上 /v1beta/models/...（/v1 是 OpenAI 相容端點）。
+_NEN_KEY_PREFIX = "sk-"
+_NEN_DEFAULT_BASE_URL = "https://nen.com.tw"
+
+
+def _build_client(api_key: str) -> genai.Client:
+    """依 key 前綴決定要不要指向 nen 代理端點。"""
+    if api_key.startswith(_NEN_KEY_PREFIX):
+        base_url = os.getenv("NEN_BASE_URL", _NEN_DEFAULT_BASE_URL)
+        return genai.Client(
+            api_key=api_key,
+            http_options=types.HttpOptions(base_url=base_url),
+        )
+    return genai.Client(api_key=api_key)
 
 # store_name (e.g. "fileSearchStores/abc123") → genai.Client
 _store_to_client: dict[str, genai.Client] = {}
@@ -59,7 +77,7 @@ def init_registry() -> None:
             continue
         seen_keys.add(api_key)
         try:
-            c = genai.Client(api_key=api_key)
+            c = _build_client(api_key)
             _clients.append(c)
             _key_names.append(name)
         except Exception as e:
@@ -94,7 +112,7 @@ def get_client_for_api_key(api_key: str) -> genai.Client:
     key_hash = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
     client = _user_key_clients.get(key_hash)
     if client is None:
-        client = genai.Client(api_key=normalized)
+        client = _build_client(normalized)
         _user_key_clients[key_hash] = client
         if len(_user_key_clients) > _USER_KEY_CACHE_MAX:
             _user_key_clients.popitem(last=False)

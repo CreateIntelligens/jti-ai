@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from fastapi.responses import Response
 
 from app.auth import require_kb_access
+from app.routers._shared.image_ids import candidate_image_ids
 from app.services.general.image_store import get_general_image_store
 
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
@@ -27,7 +28,14 @@ admin_router = APIRouter(
 
 @router.get("/stores/{store_name}/images/{image_id}")
 def get_image(store_name: str, image_id: str):
-    doc = get_general_image_store().get_image(store_name, image_id)
+    # CSV 的 img 欄位寫法與實際存檔名常有落差（'PRP(1)' vs 'PRP (1)'、帶副檔名、
+    # IMG_ 前綴），比照 HCIoT 逐一嘗試等價寫法，不要求上傳端先正規化命名。
+    store = get_general_image_store()
+    doc = None
+    for candidate in candidate_image_ids(image_id):
+        doc = store.get_image(store_name, candidate)
+        if doc:
+            break
     if not doc:
         raise HTTPException(status_code=404, detail="image not found")
     declared = doc.get("content_type") or "image/png"
