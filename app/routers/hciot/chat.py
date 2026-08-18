@@ -2,8 +2,9 @@
 HCIoT chat API - session management, messages, and conversation history.
 """
 
+import calendar
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from time import perf_counter
 from typing import Optional
 
@@ -220,6 +221,47 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+def _get_months_ago(months: int, base: datetime | None = None) -> date:
+    if base is None:
+        base = datetime.now(_TZ_TAIPEI)
+    year = base.year
+    month = base.month - months
+    while month <= 0:
+        month += 12
+        year -= 1
+    max_days = calendar.monthrange(year, month)[1]
+    day = min(base.day, max_days)
+    return date(year, month, day)
+
+
+def _validate_and_resolve_date_range(
+    date_from: Optional[str],
+    date_to: Optional[str],
+    max_months_ago: int,
+    limit_msg: str,
+) -> tuple[str, Optional[str]]:
+    min_date = _get_months_ago(max_months_ago)
+    if date_from:
+        try:
+            d_from = datetime.strptime(date_from, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="無效的開始日期格式，請使用 YYYY-MM-DD")
+        if d_from < min_date:
+            raise HTTPException(status_code=400, detail=limit_msg)
+    else:
+        date_from = min_date.isoformat()
+
+    if date_to:
+        try:
+            d_to = datetime.strptime(date_to, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="無效的結束日期格式，請使用 YYYY-MM-DD")
+        if d_to < datetime.strptime(date_from, "%Y-%m-%d").date():
+            raise HTTPException(status_code=400, detail="結束日期不能早於開始日期")
+
+    return date_from, date_to
+
+
 @compat_history_router.get("/history")
 @admin_history_router.get("")
 async def get_conversations(
@@ -247,6 +289,10 @@ async def get_conversations(
                 session_id[:8],
             )
             return {"mode": mode, "conversations": conversations}
+
+        date_from, date_to = _validate_and_resolve_date_range(
+            date_from, date_to, max_months_ago=6, limit_msg="查詢區間限制為半年內"
+        )
 
         page, page_size = normalize_history_pagination(page, page_size)
         query = build_date_query(mode, date_from, date_to, search=search)
@@ -277,6 +323,8 @@ async def get_conversations(
             page=page,
             page_size=page_size,
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Failed to get HCIoT conversations: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
@@ -322,6 +370,8 @@ async def export_conversations(
         conversation_logger = _get_conversation_logger()
         session_manager = _get_session_manager()
 
+        three_months_ago = _get_months_ago(3)
+
         if session_ids:
             sessions, total_conversations = await _run_db_call(
                 "conversation.export_by_ids",
@@ -330,6 +380,23 @@ async def export_conversations(
                 session_ids,
                 mode,
             )
+            # 下載區間限制為近三個月內
+            min_ts = three_months_ago.isoformat()
+            filtered_sessions = []
+            for s in sessions:
+                convs = [
+                    c for c in s.get("conversations", [])
+                    if (c.get("timestamp") or "") >= min_ts
+                ]
+                if convs:
+                    filtered_sessions.append({
+                        **s,
+                        "conversations": convs,
+                        "total": len(convs),
+                    })
+            sessions = filtered_sessions
+            total_conversations = count_session_conversations(sessions)
+
             if language:
                 sessions = await _run_db_call(
                     "session.filter_export_by_language",
@@ -347,40 +414,30 @@ async def export_conversations(
                 "total_sessions": len(sessions),
             }
         else:
-            if date_from or date_to:
-                query = build_date_query(mode, date_from, date_to)
-                sid_list, _ = await _run_db_call(
-                    "conversation.get_paginated_session_ids.export",
-                    conversation_logger.get_paginated_session_ids,
-                    query=query,
-                    page=1,
-                    page_size=100000,
-                )
-                sid_list = await _run_db_call(
-                    "session.filter_ids_by_language",
-                    filter_session_ids_by_language,
-                    sid_list,
-                    session_manager,
-                    language,
-                )
-                all_conversations = await _run_db_call(
-                    "conversation.get_logs_for_sessions",
-                    conversation_logger.get_logs_for_sessions,
-                    sid_list,
-                )
-            else:
-                all_conversations = await _run_db_call(
-                    "conversation.get_session_logs_by_mode",
-                    conversation_logger.get_session_logs_by_mode,
-                    mode,
-                )
-                all_conversations = await _run_db_call(
-                    "session.filter_conversations_by_language",
-                    filter_conversations_by_session_language,
-                    all_conversations,
-                    session_manager,
-                    language,
-                )
+            date_from, date_to = _validate_and_resolve_date_range(
+                date_from, date_to, max_months_ago=3, limit_msg="下載區間限制為近三個月內"
+            )
+
+            query = build_date_query(mode, date_from, date_to)
+            sid_list, _ = await _run_db_call(
+                "conversation.get_paginated_session_ids.export",
+                conversation_logger.get_paginated_session_ids,
+                query=query,
+                page=1,
+                page_size=100000,
+            )
+            sid_list = await _run_db_call(
+                "session.filter_ids_by_language",
+                filter_session_ids_by_language,
+                sid_list,
+                session_manager,
+                language,
+            )
+            all_conversations = await _run_db_call(
+                "conversation.get_logs_for_sessions",
+                conversation_logger.get_logs_for_sessions,
+                sid_list,
+            )
 
             session_list = group_conversations_by_session(all_conversations)
             result = {
@@ -397,6 +454,8 @@ async def export_conversations(
             )
 
         return result
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error("Failed to export HCIoT conversations: %s", e)
         raise HTTPException(status_code=500, detail=str(e))

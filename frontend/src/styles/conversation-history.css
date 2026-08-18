@@ -383,6 +383,12 @@
   background: var(--border, #dadce0);
 }
 
+.mini-cal-nav:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
 .mini-cal-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
@@ -433,6 +439,13 @@
   background: var(--primary, #1a73e8);
   color: var(--on-primary, #ffffff);
   font-weight: 600;
+}
+
+.mini-cal-day:disabled,
+.mini-cal-day.disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* ── Content List ── */

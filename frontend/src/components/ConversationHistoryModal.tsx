@@ -179,21 +179,42 @@ function getHistoryFetcher(mode: ConversationMode): typeof fetchAsAdmin {
   return mode === 'general' ? fetchWithApiKey : fetchAsAdmin;
 }
 
+function getMonthsAgo(months: number, baseDate: Date = new Date()): string {
+  const d = new Date(baseDate);
+  d.setMonth(d.getMonth() - months);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function buildExportUrl(
   mode: ConversationMode,
   storeName: string | undefined,
   sessionIds?: string[],
+  dateFrom?: string,
+  dateTo?: string,
 ): string {
   const selectedSessionIds = sessionIds?.length ? sessionIds.join(',') : undefined;
   if (mode === 'jti') {
-    return buildUrl('/api/jti-admin/conversations/export', { session_ids: selectedSessionIds });
+    return buildUrl('/api/jti-admin/conversations/export', {
+      session_ids: selectedSessionIds,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined,
+    });
   }
   if (mode === 'hciot') {
-    return buildUrl('/api/hciot-admin/conversations/export', { session_ids: selectedSessionIds });
+    return buildUrl('/api/hciot-admin/conversations/export', {
+      session_ids: selectedSessionIds,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined,
+    });
   }
   return buildUrl('/api/chat/history/export', {
     store_name: storeName || undefined,
     session_ids: selectedSessionIds,
+    date_from: dateFrom || undefined,
+    date_to: dateTo || undefined,
   });
 }
 
@@ -345,6 +366,13 @@ export default function ConversationHistoryModal({
     let v = value;
     if (/^\d{4}-\d$/.test(v)) v = v.slice(0, 5) + '0' + v[5];
     if (/^\d{4}-\d{2}-\d$/.test(v)) v = v.slice(0, 8) + '0' + v[8];
+    if (mode === 'hciot' && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
+      const minQueryDate = getMonthsAgo(6);
+      if (v < minQueryDate) {
+        alert(`查詢區間限制為半年內（最早為 ${minQueryDate}）`);
+        v = minQueryDate;
+      }
+    }
     if (v !== value) setter(v);
   };
 
@@ -528,10 +556,26 @@ export default function ConversationHistoryModal({
 
   const exportAsJSON = async (sessionIds?: string[]) => {
     try {
+      const isHciot = mode === 'hciot';
+      const minExportDate = getMonthsAgo(3);
+      if (isHciot) {
+        const checkFrom = activeDateFrom || dateFrom;
+        if (checkFrom && checkFrom < minExportDate) {
+          alert(`下載區間限制為近三個月內（最早可下載至 ${minExportDate}）`);
+          return;
+        }
+      }
+
       setExporting(true);
-      const response = await getHistoryFetcher(mode)(buildExportUrl(mode, storeName, sessionIds));
+      const reqDateFrom = activeDateFrom || (isHciot && !sessionIds?.length ? minExportDate : undefined);
+      const reqDateTo = activeDateTo || undefined;
+      const response = await getHistoryFetcher(mode)(
+        buildExportUrl(mode, storeName, sessionIds, reqDateFrom, reqDateTo)
+      );
       if (!response.ok) {
-        throw new Error(`Export API error: ${response.statusText}`);
+        const errJson = await response.json().catch(() => ({}));
+        const detail = errJson.detail || response.statusText;
+        throw new Error(detail);
       }
 
       const data = await response.json();
@@ -548,9 +592,9 @@ export default function ConversationHistoryModal({
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
-    } catch (error) {
+    } catch (error: any) {
       console.error('[ConversationHistory] Export error:', error);
-      alert('匯出失敗，請稍後再試');
+      alert(error?.message ? `匯出失敗：${error.message}` : '匯出失敗，請稍後再試');
     } finally {
       setExporting(false);
     }
@@ -711,6 +755,8 @@ export default function ConversationHistoryModal({
                 <MiniCalendar
                   label=""
                   value={openCal === 'from' ? dateFrom : dateTo}
+                  minDate={mode === 'hciot' ? getMonthsAgo(6) : undefined}
+                  maxDate={mode === 'hciot' ? new Date().toISOString().slice(0, 10) : undefined}
                   onChange={(d) => {
                     if (openCal === 'from') {
                       // 選開始，若 > 已有的結束，自動交換

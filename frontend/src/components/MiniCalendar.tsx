@@ -6,6 +6,8 @@ interface MiniCalendarProps {
   value: string;           // 'YYYY-MM-DD' or ''
   onChange: (date: string) => void;
   highlightRange?: { from: string; to: string };
+  minDate?: string;
+  maxDate?: string;
 }
 
 const WEEKDAYS = ['一', '二', '三', '四', '五', '六', '日'];
@@ -14,7 +16,7 @@ const MONTHS = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', 
 function pad(n: number) { return n < 10 ? `0${n}` : `${n}`; }
 function toStr(d: Date) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 
-export default function MiniCalendar({ label, value, onChange, highlightRange }: MiniCalendarProps) {
+export default function MiniCalendar({ label, value, onChange, highlightRange, minDate, maxDate }: MiniCalendarProps) {
   const today = new Date();
   const parsedValue = value && /^\d{4}-\d{2}(-\d{2})?$/.test(value) ? new Date(value) : null;
   const initial = (parsedValue && !isNaN(parsedValue.getTime())) ? parsedValue : today;
@@ -36,8 +38,26 @@ export default function MiniCalendar({ label, value, onChange, highlightRange }:
     }
   }, [value]);
 
-  const prevMonth = () => { if (month === 0) { setYear(y => y - 1); setMonth(11); } else setMonth(m => m - 1); };
-  const nextMonth = () => { if (month === 11) { setYear(y => y + 1); setMonth(0); } else setMonth(m => m + 1); };
+  const canPrevMonth = () => {
+    if (!minDate) return true;
+    const minD = new Date(minDate);
+    return year > minD.getFullYear() || (year === minD.getFullYear() && month > minD.getMonth());
+  };
+
+  const canNextMonth = () => {
+    if (!maxDate) return true;
+    const maxD = new Date(maxDate);
+    return year < maxD.getFullYear() || (year === maxD.getFullYear() && month < maxD.getMonth());
+  };
+
+  const prevMonth = () => {
+    if (!canPrevMonth()) return;
+    if (month === 0) { setYear(y => y - 1); setMonth(11); } else setMonth(m => m - 1);
+  };
+  const nextMonth = () => {
+    if (!canNextMonth()) return;
+    if (month === 11) { setYear(y => y + 1); setMonth(0); } else setMonth(m => m + 1);
+  };
 
   const startWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -65,35 +85,61 @@ export default function MiniCalendar({ label, value, onChange, highlightRange }:
     const d = dayStr(day);
     return d >= highlightRange.from && d <= highlightRange.to;
   };
+  const isDayDisabled = (day: number) => {
+    const d = dayStr(day);
+    if (minDate && d < minDate) return true;
+    if (maxDate && d > maxDate) return true;
+    return false;
+  };
 
   return (
     <div className="mini-cal">
       {label && <div className="mini-cal-label">{label}</div>}
       <div className="mini-cal-header">
-        <button className="mini-cal-nav" onClick={prevMonth}><ChevronLeft size={14} /></button>
+        <button
+          className="mini-cal-nav"
+          onClick={prevMonth}
+          disabled={!canPrevMonth()}
+        >
+          <ChevronLeft size={14} />
+        </button>
         <span className="mini-cal-title">{year} {MONTHS[month]}</span>
-        <button className="mini-cal-nav" onClick={nextMonth}><ChevronRight size={14} /></button>
+        <button
+          className="mini-cal-nav"
+          onClick={nextMonth}
+          disabled={!canNextMonth()}
+        >
+          <ChevronRight size={14} />
+        </button>
       </div>
       <div className="mini-cal-grid mini-cal-weekdays">
         {WEEKDAYS.map(w => <span key={w} className="mini-cal-wday">{w}</span>)}
       </div>
       <div className="mini-cal-grid">
-        {cells.map((day, i) =>
-          day ? (
+        {cells.map((day, i) => {
+          if (!day) return <span key={i} className="mini-cal-day empty" />;
+          const disabled = isDayDisabled(day);
+          return (
             <button
               key={i}
+              disabled={disabled}
               className={[
                 'mini-cal-day',
                 isSelected(day) ? 'selected' : '',
                 isInRange(day) ? 'in-range' : '',
                 isToday(day) ? 'today' : '',
+                disabled ? 'disabled' : '',
               ].filter(Boolean).join(' ')}
-              onClick={() => onChange(value === dayStr(day) ? '' : dayStr(day))}
+              onClick={() => {
+                if (!disabled) {
+                  onChange(value === dayStr(day) ? '' : dayStr(day));
+                }
+              }}
             >
               {day}
             </button>
-          ) : <span key={i} className="mini-cal-day empty" />
-        )}
+          );
+        })}
       </div>
     </div>
   );
