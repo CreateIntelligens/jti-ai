@@ -21,6 +21,12 @@ class _HealthCheckFilter(logging.Filter):
 logging.getLogger("uvicorn.access").addFilter(_HealthCheckFilter())
 
 MODEL_NAME = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
+# 釘死權重 revision：與 openVman 共用同一份 BGE-M3 快照，確保向量可互換。
+# 若不釘，cache 清掉後重抓可能默默拿到上游新權重，造成新舊向量不相容。
+MODEL_REVISION = os.getenv(
+    "EMBEDDING_MODEL_REVISION",
+    "5617a9f61b028005a4858fdac845db406aefb181",
+)
 BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
 MAX_LENGTH = int(os.getenv("EMBEDDING_MAX_LENGTH", "8192"))
 
@@ -63,10 +69,18 @@ def _get_model() -> Any:
     global _model
     if _model is None:
         from FlagEmbedding import FlagModel
+        from huggingface_hub import snapshot_download
+
         device = _resolve_device()
-        logger.info("Loading embedding model %s on %s...", MODEL_NAME, device)
+        logger.info(
+            "Loading embedding model %s@%s on %s...",
+            MODEL_NAME, MODEL_REVISION[:12], device,
+        )
+        # 經 snapshot_download 釘 revision（FlagModel 建構子不吃 revision 參數），
+        # 已在 cache 時不重新下載。
+        model_path = snapshot_download(MODEL_NAME, revision=MODEL_REVISION)
         _model = FlagModel(
-            MODEL_NAME,
+            model_path,
             device=device,
             use_fp16=(device == "cuda"),
         )
@@ -81,6 +95,41 @@ class EmbedRequest(BaseModel):
 
 class EmbedResponse(BaseModel):
     vectors: List[List[float]]
+    model: str
+    embedding_spec: dict
+    attempts: List[dict]
+
+
+# 與 openVman 的 /embed 回應 schema 對齊：backend 依 embedding_spec 做嚴格
+# 契約驗證（identity 欄位順序見 backend 的 _validate_response）。
+SERVICE_REVISION = "jtai-embedding/1.4.0"
+
+
+def _build_spec(input_type: str, dimensions: int) -> dict:
+    spec = {
+        "provider": "bge",
+        "model": MODEL_NAME,
+        "dimensions": dimensions,
+        "dtype": "float32",
+        "normalized": True,
+        "normalization": "l2",
+        "input_semantics": input_type,
+        "model_revision": MODEL_REVISION,
+        "service_revision": SERVICE_REVISION,
+    }
+    spec["identity"] = ":".join(
+        str(spec[field])
+        for field in (
+            "provider",
+            "model",
+            "dimensions",
+            "dtype",
+            "normalization",
+            "input_semantics",
+            "model_revision",
+        )
+    )
+    return spec
 
 
 @app.on_event("shutdown")
@@ -104,7 +153,12 @@ def health() -> dict:
 @app.post("/embed", response_model=EmbedResponse)
 def embed(req: EmbedRequest) -> EmbedResponse:
     if not req.texts:
-        return EmbedResponse(vectors=[])
+        return EmbedResponse(
+            vectors=[],
+            model=MODEL_NAME,
+            embedding_spec=_build_spec(req.input_type, 1024),
+            attempts=[{"provider": "bge", "status": "selected"}],
+        )
     try:
         # BGE-M3's encode() handles both single and batch; input_type is
         # accepted for API symmetry but bge-m3 uses one space for both sides.
@@ -116,4 +170,10 @@ def embed(req: EmbedRequest) -> EmbedResponse:
     except Exception as e:
         logger.error("Encoding failed: %s", e)
         raise HTTPException(status_code=500, detail=f"encode failed: {e}")
-    return EmbedResponse(vectors=vectors.tolist())
+    rows = vectors.tolist()
+    return EmbedResponse(
+        vectors=rows,
+        model=MODEL_NAME,
+        embedding_spec=_build_spec(req.input_type, len(rows[0])),
+        attempts=[{"provider": "bge", "status": "selected"}],
+    )

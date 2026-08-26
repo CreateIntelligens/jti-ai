@@ -13,6 +13,31 @@ server {
   # 重啟換 IP 後 nginx 仍快取舊 IP 造成 502。valid 縮短 DNS 快取秒數。
   resolver 127.0.0.11 valid=10s ipv6=off;
 
+  # JTAI 對外的 embedding edge，與 openVman 的 /api/embedding/* 路徑慣例一致：
+  # /api/embedding/embed、/api/embedding/health → 內部 embedding:8009 的 /embed、/health。
+  # ^~ 優先於下方 backend 的 regex location。只在本地 embedding profile 啟用時
+  # 可用；容器不在時由 error_page 回 503 JSON（nginx 啟動不受影響）。
+  location ^~ /api/embedding/ {
+    set $embedding_upstream embedding:8009;
+    rewrite ^/api/embedding(/.*)$ $1 break;
+    proxy_pass http://$embedding_upstream;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_read_timeout 300;
+    proxy_connect_timeout 10;
+    proxy_send_timeout 300;
+    proxy_intercept_errors on;
+    error_page 502 503 504 = @embedding_down;
+  }
+
+  location @embedding_down {
+    internal;
+    default_type application/json;
+    return 503 '{"detail":"embedding 服務未啟用或暫時無法連線。"}';
+  }
+
   # FastAPI backend routes (優先度高，必須在 / 之前)
   location ~ ^/(health|docs|openapi\.json|api/|v1/) {
     # 主機名放進變數 → 強迫 nginx 每次請求動態解析（非啟動時快取一次）。
