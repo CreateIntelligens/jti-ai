@@ -2,13 +2,13 @@
 
 ai360 km 是一個以 FastAPI、React/Vite、Google Gemini 和 self-hosted RAG 組成的多應用對話平台。現行應用包含 **JTI 活動助理**、**HCIoT 醫院衛教助理**、**ESG 永續測驗助理**，以及可綁定任意知識庫的 **通用 OpenAI-compatible API**。
 
-系統主資料庫為 AWS DocumentDB（Atlas 作為啟動時備援），保存知識庫與 session/log 資料，使用 BAAI/bge-m3 產生本地 embedding，寫入 LanceDB 做向量檢索，再由 Gemini 產生最後回答。
+系統主資料庫為 AWS DocumentDB（Atlas 作為啟動時備援），保存知識庫與 session/log 資料，使用 BAAI/bge-m3 embedding gateway 產生向量並寫入 LanceDB 做檢索，再由 Gemini 產生最後回答。Embedding gateway 可由本專案 Compose profile 啟動，也可指向 openVman 共用服務。
 
 ## 功能特色
 
 - **多應用模式**：JTI、HCIoT、ESG 與通用知識庫聊天共用後端基礎設施（Managed App Runtime），但各自保有 session、prompt、TTS 與知識庫邏輯。新增應用只需註冊 runtime config，無需重複實作底層。
 - **ESG App Tier**：ESG 永續測驗助理，含獨立測驗題庫與 per-app quiz seeding，與 JTI 共用 Managed App Runtime。
-- **Self-hosted RAG**：FlagEmbedding + BAAI/bge-m3 產生本地 embedding，LanceDB 做主要檢索，MongoDB 做知識庫與向量備份。RAG backfill 改為批次操作，大幅降低啟動時資料庫往返。
+- **Self-hosted RAG**：透過 HTTP embedding gateway 使用 FlagEmbedding + BAAI/bge-m3，LanceDB 做主要檢索，MongoDB 做知識庫與向量備份。Client 會驗證回傳的 model、identity、維度、正規化與 input semantics，同時保留相容舊版只含 `vectors` 的 `/embed` 回應。
 - **自動索引同步**：服務啟動時背景 backfill JTI/HCIoT/ESG 中英知識庫；知識庫上傳、更新、刪除時會排程同步到 RAG。
 - **通用知識庫 per-store 多租戶**：通用知識庫（文件、圖片、topic/Q&A）全面改為以 `store_name` 為鍵的多租戶架構，各 store 資料完全隔離，RAG reindex 支援 per-store 粒度。
 - **知識庫管理**：支援上傳、線上預覽、下載、編輯與刪除 TXT、Markdown、CSV、DOCX 等文件。權限採 scope 隔離：super_admin / admin 可跨應用管理，一般 user 則可管理自己 scope 所屬應用的知識庫（檔案、圖片、主題），但碰不到其他應用。
@@ -41,7 +41,7 @@ FastAPI backend
   - OpenAI-compatible /v1/chat/completions
   |
   +--> Gemini API             answer generation
-  +--> BGE-m3 / FlagEmbedding local embedding
+  +--> BGE-m3 embedding gateway (local profile or shared openVman edge)
   +--> LanceDB                local vector search
   +--> DocumentDB (primary)   sessions, logs, knowledge stores, image store, vector backup
   +--> Atlas (fallback)       startup fallback when primary unreachable
@@ -55,7 +55,7 @@ FastAPI backend
 - Docker 與 Docker Compose
 - Google Gemini API key，可設定多把
 - MongoDB，Atlas 或自架皆可
-- NVIDIA GPU + nvidia-container-toolkit 建議用於 BGE embedding；現行 `docker-compose.yml` 預設預留 GPU，CPU-only 環境需要覆寫 compose device reservation 並設定 `EMBEDDING_DEVICE=cpu`
+- 只有啟用本地 `embedding` profile 時才需要 NVIDIA GPU + nvidia-container-toolkit；指向共用 gateway 的 consumer 不需要本地 GPU
 
 ### 2. 設定環境變數
 
@@ -89,9 +89,9 @@ JTI_TTS_CHARACTER=hayley
 HCIOT_TTS_CHARACTER=healthy2
 
 # RAG
-EMBEDDING_MODEL=BAAI/bge-m3
-EMBEDDING_DEVICE=cuda
-EMBEDDING_BATCH_SIZE=32
+COMPOSE_PROFILES=embedding
+EMBEDDING_EXPECTED_MODEL=BAAI/bge-m3
+EMBEDDING_EXPECTED_DIMENSION=1024
 LANCEDB_PATH=data/lancedb
 RAG_DISTANCE_THRESHOLD=0.85
 
@@ -100,13 +100,32 @@ VITE_PUBLIC_ALLOWED_PAGES=jti,hciot
 VITE_PUBLIC_RESTRICTED_HOSTS=example.com
 ```
 
+Embedding 有兩種模式，不可同時依賴本地與共用服務：
+
+```env
+# 本地 gateway（.env.example 預設）
+COMPOSE_PROFILES=embedding
+
+# 或使用 openVman edge；不啟用本地 embedding profile
+COMPOSE_PROFILES=
+EMBEDDING_SERVICE_URL=https://openvman.example.com/api/embedding
+EMBEDDING_SERVICE_TOKEN=replace-with-openvman-embedding-token
+```
+
+`EMBEDDING_SERVICE_URL` 不要加尾端 `/embed`，client 會自行附加。內部 Docker 網路也可設為 `http://embedding:8009`。若設定外部 URL，Compose 不會強制啟動或等待本地 embedding container。
+
 ### 3. 啟動服務
 
 ```bash
-docker compose up -d --build
+# 本地 embedding 模式才需要先單獨完成這個 GPU image build；外部模式跳過。
+docker compose build embedding
+
+# 不要與上述 GPU build 並行。
+docker compose build backend frontend db-tunnel
+docker compose up -d
 ```
 
-首次啟動會下載 BGE-m3 模型到 `./.hf_cache`，並在背景索引 MongoDB 中的 JTI/HCIoT 知識庫到 `./data/lancedb`。模型下載與首次索引完成前，RAG 相關回應可能會比較慢或暫時沒有檢索結果。
+啟用本地 `embedding` profile 時，首次啟動會下載 BGE-m3 模型到 `./.hf_cache`。Backend 會在背景索引 MongoDB 中的 JTI/HCIoT 知識庫到 `./data/lancedb`；共用 gateway 不可用或首次索引尚未完成時，RAG 相關回應可能暫時沒有檢索結果。
 
 常用入口：
 

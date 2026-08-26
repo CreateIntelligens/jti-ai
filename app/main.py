@@ -629,6 +629,15 @@ async def health_check():
     except Exception:
         checks["gemini_api_key"] = False
 
+    # embedding 掛掉時 RAG 全斷但其他項目都正常，必須納入對外健康狀態
+    try:
+        from .services.embedding.service import get_embedding_service
+        checks["embedding"] = await asyncio.to_thread(
+            get_embedding_service().health_check
+        )
+    except Exception:
+        checks["embedding"] = False
+
     checks["api_key_manager"] = deps.api_key_manager is not None
     checks["general_session_manager"] = deps.get_general_chat_session_manager() is not None
 

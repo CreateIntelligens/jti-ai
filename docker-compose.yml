@@ -46,6 +46,7 @@ services:
   # GPU batch 與 backend 的 DB/Gemini 工作互相序列化（~1.9s 懲罰）。
   # backend→embedding 走 Docker service DNS 內部流量（http://embedding:8009），不經 nginx。
   embedding:
+    profiles: ["embedding"]
     build:
       context: .
       dockerfile: docker/embedding/Dockerfile
@@ -101,8 +102,6 @@ services:
         condition: service_started
       redis:
         condition: service_started
-      embedding:
-        condition: service_started
     # GPU embedding 已抽到獨立的 embedding 服務，backend 不再載模型、不需 GPU，
     # 一律經 EMBEDDING_SERVICE_URL 走 HTTP（無本地 fallback，embedding 必須在線）。
     expose:
@@ -112,7 +111,10 @@ services:
       - MODE=${MODE:-prod}
       - BACKEND_PORT=${PORT:-8008}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
-      - EMBEDDING_SERVICE_URL=http://embedding:8009
+      - EMBEDDING_SERVICE_URL=${EMBEDDING_SERVICE_URL:-http://embedding:8009}
+      - EMBEDDING_SERVICE_TOKEN=${EMBEDDING_SERVICE_TOKEN:-}
+      - EMBEDDING_EXPECTED_MODEL=${EMBEDDING_EXPECTED_MODEL:-BAAI/bge-m3}
+      - EMBEDDING_EXPECTED_DIMENSION=${EMBEDDING_EXPECTED_DIMENSION:-1024}
       - TZ=Asia/Taipei
     # 不帶 command：由 entrypoint 依 MODE 推導 uvicorn 參數（dev=--reload / prod=--workers 2）
     healthcheck:
