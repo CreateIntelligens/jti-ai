@@ -123,7 +123,8 @@ class EmbeddingService:
             texts = [texts]
 
         assert self.service_url is not None  # guaranteed by __init__
-        url = f"{self.service_url.rstrip('/')}/embed"
+        # jtai 格式嵌入直接 POST 在 base path（openVman 新表面已無 /embed）
+        url = self.service_url.rstrip('/')
         vectors: list[list[float]] = []
         headers = self._auth_headers()
         selected_identity: str | None = None

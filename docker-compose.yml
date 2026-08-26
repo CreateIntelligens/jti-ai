@@ -63,6 +63,8 @@ services:
       - "8009"
     environment:
       - HF_HOME=/home/appuser/.cache/huggingface
+      # 對外 edge 的 Bearer token，與 backend 打出去用的同一把；留空則不驗證
+      - EMBEDDING_SERVICE_TOKEN=${EMBEDDING_SERVICE_TOKEN:-}
       - TZ=Asia/Taipei
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8009/health')"]

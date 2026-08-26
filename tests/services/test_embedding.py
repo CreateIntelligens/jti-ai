@@ -85,7 +85,7 @@ class TestEmbeddingServiceRemote(unittest.TestCase):
             result = service.encode("hello", input_type="query")
 
         self.assertEqual(result.shape, (1, 1024))
-        self.assertEqual(captured["url"], "http://embedding:8009/embed")
+        self.assertEqual(captured["url"], "http://embedding:8009")
         self.assertEqual(captured["payload"]["texts"], ["hello"])
         self.assertEqual(captured["payload"]["input_type"], "query")
         self.assertEqual(captured["headers"], {})
@@ -132,7 +132,7 @@ class TestEmbeddingServiceRemote(unittest.TestCase):
         self.assertEqual(result.shape, (1, 1024))
         self.assertEqual(
             captured["url"],
-            "https://openvman.example.com/api/embedding/embed",
+            "https://openvman.example.com/api/embedding",
         )
         self.assertEqual(
             captured["headers"],
