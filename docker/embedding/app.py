@@ -216,15 +216,22 @@ def health_ready() -> dict:
     }
 
 
+# FlagEmbedding 1.4 的 encode 在多執行緒併發下會讓行程整個 crash（無
+# traceback，RAG 多 query 併發檢索時實測重現），必須序列化。GPU 推論本來
+# 就是獨占資源，序列化對吞吐幾乎沒有額外損失。
+_encode_lock = threading.Lock()
+
+
 def _encode_texts(texts: List[str], input_type: str) -> List[List[float]]:
     try:
         # BGE-M3's encode() handles both single and batch; input_type is
         # accepted for API symmetry but bge-m3 uses one space for both sides.
-        vectors = _get_model().encode(
-            texts,
-            batch_size=BATCH_SIZE,
-            max_length=MAX_LENGTH,
-        )
+        with _encode_lock:
+            vectors = _get_model().encode(
+                texts,
+                batch_size=BATCH_SIZE,
+                max_length=MAX_LENGTH,
+            )
     except Exception as e:
         logger.error("Encoding failed: %s", e)
         raise HTTPException(status_code=500, detail=f"encode failed: {e}")
