@@ -392,10 +392,11 @@ export async function getGeneralConversationDetail(sessionId: string): Promise<a
   return handleResponse<any>(response);
 }
 
-export async function deleteConversations(mode: 'jti' | 'hciot' | 'general', sessionIds: string[]): Promise<void> {
+export async function deleteConversations(mode: 'jti' | 'hciot' | 'esg' | 'general', sessionIds: string[]): Promise<void> {
   const urlMap = {
     jti: `${API_BASE}/jti-admin/conversations`,
     hciot: `${API_BASE}/hciot-admin/conversations`,
+    esg: `${API_BASE}/esg-admin/conversations`,
     general: `${API_BASE}/chat/history`,
   };
   const url = urlMap[mode];

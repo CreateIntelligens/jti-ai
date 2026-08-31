@@ -1,4 +1,4 @@
-import { API_BASE } from './base';
+import { API_BASE, buildUrl, fetchAsAdmin, handleResponse } from './base';
 import { createQaKnowledgeApi, type QaMergedCsvResponse, type SaveTopicCsvMergedPayload } from './_shared/qaKnowledge';
 import { createFixedAppTopicApi } from './_shared/fixedAppTopics';
 import type { QaAdminCategory, QaCategory } from '../../config/qaTopics';
@@ -6,6 +6,13 @@ import type { QaAdminCategory, QaCategory } from '../../config/qaTopics';
 // ESG 固定庫的 index Q&A topics / knowledge API。
 // ESG 與 JTI 完全對稱，差別只在路由前綴（esg vs jti），整個 surface 由 factory
 // 依 app 產生；以下 named export 為轉接層，維持既有呼叫端與測試介面不變。
+
+// ESG 對話歷史明細：與 JTI/HCIoT 對稱，走 esg-admin 端點（讀 esg_app 庫，
+// 而非 general 的 /api/chat/history——ESG 對話已不寫 general_app）。
+export async function getEsgConversationDetail(sessionId: string): Promise<Record<string, unknown>> {
+  const response = await fetchAsAdmin(buildUrl(`${API_BASE}/esg-admin/conversations`, { session_id: sessionId }));
+  return handleResponse<Record<string, unknown>>(response);
+}
 
 export const esgTopicApi = createFixedAppTopicApi('esg');
 export const esgQaKnowledgeApi = createQaKnowledgeApi(`${API_BASE}/esg-admin/knowledge`);

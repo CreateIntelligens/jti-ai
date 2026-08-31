@@ -26,13 +26,14 @@ import {
   getHciotConversationDetail,
   getJtiConversationDetail,
 } from '../services/api';
+import { getEsgConversationDetail } from '../services/api/esg';
 import MiniCalendar from './MiniCalendar';
 import HciotImageAttachment from './hciot/HciotImageAttachment';
 import { useEscapeKey } from '../hooks/useEscapeKey';
 import { useOverlayPressClose } from '../hooks/useOverlayPressClose';
 import { resolveHistoryPageJump } from '../utils/conversationHistoryPagination';
 
-type ConversationMode = 'jti' | 'hciot' | 'general';
+type ConversationMode = 'jti' | 'hciot' | 'esg' | 'general';
 
 interface ConversationEntry {
   _id: string;
@@ -169,6 +170,9 @@ function buildHistoryListUrl(
   if (mode === 'hciot') {
     return buildUrl('/api/hciot-admin/conversations', params);
   }
+  if (mode === 'esg') {
+    return buildUrl('/api/esg-admin/conversations', params);
+  }
   return buildUrl('/api/chat/history', {
     ...params,
     store_name: storeName || undefined,
@@ -210,6 +214,13 @@ function buildExportUrl(
       date_to: dateTo || undefined,
     });
   }
+  if (mode === 'esg') {
+    return buildUrl('/api/esg-admin/conversations/export', {
+      session_ids: selectedSessionIds,
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined,
+    });
+  }
   return buildUrl('/api/chat/history/export', {
     store_name: storeName || undefined,
     session_ids: selectedSessionIds,
@@ -224,6 +235,8 @@ async function fetchConversationEntries(mode: ConversationMode, sid: string): Pr
     data = await getJtiConversationDetail(sid);
   } else if (mode === 'hciot') {
     data = await getHciotConversationDetail(sid);
+  } else if (mode === 'esg') {
+    data = await getEsgConversationDetail(sid);
   } else {
     data = await getGeneralConversationDetail(sid);
   }

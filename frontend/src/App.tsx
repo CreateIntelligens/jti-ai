@@ -383,7 +383,9 @@ function HomeShell({ canShow }: { canShow: (page: string) => boolean }) {
         onClose={() => setConversationHistoryModalOpen(false)}
         sessionId={sessionId || undefined}
         storeName={currentStore || undefined}
-        mode="general"
+        // managed store（jti/hciot/esg）的對話寫在各自 app 的庫，必須走對應
+        // admin 端點；只有真正的動態 general store 才走 /api/chat/history
+        mode={managedContext?.appTarget ?? 'general'}
         onResumeSession={(sid, msgs, _lang) => {
           setSessionId(sid);
           setMessages(msgs.map((m) => ({
