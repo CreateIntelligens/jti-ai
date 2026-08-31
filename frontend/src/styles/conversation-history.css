@@ -391,7 +391,9 @@
 
 .mini-cal-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  /* minmax(0, 1fr)：星期列與日期列是兩個獨立 grid，1fr 會被各自內容的
+     min-content 撐開導致欄寬不一致（星期字 vs 日期按鈕），強制等分才對齊 */
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 0.125rem;
 }
 
