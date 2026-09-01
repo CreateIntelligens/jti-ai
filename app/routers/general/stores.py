@@ -323,10 +323,30 @@ def _list_store_files(config: ManagedStoreConfig) -> list[dict[str, Any]]:
 
 
 def _list_general_store_files(store_name: str) -> list[dict[str, Any]]:
-    try:
-        return list(get_knowledge_store().list_files(store_name, namespace=GENERAL_NAMESPACE))
-    except Exception:
-        return []
+    """列出 general store 的檔案,合併兩個並存的 collection。
+
+    general 的檔案可能落在新的 per-store QA workspace store,也可能留在舊的
+    單一檔案 store(見 rag/backfill.py 的同名合併邏輯)。只讀其中一邊會讓
+    前端「文件」分頁與 file_count 憑空少掉檔案。新的優先,以 filename 去重。
+    """
+    from app.services.general.knowledge_store import get_general_knowledge_store
+
+    merged: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for source in (
+        lambda: get_general_knowledge_store().list_files(store_name),
+        lambda: get_knowledge_store().list_files(store_name, namespace=GENERAL_NAMESPACE),
+    ):
+        try:
+            files = list(source())
+        except Exception:
+            continue
+        for meta in files:
+            name = meta.get("filename") or meta.get("name") or ""
+            if name and name not in seen:
+                seen.add(name)
+                merged.append(meta)
+    return merged
 
 
 def _managed_store_payload(config: ManagedStoreConfig) -> dict[str, Any]:
