@@ -257,9 +257,21 @@ def resolve_key_index_for_store(store_name: str) -> int:
         return idx
     dynamic = get_store_registry().get_store(normalize_store_name(store_name))
     if dynamic and dynamic.get("key_name"):
-        idx = gemini_clients.resolve_key_index_by_name(str(dynamic["key_name"]))
+        key_name = str(dynamic["key_name"])
+        idx = gemini_clients.resolve_key_index_by_name(key_name)
         if idx >= 0:
             return idx
+        # key_name 有值卻查不到,代表該 key 已從 GEMINI_API_KEYS 移除。
+        # 此時 key_index 已不可信:移除一把 key 會讓其後的索引往前遞補,
+        # 舊 index 會靜默指到「另一把 key」。寧可退回 0 並告警,也不要用錯 key。
+        logger.warning(
+            "[stores] store=%s 的 key_name=%r 不存在於 GEMINI_API_KEYS;"
+            "忽略已失效的 key_index=%r 並退回 index 0。請更新該 store 的 key 綁定。",
+            store_name,
+            key_name,
+            dynamic.get("key_index"),
+        )
+        return 0
     if dynamic and isinstance(dynamic.get("key_index"), int):
         return int(dynamic["key_index"])
     return 0
@@ -351,6 +363,9 @@ def _key_index_for_store_payload(store: dict[str, Any], key_name: str | None) ->
         resolved = gemini_clients.resolve_key_index_by_name(key_name)
         if resolved >= 0:
             return resolved
+        # key_name 查無:key_index 同樣已失效(見 resolve_key_index_for_store)。
+        # 回 None 讓前端顯示「未綁定」,而不是把 store 畫到別把 key 底下。
+        return None
     key_index = store.get("key_index")
     return key_index if isinstance(key_index, int) else None
 
