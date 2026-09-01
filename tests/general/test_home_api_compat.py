@@ -274,6 +274,9 @@ def test_home_can_create_key_owned_general_store(monkeypatch):
     monkeypatch.setattr(store_routes, "get_store_registry", lambda: registry, raising=False)
     monkeypatch.setattr(gemini_clients, "get_key_count", lambda: 2)
     monkeypatch.setattr(gemini_clients, "get_key_names", lambda: ["JTI", "和泰"])
+    # resolve_key_index_by_name 直讀模組層 _key_names,不經 get_key_names,
+    # 故一併補上;否則 key_name 查無會走「已失效綁定」分支回 None。
+    monkeypatch.setattr(gemini_clients, "_key_names", ["JTI", "和泰"])
 
     client = TestClient(app)
 
@@ -1008,3 +1011,33 @@ def test_resolve_request_store_rejects_legacy_key_index_scope(monkeypatch):
             app.dependency_overrides[verify_auth] = original_verify_auth
         else:
             app.dependency_overrides.pop(verify_auth, None)
+
+
+def test_store_with_removed_key_name_does_not_fall_back_to_stale_index(monkeypatch):
+    """key_name 指向已從 GEMINI_API_KEYS 移除的 key 時,不可退回舊 key_index。
+
+    移除一把 key 會讓其後的索引往前遞補,舊 key_index 會靜默指到另一把 key
+    (實際事故:POC2 被移除後,綁 POC2 的 store 打到了 index 1 的 JTI key)。
+    """
+    from app.routers.general import stores as store_routes
+    from app.services import gemini_clients
+
+    monkeypatch.setattr(gemini_clients, "_key_names", ["POC1", "JTI", "HCIoT"])
+    monkeypatch.setattr(store_routes, "resolve_managed_store", lambda name: None)
+
+    class RemovedKeyRegistry:
+        def get_store(self, name):
+            return {"name": name, "key_name": "POC2", "key_index": 1}
+
+    monkeypatch.setattr(
+        store_routes, "get_store_registry", lambda: RemovedKeyRegistry(), raising=False
+    )
+
+    # 退回 0,而不是失效的 key_index=1(那已經是 JTI)
+    assert store_routes.resolve_key_index_for_store("store_orphan") == 0
+
+    # API payload 回 None,讓前端顯示未綁定而不是畫到 JTI 底下
+    assert store_routes._key_index_for_store_payload({"key_index": 1}, "POC2") is None
+
+    # key_name 仍有效時不受影響
+    assert store_routes._key_index_for_store_payload({"key_index": 9}, "HCIoT") == 2
