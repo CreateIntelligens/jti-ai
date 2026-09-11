@@ -128,16 +128,27 @@ class PromptManager:
         doc.pop("_id", None)
         return StorePrompts(**doc)
 
-    def save_store_prompts(self, store_prompts: StorePrompts):
+    def save_store_prompts(self, store_prompts: StorePrompts) -> None:
         """保存 Store 的 prompts"""
         data = store_prompts.model_dump(exclude_none=True)
-        # active_prompt_id must be explicitly persisted even when None,
-        # otherwise $set leaves the old value in MongoDB.
-        data["active_prompt_id"] = store_prompts.active_prompt_id
+
+        # 設為 None 的欄位代表「要刪掉」，必須走 $unset。
+        # 只用 $set + exclude_none 的話這些欄位不會出現在 payload 裡，
+        # $set 又只動它收到的欄位，舊值就永遠留在 MongoDB
+        # （legacy 遷移把 jti_persona_by_prompt 設 None 清不掉即是此坑）。
+        unset = {
+            field: ""
+            for field in type(store_prompts).model_fields
+            if getattr(store_prompts, field) is None
+        }
+
+        update: dict[str, Any] = {"$set": data}
+        if unset:
+            update["$unset"] = unset
 
         self.collection.update_one(
             {"store_name": store_prompts.store_name},
-            {"$set": data},
+            update,
             upsert=True
         )
 
