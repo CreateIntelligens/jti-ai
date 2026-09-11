@@ -495,7 +495,9 @@ export default function PromptPanel({
       <div className="rp-panel">
         <div className="rp-header">
           <span className="rp-title">Prompt 設定</span>
-          <button className="icon-btn" onClick={onClose}><X size={18} /></button>
+          <button className="icon-btn" onClick={onClose} aria-label="關閉設定">
+            <X size={18} />
+          </button>
         </div>
         <div className="rp-body">
           {!currentStore ? (

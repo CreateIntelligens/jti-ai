@@ -17,8 +17,9 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.auth import verify_authenticated
-from app.services.agent_utils import normalize_language as _normalize_language
 import app.deps as deps
+from app.prompts import Prompt, PromptIndexEntry, StorePrompts
+from app.services.agent_utils import normalize_language as _normalize_language
 
 SUPPORTED_LANGUAGES = ("zh", "en")
 
@@ -167,6 +168,50 @@ class _UpdateRuntimeSettingsRequestBase(BaseModel):
     max_response_chars: Optional[int] = None
 
 
+def mirror_index_to_shared(
+    store_prompts: StorePrompts,
+    index: list[PromptIndexEntry],
+    *,
+    persona_adapter: Optional[PersonaStorageAdapter] = None,
+    language: str = "zh",
+) -> None:
+    """把 app 專屬的 prompt index 鏡射到共用的 prompts[]。
+
+    主頁（/stores/{store}/prompts）讀共用的 prompts[]，各 app 的專用設定頁讀
+    自己的 *_prompt_index。只寫專屬欄位的話主頁會空掉，使用者看到的是「自訂
+    prompt 不見了」。
+
+    persona 存成 {"zh": ..., "en": ...} 一對，共用的 content 卻是單一字串，
+    所以依 store 的語言取對應那半（__jti__ 取 zh、__jti__en 取 en）。沒有
+    adapter 時保留既有 content，不要覆寫成空字串。
+    """
+    existing = {p.id: p for p in (store_prompts.prompts or [])}
+    mirrored = []
+    for entry in index:
+        content = None
+        if persona_adapter is not None:
+            pair = persona_adapter.get(store_prompts, entry.id)
+            if isinstance(pair, dict):
+                value = pair.get(language)
+                if isinstance(value, str) and value.strip():
+                    content = value
+
+        prompt = existing.get(entry.id)
+        if prompt is None:
+            prompt = Prompt(id=entry.id, name=entry.name, content=content or "")
+        else:
+            prompt.name = entry.name
+            if content is not None:
+                prompt.content = content
+        mirrored.append(prompt)
+    store_prompts.prompts = mirrored
+
+
+def mirror_active_to_shared(store_prompts: StorePrompts, prompt_id: Optional[str]) -> None:
+    """把 app 專屬的 active_prompt_id 鏡射到共用欄位，理由同上。"""
+    store_prompts.active_prompt_id = prompt_id
+
+
 def build_persona_router(config: PersonaRouterConfig) -> APIRouter:
     router = APIRouter(tags=[config.tag], dependencies=[Depends(verify_authenticated)])
 
@@ -275,9 +320,19 @@ def build_persona_router(config: PersonaRouterConfig) -> APIRouter:
         raw = getattr(store_prompts, config.prompt_index_attr, None)
         return list(raw) if isinstance(raw, list) else []
 
+    def _store_language(store_prompts) -> str:
+        """這個 store 代表哪個語言（__jti__ -> zh、__jti__en -> en）。"""
+        return "en" if store_prompts.store_name == config.store_name_en else "zh"
+
     def _set_index(store_prompts, index: list) -> None:
         """Write the app-specific prompt index list."""
         setattr(store_prompts, config.prompt_index_attr, index)
+        mirror_index_to_shared(
+            store_prompts,
+            index,
+            persona_adapter=config.persona_adapter,
+            language=_store_language(store_prompts),
+        )
 
     def _get_app_active_id(store_prompts) -> Optional[str]:
         """Read the app-specific active_prompt_id."""
@@ -286,6 +341,7 @@ def build_persona_router(config: PersonaRouterConfig) -> APIRouter:
     def _set_app_active_id(store_prompts, prompt_id: Optional[str]) -> None:
         """Write the app-specific active_prompt_id."""
         setattr(store_prompts, config.active_prompt_id_attr, prompt_id)
+        mirror_active_to_shared(store_prompts, prompt_id)
 
     def _find_index_position(index: list, prompt_id: str) -> Optional[int]:
         return next((i for i, entry in enumerate(index) if entry.id == prompt_id), None)

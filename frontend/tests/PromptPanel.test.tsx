@@ -170,4 +170,32 @@ describe('PromptPanel', () => {
 
     expect(onClose).toHaveBeenCalledTimes(1);
   });
+
+  it.each(['jti', 'hciot', 'esg'])('keeps %s custom prompts scoped to the selected language store', async (app) => {
+    mockEnglishManagedPrompt();
+    const englishStore = `__${app}__en`;
+    const chineseStore = `__${app}__`;
+    apiMocks.listPrompts.mockImplementation(async (store: string) => ({
+      prompts: store === englishStore
+        ? [{ id: 'english-custom', name: 'English 自訂', content: '僅存在英文庫的指令', content_en: 'English store instructions' }]
+        : [],
+      active_prompt_id: store === englishStore ? 'english-custom' : null,
+      max_prompts: 3,
+    }));
+    const props = { isOpen: true, onClose: vi.fn(), onRestartChat: vi.fn() };
+    const { rerender } = render(<PromptPanel {...props} currentStore={englishStore} />);
+    expect(await screen.findByText('English 自訂')).toBeTruthy();
+    expect(screen.getByText('English store instructions')).toBeTruthy();
+    expect(screen.queryByRole('group', { name: 'Prompt 語言' })).toBeNull();
+
+    rerender(<PromptPanel {...props} currentStore={chineseStore} />);
+    await waitFor(() => {
+      expect(screen.queryByText('English 自訂')).toBeNull();
+      expect(screen.queryByText('載入中...')).toBeNull();
+    });
+    expect(apiMocks.listPrompts.mock.calls.map(([store]) => store)).toEqual([englishStore, chineseStore]);
+    expect(apiMocks.createPrompt).not.toHaveBeenCalled();
+    expect(apiMocks.updatePrompt).not.toHaveBeenCalled();
+    expect(apiMocks.setActivePrompt).not.toHaveBeenCalled();
+  });
 });

@@ -25,7 +25,10 @@ const MAX_CUSTOM = 3;
 const SYSTEM_DEFAULT_ID = 'system_default';
 
 export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, language = 'zh' }: JtiSettingsModalProps) {
-  const normalizedLanguage = api.normLang(language);
+  // 後台的中英文是兩個獨立的 store（__jti__ / __jti__en），各有各的人物設定、
+  // 知識庫與回覆規則。語言在此獨立於聊天介面，否則管理端只看得到聊天當下
+  // 那個語言的那一半資料。開啟時以聊天語言為初值。
+  const [normalizedLanguage, setNormalizedLanguage] = useState(() => api.normLang(language));
   const [activeTab, setActiveTab] = useState<'prompt' | 'quiz' | 'kb'>('prompt');
 
   // === Prompt state ===
@@ -64,6 +67,10 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
   const overlayPressClose = useOverlayPressClose(onClose);
 
   const resolveRuntimePromptId = (promptId?: string | null) => promptId || SYSTEM_DEFAULT_ID;
+
+  useEffect(() => {
+    if (isOpen) setNormalizedLanguage(api.normLang(language));
+  }, [isOpen, language]);
 
   useEffect(() => {
     if (isOpen) {
@@ -345,9 +352,24 @@ export default function JtiSettingsModal({ isOpen, onClose, onPromptChange, lang
         {/* Header */}
         <div className="jti-settings-header">
           <h2 className="jti-settings-title">設定</h2>
-          <button className="jti-settings-close" onClick={onClose} aria-label="關閉">
-            <X size={20} />
-          </button>
+          <div className="jti-settings-header-actions">
+            <div className="jti-settings-lang" role="group" aria-label="設定語言">
+              {([['zh', '中文'], ['en', 'English']] as const).map(([code, label]) => (
+                <button
+                  key={code}
+                  type="button"
+                  className={`jti-settings-lang-btn${normalizedLanguage === code ? ' active' : ''}`}
+                  aria-pressed={normalizedLanguage === code}
+                  onClick={() => setNormalizedLanguage(code)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <button className="jti-settings-close" onClick={onClose} aria-label="關閉">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Tabs */}
