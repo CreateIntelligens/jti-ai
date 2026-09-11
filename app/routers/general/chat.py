@@ -180,6 +180,29 @@ def _get_system_instruction(store_name: str, auth: dict, language: str = "zh") -
     return _compose_prompt_system_instruction(prompt, language=language)
 
 
+def _app_active_persona(managed_app: str, language: str) -> str | None:
+    """該 app 目前啟用中的 persona（來自 app 自己的 prompt store）。
+
+    各 app 的 agent 已經有解析啟用 prompt 的邏輯，直接借用，避免在這裡重複
+    一份「讀 index -> 讀 profiles -> 取語言」的實作而與之走鐘。
+    """
+    try:
+        if managed_app == "jti":
+            from app.services.jti.main_agent import main_agent
+        elif managed_app == "hciot":
+            from app.services.hciot.main_agent import main_agent
+        elif managed_app == "esg":
+            from app.services.esg.main_agent import main_agent
+        else:
+            return None
+        _pm, _store, _prompt_id, persona = main_agent._get_active_prompt_context(language)
+        return persona
+    except Exception:
+        # persona 取不到不該讓對話開不起來，交給呼叫端落回預設。
+        logger.warning("Failed to resolve active persona for %s", managed_app, exc_info=True)
+        return None
+
+
 def _app_default_system_instruction(managed_app: str, language: str = "zh") -> str | None:
     """Full system instruction (persona + rule sections) for a managed app.
 
@@ -199,7 +222,12 @@ def _app_default_system_instruction(managed_app: str, language: str = "zh") -> s
     else:
         return None
 
-    persona = app_prompts.PERSONA.get(language, app_prompts.PERSONA["zh"])
+    # 先取該 app 目前「啟用中」的 persona（使用者在 app 專用設定頁設的），
+    # 取不到才落回程式碼預設。否則主頁開 __jti__ 會用 LULU 預設人設回話，
+    # 跟同一個 app 在自己頁面的表現不一致。
+    persona = _app_active_persona(managed_app, language)
+    if not persona:
+        persona = app_prompts.PERSONA.get(language, app_prompts.PERSONA["zh"])
     sections = app_prompts.DEFAULT_RESPONSE_RULE_SECTIONS.get(
         language, app_prompts.DEFAULT_RESPONSE_RULE_SECTIONS["zh"]
     )
