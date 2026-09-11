@@ -1,7 +1,9 @@
 import os
 import sys
 import unittest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
+
+import httpx
 
 # Ensure app is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -321,3 +323,120 @@ class TestEmbeddingServiceHealthCheck(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestEmbeddingRetryOnRateLimit(unittest.TestCase):
+    """429/503 是暫時性的，單次放棄會讓整個 RAG 檢索回 0 命中。"""
+
+    def setUp(self):
+        EmbeddingService._instance = None
+
+    @staticmethod
+    def _response(status, json_body=None, headers=None):
+        request = httpx.Request("POST", "http://embedding:8009")
+        return httpx.Response(
+            status,
+            json=json_body if json_body is not None else {},
+            headers=headers or {},
+            request=request,
+        )
+
+    def _ok_body(self):
+        identity = (
+            "bge:BAAI/bge-m3:1024:float32:l2:query:test-revision"
+        )
+        return {
+            "vectors": [[0.1] * 1024],
+            "model": "BAAI/bge-m3",
+            "embedding_spec": {
+                "identity": identity,
+                "dimensions": 1024,
+                "dtype": "float32",
+                "model": "BAAI/bge-m3",
+                "model_revision": "test-revision",
+                "normalization": "l2",
+                "normalized": True,
+                "input_semantics": "query",
+                "provider": "bge",
+                "service_revision": "test-revision",
+            },
+            "attempts": [],
+        }
+
+    def _make_service(self):
+        with patch.dict(os.environ,
+                        {"EMBEDDING_SERVICE_URL": "http://embedding:8009"}):
+            return EmbeddingService()
+
+    def test_retries_429_then_succeeds(self):
+        service = self._make_service()
+        responses = [
+            self._response(429),
+            self._response(200, self._ok_body()),
+        ]
+        client = MagicMock()
+        client.post.side_effect = responses
+        client.__enter__ = MagicMock(return_value=client)
+        client.__exit__ = MagicMock(return_value=False)
+
+        with patch("app.services.embedding.service.httpx.Client",
+                   return_value=client), \
+                patch("app.services.embedding.service.time.sleep") as sleep:
+            result = service.encode("hi", input_type="query")
+
+        self.assertEqual(client.post.call_count, 2)
+        self.assertEqual(result.shape, (1, 1024))
+        sleep.assert_called_once()
+
+    def test_gives_up_after_three_attempts(self):
+        service = self._make_service()
+        client = MagicMock()
+        client.post.return_value = self._response(429)
+        client.__enter__ = MagicMock(return_value=client)
+        client.__exit__ = MagicMock(return_value=False)
+
+        with (
+            patch("app.services.embedding.service.httpx.Client", return_value=client),
+            patch("app.services.embedding.service.time.sleep"),
+            self.assertRaises(EmbeddingEncodingError) as ctx,
+        ):
+            service.encode("hi", input_type="query")
+
+        self.assertEqual(client.post.call_count, 3)
+        # 訊息要帶狀態碼，否則分不出「被限流」還是「服務掛了」
+        self.assertIn("429", str(ctx.exception))
+
+    def test_does_not_retry_client_error(self):
+        """401 之類重試也不會變好，應該直接失敗。"""
+        service = self._make_service()
+        client = MagicMock()
+        client.post.return_value = self._response(401)
+        client.__enter__ = MagicMock(return_value=client)
+        client.__exit__ = MagicMock(return_value=False)
+
+        with (
+            patch("app.services.embedding.service.httpx.Client", return_value=client),
+            patch("app.services.embedding.service.time.sleep") as sleep,
+            self.assertRaises(EmbeddingEncodingError),
+        ):
+            service.encode("hi", input_type="query")
+
+        self.assertEqual(client.post.call_count, 1)
+        sleep.assert_not_called()
+
+    def test_respects_retry_after_header(self):
+        service = self._make_service()
+        client = MagicMock()
+        client.post.side_effect = [
+            self._response(429, headers={"Retry-After": "2"}),
+            self._response(200, self._ok_body()),
+        ]
+        client.__enter__ = MagicMock(return_value=client)
+        client.__exit__ = MagicMock(return_value=False)
+
+        with patch("app.services.embedding.service.httpx.Client",
+                   return_value=client), \
+                patch("app.services.embedding.service.time.sleep") as sleep:
+            service.encode("hi", input_type="query")
+
+        sleep.assert_called_once_with(2.0)

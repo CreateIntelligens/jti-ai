@@ -1,5 +1,7 @@
 import logging
 import os
+import random
+import time
 from typing import Any
 
 import httpx
@@ -12,6 +14,13 @@ logger = logging.getLogger(__name__)
 # Chunk remote payloads so a large backfill batch doesn't post one huge body.
 _REMOTE_CHUNK_SIZE = 64
 _REMOTE_TIMEOUT_S = 120.0
+# 服務前面的 nginx 會 limit_req，密集檢索（連續問答、backfill）容易撞到 429。
+# 這是暫時且可恢復的，單次就放棄會讓整個 RAG 檢索回 0 命中，對使用者等同答不出來。
+_RETRY_STATUS = frozenset({429, 503})
+_RETRY_ATTEMPTS = 3
+_RETRY_BASE_DELAY_S = 0.5
+# 對方若有給 Retry-After 就尊重它，但設上限避免被要求睡到整個請求逾時。
+_RETRY_AFTER_CAP_S = 10.0
 # /health 探測要短 timeout：backend 的 /health 會等它，拖太久會連帶拖慢外部監控。
 _HEALTH_TIMEOUT_S = 2.0
 _DEFAULT_MODEL = "BAAI/bge-m3"
@@ -28,6 +37,62 @@ _SPEC_FIELDS = {
     "provider",
     "service_revision",
 }
+
+
+def _retry_after_seconds(resp: httpx.Response, attempt: int) -> float:
+    """退避秒數：優先用對方的 Retry-After，否則指數退避加抖動。
+
+    抖動避免多個 worker 同時撞到限流後又同步重試，再次集體觸發 limit_req。
+    """
+    raw = resp.headers.get("Retry-After")
+    if raw:
+        try:
+            return min(float(raw), _RETRY_AFTER_CAP_S)
+        except ValueError:
+            pass
+    return _RETRY_BASE_DELAY_S * (2 ** attempt) + random.uniform(0, 0.25)
+
+
+def _post_with_retry(
+    client: httpx.Client,
+    url: str,
+    *,
+    json: dict[str, Any],
+    headers: dict[str, str],
+) -> httpx.Response:
+    """POST，遇到限流/暫時不可用時重試。
+
+    只重試 _RETRY_STATUS（429/503）這類會自行恢復的狀態；4xx/5xx 其餘狀態
+    重試也不會變好，直接讓它拋出去。
+    """
+    last_status: int | None = None
+    for attempt in range(_RETRY_ATTEMPTS):
+        resp = client.post(url, json=json, headers=headers)
+        status = getattr(resp, "status_code", None)
+        if status not in _RETRY_STATUS:
+            resp.raise_for_status()
+            return resp
+
+        last_status = status
+        if attempt == _RETRY_ATTEMPTS - 1:
+            break
+        delay = _retry_after_seconds(resp, attempt)
+        logger.warning(
+            "Embedding service returned %s, retrying in %.2fs (%d/%d)",
+            status,
+            delay,
+            attempt + 1,
+            _RETRY_ATTEMPTS - 1,
+        )
+        time.sleep(delay)
+
+    logger.error(
+        "Embedding service still returning %s after %d attempts",
+        last_status,
+        _RETRY_ATTEMPTS,
+    )
+    resp.raise_for_status()
+    return resp
 
 
 class EmbeddingService:
@@ -138,12 +203,12 @@ class EmbeddingService:
                     }
                     if selected_identity:
                         payload["identity"] = selected_identity
-                    resp = client.post(
+                    resp = _post_with_retry(
+                        client,
                         url,
                         json=payload,
                         headers=headers,
                     )
-                    resp.raise_for_status()
                     batch_vectors, response_identity = self._validate_response(
                         resp.json(),
                         expected_count=len(batch),
@@ -153,12 +218,11 @@ class EmbeddingService:
                     vectors.extend(batch_vectors)
                     selected_identity = response_identity or selected_identity
         except httpx.HTTPError as exc:
-            logger.error(
-                "Remote embedding request failed (%s)",
-                type(exc).__name__,
-            )
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            detail = f"{type(exc).__name__} HTTP {status}" if status else type(exc).__name__
+            logger.error("Remote embedding request failed (%s)", detail)
             raise EmbeddingEncodingError(
-                f"Failed to encode texts: {type(exc).__name__}"
+                f"Failed to encode texts: {detail}"
             ) from exc
         except (KeyError, TypeError, ValueError) as exc:
             logger.error("Embedding response contract validation failed")
