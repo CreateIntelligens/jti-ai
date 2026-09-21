@@ -11,7 +11,7 @@
       "is_default": true,
       "name": "預設題庫",
       "selection_rules": {
-        "total": 4
+        "total": 3
       },
       "tie_breaker_priority": [
         "analyst",
@@ -20,11 +20,11 @@
         "explorer"
       ],
       "title": "生活品味人格探索",
-      "total_questions": 4,
+      "total_questions": 3,
       "quiz_copy": {
         "opening": {
-          "zh": "簡單四個問題，幫你找到命定保護殼，如果中途想離開，請輸入「中斷」，即可回到問答模式，讓我們開始測驗吧！",
-          "en": "Just four questions to find your perfect phone case! If you want to leave midway, type pause to return to chat. Let's begin!"
+          "zh": "簡單三個問題，幫你找到命定保護殼，如果中途想離開，請輸入「中斷」，即可回到問答模式，讓我們開始測驗吧！",
+          "en": "Just three questions to find your perfect phone case! If you want to leave midway, type pause to return to chat. Let's begin!"
         },
         "already_done": {
           "zh": "你已經作答過囉！想再玩一次請重新整理頁面開始新的對話。",

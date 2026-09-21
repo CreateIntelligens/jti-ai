@@ -154,7 +154,7 @@ def _default_bank_seed_payload(data: dict[str, Any]) -> dict[str, Any]:
         "name": data.get("name", "預設題庫"),
         "title": data.get("title", data.get("name", "")),
         "description": data.get("description", ""),
-        "total_questions": data.get("total_questions", 4),
+        "total_questions": data.get("total_questions", 3),
         "dimensions": data.get("dimensions", []),
         "tie_breaker_priority": data.get("tie_breaker_priority", []),
         "selection_rules": data.get("selection_rules", {}),
@@ -285,6 +285,14 @@ def migrate_quiz_bank() -> None:
 
     # Upgrade any JTI legacy data
     _upgrade_legacy_data()
+
+    from app.services.mongo_client import get_mongo_db
+    db_jti = get_mongo_db("jti_app")
+    if db_jti is not None:
+        db_jti["quiz_bank_metadata"].update_many(
+            {"store_name": {"$in": [JTI_STORE_NAME, f"{JTI_STORE_NAME}en"]}},
+            {"$set": {"selection_rules.total": 3, "total_questions": 3}},
+        )
 
     from app.services.jti.quiz_bank_store import get_quiz_bank_store
     store = get_quiz_bank_store()
