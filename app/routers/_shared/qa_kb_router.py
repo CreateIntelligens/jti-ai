@@ -185,8 +185,8 @@ def _add_knowledge_routes(router: APIRouter, config: QaKbRouterConfig) -> None:
             if not updated:
                 raise HTTPException(status_code=404, detail="檔案不存在")
 
-            if not is_document:
-                _schedule_rag_sync(config, background_tasks, language, safe_name, new_bytes)
+            # 沒有 topic 的文件上傳時也會進 RAG，改完要重建，否則會一直查到舊內容
+            _schedule_rag_sync(config, background_tasks, language, safe_name, new_bytes)
 
         topic_synced = _sync_topic_questions_for_doc(config, language, doc) if not is_document else False
 
@@ -320,8 +320,8 @@ def _add_knowledge_routes(router: APIRouter, config: QaKbRouterConfig) -> None:
             raise HTTPException(status_code=404, detail="檔案不存在")
 
         has_topic = bool(existing.get("topic_id"))
-        if has_topic:
-            _schedule_rag_delete(config, background_tasks, language, safe_name)
+        # 不論有沒有 topic 都已建過索引，刪檔時一併清掉向量
+        _schedule_rag_delete(config, background_tasks, language, safe_name)
 
         topic_synced = _sync_topic_questions_for_doc(config, language, existing) if has_topic else False
         config.invalidate_cache(language)
