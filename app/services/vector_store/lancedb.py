@@ -1,6 +1,7 @@
 import logging
 import os
 import threading
+from datetime import timedelta
 from typing import Any, Dict, List, Optional
 
 import lancedb
@@ -23,7 +24,10 @@ class LanceDBStore:
         if self._db is None:
             if not self.uri.startswith("memory://"):
                 os.makedirs(self.uri, exist_ok=True)
-            self._db = lancedb.connect(self.uri)
+            # uvicorn 跑多個 worker，各自快取 table handle；不設這個的話 handle 會
+            # 停在第一次開啟的版本，別的 worker 寫入的知識要等重啟才看得到。
+            # 0 = 每次讀取前都檢查最新版本（本機磁碟，只多讀一次 manifest）。
+            self._db = lancedb.connect(self.uri, read_consistency_interval=timedelta(0))
         return self._db
 
     _EXPECTED_STRING_COLUMNS = ("image_id", "url")
