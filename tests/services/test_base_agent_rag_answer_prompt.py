@@ -136,7 +136,7 @@ class FakeAgent(BaseAgent):
     async def _send_enriched_with_model_fallback(self, chat_session, enriched, force_config, session):
         return chat_session, chat_session.send_message(enriched, config=force_config)
 
-    async def _execute_rag_tool(self, ai_query: str, user_message: str, session: Session):
+    async def _execute_rag_tool(self, ai_query: str, user_message: str, session: Session, query_vectors=None):
         return "PRP 是 Platelet-Rich Plasma，中文常稱高濃度血小板血漿。", [
             {
                 "title": "PRP.csv",

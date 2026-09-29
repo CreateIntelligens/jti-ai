@@ -62,6 +62,45 @@ class RAGPipeline:
             logger.error(f"[RAG Pipeline] Retrieval failed: {e}")
             return None, None
 
+    def encode_queries(self, texts: List[str]) -> Dict[str, Any]:
+        """Embed several queries in one request; empty mapping on failure.
+
+        openVman's edge caps concurrent /api/embedding connections per source,
+        so a turn's queries must share one request instead of one each.
+        """
+        unique = list(dict.fromkeys(texts))
+        if not unique:
+            return {}
+        try:
+            vectors = self.embedding_service.encode(unique, input_type="query")
+        except Exception as e:
+            logger.error(f"[RAG Pipeline] Query embedding failed: {e}")
+            return {}
+        return dict(zip(unique, vectors))
+
+    def retrieve_with_vector(
+        self,
+        query: str,
+        query_vector,
+        language: str = "zh",
+        source_type: Optional[str | List[str]] = None,
+        top_k: int = 5,
+    ) -> Tuple[Optional[str], Optional[List[Dict[str, Any]]]]:
+        """Like retrieve(), but with a vector already produced by encode_queries()."""
+        t0 = time.time()
+        try:
+            return self._search_and_format(
+                query_vector,
+                query,
+                language,
+                source_type,
+                top_k,
+                t0,
+            )
+        except Exception as e:
+            logger.error(f"[RAG Pipeline] Retrieval failed: {e}")
+            return None, None
+
     def _search_and_format(
         self,
         query_vector,

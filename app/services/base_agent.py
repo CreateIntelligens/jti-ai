@@ -449,8 +449,17 @@ class BaseAgent:
         queries = self._extract_search_queries(tool_args, fallback=user_message)
         logger.info(f"[Tool Call] search_knowledge(queries={queries})")
 
+        # 一次送出所有查詢的 embedding：openVman 邊緣限制每來源 2 條同時連線，
+        # 逐句各送一次會每輪撞到 429。
+        loop = asyncio.get_running_loop()
+        query_vectors = await loop.run_in_executor(
+            None, get_rag_pipeline().encode_queries, list(dict.fromkeys([*queries, user_message]))
+        )
         sub_results = await asyncio.gather(
-            *[self._execute_rag_tool(query, user_message, session) for query in queries]
+            *[
+                self._execute_rag_tool(query, user_message, session, query_vectors=query_vectors)
+                for query in queries
+            ]
         )
         tool_result, citations = self._format_search_results(queries, sub_results)
         return tool_name, tool_result, citations
@@ -486,12 +495,26 @@ class BaseAgent:
                 base.append(c)
         return base
 
-    async def _execute_rag_tool(self, ai_query: str, user_message: str, session: Session) -> tuple[str, list[dict] | None]:
+    async def _execute_rag_tool(
+        self,
+        ai_query: str,
+        user_message: str,
+        session: Session,
+        query_vectors: dict[str, Any] | None = None,
+    ) -> tuple[str, list[dict] | None]:
         """Run dual RAG search: AI-rewritten query + original user message, merge & dedupe.
-        Skips the second query when ai_query matches user_message."""
+        Skips the second query when ai_query matches user_message.
+
+        query_vectors maps each query text to its embedding from
+        RAGPipeline.encode_queries(); a text missing from it (embedding failed)
+        contributes no results."""
         loop = asyncio.get_running_loop()
         pipeline = get_rag_pipeline()
-        
+        if query_vectors is None:
+            query_vectors = await loop.run_in_executor(
+                None, pipeline.encode_queries, [ai_query, user_message]
+            )
+
         # Resolve the language axis used for RAG retrieval. When a subclass
         # overrides this with a non-None value, take it as the storage key
         # verbatim (GeneralAgent stores per-store under language=store_name);
@@ -502,21 +525,24 @@ class BaseAgent:
         )
         rag_source_type = self._get_rag_source_type_for_session(session)
 
-        ai_future = loop.run_in_executor(
-            None,
-            lambda q=ai_query, sl=search_lang, rst=rag_source_type: pipeline.retrieve(q, language=sl, source_type=rst, top_k=3),
-        )
+        async def search(text: str) -> list[dict] | None:
+            vector = query_vectors.get(text)
+            if vector is None:
+                return None
+            _, found = await loop.run_in_executor(
+                None,
+                lambda: pipeline.retrieve_with_vector(
+                    text, vector, language=search_lang, source_type=rag_source_type, top_k=3
+                ),
+            )
+            return found
 
         # Skip duplicate query when AI didn't rewrite
         if ai_query == user_message:
-            _, ai_citations = await ai_future
+            ai_citations = await search(ai_query)
             user_citations = None
         else:
-            user_future = loop.run_in_executor(
-                None,
-                lambda um=user_message, sl=search_lang, rst=rag_source_type: pipeline.retrieve(um, language=sl, source_type=rst, top_k=3),
-            )
-            (_, ai_citations), (_, user_citations) = await asyncio.gather(ai_future, user_future)
+            ai_citations, user_citations = await asyncio.gather(search(ai_query), search(user_message))
 
         # Fuse the two result lists with Reciprocal Rank Fusion.
         # Each ranked list is sorted by its own distance, then every doc gets
