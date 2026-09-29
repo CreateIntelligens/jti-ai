@@ -36,6 +36,7 @@ if redis.call('get', KEYS[1]) == ARGV[1] then
 end
 return 0
 """
+_DEFAULT_RAG_SYNC_INTERVAL_SECONDS = 300
 _FIXED_RAG_BACKFILL_JOBS = (
     ("jti", "zh"),
     ("jti", "en"),
@@ -195,6 +196,11 @@ async def lifespan(_: FastAPI):
     try:
         from app.services.rag.backfill import get_backfill_service
         _schedule_background_task(_run_rag_backfill(get_backfill_service()))
+        sync_interval = _rag_sync_interval_seconds()
+        if sync_interval > 0:
+            _schedule_background_task(
+                _run_rag_periodic_sync(get_backfill_service(), sync_interval)
+            )
     except Exception as e:
         logger.error(f"[RAG] Failed to init backfill: {e}")
 
@@ -422,6 +428,45 @@ async def _run_rag_backfill(backfill: Any) -> None:
         # 已處理的失敗要立即釋放，避免其他 worker 等完整段 TTL。
         if lock_client is not None and lock_token is not None:
             _release_backfill_lock(lock_client, lock_token)
+
+
+def _rag_sync_interval_seconds() -> int:
+    raw = os.getenv("RAG_SYNC_INTERVAL_SECONDS", "")
+    try:
+        return max(int(raw), 0)
+    except ValueError:
+        return _DEFAULT_RAG_SYNC_INTERVAL_SECONDS
+
+
+async def _run_rag_periodic_sync(backfill: Any, interval_seconds: int) -> None:
+    """各機器共用 Mongo 但各有自己的 LanceDB；在別台後台改的知識只會索引到
+    那一台。定期跑增量 backfill（比對 fingerprint，只重建有變動的檔案並清掉
+    已刪除的），讓每台不必重啟也能追上。"""
+    lock_client = _build_backfill_lock_client()
+    while True:
+        await asyncio.sleep(interval_seconds)
+        await _run_rag_sync_round(backfill, lock_client)
+
+
+async def _run_rag_sync_round(backfill: Any, lock_client: Any) -> bool:
+    """Run one incremental sync; False when another worker holds the lock."""
+    loop = asyncio.get_running_loop()
+    lock_token: str | None = None
+    if lock_client is not None:
+        lock_token = await loop.run_in_executor(None, _acquire_backfill_lock, lock_client)
+        # 同台另一個 worker 正在跑啟動 backfill 或這輪同步，下一輪再來。
+        if lock_token is None:
+            return False
+
+    try:
+        for source_type, partition in _build_rag_backfill_jobs(_list_general_store_names()):
+            await loop.run_in_executor(None, backfill.run_backfill, source_type, partition)
+    except Exception as exc:
+        logger.error("[RAG] Periodic sync failed: %s", exc)
+    finally:
+        if lock_client is not None and lock_token is not None:
+            _release_backfill_lock(lock_client, lock_token)
+    return True
 
 
 app = FastAPI(title="ai360 km api", lifespan=lifespan)
