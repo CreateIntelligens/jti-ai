@@ -1,5 +1,14 @@
 # Changelog
 
+## [Unreleased]
+
+### Embedding 換成 EmbeddingGemma 2
+
+- **模型**：RAG embedding 從 BAAI/bge-m3（1024 維）換成 `google/embeddinggemma-2`（768 維，revision 釘死），依供應鏈政策移除 BGE 與 FlagEmbedding。本地 gateway（`docker/embedding`）與 openVman 共用服務算出的向量完全相同。
+- **檢索語意**：查詢用 `search_query`（search result 前綴），文件用 `document` 並以 topic 標籤作為標題；每次請求都釘死 identity。
+- **LanceDB 表名依模型推導**：換模型會自動在新表重建，舊表保留可以回退；新增 `scripts/prebuild_rag_index.py`，可在切換前先建好新表，切換時不停機（見 `docs/embedding-model-cutover.md`）。
+- 修正：知識庫從 API 上傳或編輯時，非 HCIoT 的檔案拿不到 topic，造成 chunk 前綴與 embedding 標題跟全量重建時不一致。
+
 ## [1.1.0] - 2026-06-22
 
 通用知識庫（General）全面升級為 **per-store 多租戶架構**，新增 ESG app tier；JTI 與 ESG 遷移至共用 Managed App Runtime，後端啟動效能提升，並完善 app 隔離與安全修補。

@@ -2,13 +2,13 @@
 
 ai360 km 是一個以 FastAPI、React/Vite、Google Gemini 和 self-hosted RAG 組成的多應用對話平台。現行應用包含 **JTI 活動助理**、**HCIoT 醫院衛教助理**、**ESG 永續測驗助理**，以及可綁定任意知識庫的 **通用 OpenAI-compatible API**。
 
-系統主資料庫為 AWS DocumentDB（Atlas 作為啟動時備援），保存知識庫與 session/log 資料，使用 BAAI/bge-m3 embedding gateway 產生向量並寫入 LanceDB 做檢索，再由 Gemini 產生最後回答。Embedding gateway 可由本專案 Compose profile 啟動，也可指向 openVman 共用服務。
+系統主資料庫為 AWS DocumentDB（Atlas 作為啟動時備援），保存知識庫與 session/log 資料，使用 EmbeddingGemma 2（`google/embeddinggemma-2`）embedding gateway 產生向量並寫入 LanceDB 做檢索，再由 Gemini 產生最後回答。Embedding gateway 可由本專案 Compose profile 啟動，也可指向 openVman 共用服務。
 
 ## 功能特色
 
 - **多應用模式**：JTI、HCIoT、ESG 與通用知識庫聊天共用後端基礎設施（Managed App Runtime），但各自保有 session、prompt、TTS 與知識庫邏輯。新增應用只需註冊 runtime config，無需重複實作底層。
 - **ESG App Tier**：ESG 永續測驗助理，含獨立測驗題庫與 per-app quiz seeding，與 JTI 共用 Managed App Runtime。
-- **Self-hosted RAG**：透過 HTTP embedding gateway 使用 FlagEmbedding + BAAI/bge-m3，LanceDB 做主要檢索，MongoDB 做知識庫與向量備份。Client 會驗證回傳的 model、identity、維度、正規化與 input semantics，同時保留相容舊版只含 `vectors` 的 `/embed` 回應。
+- **Self-hosted RAG**：透過 HTTP embedding gateway 使用 sentence-transformers + EmbeddingGemma 2（768 維），LanceDB 做主要檢索，MongoDB 做知識庫與向量備份。Client 每次請求都釘死 identity（查詢 `search_query`、文件 `document` 並帶 topic 標題），並驗證回傳的 model、identity、維度、正規化與 input semantics。LanceDB 表名依模型與維度推導，換模型會自動在新表重建。
 - **自動索引同步**：服務啟動時背景 backfill JTI/HCIoT/ESG 中英知識庫；知識庫上傳、更新、刪除時會排程同步到 RAG。
 - **通用知識庫 per-store 多租戶**：通用知識庫（文件、圖片、topic/Q&A）全面改為以 `store_name` 為鍵的多租戶架構，各 store 資料完全隔離，RAG reindex 支援 per-store 粒度。
 - **知識庫管理**：支援上傳、線上預覽、下載、編輯與刪除 TXT、Markdown、CSV、DOCX 等文件。權限採 scope 隔離：super_admin / admin 可跨應用管理，一般 user 則可管理自己 scope 所屬應用的知識庫（檔案、圖片、主題），但碰不到其他應用。
@@ -41,7 +41,7 @@ FastAPI backend
   - OpenAI-compatible /v1/chat/completions
   |
   +--> Gemini API             answer generation
-  +--> BGE-m3 embedding gateway (local profile or shared openVman edge)
+  +--> EmbeddingGemma 2 gateway (local profile or shared openVman edge)
   +--> LanceDB                local vector search
   +--> DocumentDB (primary)   sessions, logs, knowledge stores, image store, vector backup
   +--> Atlas (fallback)       startup fallback when primary unreachable
@@ -90,9 +90,9 @@ HCIOT_TTS_CHARACTER=healthy2
 
 # RAG
 COMPOSE_PROFILES=embedding
-EMBEDDING_EXPECTED_MODEL=BAAI/bge-m3
-EMBEDDING_EXPECTED_DIMENSION=1024
-LANCEDB_PATH=data/lancedb
+EMBEDDING_EXPECTED_MODEL=google/embeddinggemma-2
+EMBEDDING_EXPECTED_DIMENSION=768
+LANCEDB_PATH=data/shared/lancedb
 RAG_DISTANCE_THRESHOLD=0.85
 
 # Frontend page gate for restricted hosts
@@ -112,7 +112,7 @@ EMBEDDING_SERVICE_URL=https://openvman.example.com/api/embedding
 EMBEDDING_SERVICE_TOKEN=replace-with-openvman-embedding-token
 ```
 
-`EMBEDDING_SERVICE_URL` 不要加尾端 `/embed`，client 會自行附加。內部 Docker 網路也可設為 `http://embedding:8009`。若設定外部 URL，Compose 不會強制啟動或等待本地 embedding container。
+`EMBEDDING_SERVICE_URL` 指向 gateway 的 base path（client 直接 POST 在這個路徑），不要加尾端 `/embed`。內部 Docker 網路也可設為 `http://embedding:8009`。若設定外部 URL，Compose 不會強制啟動或等待本地 embedding container。
 
 ### 3. 啟動服務
 
@@ -125,7 +125,7 @@ docker compose build backend frontend db-tunnel
 docker compose up -d
 ```
 
-啟用本地 `embedding` profile 時，首次啟動會下載 BGE-m3 模型到 `./.hf_cache`。Backend 會在背景索引 MongoDB 中的 JTI/HCIoT 知識庫到 `./data/lancedb`；共用 gateway 不可用或首次索引尚未完成時，RAG 相關回應可能暫時沒有檢索結果。
+啟用本地 `embedding` profile 時，首次啟動會從 Hugging Face 下載 EmbeddingGemma 2（revision 釘死）到 `./.hf_cache`。Backend 會在背景索引 MongoDB 中的知識庫到 `./data/shared/lancedb`；更換 embedding 模型的步驟見 [docs/embedding-model-cutover.md](docs/embedding-model-cutover.md)。共用 gateway 不可用或首次索引尚未完成時，RAG 相關回應可能暫時沒有檢索結果。
 
 常用入口：
 
@@ -156,7 +156,7 @@ ai360-km/
 │   │   ├── esg/                        # ESG chat、quiz、quiz-bank、prompt、knowledge
 │   │   └── _shared/                    # 共用 persona router factory
 │   ├── services/
-│   │   ├── embedding/                  # BGE-m3 embedding service
+│   │   ├── embedding/                  # embedding gateway HTTP client
 │   │   ├── rag/                        # chunker、retrieval pipeline、batch backfill、document RAG service
 │   │   ├── vector_store/               # LanceDB primary store、MongoDB vector backup
 │   │   ├── session/                    # session managers and factories
@@ -224,5 +224,5 @@ Admin:
 2. 上傳、更新、刪除會排程同步到 RAG；服務啟動時也會背景掃描 JTI/HCIoT 的 `zh`、`en` 知識庫。
 3. Q&A CSV 以 row 為 chunk，並會保留 `img` 欄位解析出的 `image_id` 與 `url`。
 4. HCIoT 一般文件知識（非 Q&A）會走 `DocumentRagService`，用較大的 semantic chunks 寫入 `{app}_doc_knowledge`，不掛 topic、不產生預設問題。
-5. BGE-m3 產生 embedding 後寫入 LanceDB，並同步一份到 MongoDB vector backup。
+5. EmbeddingGemma 2 產生 embedding 後寫入 LanceDB（表名依模型推導，例如 `knowledge_embeddinggemma_2_768`）。
 6. Chat 或 `/v1/chat/completions` 查詢時會依 `language`、`source_type` 和 distance threshold 篩選檢索結果。
