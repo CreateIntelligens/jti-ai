@@ -8,6 +8,7 @@
 - **檢索語意**：查詢用 `search_query`（search result 前綴），文件用 `document` 並以 topic 標籤作為標題；每次請求都釘死 identity。
 - **LanceDB 表名依模型推導**：換模型會自動在新表重建，舊表保留可以回退；新增 `scripts/prebuild_rag_index.py`，可在切換前先建好新表，切換時不停機（見 `docs/embedding-model-cutover.md`）。
 - 修正：知識庫從 API 上傳或編輯時，非 HCIoT 的檔案拿不到 topic，造成 chunk 前綴與 embedding 標題跟全量重建時不一致。
+- **索引檢查 API**：`GET /api/admin/rag/audit`（管理員）比對這台的 LanceDB 與共用 Mongo，回報缺漏、過期、殘留（含已刪除 store）與重複的 chunk，部署後可以遠端確認索引乾淨。
 - **重啟自動恢復**：RAG backfill 的 Redis 鎖改成 60 秒 TTL 加心跳續約，持有者被砍掉時一分鐘內自動過期（原本要空等 30 分鐘）；embedding 還在下載或載入模型時，啟動暖機每 10 秒重試一次（最多 15 分鐘），不會直接放棄建索引；還沒切換的 bge gateway 收到的查詢會退回 `query` 語意，先 pull 再切換也不會讓檢索失效。
 
 ## [1.1.0] - 2026-06-22

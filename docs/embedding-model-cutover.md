@@ -121,6 +121,19 @@ curl -s http://localhost:<PORT>/health
 # 預期："embedding": true
 ```
 
+確認索引是乾淨的（約 30 秒；需要 `ADMIN_API_KEY`）：
+
+```bash
+curl -s -H "Authorization: Bearer $ADMIN_API_KEY" http://localhost:<PORT>/api/admin/rag/audit
+```
+
+- `clean` 要是 `true`：表名和維度都是 gemma 的；Mongo 裡每個檔案都有索引，而且內容
+  （fingerprint）一致；沒有已刪除檔案或已刪除 store 的殘留；沒有重複的 chunk。
+- 不是 `true` 時，各分區的 `missing`／`stale`／`orphans` 以及 `orphan_partitions`
+  會列出是哪些檔案。
+- 各台機器共用同一個 Mongo，所以 `total_chunks` 和各分區的數量應該跟其他已切換的機器相同。
+- `other_tables` 會列出舊的 `knowledge` 表。它是留著回退用的，檢索不會讀它。
+
 接著用前端或 API 分別問 jti、hciot 各一題知識庫裡有的問題，確認回答有引用到正確的段落。
 
 如果 log 出現 `[RAG] Another worker is indexing; waiting for it to finish`：通常是舊容器被砍掉時

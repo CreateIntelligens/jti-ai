@@ -212,6 +212,7 @@ Admin:
 - `GET/POST/PUT/DELETE /api/general/stores/{store_name}/topics/...`
 - `GET/POST/PUT/DELETE /api/general/stores/{store_name}/images/...`
 - `POST /api/admin/rag/reindex`（支援 per-store 粒度）
+- `GET /api/admin/rag/audit`（檢查這台的 LanceDB 是否與共用 Mongo 一致）
 - `POST /api/admin/db-sync`（DocumentDB ↔ Atlas 同步，限 super_admin）
 - `GET/POST/PUT/DELETE /api/keys`
 

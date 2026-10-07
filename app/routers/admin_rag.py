@@ -92,3 +92,15 @@ async def reindex_status(source_type: str = "hciot", auth: dict = Depends(verify
         "source_type": source_type,
         "reindexing": is_running,
     }
+
+
+@router.get("/audit")
+async def audit_index(_auth: dict = Depends(verify_admin)):
+    """這台機器的 LanceDB 是否與共用 Mongo 一致（換模型或部署後用來驗證）。"""
+    # 延遲 import：app.main 會 import 這個 router。
+    from app.main import _build_rag_backfill_jobs, _list_general_store_names
+    from app.services.rag.index_audit import audit_rag_index
+
+    loop = asyncio.get_running_loop()
+    jobs = _build_rag_backfill_jobs(_list_general_store_names())
+    return await loop.run_in_executor(None, audit_rag_index, jobs)
