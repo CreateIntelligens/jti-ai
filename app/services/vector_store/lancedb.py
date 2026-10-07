@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import threading
 from datetime import timedelta
 from typing import Any, Dict, List, Optional
@@ -7,6 +8,11 @@ from typing import Any, Dict, List, Optional
 import lancedb
 import numpy as np
 import pandas as pd
+
+from app.services.embedding.service import (
+    configured_dimensions,
+    configured_model,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -222,6 +228,24 @@ class LanceDBStore:
         count = tbl.count_rows() if tbl else 0
         return {"count": count, "table_name": self.table_name}
 
+_LEGACY_TABLE_NAME = "knowledge"
+_LEGACY_EMBEDDING = ("BAAI/bge-m3", 1024)
+
+
+def knowledge_table_name() -> str:
+    """依 embedding 模型決定表名，換模型就自動換一張新表重建。
+
+    不同模型（或維度）的向量不能放同一張表：維度不同直接寫不進去，維度相同
+    也會因 fingerprint 未變而跳過重算，查詢向量就拿去比對舊模型的向量。
+    舊表留著不刪，模型設定改回去即可回退。
+    """
+    model, dimensions = configured_model(), configured_dimensions()
+    if (model, dimensions) == _LEGACY_EMBEDDING:
+        return _LEGACY_TABLE_NAME
+    slug = re.sub(r"[^a-z0-9]+", "_", model.rsplit("/", 1)[-1].lower()).strip("_")
+    return f"{_LEGACY_TABLE_NAME}_{slug}_{dimensions}"
+
+
 _lancedb_store: Optional[LanceDBStore] = None
 
 
@@ -230,5 +254,6 @@ def get_lancedb_store() -> LanceDBStore:
     if _lancedb_store is None:
         _lancedb_store = LanceDBStore(
             uri=os.getenv("LANCEDB_PATH", "data/shared/lancedb"),
+            table_name=knowledge_table_name(),
         )
     return _lancedb_store

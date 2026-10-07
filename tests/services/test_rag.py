@@ -202,6 +202,11 @@ class TestRAGPipeline(unittest.TestCase):
 
         records = mock_lancedb_store.replace_file_chunks.call_args.args[3]
         self.assertTrue(records[0]["text"].startswith("【FAQ / Department Introductions】"))
+        # 文件向量的標題用 topic，不用檔名
+        self.assertEqual(
+            mock_embedding_service.encode.call_args.kwargs["titles"],
+            ["FAQ / Department Introductions"],
+        )
 
     def test_hciot_backfill_skips_topic_store_lookup_when_labels_are_usable(self):
         topic_info = {
@@ -231,6 +236,17 @@ class TestRAGPipeline(unittest.TestCase):
             {"category_label": "骨科", "topic_label": "痛風"}
         )
         self.assertEqual(prefix, "【骨科 / 痛風】")
+
+    def test_title_uses_topic_even_without_prefix(self):
+        """JTI/ESG 的假 topic 不加前綴，但仍可當標題；沒有 topic 就不給標題。"""
+        cases = [
+            ({"category_label": "常見問題", "topic_label": "常見問題"}, "常見問題"),
+            ({"category_label": "骨科", "topic_label": "痛風"}, "骨科 / 痛風"),
+            ({"category_label": "", "topic_label": ""}, ""),
+        ]
+        for topic_info, expected in cases:
+            with self.subTest(topic_info=topic_info):
+                self.assertEqual(BackfillService._build_title(topic_info), expected)
 
 if __name__ == '__main__':
     unittest.main()

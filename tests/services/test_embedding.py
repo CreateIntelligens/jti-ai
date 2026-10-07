@@ -11,6 +11,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")
 from app.services.embedding.errors import EmbeddingEncodingError
 from app.services.embedding.service import EmbeddingService
 
+REV = "914f7f89142e33e77833254d9c9b90c3cef7303b"
+
 
 class TestEmbeddingServiceRequiresUrl(unittest.TestCase):
 
@@ -37,25 +39,25 @@ class TestEmbeddingServiceRemote(unittest.TestCase):
     @staticmethod
     def _extended_response(vectors, input_type="document", identity=None):
         identity = identity or (
-            "bge:BAAI/bge-m3:1024:float32:l2:"
-            f"{input_type}:test-revision"
+            "gemma:google/embeddinggemma-2:768:float32:l2:"
+            f"{input_type}:{REV}"
         )
         return {
             "vectors": vectors,
-            "model": "BAAI/bge-m3",
+            "model": "google/embeddinggemma-2",
             "embedding_spec": {
                 "identity": identity,
-                "provider": "bge",
-                "model": "BAAI/bge-m3",
-                "dimensions": 1024,
+                "provider": "gemma",
+                "model": "google/embeddinggemma-2",
+                "dimensions": 768,
                 "dtype": "float32",
                 "normalized": True,
                 "normalization": "l2",
                 "input_semantics": input_type,
-                "model_revision": "test-revision",
+                "model_revision": REV,
                 "service_revision": "1.0.0",
             },
-            "attempts": [{"provider": "bge", "status": "selected"}],
+            "attempts": [{"provider": "gemma", "status": "selected"}],
         }
 
     def test_remote_encode_returns_2d_ndarray(self):
@@ -68,7 +70,7 @@ class TestEmbeddingServiceRemote(unittest.TestCase):
                 pass
 
             def json(self):
-                return {"vectors": [[0.1] * 1024]}
+                return {"vectors": [[0.1] * 768]}
 
         class FakeClient:
             def __enter__(self_inner):
@@ -86,7 +88,7 @@ class TestEmbeddingServiceRemote(unittest.TestCase):
         with patch("httpx.Client", return_value=FakeClient()):
             result = service.encode("hello", input_type="query")
 
-        self.assertEqual(result.shape, (1, 1024))
+        self.assertEqual(result.shape, (1, 768))
         self.assertEqual(captured["url"], "http://embedding:8009")
         self.assertEqual(captured["payload"]["texts"], ["hello"])
         self.assertEqual(captured["payload"]["input_type"], "query")
@@ -112,7 +114,7 @@ class TestEmbeddingServiceRemote(unittest.TestCase):
 
             def json(self):
                 return TestEmbeddingServiceRemote._extended_response(
-                    [[0.1] * 1024],
+                    [[0.1] * 768],
                     input_type="query",
                 )
 
@@ -131,7 +133,7 @@ class TestEmbeddingServiceRemote(unittest.TestCase):
         with patch("httpx.Client", return_value=FakeClient()):
             result = service.encode("hello", input_type="query")
 
-        self.assertEqual(result.shape, (1, 1024))
+        self.assertEqual(result.shape, (1, 768))
         self.assertEqual(
             captured["url"],
             "https://openvman.example.com/api/embedding",
@@ -154,7 +156,7 @@ class TestEmbeddingServiceRemote(unittest.TestCase):
                 pass
 
             def json(self):
-                return {"vectors": [[0.1] * 1024 for _ in range(self._n)]}
+                return {"vectors": [[0.1] * 768 for _ in range(self._n)]}
 
         class FakeClient:
             def __enter__(self_inner):
@@ -171,14 +173,14 @@ class TestEmbeddingServiceRemote(unittest.TestCase):
         with patch("httpx.Client", return_value=FakeClient()):
             result = service.encode(texts)
 
-        self.assertEqual(result.shape, (130, 1024))
+        self.assertEqual(result.shape, (130, 768))
         self.assertEqual(post_calls, [64, 64, 2])
 
     def test_extended_batches_lock_the_selected_identity(self):
         service = self._make_service()
         payloads = []
         identity = (
-            "bge:BAAI/bge-m3:1024:float32:l2:document:test-revision"
+            "gemma:google/embeddinggemma-2:768:float32:l2:document:" + REV
         )
 
         class FakeResponse:
@@ -190,7 +192,7 @@ class TestEmbeddingServiceRemote(unittest.TestCase):
 
             def json(self):
                 return TestEmbeddingServiceRemote._extended_response(
-                    [[0.1] * 1024 for _ in range(self._count)],
+                    [[0.1] * 768 for _ in range(self._count)],
                     identity=identity,
                 )
 
@@ -208,8 +210,9 @@ class TestEmbeddingServiceRemote(unittest.TestCase):
         with patch("httpx.Client", return_value=FakeClient()):
             result = service.encode([f"text-{index}" for index in range(65)])
 
-        self.assertEqual(result.shape, (65, 1024))
-        self.assertNotIn("identity", payloads[0])
+        self.assertEqual(result.shape, (65, 768))
+        # 第一批就要帶 identity，否則服務會照它自己的 fallback 順序挑模型
+        self.assertEqual(payloads[0]["identity"], identity)
         self.assertEqual(payloads[1]["identity"], identity)
 
     def test_incompatible_extended_metadata_raises(self):
@@ -221,9 +224,9 @@ class TestEmbeddingServiceRemote(unittest.TestCase):
 
             def json(self):
                 data = TestEmbeddingServiceRemote._extended_response(
-                    [[0.1] * 1024]
+                    [[0.1] * 768]
                 )
-                data["embedding_spec"]["dimensions"] = 768
+                data["embedding_spec"]["dimensions"] = 1024
                 return data
 
         class FakeClient:
@@ -321,10 +324,6 @@ class TestEmbeddingServiceHealthCheck(unittest.TestCase):
             self.assertFalse(service.health_check())
 
 
-if __name__ == '__main__':
-    unittest.main()
-
-
 class TestEmbeddingRetryOnRateLimit(unittest.TestCase):
     """429/503 是暫時性的，單次放棄會讓整個 RAG 檢索回 0 命中。"""
 
@@ -343,22 +342,22 @@ class TestEmbeddingRetryOnRateLimit(unittest.TestCase):
 
     def _ok_body(self):
         identity = (
-            "bge:BAAI/bge-m3:1024:float32:l2:query:test-revision"
+            "gemma:google/embeddinggemma-2:768:float32:l2:query:" + REV
         )
         return {
-            "vectors": [[0.1] * 1024],
-            "model": "BAAI/bge-m3",
+            "vectors": [[0.1] * 768],
+            "model": "google/embeddinggemma-2",
             "embedding_spec": {
                 "identity": identity,
-                "dimensions": 1024,
+                "dimensions": 768,
                 "dtype": "float32",
-                "model": "BAAI/bge-m3",
-                "model_revision": "test-revision",
+                "model": "google/embeddinggemma-2",
+                "model_revision": REV,
                 "normalization": "l2",
                 "normalized": True,
                 "input_semantics": "query",
-                "provider": "bge",
-                "service_revision": "test-revision",
+                "provider": "gemma",
+                "service_revision": "1.0.0",
             },
             "attempts": [],
         }
@@ -385,7 +384,7 @@ class TestEmbeddingRetryOnRateLimit(unittest.TestCase):
             result = service.encode("hi", input_type="query")
 
         self.assertEqual(client.post.call_count, 2)
-        self.assertEqual(result.shape, (1, 1024))
+        self.assertEqual(result.shape, (1, 768))
         sleep.assert_called_once()
 
     def test_gives_up_after_three_attempts(self):
@@ -440,3 +439,140 @@ class TestEmbeddingRetryOnRateLimit(unittest.TestCase):
             service.encode("hi", input_type="query")
 
         sleep.assert_called_once_with(2.0)
+
+
+class TestEmbeddingIdentityAndTitles(unittest.TestCase):
+    """換模型後查詢與文件向量必須出自同一個釘死的模型。"""
+
+    def setUp(self):
+        EmbeddingService._instance = None
+
+    def _make_service(self, env=None):
+        merged = {"EMBEDDING_SERVICE_URL": "http://embedding:8009"}
+        merged.update(env or {})
+        with patch.dict(os.environ, merged):
+            return EmbeddingService()
+
+    @staticmethod
+    def _client(payloads, identity_for=None):
+        def post(url, json, headers):
+            payloads.append(json)
+            input_type = json["input_type"]
+            body = TestEmbeddingServiceRemote._extended_response(
+                [[0.1] * 768 for _ in json["texts"]],
+                input_type=input_type,
+                identity=identity_for(input_type) if identity_for else None,
+            )
+            return httpx.Response(
+                200,
+                json=body,
+                request=httpx.Request("POST", url),
+            )
+
+        client = MagicMock()
+        client.post.side_effect = post
+        client.__enter__ = MagicMock(return_value=client)
+        client.__exit__ = MagicMock(return_value=False)
+        return client
+
+    def test_query_and_document_pin_their_own_identity(self):
+        service = self._make_service()
+        payloads = []
+        with patch("app.services.embedding.service.httpx.Client",
+                   return_value=self._client(payloads)):
+            service.encode("q", input_type="query")
+            service.encode("d", input_type="document")
+
+        self.assertEqual(
+            payloads[0]["identity"],
+            "gemma:google/embeddinggemma-2:768:float32:l2:query:" + REV,
+        )
+        self.assertEqual(
+            payloads[1]["identity"],
+            "gemma:google/embeddinggemma-2:768:float32:l2:document:" + REV,
+        )
+
+    def test_search_query_identity(self):
+        """jtai 檢索用 search_query 語意；服務端依此套 search result 前綴。"""
+        service = self._make_service()
+        self.assertEqual(
+            service._identity("search_query"),
+            "gemma:google/embeddinggemma-2:768:float32:l2:search_query:" + REV,
+        )
+
+    def test_response_from_other_model_is_rejected(self):
+        service = self._make_service()
+        with (
+            patch(
+                "app.services.embedding.service.httpx.Client",
+                return_value=self._client(
+                    [],
+                    identity_for=lambda t: (
+                        f"gemma:google/embeddinggemma-2:768:float32:l2:{t}:other"
+                    ),
+                ),
+            ),
+            self.assertRaises(EmbeddingEncodingError),
+        ):
+            service.encode("q", input_type="query")
+
+    def test_empty_provider_env_still_pins_default_model(self):
+        """compose 沒設變數時傳進來的是空字串，不能因此失去 identity。"""
+        service = self._make_service(
+            {"EMBEDDING_PROVIDER": "", "EMBEDDING_MODEL_REVISION": ""}
+        )
+        self.assertEqual(
+            service._identity("query"),
+            "gemma:google/embeddinggemma-2:768:float32:l2:query:" + REV,
+        )
+
+    def test_other_model_without_provider_sends_no_identity(self):
+        """自架 bge 的部署沒設 provider 時維持舊行為，不能被套上 gemma 的 identity。"""
+        service = self._make_service({
+            "EMBEDDING_EXPECTED_MODEL": "BAAI/bge-m3",
+            "EMBEDDING_EXPECTED_DIMENSION": "1024",
+            "EMBEDDING_PROVIDER": "",
+        })
+        self.assertIsNone(service._identity("query"))
+
+    def test_other_model_with_provider_is_pinned(self):
+        service = self._make_service({
+            "EMBEDDING_EXPECTED_MODEL": "BAAI/bge-m3",
+            "EMBEDDING_EXPECTED_DIMENSION": "1024",
+            "EMBEDDING_PROVIDER": "bge",
+            "EMBEDDING_MODEL_REVISION": "abc",
+        })
+        self.assertEqual(
+            service._identity("document"),
+            "bge:BAAI/bge-m3:1024:float32:l2:document:abc",
+        )
+
+    def test_document_titles_follow_batches(self):
+        service = self._make_service()
+        payloads = []
+        texts = [f"t{i}" for i in range(70)]
+        titles = [f"title-{i}" for i in range(70)]
+        with patch("app.services.embedding.service.httpx.Client",
+                   return_value=self._client(payloads)):
+            service.encode(texts, titles=titles)
+
+        self.assertEqual(payloads[0]["titles"], titles[:64])
+        self.assertEqual(payloads[1]["titles"], titles[64:])
+
+    def test_query_never_sends_titles(self):
+        service = self._make_service()
+        payloads = []
+        with patch("app.services.embedding.service.httpx.Client",
+                   return_value=self._client(payloads)):
+            service.encode("q", input_type="query", titles=["ignored"])
+
+        self.assertNotIn("titles", payloads[0])
+
+    def test_titles_length_mismatch_raises(self):
+        service = self._make_service()
+        with self.assertRaises(ValueError):
+            service.encode(["a", "b"], titles=["only-one"])
+
+
+if __name__ == '__main__':
+    unittest.main()

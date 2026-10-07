@@ -23,8 +23,13 @@ _RETRY_BASE_DELAY_S = 0.5
 _RETRY_AFTER_CAP_S = 10.0
 # /health 探測要短 timeout：backend 的 /health 會等它，拖太久會連帶拖慢外部監控。
 _HEALTH_TIMEOUT_S = 2.0
-_DEFAULT_MODEL = "BAAI/bge-m3"
-_DEFAULT_DIMENSIONS = 1024
+_DEFAULT_MODEL = "google/embeddinggemma-2"
+_DEFAULT_DIMENSIONS = 768
+_DEFAULT_PROVIDER = "gemma"
+_DEFAULT_MODEL_REVISION = "914f7f89142e33e77833254d9c9b90c3cef7303b"
+# 檢索查詢用 search result 前綴而非 openVman Brain 的 question answering：jtai 知識庫
+# 是 q/a 列，85 題口語改寫的 R@5 為 80 對 75（bge-m3 為 83）。
+QUERY_INPUT_TYPE = "search_query"
 _SPEC_FIELDS = {
     "dimensions",
     "dtype",
@@ -95,6 +100,24 @@ def _post_with_retry(
     return resp
 
 
+def configured_model() -> str:
+    return os.getenv(
+        "EMBEDDING_EXPECTED_MODEL",
+        os.getenv("EMBEDDING_MODEL", _DEFAULT_MODEL),
+    ).strip()
+
+
+def configured_dimensions() -> int:
+    try:
+        return int(
+            os.getenv("EMBEDDING_EXPECTED_DIMENSION", str(_DEFAULT_DIMENSIONS))
+        )
+    except ValueError as exc:
+        raise EmbeddingEncodingError(
+            "EMBEDDING_EXPECTED_DIMENSION must be an integer."
+        ) from exc
+
+
 class EmbeddingService:
     """HTTP client for the standalone embedding service.
 
@@ -120,21 +143,38 @@ class EmbeddingService:
             if service_token is not None
             else os.getenv("EMBEDDING_SERVICE_TOKEN", "")
         ).strip()
-        self.expected_model = os.getenv(
-            "EMBEDDING_EXPECTED_MODEL",
-            os.getenv("EMBEDDING_MODEL", _DEFAULT_MODEL),
-        ).strip()
-        try:
-            self.expected_dimensions = int(
-                os.getenv(
-                    "EMBEDDING_EXPECTED_DIMENSION",
-                    str(_DEFAULT_DIMENSIONS),
-                )
-            )
-        except ValueError as exc:
-            raise EmbeddingEncodingError(
-                "EMBEDDING_EXPECTED_DIMENSION must be an integer."
-            ) from exc
+        self.expected_model = configured_model()
+        self.expected_dimensions = configured_dimensions()
+        # 預設的 provider/revision 只屬於預設模型；別台還在跑自己 bge 服務的部署
+        # 若沒設這兩個值，就維持舊行為（不釘 identity），不能被硬套 gemma。
+        is_default_model = self.expected_model == _DEFAULT_MODEL
+        # compose 沒設時會傳空字串，視同未設定。
+        self.provider = (
+            os.getenv("EMBEDDING_PROVIDER", "").strip()
+            or (_DEFAULT_PROVIDER if is_default_model else "")
+        )
+        self.model_revision = (
+            os.getenv("EMBEDDING_MODEL_REVISION", "").strip()
+            or (_DEFAULT_MODEL_REVISION if is_default_model else "")
+        )
+
+    def _identity(self, input_type: str) -> str | None:
+        """固定要求的 embedding identity。
+
+        共用服務沒收到 identity 時會照它自己的 fallback 順序挑模型，不一定是我們
+        索引用的那個；查詢和文件向量一旦出自不同模型，檢索就全錯，所以每次都釘死。
+        """
+        if not self.provider or not self.model_revision:
+            return None
+        return ":".join((
+            self.provider,
+            self.expected_model,
+            str(self.expected_dimensions),
+            "float32",
+            "l2",
+            input_type,
+            self.model_revision,
+        ))
 
     @classmethod
     def get_instance(cls) -> 'EmbeddingService':
@@ -176,7 +216,8 @@ class EmbeddingService:
     def encode(
         self,
         texts: str | list[str],
-        input_type: str = "document"
+        input_type: str = "document",
+        titles: list[str] | None = None,
     ) -> np.ndarray:
         """Encode text(s) into embeddings via the embedding service.
 
@@ -186,13 +227,18 @@ class EmbeddingService:
         """
         if isinstance(texts, str):
             texts = [texts]
+        # 標題只對文件向量有意義；服務端會組成「title: … | text: 」前綴。
+        if input_type != "document":
+            titles = None
+        if titles is not None and len(titles) != len(texts):
+            raise ValueError("titles must match texts in length")
 
         assert self.service_url is not None  # guaranteed by __init__
         # jtai 格式嵌入直接 POST 在 base path（openVman 新表面已無 /embed）
         url = self.service_url.rstrip('/')
         vectors: list[list[float]] = []
         headers = self._auth_headers()
-        selected_identity: str | None = None
+        selected_identity = self._identity(input_type)
         try:
             with httpx.Client(timeout=_REMOTE_TIMEOUT_S) as client:
                 for start in range(0, len(texts), _REMOTE_CHUNK_SIZE):
@@ -201,6 +247,8 @@ class EmbeddingService:
                         "texts": batch,
                         "input_type": input_type,
                     }
+                    if titles is not None:
+                        payload["titles"] = titles[start:start + _REMOTE_CHUNK_SIZE]
                     if selected_identity:
                         payload["identity"] = selected_identity
                     resp = _post_with_retry(

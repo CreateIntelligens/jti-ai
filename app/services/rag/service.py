@@ -5,7 +5,10 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
 
-from app.services.embedding.service import get_embedding_service
+from app.services.embedding.service import (
+    QUERY_INPUT_TYPE,
+    get_embedding_service,
+)
 from app.services.vector_store.lancedb import get_lancedb_store
 
 logger = logging.getLogger(__name__)
@@ -49,7 +52,9 @@ class RAGPipeline:
         """
         t0 = time.time()
         try:
-            query_vector = self.embedding_service.encode(query, input_type="query")
+            query_vector = self.embedding_service.encode(
+                query, input_type=QUERY_INPUT_TYPE
+            )
             return self._search_and_format(
                 query_vector,
                 query,
@@ -72,7 +77,9 @@ class RAGPipeline:
         if not unique:
             return {}
         try:
-            vectors = self.embedding_service.encode(unique, input_type="query")
+            vectors = self.embedding_service.encode(
+                unique, input_type=QUERY_INPUT_TYPE
+            )
         except Exception as e:
             logger.error(f"[RAG Pipeline] Query embedding failed: {e}")
             return {}

@@ -93,11 +93,33 @@ class TestVectorStore(unittest.TestCase):
     def test_get_lancedb_store_ignores_legacy_table_name_env(self):
         with patch.dict(
             os.environ,
-            {"LANCEDB_PATH": "memory://", LEGACY_TABLE_NAME_ENV: "legacy_name"},
+            {
+                "LANCEDB_PATH": "memory://",
+                LEGACY_TABLE_NAME_ENV: "legacy_name",
+                "EMBEDDING_EXPECTED_MODEL": "BAAI/bge-m3",
+                "EMBEDDING_EXPECTED_DIMENSION": "1024",
+            },
         ):
             store = lancedb_module.get_lancedb_store()
 
         self.assertEqual(store.table_name, "knowledge")
+
+    def test_table_name_follows_embedding_model(self):
+        """換模型要換表：維度不同寫不進舊表，維度相同又會被 fingerprint 跳過重算。"""
+        cases = {
+            ("BAAI/bge-m3", "1024"): "knowledge",
+            ("google/embeddinggemma-2", "768"): "knowledge_embeddinggemma_2_768",
+            ("google/embeddinggemma-2", "256"): "knowledge_embeddinggemma_2_256",
+        }
+        for (model, dims), expected in cases.items():
+            with patch.dict(
+                os.environ,
+                {
+                    "EMBEDDING_EXPECTED_MODEL": model,
+                    "EMBEDDING_EXPECTED_DIMENSION": dims,
+                },
+            ):
+                self.assertEqual(lancedb_module.knowledge_table_name(), expected)
 
 
 if __name__ == "__main__":

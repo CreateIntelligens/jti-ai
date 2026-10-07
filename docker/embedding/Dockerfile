@@ -34,14 +34,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && groupadd -g 1000 appuser \
     && useradd -m -u 1000 -g appuser appuser
 
-COPY --from=builder /app/.venv /app/.venv
+# 直接以 --chown 複製：事後 chown -R 會把整個 torch venv 再寫一層（十多分鐘、I/O 打滿），
+# 而且放在 app.py 之後，改一行程式就得重跑。
+COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
 
 WORKDIR /app
-COPY docker/embedding/app.py /app/app.py
-COPY docker/embedding/entrypoint.sh /usr/local/bin/embedding-entrypoint.sh
-RUN chmod +x /usr/local/bin/embedding-entrypoint.sh \
-    && mkdir -p /home/appuser/.cache/huggingface \
-    && chown -R appuser:appuser /app /home/appuser/.cache
+RUN mkdir -p /home/appuser/.cache/huggingface \
+    && chown appuser:appuser /app /home/appuser/.cache /home/appuser/.cache/huggingface
+COPY --chmod=755 docker/embedding/entrypoint.sh /usr/local/bin/embedding-entrypoint.sh
+COPY --chown=appuser:appuser docker/embedding/app.py /app/app.py
 
 ENTRYPOINT ["/usr/local/bin/embedding-entrypoint.sh"]
 CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8009"]

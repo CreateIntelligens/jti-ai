@@ -208,6 +208,15 @@ class BackfillService:
             return f"【{category_label}】"
         return ""
 
+    @staticmethod
+    def _build_title(topic_info: dict[str, str]) -> str:
+        """文件向量的標題。檔名多半是 jti_009.csv 這類流水號，對語意沒幫助，只用 topic。"""
+        topic_label = topic_info.get("topic_label") or ""
+        category_label = topic_info.get("category_label") or ""
+        if topic_label and category_label and topic_label != category_label:
+            return f"{category_label} / {topic_label}"
+        return topic_label or category_label
+
     def _compute_fingerprint(self, data: bytes) -> str:
         """Computes SHA256 hash of file content."""
         return hashlib.sha256(data).hexdigest()
@@ -462,7 +471,11 @@ class BackfillService:
             if not chunks_text:
                 return
 
-            embeddings = self.embedding_service.encode(chunks_text)
+            title = self._build_title(topic_info)
+            embeddings = self.embedding_service.encode(
+                chunks_text,
+                titles=[title] * len(chunks_text) if title else None,
+            )
 
             # NOTE: topic info is encoded into the chunk text via topic_prefix above.
             # We intentionally do NOT add topic_id as a top-level LanceDB column,

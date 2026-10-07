@@ -115,8 +115,12 @@ services:
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - EMBEDDING_SERVICE_URL=${EMBEDDING_SERVICE_URL:-http://embedding:8009}
       - EMBEDDING_SERVICE_TOKEN=${EMBEDDING_SERVICE_TOKEN:-}
-      - EMBEDDING_EXPECTED_MODEL=${EMBEDDING_EXPECTED_MODEL:-BAAI/bge-m3}
-      - EMBEDDING_EXPECTED_DIMENSION=${EMBEDDING_EXPECTED_DIMENSION:-1024}
+      - EMBEDDING_EXPECTED_MODEL=${EMBEDDING_EXPECTED_MODEL:-google/embeddinggemma-2}
+      - EMBEDDING_EXPECTED_DIMENSION=${EMBEDDING_EXPECTED_DIMENSION:-768}
+      # 留空時由程式依模型決定（gemma 有內建預設，其他模型不釘 identity）。
+      # 這裡的 revision 是「目前 embedding 模型」的權重版本；openVman 同名變數指的是 BGE，別照抄。
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER-}
+      - EMBEDDING_MODEL_REVISION=${EMBEDDING_MODEL_REVISION-}
       - TZ=Asia/Taipei
     # 不帶 command：由 entrypoint 依 MODE 推導 uvicorn 參數（dev=--reload / prod=--workers 2）
     healthcheck:

@@ -115,7 +115,7 @@ class TestPipelineEncodeQueries:
 
         vectors = pipeline.encode_queries(["a", "b", "a"])
 
-        encode.assert_called_once_with(["a", "b"], input_type="query")
+        encode.assert_called_once_with(["a", "b"], input_type="search_query")
         assert vectors["a"].tolist() == [1.0, 0.0]
         assert vectors["b"].tolist() == [0.0, 1.0]
 

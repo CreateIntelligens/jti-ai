@@ -4,6 +4,7 @@ import threading
 import time
 from typing import Any, List, Literal, Optional, Union
 
+import numpy as np
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel
 
@@ -22,16 +23,28 @@ class _HealthCheckFilter(logging.Filter):
 
 logging.getLogger("uvicorn.access").addFilter(_HealthCheckFilter())
 
-MODEL_NAME = os.getenv("EMBEDDING_MODEL", "BAAI/bge-m3")
-# 釘死權重 revision：與 openVman 共用同一份 BGE-M3 快照，確保向量可互換。
+PROVIDER = "gemma"
+MODEL_NAME = os.getenv("EMBEDDING_MODEL", "google/embeddinggemma-2")
+# 釘死權重 revision：與 openVman 共用同一份 EmbeddingGemma 2 快照，確保向量可互換。
 # 若不釘，cache 清掉後重抓可能默默拿到上游新權重，造成新舊向量不相容。
 # 更新方式：openVman 換新快照時，把這裡改成相同 SHA 並重算所有既有向量。
 MODEL_REVISION = os.getenv(
     "EMBEDDING_MODEL_REVISION",
-    "5617a9f61b028005a4858fdac845db406aefb181",
+    "914f7f89142e33e77833254d9c9b90c3cef7303b",
 )
-BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
-MAX_LENGTH = int(os.getenv("EMBEDDING_MAX_LENGTH", "8192"))
+# Matryoshka 可截成 512/256/128，但 backend 的表名與驗證都以維度區分，改了要重建索引。
+DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "768"))
+BATCH_SIZE = int(os.getenv("EMBEDDING_BATCH_SIZE", "16"))
+MAX_LENGTH = int(os.getenv("EMBEDDING_MAX_LENGTH", "2048"))
+# 與 openVman 相同的單次上限，避免一個請求把 GPU 佔太久。
+MAX_TEXTS_PER_REQUEST = 512
+
+# 非對稱模型：查詢與文件要加不同前綴，向量才在同一個空間裡可比。前綴必須與
+# openVman 的 gemma provider 逐字一致，否則同一個 identity 算出不同向量。
+_QUERY_PREFIXES = {
+    "query": "task: question answering | query: ",
+    "search_query": "task: search result | query: ",
+}
 # 對外 edge 的 Bearer token（與 openVman 表面一致：/health 公開，其餘要驗）。
 # 留空 = 不驗證，供 Docker 內網 fallback 模式使用。
 SERVICE_TOKEN = os.getenv("EMBEDDING_SERVICE_TOKEN", "").strip()
@@ -63,25 +76,6 @@ def _resolve_device() -> str:
         return "cpu"
 
 
-def _shutdown_loky_executor() -> None:
-    """Shut down joblib/loky's reusable process pool if it was started.
-
-    FlagEmbedding pulls in joblib, whose loky backend keeps a reusable
-    executor backed by a POSIX semaphore (/dev/shm/sem.loky-*). It is only
-    reclaimed by loky's own atexit, which races the multiprocessing
-    resource_tracker and triggers a "leaked semaphore" warning. Stopping it
-    during teardown reclaims the semaphore deterministically. No-op if loky
-    was never used.
-    """
-    for path in ("joblib.externals.loky", "loky"):
-        try:
-            module = __import__(path, fromlist=["get_reusable_executor"])
-            module.get_reusable_executor().shutdown(wait=True, kill_workers=True)
-            return
-        except Exception:
-            continue
-
-
 _model_lock = threading.Lock()
 
 
@@ -98,28 +92,34 @@ def _get_model() -> Any:
 
 def _load_model_locked() -> None:
     global _model
-    from FlagEmbedding import FlagModel
-    from huggingface_hub import snapshot_download
+    import torch
+    from sentence_transformers import SentenceTransformer
 
     device = _resolve_device()
     logger.info(
         "Loading embedding model %s@%s on %s...",
         MODEL_NAME, MODEL_REVISION[:12], device,
     )
-    # 經 snapshot_download 釘 revision（FlagModel 建構子不吃 revision 參數），
-    # 已在 cache 時不重新下載。
-    model_path = snapshot_download(MODEL_NAME, revision=MODEL_REVISION)
-    _model = FlagModel(
-        model_path,
+    # 官方說明 fp16 會出 NaN，GPU 上只能用 bf16。
+    dtype = torch.bfloat16 if device.startswith("cuda") else torch.float32
+    model = SentenceTransformer(
+        MODEL_NAME,
         device=device,
-        use_fp16=(device == "cuda"),
+        revision=MODEL_REVISION,
+        model_kwargs={"torch_dtype": dtype},
     )
+    model.max_seq_length = MAX_LENGTH
+    _model = model
     logger.info("Embedding model loaded.")
 
 
 class EmbedRequest(BaseModel):
     texts: List[str]
-    input_type: Literal["query", "document"] = "document"
+    input_type: Literal["query", "search_query", "document"] = "document"
+    # 文件標題（檔名或主題），只用於 document；沒給就是 title: none。
+    titles: Optional[List[str]] = None
+    identity: Optional[str] = None
+    acceptable_identities: Optional[List[str]] = None
 
 
 class EmbedResponse(BaseModel):
@@ -131,12 +131,12 @@ class EmbedResponse(BaseModel):
 
 # 與 openVman 的 /embed 回應 schema 對齊：backend 依 embedding_spec 做嚴格
 # 契約驗證（identity 欄位順序見 backend 的 _validate_response）。
-SERVICE_REVISION = "jtai-embedding/1.4.0"
+SERVICE_REVISION = "jtai-embedding/2.0.0"
 
 
-def _build_spec(input_type: str, dimensions: int) -> dict:
+def _build_spec(input_type: str, dimensions: int = DIMENSIONS) -> dict:
     spec = {
-        "provider": "bge",
+        "provider": PROVIDER,
         "model": MODEL_NAME,
         "dimensions": dimensions,
         "dtype": "float32",
@@ -178,13 +178,6 @@ def _load_model_safely() -> None:
 @app.on_event("shutdown")
 def _on_shutdown() -> None:
     global _model
-    model = _model
-    if model is None:
-        return
-    stop_self_pool = getattr(model, "stop_self_pool", None)
-    if callable(stop_self_pool):
-        stop_self_pool()
-    _shutdown_loky_executor()
     _model = None
 
 
@@ -210,32 +203,68 @@ def health_ready() -> dict:
         "service": "embedding-service",
         "service_revision": SERVICE_REVISION,
         "model": MODEL_NAME,
-        "dimension": 1024,
+        "dimension": DIMENSIONS,
         "normalization": "l2",
-        "embedding_spec": _build_spec("document", 1024),
+        "embedding_spec": _build_spec("document"),
     }
 
 
-# FlagEmbedding 1.4 的 encode 在多執行緒併發下會讓行程整個 crash（無
-# traceback，RAG 多 query 併發檢索時實測重現），必須序列化。GPU 推論本來
-# 就是獨占資源，序列化對吞吐幾乎沒有額外損失。
+# GPU 推論本來就是獨占資源，序列化對吞吐幾乎沒有額外損失，也避免併發請求
+# 同時配置 batch 造成 CUDA OOM。
 _encode_lock = threading.Lock()
 
 
-def _encode_texts(texts: List[str], input_type: str) -> List[List[float]]:
+def _format_inputs(
+    texts: List[str],
+    input_type: str,
+    titles: Optional[List[str]],
+) -> List[str]:
+    prefix = _QUERY_PREFIXES.get(input_type)
+    if prefix is not None:
+        return [prefix + text for text in texts]
+    names = titles if titles and len(titles) == len(texts) else [""] * len(texts)
+    return [
+        f"title: {(name or '').strip() or 'none'} | text: {text}"
+        for name, text in zip(names, texts)
+    ]
+
+
+def _encode_texts(
+    texts: List[str],
+    input_type: str,
+    titles: Optional[List[str]] = None,
+) -> List[List[float]]:
     try:
-        # BGE-M3's encode() handles both single and batch; input_type is
-        # accepted for API symmetry but bge-m3 uses one space for both sides.
         with _encode_lock:
             vectors = _get_model().encode(
-                texts,
+                _format_inputs(texts, input_type, titles),
                 batch_size=BATCH_SIZE,
-                max_length=MAX_LENGTH,
+                convert_to_numpy=True,
+                normalize_embeddings=False,
+                show_progress_bar=False,
             )
     except Exception as e:
         logger.error("Encoding failed: %s", e)
         raise HTTPException(status_code=500, detail=f"encode failed: {e}")
-    return vectors.tolist()
+    # Matryoshka 截短後一定要重新正規化，否則不再是單位向量。
+    vectors = np.asarray(vectors[:, :DIMENSIONS], dtype=np.float32)
+    norms = np.linalg.norm(vectors, axis=1, keepdims=True)
+    return (vectors / np.clip(norms, 1e-12, None)).tolist()
+
+
+def _check_identity(req: "EmbedRequest") -> None:
+    """呼叫端指定的 identity 必須是我們這個模型，否則拒絕而不是回別的向量。"""
+    ours = _build_spec(req.input_type)["identity"]
+    wanted = [req.identity] if req.identity else (req.acceptable_identities or [])
+    if wanted and ours not in wanted:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "No configured embedding provider matched requested criteria "
+                f"(requested_identity={req.identity!r}, "
+                f"acceptable_identities={req.acceptable_identities!r})"
+            ),
+        )
 
 
 @app.post(
@@ -250,13 +279,25 @@ def _encode_texts(texts: List[str], input_type: str) -> List[List[float]]:
     include_in_schema=False,  # 舊路徑相容別名，遷移期後可移除
 )
 def embed(req: EmbedRequest) -> EmbedResponse:
-    rows = _encode_texts(req.texts, req.input_type) if req.texts else []
-    dimensions = len(rows[0]) if rows else 1024
+    if len(req.texts) > MAX_TEXTS_PER_REQUEST:
+        raise HTTPException(
+            status_code=413,
+            detail=f"at most {MAX_TEXTS_PER_REQUEST} texts per request",
+        )
+    if req.titles is not None and len(req.titles) != len(req.texts):
+        raise HTTPException(
+            status_code=422, detail="titles must match texts in length"
+        )
+    _check_identity(req)
+    rows = (
+        _encode_texts(req.texts, req.input_type, req.titles)
+        if req.texts else []
+    )
     return EmbedResponse(
         vectors=rows,
         model=MODEL_NAME,
-        embedding_spec=_build_spec(req.input_type, dimensions),
-        attempts=[{"provider": "bge", "status": "selected"}],
+        embedding_spec=_build_spec(req.input_type),
+        attempts=[{"provider": PROVIDER, "status": "selected"}],
     )
 
 
@@ -289,9 +330,9 @@ def list_models() -> dict:
                 "id": MODEL_NAME,
                 "object": "model",
                 "created": _STARTED_AT,
-                "owned_by": "jtai-bge",
-                "dimensions": 1024,
-                "identity": _build_spec("document", 1024)["identity"],
+                "owned_by": "jtai-gemma",
+                "dimensions": DIMENSIONS,
+                "identity": _build_spec("document")["identity"],
             }
         ],
     }
