@@ -8,4 +8,4 @@ For current behavior, prefer:
 
 - the codebase
 - tests
-- active docs/specs that still exist in `docs/` or `openspec/`
+- active docs/specs that still exist in `docs/`

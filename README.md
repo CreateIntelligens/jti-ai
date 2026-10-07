@@ -179,7 +179,6 @@ ai360-km/
 ├── docker/                             # backend/frontend Dockerfiles and nginx template
 ├── data/                               # LanceDB vector data and TTS cache
 ├── docs/                               # current docs and archived plans when present
-├── openspec/                           # OpenSpec artifacts
 ├── docker-compose.yml
 ├── .env.example
 └── CHANGELOG.md
