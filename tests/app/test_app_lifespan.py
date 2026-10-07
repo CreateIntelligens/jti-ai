@@ -1,4 +1,6 @@
+import asyncio
 import importlib
+import time
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -52,6 +54,57 @@ class TestBackfillLock(unittest.TestCase):
         # 哨兵值不是 None（None 代表輸給別的 worker，會跳過索引）。
         self.assertIsNotNone(token)
         self.assertEqual(token, app_main._RAG_BACKFILL_LOCK_UNHELD_TOKEN)
+
+    def test_held_lock_keeps_renewing_until_released(self):
+        """短 TTL 靠心跳續約：活著的持有者不會在長時間 backfill 中途掉鎖。"""
+        client = MagicMock()
+        client.set.return_value = True
+        client.eval.return_value = 1
+
+        with patch.object(app_main, "_RAG_BACKFILL_LOCK_RENEW_SECONDS", 0.01):
+            token = app_main._acquire_backfill_lock(client)
+            time.sleep(0.1)
+            app_main._release_backfill_lock(client, token)
+            renewals = [
+                c for c in client.eval.call_args_list
+                if c.args[0] == app_main._RENEW_LOCK_IF_OWNED
+            ]
+            self.assertGreaterEqual(len(renewals), 2)
+            self.assertEqual(renewals[0].args[3], token)
+            self.assertEqual(
+                renewals[0].args[4], app_main._RAG_BACKFILL_LOCK_TTL_SECONDS
+            )
+            count_after_release = client.eval.call_count
+            time.sleep(0.1)
+
+        self.assertEqual(client.eval.call_count, count_after_release)
+        self.assertNotIn(token, app_main._backfill_lock_renewals)
+
+    def test_renewal_stops_once_lock_is_lost(self):
+        client = MagicMock()
+        client.set.return_value = True
+        client.eval.return_value = 0  # 鎖已不是自己的
+
+        with patch.object(app_main, "_RAG_BACKFILL_LOCK_RENEW_SECONDS", 0.01):
+            token = app_main._acquire_backfill_lock(client)
+            time.sleep(0.1)
+
+        self.assertEqual(client.eval.call_count, 1)
+        app_main._release_backfill_lock(client, token)
+
+    def test_lock_ttl_is_short_enough_for_a_killed_holder(self):
+        """持有者被 SIGKILL 時沒人釋放；TTL 決定新容器最多要等多久。"""
+        client = MagicMock()
+        client.set.return_value = True
+
+        token = app_main._acquire_backfill_lock(client)
+        app_main._release_backfill_lock(client, token)
+
+        self.assertLessEqual(client.set.call_args.kwargs["ex"], 120)
+        self.assertLess(
+            app_main._RAG_BACKFILL_LOCK_RENEW_SECONDS,
+            app_main._RAG_BACKFILL_LOCK_TTL_SECONDS / 2,
+        )
 
     def test_release_only_deletes_when_token_matches(self):
         """TTL 過期換手後，舊 worker 不能刪掉新持有者的鎖。"""
@@ -195,3 +248,34 @@ class TestBackfillCoordination(unittest.IsolatedAsyncioTestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestEmbeddingWarmup(unittest.IsolatedAsyncioTestCase):
+    """embedding 跟 backend 一起重開時模型還在下載；暖機要等，不能直接放棄索引。"""
+
+    async def test_retries_until_embedding_is_ready(self):
+        backfill = MagicMock()
+        backfill.embedding_service.encode.side_effect = [
+            RuntimeError("model loading"),
+            RuntimeError("model loading"),
+            [[0.0]],
+        ]
+        loop = asyncio.get_running_loop()
+        with patch.object(app_main, "_RAG_WARMUP_RETRY_SECONDS", 0):
+            ready = await app_main._wait_for_embedding(backfill, loop)
+
+        self.assertTrue(ready)
+        self.assertEqual(backfill.embedding_service.encode.call_count, 3)
+
+    async def test_gives_up_after_timeout(self):
+        backfill = MagicMock()
+        backfill.embedding_service.encode.side_effect = RuntimeError("down")
+        loop = asyncio.get_running_loop()
+        with (
+            patch.object(app_main, "_RAG_WARMUP_RETRY_SECONDS", 0),
+            patch.object(app_main, "_RAG_WARMUP_TIMEOUT_SECONDS", 0),
+        ):
+            ready = await app_main._wait_for_embedding(backfill, loop)
+
+        self.assertFalse(ready)
+

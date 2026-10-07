@@ -158,6 +158,16 @@ class EmbeddingService:
             or (_DEFAULT_MODEL_REVISION if is_default_model else "")
         )
 
+    def _effective_input_type(self, input_type: str) -> str:
+        """search_query 只有 gemma gateway 認得。
+
+        還沒切換的部署（例如 prod 先 pull 了新程式、仍跑舊 bge gateway）重啟後
+        必須照常檢索，所以非 gemma 時退回 query。
+        """
+        if input_type == QUERY_INPUT_TYPE and self.provider != _DEFAULT_PROVIDER:
+            return "query"
+        return input_type
+
     def _identity(self, input_type: str) -> str | None:
         """固定要求的 embedding identity。
 
@@ -227,6 +237,7 @@ class EmbeddingService:
         """
         if isinstance(texts, str):
             texts = [texts]
+        input_type = self._effective_input_type(input_type)
         # 標題只對文件向量有意義；服務端會組成「title: … | text: 」前綴。
         if input_type != "document":
             titles = None

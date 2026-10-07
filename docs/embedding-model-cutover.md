@@ -3,22 +3,47 @@
 適用：本地 embedding profile（`COMPOSE_PROFILES=embedding`）的部署，從 BAAI/bge-m3 換成
 EmbeddingGemma 2（`google/embeddinggemma-2`，768 維）。之後再換模型，步驟也一樣。
 
-## 為什麼要照這個順序
-
-- 不同模型的向量不能混用。LanceDB 的表名是依模型推導的：bge-m3/1024 用 `knowledge`，
-  gemma 用 `knowledge_embeddinggemma_2_768`。換模型之後，backend 就改讀新表。
-- 新表一開始是空的。如果直接重建容器，要等索引建完（約 3 分鐘）檢索才會恢復正常。
-- 所以先開一個**臨時的** gemma embedding 容器，在背景把新表建好；這段期間線上照常用舊模型。
-  最後才切換容器，backend 啟動時新表已經是完整的，fingerprint 相同會直接跳過，約 10 秒就 Ready。
-- 舊的 `knowledge` 表不會被刪除，要回退時可以直接用。
-
 ## 前置確認
 
-- 這台機器有 GPU。切換過程中舊模型（約 2.5 GB）和新模型（約 3 GB）會同時佔用 GPU 記憶體。
+- 這台機器有 GPU。gemma 約佔 3 GB；不停機切換時，舊模型（約 2.5 GB）會同時在跑。
 - 可以連到 huggingface.co（第一次要下載模型，不需要 token）。
 - 一次只 build 一個映像；build 期間不要同時重建其他容器。
 
-## 步驟
+## 兩種做法
+
+- 不同模型的向量不能混用。LanceDB 的表名是依模型推導的：bge-m3/1024 用 `knowledge`，
+  gemma 用 `knowledge_embeddinggemma_2_768`。換模型之後，backend 就改讀新表；舊表不會被刪，
+  回退時可以直接用。
+- **簡易切換**（下一節）：pull、build、改 `.env`、重開。重開後 backend 會自動在新表建索引，
+  實測約 3 分鐘（2013 段，A4000）。這段時間回答不會出錯，但可能沒有引用知識庫。
+  embedding 還在下載或載入模型時，backend 會每 10 秒重試一次，等它好了再接著建索引，
+  不需要手動處理。
+- **不停機切換**（「步驟」一節）：先開一個臨時的 gemma 容器，在背景把新表建好再切換，
+  重開後約 10 秒就 Ready。步驟比較多。
+
+## 簡易切換
+
+```bash
+docker tag "$(docker compose images -q embedding)" jtai-embedding:pre-gemma   # 回退用
+git pull
+docker compose build embedding          # 只 build 這一個；線上照常
+```
+
+`.env` 裡的這兩行改成下面的值（也可以直接刪掉，程式預設就是 gemma）：
+
+```env
+EMBEDDING_EXPECTED_MODEL=google/embeddinggemma-2
+EMBEDDING_EXPECTED_DIMENSION=768
+```
+
+```bash
+docker compose up -d --force-recreate embedding backend
+docker compose logs -f backend | grep "\[RAG\]"   # 等到 "[RAG] Ready — ... chunks"
+```
+
+驗證方式見後面的「驗證」。
+
+## 步驟（不停機切換）
 
 以下指令都在專案根目錄執行。
 
@@ -35,7 +60,9 @@ git pull
 docker compose build embedding
 ```
 
-`docker compose build` 不會動到正在跑的容器，線上服務照常。
+`docker compose build` 不會動到正在跑的容器，線上服務照常。只 `git pull` 而還沒切換時，
+就算 backend 重啟也沒關係：`.env` 還是 bge，程式會沿用舊的 `knowledge` 表，
+查詢也會退回 bge 認得的 `query` 語意。
 
 ### 3. 開臨時的 gemma embedding 容器，等模型載入
 
@@ -95,6 +122,10 @@ curl -s http://localhost:<PORT>/health
 ```
 
 接著用前端或 API 分別問 jti、hciot 各一題知識庫裡有的問題，確認回答有引用到正確的段落。
+
+如果 log 出現 `[RAG] Another worker is indexing; waiting for it to finish`：通常是舊容器被砍掉時
+還握著 Redis 鎖。鎖只有 60 秒 TTL，持有者活著時才會續約，所以一分鐘內就會自己過期，
+worker 接著繼續，不需要手動處理。
 
 ## 回退
 

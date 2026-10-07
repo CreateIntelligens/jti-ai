@@ -547,6 +547,33 @@ class TestEmbeddingIdentityAndTitles(unittest.TestCase):
             "bge:BAAI/bge-m3:1024:float32:l2:document:abc",
         )
 
+    def test_legacy_bge_deployment_keeps_plain_query_semantics(self):
+        """先 pull 新程式、還沒切換 gateway 的部署，重啟後檢索不能壞。"""
+        service = self._make_service({
+            "EMBEDDING_EXPECTED_MODEL": "BAAI/bge-m3",
+            "EMBEDDING_EXPECTED_DIMENSION": "1024",
+            "EMBEDDING_PROVIDER": "",
+        })
+        payloads = []
+
+        def post(url, json, headers):
+            payloads.append(json)
+            return httpx.Response(
+                200,
+                json={"vectors": [[0.1] * 1024 for _ in json["texts"]]},
+                request=httpx.Request("POST", url),
+            )
+
+        client = MagicMock()
+        client.post.side_effect = post
+        client.__enter__ = MagicMock(return_value=client)
+        client.__exit__ = MagicMock(return_value=False)
+        with patch("app.services.embedding.service.httpx.Client", return_value=client):
+            service.encode("q", input_type="search_query")
+
+        self.assertEqual(payloads[0]["input_type"], "query")
+        self.assertNotIn("identity", payloads[0])
+
     def test_document_titles_follow_batches(self):
         service = self._make_service()
         payloads = []

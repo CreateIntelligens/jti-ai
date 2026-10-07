@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import os
+import threading
 import time
 import uuid
 import warnings
@@ -23,10 +24,16 @@ _NOISY_LOGGERS = ("httpx", "google")
 _UVICORN_LOGGERS = ("uvicorn", "uvicorn.access", "uvicorn.error")
 _AFC_WARNING_PATTERNS = (".*automatic function calling.*", ".*AFC.*")
 _RAG_BACKFILL_LOCK_KEY = "rag:backfill:startup"
-# Backfill 可能耗時數分鐘；TTL 需涵蓋正常執行時間，也要允許崩潰後復原。
-_RAG_BACKFILL_LOCK_TTL_SECONDS = 30 * 60
+# 短 TTL 加心跳續約：持有者活著就一直續，被 SIGKILL 或整台重開時一分鐘內自動過期，
+# 不必等完整段 backfill 時間（曾因舊容器殘留鎖，新容器空等 30 分鐘）。
+_RAG_BACKFILL_LOCK_TTL_SECONDS = 60
+_RAG_BACKFILL_LOCK_RENEW_SECONDS = 20
 _RAG_BACKFILL_WAIT_TIMEOUT_SECONDS = 30 * 60
 _RAG_BACKFILL_LOCK_POLL_SECONDS = 2
+# embedding 容器跟 backend 一起重開時，第一次要下載並載入模型，可能好幾分鐘；
+# 暖機要等它好，否則啟動 backfill 直接放棄，索引要等下一輪背景同步才補。
+_RAG_WARMUP_TIMEOUT_SECONDS = 15 * 60
+_RAG_WARMUP_RETRY_SECONDS = 10
 # Redis 不可用時的哨兵：照常索引，但不要去刪別人的鎖。
 _RAG_BACKFILL_LOCK_UNHELD_TOKEN = ""
 # 只在 value 仍等於自己的 token 時才刪，避免 TTL 過期換手後誤刪新持有者的鎖。
@@ -36,6 +43,14 @@ if redis.call('get', KEYS[1]) == ARGV[1] then
 end
 return 0
 """
+_RENEW_LOCK_IF_OWNED = """
+if redis.call('get', KEYS[1]) == ARGV[1] then
+    return redis.call('expire', KEYS[1], ARGV[2])
+end
+return 0
+"""
+# token → 停止該把鎖心跳的 event
+_backfill_lock_renewals: dict[str, threading.Event] = {}
 _DEFAULT_RAG_SYNC_INTERVAL_SECONDS = 300
 _FIXED_RAG_BACKFILL_JOBS = (
     ("jti", "zh"),
@@ -325,7 +340,35 @@ def _acquire_backfill_lock(client: Any) -> str | None:
         # A Redis hiccup must not stop indexing — fall back to running it.
         logger.warning("[RAG] Backfill lock unavailable, indexing anyway: %s", exc)
         return _RAG_BACKFILL_LOCK_UNHELD_TOKEN
-    return token if acquired else None
+    if not acquired:
+        return None
+    _start_backfill_lock_renewal(client, token)
+    return token
+
+
+def _start_backfill_lock_renewal(client: Any, token: str) -> None:
+    """Keep extending the lock's TTL while this process is alive."""
+    stop = threading.Event()
+    _backfill_lock_renewals[token] = stop
+
+    def renew() -> None:
+        while not stop.wait(_RAG_BACKFILL_LOCK_RENEW_SECONDS):
+            try:
+                still_held = client.eval(
+                    _RENEW_LOCK_IF_OWNED,
+                    1,
+                    _RAG_BACKFILL_LOCK_KEY,
+                    token,
+                    _RAG_BACKFILL_LOCK_TTL_SECONDS,
+                )
+            except Exception as exc:
+                logger.warning("[RAG] Failed to renew backfill lock: %s", exc)
+                continue
+            if not still_held:
+                logger.warning("[RAG] Backfill lock was lost; stopped renewing")
+                return
+
+    threading.Thread(target=renew, name="rag-lock-renew", daemon=True).start()
 
 
 def _wait_for_backfill_lock_release(client: Any) -> bool:
@@ -353,20 +396,38 @@ def _release_backfill_lock(client: Any, token: str) -> None:
     """
     if token == _RAG_BACKFILL_LOCK_UNHELD_TOKEN:
         return
+    stop = _backfill_lock_renewals.pop(token, None)
+    if stop is not None:
+        stop.set()
     try:
         client.eval(_RELEASE_LOCK_IF_OWNED, 1, _RAG_BACKFILL_LOCK_KEY, token)
     except Exception as exc:
         logger.warning("[RAG] Failed to release backfill lock: %s", exc)
 
 
+async def _wait_for_embedding(backfill: Any, loop: asyncio.AbstractEventLoop) -> bool:
+    deadline = time.time() + _RAG_WARMUP_TIMEOUT_SECONDS
+    while True:
+        try:
+            await loop.run_in_executor(None, backfill.embedding_service.encode, "warmup")
+            return True
+        except Exception as exc:
+            if time.time() >= deadline:
+                logger.error("[RAG] Embedding warmup failed: %s", exc)
+                return False
+            logger.warning(
+                "[RAG] Embedding not ready yet, retrying in %ds: %s",
+                _RAG_WARMUP_RETRY_SECONDS,
+                exc,
+            )
+        await asyncio.sleep(_RAG_WARMUP_RETRY_SECONDS)
+
+
 async def _run_rag_backfill(backfill: Any) -> None:
     """Background task to warm up embedding model and index knowledge files."""
     loop = asyncio.get_running_loop()
     started_at = time.time()
-    try:
-        await loop.run_in_executor(None, backfill.embedding_service.encode, "warmup")
-    except Exception as exc:
-        logger.error("[RAG] Embedding warmup failed: %s", exc)
+    if not await _wait_for_embedding(backfill, loop):
         return
 
     lock_client = _build_backfill_lock_client()
@@ -425,7 +486,7 @@ async def _run_rag_backfill(backfill: Any) -> None:
     except Exception as exc:
         logger.error("[RAG] Backfill failed: %s", exc)
     finally:
-        # 已處理的失敗要立即釋放，避免其他 worker 等完整段 TTL。
+        # 已處理的失敗要立即釋放，避免其他 worker 再等一次 TTL。
         if lock_client is not None and lock_token is not None:
             _release_backfill_lock(lock_client, lock_token)
 
