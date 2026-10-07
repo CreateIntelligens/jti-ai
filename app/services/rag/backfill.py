@@ -147,14 +147,31 @@ class BackfillService:
 
     @staticmethod
     def _fetch_topic_info(source_type: str, language: str, filename: str) -> dict[str, str]:
-        """Fallback path when caller didn't pre-fetch topic info. Only hciot stores topic metadata."""
-        if source_type != "hciot":
-            return BackfillService._extract_topic_info(None)
+        """Fallback path when caller didn't pre-fetch topic info (KB upload/edit).
+
+        Must read the same doc backfill would list, for every source: the topic
+        feeds both the chunk prefix and the embedding title, so a file edited
+        through the API would otherwise get a different vector than a rebuild.
+        """
         try:
-            doc = get_hciot_knowledge_store().get_file(language, filename)
+            doc = BackfillService._get_file_doc(source_type, language, filename)
         except Exception:
             doc = None
         return BackfillService._extract_topic_info(doc)
+
+    @staticmethod
+    def _get_file_doc(source_type: str, language: str, filename: str) -> dict | None:
+        if source_type == "general":
+            return get_general_knowledge_store().get_file(language, filename) or (
+                get_knowledge_store().get_file(language, filename, namespace=_GENERAL_NAMESPACE)
+            )
+        store_getters = {
+            "hciot": get_hciot_knowledge_store,
+            "esg": get_esg_knowledge_store,
+            "jti": get_jti_knowledge_store,
+        }
+        getter = store_getters.get(source_type)
+        return getter().get_file(language, filename) if getter else None
 
     @staticmethod
     def _merge_topic_store_labels(source_type: str, language: str, topic_info: dict[str, str]) -> dict[str, str]:

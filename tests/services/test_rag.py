@@ -208,6 +208,40 @@ class TestRAGPipeline(unittest.TestCase):
             ["FAQ / Department Introductions"],
         )
 
+    def test_upload_path_uses_same_topic_title_as_backfill(self):
+        """KB 上傳/編輯不帶 topic_info；必須查回同一份 doc，否則向量跟全量重建不同。"""
+        backfill = BackfillService()
+        mock_embedding_service.encode.reset_mock()
+        mock_embedding_service.encode.return_value = np.random.rand(1, 768)
+        store = MagicMock()
+        store.get_file.return_value = {
+            "topic_label": "常見問題",
+            "category_label": "常見問題",
+        }
+
+        with patch("app.services.rag.backfill.get_jti_knowledge_store", return_value=store):
+            backfill.index_single_file("jti", "zh", "jti_001.csv", b"q,a\nQ?,A")
+
+        store.get_file.assert_called_once_with("zh", "jti_001.csv")
+        self.assertEqual(
+            mock_embedding_service.encode.call_args.kwargs["titles"], ["常見問題"]
+        )
+
+    def test_general_upload_falls_back_to_legacy_store_for_topic(self):
+        new_store = MagicMock()
+        new_store.get_file.return_value = None
+        old_store = MagicMock()
+        old_store.get_file.return_value = {"topic_label": "釣點", "category_label": "台北"}
+
+        with (
+            patch("app.services.rag.backfill.get_general_knowledge_store", return_value=new_store),
+            patch("app.services.rag.backfill.get_knowledge_store", return_value=old_store),
+        ):
+            info = BackfillService._fetch_topic_info("general", "store_x", "a.csv")
+
+        old_store.get_file.assert_called_once_with("store_x", "a.csv", namespace="general")
+        self.assertEqual(BackfillService._build_title(info), "台北 / 釣點")
+
     def test_hciot_backfill_skips_topic_store_lookup_when_labels_are_usable(self):
         topic_info = {
             "topic_id": "faq/department-introductions",
