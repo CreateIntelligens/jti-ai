@@ -255,3 +255,28 @@ class TestUserScopeDerivation:
         u = self._user()
         assert u.scope_kind == "app"
         assert u.scope_value is None
+
+
+class TestSetPassword:
+    @requires_bcrypt
+    def test_set_password_stores_new_hash_only(self):
+        mgr = _manager_with_mock_collection()
+        mgr.collection.update_one.return_value = MagicMock(matched_count=1)
+
+        assert mgr.set_password("admin", "correct-horse-battery") is True
+
+        query, update = mgr.collection.update_one.call_args.args
+        assert query == {"username": "admin"}
+        assert list(update["$set"]) == ["password_hash"]
+        assert update["$set"]["password_hash"] != "correct-horse-battery"
+
+    def test_short_password_rejected_before_db(self):
+        mgr = _manager_with_mock_collection()
+        with pytest.raises(ValueError):
+            mgr.set_password("admin", "short")
+        mgr.collection.update_one.assert_not_called()
+
+    def test_unknown_user_returns_false(self):
+        mgr = _manager_with_mock_collection()
+        mgr.collection.update_one.return_value = MagicMock(matched_count=0)
+        assert mgr.set_password("ghost", "long-enough-password") is False

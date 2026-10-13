@@ -200,6 +200,20 @@ class UserManager:
 
         return [self._user_from_doc(doc) for doc in docs]
 
+    MIN_PASSWORD_LENGTH = 12
+
+    def set_password(self, username: str, new_password: str) -> bool:
+        """重設密碼(只在主機上用 scripts/reset_password.py 呼叫,不開放成 API)。"""
+        if len(new_password or "") < self.MIN_PASSWORD_LENGTH:
+            raise ValueError(f"密碼至少 {self.MIN_PASSWORD_LENGTH} 個字元")
+        result = self.collection.update_one(
+            {"username": username},
+            {"$set": {"password_hash": hash_password(new_password)}},
+        )
+        if result.matched_count:
+            logger.info("[UserManager] 已重設使用者 %s 的密碼", username)
+        return bool(result.matched_count)
+
     def set_disabled(self, user_id: str, disabled: bool) -> bool:
         """啟用 / 停用使用者"""
         result = self.collection.update_one(
