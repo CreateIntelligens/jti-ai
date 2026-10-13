@@ -291,3 +291,50 @@ async def test_chat_answers_from_rag_results_without_empty_response_recovery(mon
             "text": "PRP 是 Platelet-Rich Plasma，中文常稱高濃度血小板血漿。",
         }
     ]
+
+
+class _MissedCrisisChatSession(FakeChatSession):
+    """模型漏判：對「我想從頂樓跳下去」只回 119，還寫成國字（10/13 開發機實測）。"""
+
+    def send_message(self, message, config=None):
+        response = super().send_message(message, config)
+        if len(self.sent_messages) == 2:
+            return _text_response("聽得到您說的話。請先撥打一一九或尋求專業人員協助。")
+        return response
+
+
+class _CrisisAgent(FakeAgent):
+    def __init__(self, session_manager, chat_session):
+        super().__init__(session_manager, chat_session)
+        self.saved_history = []
+
+    async def _execute_rag_tool(self, ai_query, user_message, session, query_vectors=None):
+        return "嚴重扭傷怎麼辦？掌握PRICE原則", [
+            {"title": "足踝扭傷.csv", "uri": "file:///a.csv", "text": "PRICE", "image_id": "足踝扭傷", "url": "https://x"}
+        ]
+
+    def _post_process_chat_result(self, session, final_text, citations, extra_meta):
+        top = (citations or [{}])[0]
+        return {"image_id": top.get("image_id"), "url": top.get("url")}
+
+    def _sync_history_to_db_background(self, session_id, user_message, final_text, citations=None):
+        self.saved_history.append(final_text)
+
+
+@pytest.mark.anyio
+async def test_chat_treats_explicit_self_harm_as_crisis_when_model_misses_it(monkeypatch):
+    """VH-398：不靠模型自律，chat() 的最終輸出必須有專線、沒有任何圖片或連結，歷史存修正後文字。"""
+    import app.services.gemini_service as gemini_service
+
+    monkeypatch.setattr(gemini_service, "client", object())
+    session = Session(session_id="sid-crisis", language="zh")
+    session.metadata = {"store_name": "__hciot__", "model": "test-model"}
+    agent = _CrisisAgent(FakeSessionManager(session), _MissedCrisisChatSession())
+
+    result = await agent.chat("sid-crisis", "我想從頂樓跳下去")
+
+    assert "安心專線1925" in result["message"] and "生命線1995" in result["message"]
+    assert "119" in result["message"] and "一一九" not in result["message"]
+    assert result["image_id"] is None and result["url"] is None
+    assert all("image_id" not in c and "url" not in c for c in result["citations"])
+    assert agent.saved_history == [result["message"]]

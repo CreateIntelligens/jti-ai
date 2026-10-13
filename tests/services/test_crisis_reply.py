@@ -22,6 +22,8 @@ from app.services.crisis_reply import (
         ("撥打一九二五安心專線或一九五五生命線", "撥打1925安心專線或1995生命線"),
         # 連在一起寫時，每個號碼只歸屬前面那個名稱
         ("安心專線1925生命線1995", "安心專線1925生命線1995"),
+        ("安心專線1925，１９５５　生命線", "安心專線1925，1995　生命線"),
+        ("安心專線1925，1955：生命線", "安心專線1925，1995：生命線"),
     ],
 )
 def test_hotline_numbers_are_forced_to_correct_values(reply, expected):
@@ -124,3 +126,8 @@ def test_explicit_self_harm_messages_are_detected(message):
 )
 def test_ordinary_messages_are_not_self_harm(message):
     assert not is_self_harm_message(message)
+
+
+def test_english_number_before_label_is_fixed():
+    fixed = enforce_crisis_hotlines("Call 1955 Lifeline or 1925 suicide prevention hotline.", "en")
+    assert "1995 Lifeline" in fixed and "1925 suicide prevention hotline" in fixed

@@ -23,10 +23,12 @@ _ZH_LIFELINE_LABEL = r"生命線"
 # 這樣「安心專線1925生命線1995」不會把 1925 誤認成生命線的號碼。
 _ZH_PAIR = re.compile(
     rf"(?P<label>{_ZH_SUICIDE_LABEL}|{_ZH_LIFELINE_LABEL})(?P<gap>{_GAP})(?P<num>{_NUMBER})"
-    rf"|(?P<num2>{_NUMBER})(?P<gap2> ?)(?P<label2>{_ZH_SUICIDE_LABEL}|{_ZH_LIFELINE_LABEL})"
+    rf"|(?P<num2>{_NUMBER})(?P<gap2>[ 　:：]{{0,2}})(?P<label2>{_ZH_SUICIDE_LABEL}|{_ZH_LIFELINE_LABEL})"
 )
+_EN_LABEL = r"suicide prevention (?:hotline|line|center)|lifeline"
 _EN_PAIR = re.compile(
-    rf"(?P<label>suicide prevention (?:hotline|line|center)|lifeline)(?P<gap>[ :(\-]{{0,3}}(?:at |on )?)(?P<num>{_NUMBER})",
+    rf"(?P<label>{_EN_LABEL})(?P<gap>[ :(\-]{{0,3}}(?:at |on )?)(?P<num>{_NUMBER})"
+    rf"|(?P<num2>{_NUMBER})(?P<gap2>[ :(]{{0,2}})(?P<label2>{_EN_LABEL})",
     re.IGNORECASE,
 )
 _MISSING_NAMES = (
@@ -91,10 +93,7 @@ def enforce_crisis_hotlines(
         text = text.replace(spoken, digits)
     text = text.replace("一一九", "119")
     text = _ZH_PAIR.sub(_fix_pair, text)
-    text = _EN_PAIR.sub(
-        lambda m: f"{m.group('label')}{m.group('gap')}{_number_for(m.group('label'))}",
-        text,
-    )
+    text = _EN_PAIR.sub(_fix_pair, text)
 
     missing = [
         (zh, en, number)
