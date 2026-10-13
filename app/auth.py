@@ -13,6 +13,7 @@ import os
 from fastapi import Depends, HTTPException, Request
 
 from app.security.tokens import decode_session_token
+from app.services.audit_log import observe_actor
 
 ADMIN_ROLES = {"admin", "super_admin"}
 KB_ACCESS_DENIED_DETAIL = "Insufficient permission for this knowledge base"
@@ -70,6 +71,7 @@ def _resolve_session_jwt(token: str) -> dict | None:
     role = claims.get("role")
     scope = claims.get("scope", claims.get("app"))
     store_name = None
+    observe_actor(role=role, user_id=user_id, auth_method="session")
 
     from app import deps
 
@@ -77,6 +79,7 @@ def _resolve_session_jwt(token: str) -> dict | None:
         user = deps.user_manager.get_user(user_id) if user_id else None
         if user is None:
             raise HTTPException(status_code=401, detail="Session user not found")
+        observe_actor(user=user)
         if getattr(user, "disabled", False):
             raise HTTPException(status_code=401, detail="User is disabled")
         role = user.role
@@ -121,11 +124,13 @@ def verify_auth(request: Request) -> dict:
     # 是 session JWT？(優先序最高;sk-xxx 不會 decode 成功,順序安全)
     jwt_auth = _resolve_session_jwt(token)
     if jwt_auth is not None:
+        observe_actor(request, **jwt_auth, auth_method="session")
         return jwt_auth
 
     # 是 Admin Key？→ super_admin
     admin_key = os.getenv("ADMIN_API_KEY")
     if admin_key and token == admin_key:
+        observe_actor(request, role="super_admin", auth_method="admin_api_key")
         return {"role": "super_admin", "store_name": None}
 
     # 是一般 Key？（查 MongoDB）
@@ -134,6 +139,8 @@ def verify_auth(request: Request) -> dict:
     if deps.api_key_manager:
         api_key_info = deps.api_key_manager.verify_key(token)
         if api_key_info:
+            observe_actor(request, role="user", auth_method="api_key",
+                          api_key=api_key_info)
             return {
                 "role": "user",
                 "store_name": api_key_info.store_name,

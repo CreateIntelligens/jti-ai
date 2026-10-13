@@ -15,10 +15,11 @@ from pydantic import BaseModel
 import app.deps as deps
 from app.security.tokens import create_session_token
 from app.auth import verify_auth
+from app.services.audit_log import AuditRoute
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/auth", tags=["auth"])
+router = APIRouter(prefix="/api/auth", tags=["auth"], route_class=AuditRoute)
 
 # session cookie 名稱與有效期 (秒),與 token 預設一致
 _COOKIE_NAME = "session"

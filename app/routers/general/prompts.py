@@ -17,10 +17,12 @@ from app.auth import verify_authenticated, verify_auth
 from app.routers.general.stores import resolve_store_config, _authorize_store_access
 from fastapi import Request
 import app.deps as deps
+from app.services.audit_log import AuditRoute
 
 SYSTEM_DEFAULT_PROMPT_ID = "system_default"
 
 router = APIRouter(
+    route_class=AuditRoute,
     prefix="/api/stores",
     tags=["Prompt Management"],
     dependencies=[Depends(verify_authenticated)],

@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends
 
 from app.auth import require_kb_access
 from app.routers._shared.qa_kb_router import QaKbRouterConfig, build_qa_kb_router
+from app.services.audit_log import AuditRoute
 from app.services.general.knowledge_store import get_general_knowledge_store
 from app.services.general.topic_store import get_general_topic_store
 from app.services.rag.backfill import get_backfill_service
@@ -62,6 +63,7 @@ router = build_qa_kb_router(
 # store_name is carried in the `language` query param, matching the rest of
 # the general knowledge surface.
 _reindex_router = APIRouter(
+    route_class=AuditRoute,
     tags=["General Knowledge"], dependencies=[Depends(require_kb_access("general"))]
 )
 _running_store_reindexes: set[str] = set()

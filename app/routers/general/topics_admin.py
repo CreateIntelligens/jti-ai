@@ -18,9 +18,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.auth import require_kb_access
+from app.services.audit_log import AuditRoute
 from app.services.general.topic_store import get_general_topic_store
 
-router = APIRouter(tags=["General Topics"], dependencies=[Depends(require_kb_access("general"))])
+router = APIRouter(
+    route_class=AuditRoute,
+    tags=["General Topics"],
+    dependencies=[Depends(require_kb_access("general"))],
+)
 public_router = APIRouter(tags=["General Topics"])
 
 

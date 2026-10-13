@@ -9,8 +9,13 @@ from pydantic import BaseModel
 
 from app.auth import verify_auth
 import app.deps as deps
+from app.services.audit_log import AuditRoute
 
-router = APIRouter(prefix="/api", tags=["API Key Management"])
+router = APIRouter(
+    route_class=AuditRoute,
+    prefix="/api",
+    tags=["API Key Management"],
+)
 
 ADMIN_ROLES = {"admin", "super_admin"}
 

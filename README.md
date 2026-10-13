@@ -79,9 +79,25 @@ API_ENCRYPTION_KEY=your_fernet_key
 
 `gemini-3.1-flash-lite` 是穩定 model id；若要測試 preview model，可自行把 `GEMINI_MODEL_NAME` 改成當前可用的 preview id。
 
+稽核紀錄存於 `system_config.audit_logs`，並寫入 bind-mounted
+`logs/shared/app.log`；可由 super_admin 查詢 `GET /api/admin/audit-logs`。
+`AUDIT_TRUSTED_PROXY_HOPS` 預設 `1`：本專案 nginx 直接代理到 backend，
+Vite 不代理 API。將 socket peer 接在轉送鏈最右側，向左略過指定數目的
+可信代理後取來源；不採信任意最左值。XFF 優先，其次 Forwarded、X-Real-IP；
+值缺少或無效則回到 peer。直連部署設 `0`，增加代理時依實際部署調整。
+跳數設定僅適用於 backend 只能由指定代理存取的部署；應在入口限制直接存取。
+稽核只解析請求標頭，不修改 uvicorn 設定或既有請求處理。`peer_ip` 保留
+ASGI request.client.host；若伺服器先前已改寫此值，稽核不還原或再改寫它。
+Mongo 與共享檔案寫入均在背景佇列處理，失敗只記 warning，不影響原 API。
+佇列滿或程序退出時，未完成的紀錄可能遺失；共用檔案沿用既有保留設定。
+RAG 稽核記錄接受請求的結果，不改動既有背景工作流程。
+
 常用選配：
 
 ```env
+# Audit
+AUDIT_TRUSTED_PROXY_HOPS=1
+
 # TTS
 TTS_API_URL=http://10.9.0.35:8001/tts_stream
 NORMALIZE_API_URL=http://10.9.0.35:8956/normalize

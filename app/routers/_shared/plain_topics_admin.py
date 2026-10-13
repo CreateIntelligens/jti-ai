@@ -31,6 +31,7 @@ from app.services._shared.qa_kb.csv_utils import (
     extract_questions_from_csv,
     normalize_qa_csv_rows,
 )
+from app.services.audit_log import AuditRoute
 
 logger = logging.getLogger(__name__)
 
@@ -319,7 +320,11 @@ def build_plain_topics_admin(
     get_knowledge_store: Callable[[], object] | None = None,
     adopt_orphan_csvs: bool = False,
 ) -> PlainTopicsAdmin:
-    router = APIRouter(tags=[tag], dependencies=[Depends(require_kb_access(app))])
+    router = APIRouter(
+        route_class=AuditRoute,
+        tags=[tag],
+        dependencies=[Depends(require_kb_access(app))],
+    )
     public_router = APIRouter(tags=[tag])
 
     def _seed_knowledge_csv(language: Lang, seed: SeedTopic) -> None:

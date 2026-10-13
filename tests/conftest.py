@@ -21,3 +21,10 @@ def _reset_topics_read_state(monkeypatch):
 
     monkeypatch.setattr(topics_cache, "_get_client", lambda: None)
     plain_topics_admin.reset_seed_guard()
+
+
+@pytest.fixture(autouse=True)
+def _isolate_audit_database(monkeypatch):
+    from app.services import audit_log
+
+    monkeypatch.setattr(audit_log, "_enqueue_record", lambda record: None)

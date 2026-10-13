@@ -7,6 +7,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.auth import KB_ACCESS_DENIED_DETAIL, can_access_kb, verify_admin, verify_auth
+from app.services.audit_log import AuditRoute
 from app.services.rag.backfill import get_backfill_service
 
 logger = logging.getLogger(__name__)
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 LANGUAGES = ["zh", "en"]
 SOURCE_TYPES = ["hciot", "jti", "esg"]
 
-router = APIRouter(prefix="/api/admin/rag")
+router = APIRouter(prefix="/api/admin/rag", route_class=AuditRoute)
 
 
 class ReindexRequest(BaseModel):

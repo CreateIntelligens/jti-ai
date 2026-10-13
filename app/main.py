@@ -151,6 +151,7 @@ from .services.agent_utils import strip_citations
 from .services.crisis_reply import enforce_crisis_hotlines
 from .services.model_discovery import get_available_models
 from .services.mongo_client import get_mongo_client
+from .routers.admin_audit import router as admin_audit_router
 from .routers.admin_rag import router as admin_rag_router
 from .routers.auth_routes import router as auth_router
 from .routers.esg import (
@@ -770,6 +771,7 @@ def index():
     return {"message": "ai360 km api", "docs": "/docs"}
 
 
+app.include_router(admin_audit_router)
 app.include_router(admin_rag_router)
 app.include_router(auth_router)
 app.include_router(jti_chat.runtime_router)

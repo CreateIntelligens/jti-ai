@@ -24,6 +24,7 @@ from pydantic import BaseModel
 from typing import Literal
 
 from app.auth import require_role
+from app.services.audit_log import AuditRoute
 from app.services.db_names import (
     CONTROL_PLANE_DB_NAME,
     ESG_DB_NAME,
@@ -40,7 +41,11 @@ from app.services.db_sync.reverse import run_reverse_sync
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/admin", tags=["DB Sync"])
+router = APIRouter(
+    route_class=AuditRoute,
+    prefix="/api/admin",
+    tags=["DB Sync"],
+)
 
 # 僅 super_admin。module-level 以便測試可用 dependency_overrides 覆寫。
 require_super_admin_dep = require_role("super_admin")

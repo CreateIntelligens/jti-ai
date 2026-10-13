@@ -23,6 +23,7 @@ from app.schemas.chat import (
     DeleteConversationResponse,
     ExportConversationsResponse,
 )
+from app.services.audit_log import AuditRoute
 from app.services.general.managed_chat import ManagedChatConfig, ManagedChatService
 from app.services.jti.main_agent import main_agent
 from app.services.jti.quiz_flow import JTI_QUIZ_CONFIG
@@ -63,12 +64,14 @@ admin_history_router = APIRouter(
 )
 # 刪除對話歷史：維持 admin only。
 compat_history_admin_router = APIRouter(
+    route_class=AuditRoute,
     prefix="/api/jti",
     tags=["JTI Conversations"],
     include_in_schema=False,
     dependencies=[Depends(verify_admin)],
 )
 admin_history_admin_router = APIRouter(
+    route_class=AuditRoute,
     prefix="/api/jti-admin/conversations",
     tags=["JTI Conversations"],
     dependencies=[Depends(verify_admin)],

@@ -19,6 +19,7 @@ from pydantic import BaseModel
 
 from app.auth import verify_auth
 from app.routers.general.stores import _authorize_store_access
+from app.services.audit_log import AuditRoute
 from app.services.jti.quiz_bank_store import get_quiz_bank_store, DEFAULT_BANK_ID
 from app.services.jti.quiz_results_store import get_quiz_results_store, DEFAULT_SET_ID
 from app.tools.jti.quiz import invalidate_quiz_cache
@@ -26,7 +27,11 @@ from app.tools.jti.quiz_results import invalidate_quiz_results_cache
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/general/quiz-bank/{store_name}", tags=["General Store Quiz Bank"])
+router = APIRouter(
+    route_class=AuditRoute,
+    prefix="/api/general/quiz-bank/{store_name}",
+    tags=["General Store Quiz Bank"],
+)
 
 
 # ========== Request Models ==========

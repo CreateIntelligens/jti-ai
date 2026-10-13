@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, File, Query, Request, UploadFile
 
 from app.auth import require_app_access, verify_auth
 from app.routers.general import quiz_bank as general_quiz_bank
+from app.services.audit_log import AuditRoute
 from app.services.quiz.config import ESG_STORE_NAME
 
 CreateBankRequest = general_quiz_bank.CreateBankRequest
@@ -15,7 +16,11 @@ UpdateQuestionRequest = general_quiz_bank.UpdateQuestionRequest
 UpdateQuizResultRequest = general_quiz_bank.UpdateQuizResultRequest
 DEFAULT_BANK_ID = general_quiz_bank.DEFAULT_BANK_ID
 
-router = APIRouter(tags=["ESG Quiz Bank"], dependencies=[Depends(require_app_access("esg"))])
+router = APIRouter(
+    route_class=AuditRoute,
+    tags=["ESG Quiz Bank"],
+    dependencies=[Depends(require_app_access("esg"))],
+)
 
 
 @router.get("/banks/")

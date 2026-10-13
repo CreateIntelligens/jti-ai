@@ -20,6 +20,7 @@ from app.auth import verify_authenticated
 import app.deps as deps
 from app.prompts import Prompt, PromptIndexEntry, StorePrompts
 from app.services.agent_utils import normalize_language as _normalize_language
+from app.services.audit_log import AuditRoute
 
 SUPPORTED_LANGUAGES = ("zh", "en")
 
@@ -213,7 +214,11 @@ def mirror_active_to_shared(store_prompts: StorePrompts, prompt_id: Optional[str
 
 
 def build_persona_router(config: PersonaRouterConfig) -> APIRouter:
-    router = APIRouter(tags=[config.tag], dependencies=[Depends(verify_authenticated)])
+    router = APIRouter(
+        route_class=AuditRoute,
+        tags=[config.tag],
+        dependencies=[Depends(verify_authenticated)],
+    )
 
     def require_prompt_manager():
         if not deps.prompt_manager:

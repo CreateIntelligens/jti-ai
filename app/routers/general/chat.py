@@ -28,6 +28,7 @@ from app.schemas.chat import (
     GeneralConversationsBySessionResponse,
     GeneralConversationsResponse,
 )
+from app.services.audit_log import AuditRoute
 from app.services.tts_text import prepare_tts_text
 from app.models_config import DEFAULT_RAG_MODEL
 from app.utils import (
@@ -52,7 +53,11 @@ from app.services.general.agent_prompts import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/chat", tags=["General Chat"])
+router = APIRouter(
+    route_class=AuditRoute,
+    prefix="/api/chat",
+    tags=["General Chat"],
+)
 _get_tts_manager = wire_tts(router, "general")
 
 

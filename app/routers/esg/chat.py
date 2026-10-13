@@ -22,6 +22,7 @@ from app.schemas.chat import (
     DeleteConversationResponse,
     ExportConversationsResponse,
 )
+from app.services.audit_log import AuditRoute
 from app.services.esg.agent_prompts import WELCOME_TEXT
 from app.services.esg.main_agent import main_agent
 from app.services.esg.quiz_flow import ESG_QUIZ_CONFIG
@@ -65,12 +66,14 @@ admin_history_router = APIRouter(
     dependencies=[Depends(require_history_access(_MODE))],
 )
 compat_history_admin_router = APIRouter(
+    route_class=AuditRoute,
     prefix="/api/esg",
     tags=["ESG Conversations"],
     include_in_schema=False,
     dependencies=[Depends(verify_admin)],
 )
 admin_history_admin_router = APIRouter(
+    route_class=AuditRoute,
     prefix="/api/esg-admin/conversations",
     tags=["ESG Conversations"],
     dependencies=[Depends(verify_admin)],

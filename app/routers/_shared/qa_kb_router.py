@@ -41,6 +41,7 @@ from app.routers._shared.qa_kb_upload import (
     save_qa_csv_to_topic,
 )
 from app.services._shared.qa_kb.csv_utils import _parse_csv_rows, merge_csv_files
+from app.services.audit_log import AuditRoute
 
 logger = logging.getLogger(__name__)
 
@@ -466,7 +467,11 @@ def build_qa_kb_router(
     include_knowledge: bool = True,
     include_csv_parse: bool = False,
 ) -> APIRouter:
-    router = APIRouter(tags=[config.tag], dependencies=[Depends(require_kb_access(config.app))])
+    router = APIRouter(
+        route_class=AuditRoute,
+        tags=[config.tag],
+        dependencies=[Depends(require_kb_access(config.app))],
+    )
     if include_knowledge:
         _add_knowledge_routes(router, config)
     if include_csv_parse:

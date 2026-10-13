@@ -14,9 +14,14 @@ from pymongo.errors import DuplicateKeyError
 
 import app.deps as deps
 from app.auth import require_role
+from app.services.audit_log import AuditRoute
 from app.users import User
 
-router = APIRouter(prefix="/api", tags=["User Management"])
+router = APIRouter(
+    route_class=AuditRoute,
+    prefix="/api",
+    tags=["User Management"],
+)
 
 # module-level 守門依賴 (固定可被測試以 dependency_overrides 覆寫)
 require_admin_dep = require_role("admin", "super_admin")

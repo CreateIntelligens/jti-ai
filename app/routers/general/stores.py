@@ -28,6 +28,7 @@ from app.routers.knowledge_utils import (
     validate_upload_limits,
 )
 from app.services import app_key_map, gemini_clients
+from app.services.audit_log import AuditRoute
 from app.services.db_names import CONTROL_PLANE_DB_NAME
 from app.services.hciot.knowledge_store import get_hciot_knowledge_store
 from app.services.jti.knowledge_store import get_jti_knowledge_store
@@ -35,7 +36,11 @@ from app.services.knowledge_store import get_knowledge_store
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api", tags=["Store Management"])
+router = APIRouter(
+    route_class=AuditRoute,
+    prefix="/api",
+    tags=["Store Management"],
+)
 
 
 @dataclass(frozen=True)

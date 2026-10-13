@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 import app.deps as deps
 from app.auth import require_app_access, require_history_access, verify_admin
 from app.routers.tts_utils import attach_tts_message_id, wire_tts
+from app.services.audit_log import AuditRoute
 from app.services.gemini_service import run_sync
 from app.schemas.chat import (
     ChatRequest,
@@ -64,12 +65,14 @@ admin_history_router = APIRouter(
 )
 # 刪除對話歷史：維持 admin only。
 compat_history_admin_router = APIRouter(
+    route_class=AuditRoute,
     prefix="/api/hciot",
     tags=["HCIoT Conversations"],
     include_in_schema=False,
     dependencies=[Depends(verify_admin)],
 )
 admin_history_admin_router = APIRouter(
+    route_class=AuditRoute,
     prefix="/api/hciot-admin/conversations",
     tags=["HCIoT Conversations"],
     dependencies=[Depends(verify_admin)],

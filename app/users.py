@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 from pymongo import MongoClient
 
 from app.security.passwords import hash_password, verify_password
+from app.services.audit_log import observe_login_result
 from app.services.db_names import CONTROL_PLANE_DB_NAME
 from app.services.mongo_client import resolve_mongodb_uri
 
@@ -159,13 +160,17 @@ class UserManager:
         """
         doc = self.collection.find_one({"username": username})
         if not doc:
+            observe_login_result(None, username, "unknown_user")
             return None
 
         user = self._user_from_doc(doc)
         if user.disabled:
+            observe_login_result(user, username, "disabled")
             return None
         if not verify_password(password, user.password_hash):
+            observe_login_result(user, username, "bad_password")
             return None
+        observe_login_result(user, username)
         return user
 
     def get_user(self, user_id: str) -> User | None:

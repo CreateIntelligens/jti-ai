@@ -7,6 +7,7 @@ from fastapi.responses import Response
 
 from app.auth import require_kb_access
 from app.routers._shared.image_ids import candidate_image_ids
+from app.services.audit_log import AuditRoute
 from app.services.general.image_store import get_general_image_store
 
 MAX_IMAGE_SIZE = 10 * 1024 * 1024  # 10MB
@@ -22,6 +23,7 @@ _SAFE_IMAGE_HEADERS = {
 
 router = APIRouter(tags=["General Images"])
 admin_router = APIRouter(
+    route_class=AuditRoute,
     tags=["General Admin Images"], dependencies=[Depends(require_kb_access("general"))]
 )
 
