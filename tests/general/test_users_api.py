@@ -133,6 +133,19 @@ def test_super_admin_creates_admin_role_ok(client):
     assert resp.json()["role"] == "admin"
 
 
+@pytest.mark.parametrize("caller", ["super_admin", "admin"])
+def test_nobody_can_create_super_admin_via_api(client, caller):
+    """2026-10-06 入侵：取得 admin 身分後用這支 API 開了 super_admin 後門帳號。"""
+    deps.user_manager = MagicMock()
+    _override_auth({"role": caller, "scope": None, "store_name": None, "user_id": "su_1"})
+
+    resp = client.post("/api/users", json={
+        "username": "rceadmin", "password": "pw", "role": "super_admin",
+    })
+    assert resp.status_code == 403
+    deps.user_manager.create_user.assert_not_called()
+
+
 def test_create_duplicate_username_conflict(client):
     deps.user_manager = MagicMock()
     deps.user_manager.create_user.side_effect = DuplicateKeyError("dup")
