@@ -13,17 +13,25 @@ from app.services.safety_numbers import LIFELINE, SUICIDE_PREVENTION_HOTLINE
 
 _DIGIT = "[0-9０-９〇零一二三四五六七八九]"
 _NUMBER = rf"{_DIGIT}(?:[ -]?{_DIGIT}){{2,3}}"
-# 專線名稱與號碼之間常見的連接字，例如「生命線：」「生命線是」「生命線電話」
-_GAP = r"[^0-9０-９〇零一二三四五六七八九。，,；;！!？?\n]{0,8}?"
+# 名稱與號碼之間的連接字（「生命線：」「生命線是」「生命線電話」）。不能跨過「或、和、、」等
+# 連接詞，否則「安心專線或1925生命線」會把屬於生命線的號碼算給安心專線。
+_GAP = r"[^0-9０-９〇零一二三四五六七八九。，,；;！!？?\n或和及與跟、]{0,6}?"
 
-# (名稱的 regex, 正確號碼, 補充時用的中文名稱, 英文名稱)
-_HOTLINES = (
-    (r"安心專線|自殺防治(?:專線|安心專線)?", SUICIDE_PREVENTION_HOTLINE, "安心專線", "suicide prevention hotline"),
-    (r"生命線", LIFELINE, "生命線", "Lifeline"),
+_ZH_SUICIDE_LABEL = r"安心專線|自殺防治(?:專線|安心專線)?"
+_ZH_LIFELINE_LABEL = r"生命線"
+# 由左到右一次掃描，每個號碼只歸屬一個名稱：「名稱+號碼」或「號碼+名稱」。
+# 這樣「安心專線1925生命線1995」不會把 1925 誤認成生命線的號碼。
+_ZH_PAIR = re.compile(
+    rf"(?P<label>{_ZH_SUICIDE_LABEL}|{_ZH_LIFELINE_LABEL})(?P<gap>{_GAP})(?P<num>{_NUMBER})"
+    rf"|(?P<num2>{_NUMBER})(?P<gap2> ?)(?P<label2>{_ZH_SUICIDE_LABEL}|{_ZH_LIFELINE_LABEL})"
 )
-_EN_HOTLINES = (
-    (r"suicide prevention (?:hotline|line|center)", SUICIDE_PREVENTION_HOTLINE),
-    (r"lifeline", LIFELINE),
+_EN_PAIR = re.compile(
+    rf"(?P<label>suicide prevention (?:hotline|line|center)|lifeline)(?P<gap>[ :(\-]{{0,3}}(?:at |on )?)(?P<num>{_NUMBER})",
+    re.IGNORECASE,
+)
+_MISSING_NAMES = (
+    (SUICIDE_PREVENTION_HOTLINE, "安心專線", "suicide prevention hotline"),
+    (LIFELINE, "生命線", "Lifeline"),
 )
 _SPOKEN_FORMS = {
     SUICIDE_PREVENTION_HOTLINE.translate(str.maketrans("0123456789", "〇一二三四五六七八九")): SUICIDE_PREVENTION_HOTLINE,
@@ -36,40 +44,61 @@ _CRISIS_MARKERS = re.compile(
 )
 
 
+# 使用者明確說出自傷意圖。模型偶爾會漏判（10/13「我想從頂樓跳下去」只回了 119），
+# 這時仍要當危機處理。寧可對玩笑話多補一句專線，也不要漏掉真正的危機。
+_SELF_HARM_MESSAGE = re.compile(
+    r"自殺|自殘|自傷|輕生|想死|不想活|活不下去|(?:死掉|死了)算了|不如死|結束(?:自己的)?生命|傷害自己|割腕|上吊|燒炭|跳樓"
+    r"|(?:頂樓|樓頂|高樓|陽台|橋上).{0,4}跳"
+    r"|suicid|kill myself|end my life|want to die|don't want to live|do not want to live|hurt myself|self[- ]harm",
+    re.IGNORECASE,
+)
+
+
+def is_self_harm_message(user_message: str) -> bool:
+    return bool(user_message) and bool(_SELF_HARM_MESSAGE.search(user_message))
+
+
+def _number_for(label: str) -> str:
+    return LIFELINE if re.fullmatch(_ZH_LIFELINE_LABEL + "|lifeline", label, re.IGNORECASE) else SUICIDE_PREVENTION_HOTLINE
+
+
+def _fix_pair(match: re.Match) -> str:
+    if match.group("label"):
+        return f"{match.group('label')}{match.group('gap')}{_number_for(match.group('label'))}"
+    return f"{_number_for(match.group('label2'))}{match.group('gap2')}{match.group('label2')}"
+
+
 def is_crisis_reply(text: str) -> bool:
     return bool(text) and bool(_CRISIS_MARKERS.search(text))
 
 
-def enforce_crisis_hotlines(text: str, language: str | None = None) -> str:
+def enforce_crisis_hotlines(
+    text: str,
+    language: str | None = None,
+    force: bool = False,
+) -> str:
     """把危機回覆裡的專線號碼改成正確值，缺的補上；不是危機回覆就原樣回傳。
 
+    force=True 表示已從使用者訊息判定為危機，即使回覆沒提到專線也要補上。
     language 沒給時依回覆內容判斷（含中日韓文字就當中文），補上的句子才不會語言錯置。
     """
-    if not is_crisis_reply(text):
+    if not force and not is_crisis_reply(text):
         return text
     if language is None:
         language = "zh" if re.search(r"[\u4e00-\u9fff]", text) else "en"
 
     for spoken, digits in _SPOKEN_FORMS.items():
         text = text.replace(spoken, digits)
-
-    for label, number, _zh, _en in _HOTLINES:
-        text = re.sub(
-            rf"({label})({_GAP})({_NUMBER})",
-            lambda m, n=number: f"{m.group(1)}{m.group(2)}{n}",
-            text,
-        )
-    for label, number in _EN_HOTLINES:
-        text = re.sub(
-            rf"({label})({_GAP})({_NUMBER})",
-            lambda m, n=number: f"{m.group(1)}{m.group(2)}{n}",
-            text,
-            flags=re.IGNORECASE,
-        )
+    text = text.replace("一一九", "119")
+    text = _ZH_PAIR.sub(_fix_pair, text)
+    text = _EN_PAIR.sub(
+        lambda m: f"{m.group('label')}{m.group('gap')}{_number_for(m.group('label'))}",
+        text,
+    )
 
     missing = [
         (zh, en, number)
-        for _label, number, zh, en in _HOTLINES
+        for number, zh, en in _MISSING_NAMES
         if not re.search(rf"(?<!\d){number}(?!\d)", text)
     ]
     if not missing:

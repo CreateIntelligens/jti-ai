@@ -28,7 +28,11 @@ from app.services.agent_utils import (
     normalize_language,
     strip_citations,
 )
-from app.services.crisis_reply import enforce_crisis_hotlines, is_crisis_reply
+from app.services.crisis_reply import (
+    enforce_crisis_hotlines,
+    is_crisis_reply,
+    is_self_harm_message,
+)
 from app.services.gemini_clients import (
     get_client_by_index,
     is_invalid_key_error,
@@ -775,7 +779,8 @@ class BaseAgent:
             final_text = strip_citations(extract_response_text(response))
             final_text = final_text or self._get_chat_fallback_message(session.language)
             # 存進歷史前就修正，否則下一輪模型會照著錯的號碼講
-            final_text = enforce_crisis_hotlines(final_text, session.language)
+            self_harm = is_self_harm_message(user_message)
+            final_text = enforce_crisis_hotlines(final_text, session.language, force=self_harm)
             self._sync_history_to_db_background(session_id, user_message, final_text, citations)
 
             # 組裝結果
@@ -786,7 +791,7 @@ class BaseAgent:
                 "citations": citations,
             }
             result.update(self._post_process_chat_result(session, final_text, citations, extra_meta))
-            if is_crisis_reply(final_text):
+            if self_harm or is_crisis_reply(final_text):
                 # 圖片是依排第一的引用段落附上的，與危機回覆無關，可能誤導求助者。
                 # citations 也要清：其他前端（kiosk、文字客服）可能直接讀它來顯示圖片。
                 result["image_id"] = None
