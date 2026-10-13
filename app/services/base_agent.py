@@ -26,7 +26,11 @@ from app.services.agent_utils import (
     normalize_language,
     strip_citations,
 )
-from app.services.gemini_clients import get_client_by_index
+from app.services.gemini_clients import (
+    get_client_by_index,
+    is_invalid_key_error,
+    mark_client_invalid,
+)
 from app.services.rag.service import get_rag_pipeline
 
 logger = logging.getLogger(__name__)
@@ -367,6 +371,35 @@ class BaseAgent:
 
         raise RuntimeError("model fallback send exited unexpectedly")
 
+    async def _send_with_key_failover(
+        self,
+        chat_session,
+        enriched: str,
+        force_config,
+        session: Session,
+    ):
+        """Key 被刪除或停用時，標記它並改用別把 key 重建 chat session 再送一次。
+
+        使用者只多等一次失敗的往返（約零點幾秒），之後的請求直接用新的 key。
+        """
+        try:
+            return await self._send_enriched_with_model_fallback(
+                chat_session, enriched, force_config, session
+            )
+        except Exception as exc:
+            if not is_invalid_key_error(exc):
+                raise
+            store_name = self._get_store_name_for_session(session)
+            dead_client = get_client_by_index(resolve_key_index_for_store(store_name))
+            if not mark_client_invalid(dead_client):
+                raise
+            self._chat_sessions.pop(session.session_id, None)
+            chat_session = self._get_or_create_chat_session(session)
+            force_config = self._get_force_tool_config(session)
+            return await self._send_enriched_with_model_fallback(
+                chat_session, enriched, force_config, session
+            )
+
     async def _run_tool_loop(self, chat_session, enriched: str, session: Session, user_message: str):
         """Send enriched message with forced tool call, handle function calling loop.
         Returns (response, citations)."""
@@ -374,7 +407,7 @@ class BaseAgent:
 
         force_config = self._get_force_tool_config(session)
         history_start = self._chat_history_len(chat_session)
-        chat_session, response = await self._send_enriched_with_model_fallback(
+        chat_session, response = await self._send_with_key_failover(
             chat_session,
             enriched,
             force_config,

@@ -10,6 +10,8 @@ Gemini Multi-Key Registry
 import hashlib
 import logging
 import os
+import threading
+import time
 from collections import OrderedDict
 
 from google import genai
@@ -43,6 +45,22 @@ _clients: list[genai.Client] = []
 # key index → 顯示名稱
 _key_names: list[str] = []
 
+# key index → 被判定失效的時間（monotonic）。失效的 key 在 _DEAD_KEY_RETRY_SECONDS 內
+# 一律改用下一把可用的 key；過了這段時間再讓它試一次，換回新 key 或 key 恢復時不必重啟。
+_dead_since: dict[int, float] = {}
+_DEAD_KEY_RETRY_SECONDS = 10 * 60
+# Google 對被刪除/停用的 key 回 400 API_KEY_INVALID；nen 代理回 401/403。
+# 只認這幾種「key 本身不能用」的錯，429 額度、503、模型下架都不換 key。
+_INVALID_KEY_MARKERS = (
+    "API_KEY_INVALID",
+    "API key not valid",
+    "API key expired",
+    "API_KEY_SERVICE_BLOCKED",
+    "CONSUMER_SUSPENDED",
+    "401 UNAUTHENTICATED",
+    "403 PERMISSION_DENIED",
+)
+
 # Browser-supplied user keys are never persisted. Cache clients by hash with LRU eviction.
 _USER_KEY_CACHE_MAX = 128
 _user_key_clients: "OrderedDict[str, genai.Client]" = OrderedDict()
@@ -62,6 +80,7 @@ def init_registry() -> None:
     _store_to_client = {}
     _clients = []
     _key_names = []
+    _dead_since.clear()
 
     keys_raw = os.getenv("GEMINI_API_KEYS", "")
     tokens = [t.strip() for t in keys_raw.split(",") if t.strip()]
@@ -97,11 +116,82 @@ def get_all_clients() -> list[genai.Client]:
     return list(_clients)
 
 
+def is_invalid_key_error(exc: BaseException) -> bool:
+    """這個錯誤是不是「API key 本身失效」（換一把 key 才會好）。"""
+    text = str(exc)
+    return any(marker in text for marker in _INVALID_KEY_MARKERS)
+
+
+def _is_dead(key_index: int) -> bool:
+    since = _dead_since.get(key_index)
+    if since is None:
+        return False
+    if time.monotonic() - since >= _DEAD_KEY_RETRY_SECONDS:
+        # 到期：讓這把 key 再被用一次；還是壞的話呼叫端會再標記。
+        _dead_since.pop(key_index, None)
+        return False
+    return True
+
+
+def _key_label(key_index: int) -> str:
+    return _key_names[key_index] if 0 <= key_index < len(_key_names) else f"#{key_index}"
+
+
+def mark_client_invalid(client: genai.Client) -> bool:
+    """把這個 client 的 key 標成失效。回傳是否還有其他可用的 key 可以換。"""
+    try:
+        key_index = _clients.index(client)
+    except ValueError:
+        return False
+    if key_index not in _dead_since:
+        logger.error(
+            "[Registry] Gemini key「%s」失效，%d 分鐘內改用其他 key",
+            _key_label(key_index),
+            _DEAD_KEY_RETRY_SECONDS // 60,
+        )
+    _dead_since[key_index] = time.monotonic()
+    return any(not _is_dead(i) for i in range(len(_clients)))
+
+
+def _first_live_index() -> int | None:
+    for i in range(len(_clients)):
+        if not _is_dead(i):
+            return i
+    return None
+
+
 def get_client_by_index(key_index: int) -> genai.Client:
-    """根據 key index 取得 client（0-based）。"""
-    if 0 <= key_index < len(_clients):
+    """根據 key index 取得 client（0-based）；該 key 失效時改用第一把可用的。"""
+    if not 0 <= key_index < len(_clients):
+        return get_default_client()
+    if not _is_dead(key_index):
         return _clients[key_index]
-    return get_default_client()
+    fallback = _first_live_index()
+    if fallback is None:
+        # 全部都失效時照舊用原本那把，讓錯誤原樣浮出來，而不是吞掉。
+        return _clients[key_index]
+    logger.debug(
+        "[Registry] key「%s」失效中，改用「%s」",
+        _key_label(key_index),
+        _key_label(fallback),
+    )
+    return _clients[fallback]
+
+
+def probe_keys() -> None:
+    """逐把 key 打一次最便宜的 API，先把失效的標起來，第一個請求就不必踩到。"""
+    for i, client in enumerate(list(_clients)):
+        try:
+            next(iter(client.models.list(config={"page_size": 1})), None)
+        except Exception as exc:
+            if is_invalid_key_error(exc):
+                mark_client_invalid(client)
+            else:
+                logger.warning("[Registry] key「%s」檢查失敗（不視為失效）: %s", _key_label(i), exc)
+
+
+def probe_keys_in_background() -> None:
+    threading.Thread(target=probe_keys, name="gemini-key-probe", daemon=True).start()
 
 
 def get_client_for_api_key(api_key: str) -> genai.Client:
@@ -166,7 +256,8 @@ def resolve_key_index_by_name(name: str) -> int:
 
 
 def get_default_client() -> genai.Client:
-    """回傳第一把 key 的 client。"""
+    """回傳第一把可用 key 的 client。"""
     if _clients:
-        return _clients[0]
+        live = _first_live_index()
+        return _clients[0 if live is None else live]
     raise ValueError("No Gemini API keys available (set GEMINI_API_KEYS)")

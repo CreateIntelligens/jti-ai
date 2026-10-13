@@ -34,9 +34,10 @@ def init_managers():
     global prompt_manager, api_key_manager, user_manager
     try:
         from .services import app_key_map
-        from .services.gemini_clients import init_registry
+        from .services.gemini_clients import init_registry, probe_keys_in_background
         from .services.gemini_service import init_gemini_client
         init_registry()
+        probe_keys_in_background()
         app_key_map.validate_app_key_map()
         init_gemini_client()
 

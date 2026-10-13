@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Gemini key 自動切換
+
+- key 被刪除或停用（`API_KEY_INVALID`、401、403）時，這次請求立即改用其他可用的 key 重送，並在 10 分鐘內跳過失效的 key；啟動時會在背景檢查每把 key。額度用完（429）、服務暫時無法使用（503）、模型下架不會換 key；全部 key 都失效時照常回報錯誤。
+
 ### Embedding 換成 EmbeddingGemma 2
 
 - **模型**：RAG embedding 從 BAAI/bge-m3（1024 維）換成 `google/embeddinggemma-2`（768 維，revision 釘死），依供應鏈政策移除 BGE 與 FlagEmbedding。本地 gateway（`docker/embedding`）與 openVman 共用服務算出的向量完全相同。

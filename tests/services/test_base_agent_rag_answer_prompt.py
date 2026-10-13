@@ -218,6 +218,53 @@ async def test_invalid_argument_does_not_trigger_model_fallback(monkeypatch):
 
 
 @pytest.mark.anyio
+async def test_invalid_key_rebuilds_session_on_another_key(monkeypatch):
+    """key 被刪除時，這次請求就換 key 重送，使用者不會看到錯誤。"""
+    session = Session(metadata={"model": "gemini-flash-lite-latest"})
+    rebuilt = ResultChatSession(_text_response("OK"))
+    agent = FakeAgent(FakeSessionManager(session), rebuilt)
+    dead_client = object()
+    marked = []
+    monkeypatch.setattr(base_agent_module, "get_client_by_index", lambda _i: dead_client)
+    monkeypatch.setattr(base_agent_module, "resolve_key_index_for_store", lambda _s: 2)
+    monkeypatch.setattr(
+        base_agent_module, "mark_client_invalid", lambda c: marked.append(c) or True
+    )
+    calls = []
+
+    async def send(chat_session, enriched, force_config, session):
+        calls.append(chat_session)
+        if len(calls) == 1:
+            raise RuntimeError("400 INVALID_ARGUMENT ... 'reason': 'API_KEY_INVALID'")
+        return chat_session, chat_session.send_message(enriched, config=force_config)
+
+    monkeypatch.setattr(agent, "_send_enriched_with_model_fallback", send)
+    chat_session, response = await agent._send_with_key_failover(
+        ResultChatSession(_text_response("unused")), "q", None, session
+    )
+
+    assert marked == [dead_client]
+    assert chat_session is rebuilt
+    assert response.text == "OK"
+
+
+@pytest.mark.anyio
+async def test_non_key_errors_do_not_switch_keys(monkeypatch):
+    session = Session(metadata={"model": "gemini-flash-lite-latest"})
+    agent = FakeAgent(FakeSessionManager(session), ResultChatSession(_text_response("x")))
+    marked = []
+    monkeypatch.setattr(base_agent_module, "mark_client_invalid", lambda c: marked.append(c))
+
+    async def send(*_args):
+        raise RuntimeError("429 RESOURCE_EXHAUSTED")
+
+    monkeypatch.setattr(agent, "_send_enriched_with_model_fallback", send)
+    with pytest.raises(RuntimeError, match="429"):
+        await agent._send_with_key_failover(None, "q", None, session)
+    assert marked == []
+
+
+@pytest.mark.anyio
 async def test_chat_answers_from_rag_results_without_empty_response_recovery(monkeypatch):
     import app.services.gemini_service as gemini_service
 
