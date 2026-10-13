@@ -40,10 +40,15 @@ def is_crisis_reply(text: str) -> bool:
     return bool(text) and bool(_CRISIS_MARKERS.search(text))
 
 
-def enforce_crisis_hotlines(text: str, language: str = "zh") -> str:
-    """把危機回覆裡的專線號碼改成正確值，缺的補上；不是危機回覆就原樣回傳。"""
+def enforce_crisis_hotlines(text: str, language: str | None = None) -> str:
+    """把危機回覆裡的專線號碼改成正確值，缺的補上；不是危機回覆就原樣回傳。
+
+    language 沒給時依回覆內容判斷（含中日韓文字就當中文），補上的句子才不會語言錯置。
+    """
     if not is_crisis_reply(text):
         return text
+    if language is None:
+        language = "zh" if re.search(r"[\u4e00-\u9fff]", text) else "en"
 
     for spoken, digits in _SPOKEN_FORMS.items():
         text = text.replace(spoken, digits)

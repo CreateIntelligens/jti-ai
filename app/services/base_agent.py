@@ -10,6 +10,7 @@ Base Agent - 共用的 Gemini chat session 管理邏輯
 
 import asyncio
 import logging
+import math
 import os
 import time
 from collections import OrderedDict
@@ -45,9 +46,11 @@ _DEFAULT_IMAGE_MAX_DISTANCE = 0.27
 
 def _image_max_distance() -> float:
     try:
-        return float(os.getenv("RAG_IMAGE_MAX_DISTANCE", _DEFAULT_IMAGE_MAX_DISTANCE))
+        value = float(os.getenv("RAG_IMAGE_MAX_DISTANCE", _DEFAULT_IMAGE_MAX_DISTANCE))
     except ValueError:
         return _DEFAULT_IMAGE_MAX_DISTANCE
+    # nan 會讓比較永遠為假（圖片照附），負數則等於關掉所有附圖
+    return value if math.isfinite(value) and value >= 0 else _DEFAULT_IMAGE_MAX_DISTANCE
 
 
 class BaseAgent:
@@ -614,7 +617,7 @@ class BaseAgent:
     def _public_citation(citation: dict) -> dict:
         """去掉內部欄位；不夠相關的段落不帶圖片與連結。
 
-        回覆的附圖取自排第一的引用。距離門檻不過濾段落（每次都會撈到幾段），
+        逐筆判斷：回覆的附圖取自排第一的引用，第一名不夠相關時就不附圖。距離門檻不過濾段落（每次都會撈到幾段），
         閒聊或危機訊息也會撈到帶圖的衛教段落，原樣附上會誤導使用者（VH-398）。
         """
         public = {k: v for k, v in citation.items() if not k.startswith("_")}
@@ -784,9 +787,14 @@ class BaseAgent:
             }
             result.update(self._post_process_chat_result(session, final_text, citations, extra_meta))
             if is_crisis_reply(final_text):
-                # 圖片是依排第一的引用段落附上的，與危機回覆無關，可能誤導求助者
+                # 圖片是依排第一的引用段落附上的，與危機回覆無關，可能誤導求助者。
+                # citations 也要清：其他前端（kiosk、文字客服）可能直接讀它來顯示圖片。
                 result["image_id"] = None
                 result["url"] = None
+                result["citations"] = [
+                    {k: v for k, v in c.items() if k not in ("image_id", "url")}
+                    for c in (result.get("citations") or [])
+                ]
             return result
 
         except Exception as e:

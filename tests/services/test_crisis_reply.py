@@ -68,3 +68,18 @@ def test_image_distance_is_configurable(monkeypatch):
     monkeypatch.setenv("RAG_IMAGE_MAX_DISTANCE", "0.4")
     far = {"image_id": "x", "_distance": 0.33}
     assert BaseAgent._public_citation(far) == {"image_id": "x"}
+
+
+def test_language_is_inferred_when_not_given():
+    """OpenAI 相容 API 沒有 session 語言，英文回覆不能被補上中文句子。"""
+    fixed = enforce_crisis_hotlines("Please call Lifeline 1995.")
+    assert fixed.endswith("You can also call the suicide prevention hotline 1925.")
+    assert enforce_crisis_hotlines("請撥打生命線1995。").endswith("也可以撥打安心專線1925。")
+
+
+@pytest.mark.parametrize("raw", ["nan", "-1", "inf", "abc"])
+def test_invalid_image_distance_falls_back_to_default(monkeypatch, raw):
+    from app.services import base_agent
+
+    monkeypatch.setenv("RAG_IMAGE_MAX_DISTANCE", raw)
+    assert base_agent._image_max_distance() == base_agent._DEFAULT_IMAGE_MAX_DISTANCE
