@@ -135,7 +135,7 @@ def test_super_admin_creates_admin_role_ok(client):
 
 @pytest.mark.parametrize("caller", ["super_admin", "admin"])
 def test_nobody_can_create_super_admin_via_api(client, caller):
-    """2026-10-06 入侵：取得 admin 身分後用這支 API 開了 super_admin 後門帳號。"""
+    """super_admin 只能在主機上建立，任何角色都不能透過 API 建。"""
     deps.user_manager = MagicMock()
     _override_auth({"role": caller, "scope": None, "store_name": None, "user_id": "su_1"})
 

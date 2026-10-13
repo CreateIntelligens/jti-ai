@@ -109,8 +109,8 @@ def create_user(request: CreateUserRequest, auth: dict = Depends(require_admin_d
     """
     manager = _require_manager()
 
-    # super_admin 只能在主機上用 scripts/create_user.py 建立。2026-10-06 有人取得 admin
-    # 登入身分後,就是透過這支 API 開了兩個 super_admin 後門帳號。
+    # super_admin 只能在主機上用 scripts/create_user.py 建立:即使管理員身分被冒用,
+    # 也不能透過 API 再生出最高權限帳號。
     if request.role == "super_admin":
         raise HTTPException(status_code=403, detail="super_admin 不能透過 API 建立")
 
