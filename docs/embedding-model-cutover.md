@@ -157,5 +157,7 @@ docker compose up -d --force-recreate embedding backend
   並以 topic 標籤作為標題。前綴必須跟 openVman 共用服務完全一致：兩邊算出的向量相同
   （cos = 1.0），本地和共用的服務可以互換。
 - `RAG_DISTANCE_THRESHOLD` 維持 0.85。這個值在 bge 和 gemma 下都等於不過濾。
+- `RAG_IMAGE_MAX_DISTANCE`（預設 0.27）決定排第一的引用要多相關才附圖片和連結，是在 gemma 上校正的。
+  換模型後要重新校正，否則一般問答可能少圖，或閒聊、危機訊息又被附上無關的衛教圖（VH-398）。
 - jtai 自己的 85 題口語改寫題，Recall@5：gemma 80、bge 83。模糊問法略弱，
   一般問法的回答沒有差異。

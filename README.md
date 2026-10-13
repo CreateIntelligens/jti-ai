@@ -94,6 +94,8 @@ EMBEDDING_EXPECTED_MODEL=google/embeddinggemma-2
 EMBEDDING_EXPECTED_DIMENSION=768
 LANCEDB_PATH=data/shared/lancedb
 RAG_DISTANCE_THRESHOLD=0.85
+# 排第一的引用距離低於此值才附圖片／連結（依 embedding 模型校正）
+RAG_IMAGE_MAX_DISTANCE=0.27
 
 # Frontend page gate for restricted hosts
 VITE_PUBLIC_ALLOWED_PAGES=jti,hciot

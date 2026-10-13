@@ -148,6 +148,7 @@ from pydantic import BaseModel
 
 from .auth import _extract_bearer_token, verify_auth
 from .services.agent_utils import strip_citations
+from .services.crisis_reply import enforce_crisis_hotlines
 from .services.model_discovery import get_available_models
 from .services.mongo_client import get_mongo_client
 from .routers.admin_rag import router as admin_rag_router
@@ -690,7 +691,7 @@ async def openai_chat_completions(
             fallback_chain(model_name, gemini_client),
         )
 
-        answer_text = strip_citations(response.text or "")
+        answer_text = enforce_crisis_hotlines(strip_citations(response.text or ""))
         if warning:
             answer_text = f"⚠️ {warning}\n\n{answer_text}"
 

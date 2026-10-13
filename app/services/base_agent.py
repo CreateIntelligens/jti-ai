@@ -10,6 +10,7 @@ Base Agent - 共用的 Gemini chat session 管理邏輯
 
 import asyncio
 import logging
+import os
 import time
 from collections import OrderedDict
 from typing import Any, cast
@@ -26,6 +27,7 @@ from app.services.agent_utils import (
     normalize_language,
     strip_citations,
 )
+from app.services.crisis_reply import enforce_crisis_hotlines, is_crisis_reply
 from app.services.gemini_clients import (
     get_client_by_index,
     is_invalid_key_error,
@@ -36,6 +38,16 @@ from app.services.rag.service import get_rag_pipeline
 logger = logging.getLogger(__name__)
 
 _CHAT_SESSION_CACHE_MAX = 128
+# EmbeddingGemma 2（search_query）上校正：正確段落第 1 名的 cosine distance 約 80% 低於
+# 0.27，閒聊／不相關查詢的第 1 名約 96% 高於它。換 embedding 模型要重新校正。
+_DEFAULT_IMAGE_MAX_DISTANCE = 0.27
+
+
+def _image_max_distance() -> float:
+    try:
+        return float(os.getenv("RAG_IMAGE_MAX_DISTANCE", _DEFAULT_IMAGE_MAX_DISTANCE))
+    except ValueError:
+        return _DEFAULT_IMAGE_MAX_DISTANCE
 
 
 class BaseAgent:
@@ -595,8 +607,21 @@ class BaseAgent:
         )
 
         # Strip internal fields before returning to caller
-        cleaned = [{k: v for k, v in c.items() if not k.startswith("_")} for c in merged]
+        cleaned = [self._public_citation(c) for c in merged]
         return kb_text, cleaned
+
+    @staticmethod
+    def _public_citation(citation: dict) -> dict:
+        """去掉內部欄位；不夠相關的段落不帶圖片與連結。
+
+        回覆的附圖取自排第一的引用。距離門檻不過濾段落（每次都會撈到幾段），
+        閒聊或危機訊息也會撈到帶圖的衛教段落，原樣附上會誤導使用者（VH-398）。
+        """
+        public = {k: v for k, v in citation.items() if not k.startswith("_")}
+        if citation.get("_distance", 999) >= _image_max_distance():
+            public.pop("image_id", None)
+            public.pop("url", None)
+        return public
 
     @staticmethod
     def _rrf_merge(
@@ -746,6 +771,8 @@ class BaseAgent:
             # 提取文字與同步 DB
             final_text = strip_citations(extract_response_text(response))
             final_text = final_text or self._get_chat_fallback_message(session.language)
+            # 存進歷史前就修正，否則下一輪模型會照著錯的號碼講
+            final_text = enforce_crisis_hotlines(final_text, session.language)
             self._sync_history_to_db_background(session_id, user_message, final_text, citations)
 
             # 組裝結果
@@ -756,6 +783,10 @@ class BaseAgent:
                 "citations": citations,
             }
             result.update(self._post_process_chat_result(session, final_text, citations, extra_meta))
+            if is_crisis_reply(final_text):
+                # 圖片是依排第一的引用段落附上的，與危機回覆無關，可能誤導求助者
+                result["image_id"] = None
+                result["url"] = None
             return result
 
         except Exception as e:
