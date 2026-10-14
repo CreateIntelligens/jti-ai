@@ -47,8 +47,10 @@ _CHAT_SESSION_CACHE_MAX = 128
 # EmbeddingGemma 2（search_query）上校正：正確段落第 1 名的 cosine distance 約 80% 低於
 # 0.27，閒聊／不相關查詢的第 1 名約 96% 高於它。換 embedding 模型要重新校正。
 _DEFAULT_IMAGE_MAX_DISTANCE = 0.27
-# 分類模型自己有 2 秒時限；這裡再兜底，避免連線卡住拖住整則回覆
-_SELF_HARM_WAIT_SECONDS = 3.0
+# 分類模型自己有 0.8 秒時限；這裡再兜底，避免連線卡住拖住整則回覆
+_SELF_HARM_WAIT_SECONDS = 1.5
+# 危機常分成幾句說（「我有一整罐安眠藥」→「今晚全部吃掉」），判斷時附上前幾句
+_SELF_HARM_RECENT_USER_MESSAGES = 3
 
 
 def _image_max_distance() -> float:
@@ -779,7 +781,12 @@ class BaseAgent:
             logger.info(f"[{self.__class__.__name__}] 訊息: {user_message[:50]}...")
 
             # 自傷判斷和主模型同時跑，主模型回完時通常早已有結果
-            self_harm_task = asyncio.create_task(detect_self_harm(user_message))
+            recent_user_messages = [
+                entry.get("content", "")
+                for entry in session.chat_history
+                if isinstance(entry, dict) and entry.get("role") == "user"
+            ][-_SELF_HARM_RECENT_USER_MESSAGES:]
+            self_harm_task = asyncio.create_task(detect_self_harm(user_message, recent_user_messages))
             try:
                 # 使用基底類別提供的 tool loop 進行 RAG
                 response, citations = await self._run_tool_loop(chat_session, enriched, session, user_message)

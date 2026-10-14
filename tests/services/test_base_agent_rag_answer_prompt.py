@@ -364,7 +364,7 @@ async def _chat_with_classifier(monkeypatch, user_message, classify):
 
 @pytest.mark.anyio
 async def test_chat_uses_classifier_for_metaphorical_self_harm(monkeypatch):
-    async def classify(message):
+    async def classify(message, recent_user_messages=None):
         return True
 
     result = await _chat_with_classifier(monkeypatch, "好想睡著就不要再醒來", classify)
@@ -374,7 +374,7 @@ async def test_chat_uses_classifier_for_metaphorical_self_harm(monkeypatch):
 
 @pytest.mark.anyio
 async def test_chat_trusts_classifier_over_regex_for_jokes(monkeypatch):
-    async def classify(message):
+    async def classify(message, recent_user_messages=None):
         return False
 
     result = await _chat_with_classifier(monkeypatch, "笑到想死", classify)
@@ -390,9 +390,39 @@ async def test_chat_falls_back_to_regex_when_classifier_hangs(monkeypatch):
 
     monkeypatch.setattr(base_agent, "_SELF_HARM_WAIT_SECONDS", 0.05)
 
-    async def classify(message):
+    async def classify(message, recent_user_messages=None):
         await asyncio.sleep(5)
         return False
 
     result = await _chat_with_classifier(monkeypatch, "我想從頂樓跳下去", classify)
+    assert "安心專線1925" in result["message"]
+
+
+@pytest.mark.anyio
+async def test_chat_sends_recent_user_messages_to_classifier(monkeypatch):
+    """危機常分成幾句說；只看最新一句會漏判「我有一整罐安眠藥」→「今晚就全部吃掉」。"""
+    import app.services.gemini_service as gemini_service
+    from app.services import self_harm_classifier
+
+    seen = []
+
+    async def classify(message, recent_user_messages=None):
+        seen.append((message, recent_user_messages))
+        return True
+
+    monkeypatch.setattr(gemini_service, "client", object())
+    monkeypatch.setattr(self_harm_classifier, "classify_self_harm", classify)
+    session = Session(session_id="sid-ctx", language="zh")
+    session.metadata = {"store_name": "__hciot__", "model": "test-model"}
+    session.chat_history = [
+        {"role": "user", "content": "第一句"},
+        {"role": "assistant", "content": "回覆"},
+        {"role": "user", "content": "第二句"},
+        {"role": "user", "content": "第三句"},
+        {"role": "user", "content": "我手邊有一整罐安眠藥"},
+    ]
+    agent = _CrisisAgent(FakeSessionManager(session), _PlainReplyChatSession())
+    result = await agent.chat("sid-ctx", "今晚就全部吃掉")
+
+    assert seen == [("今晚就全部吃掉", ["第二句", "第三句", "我手邊有一整罐安眠藥"])]
     assert "安心專線1925" in result["message"]

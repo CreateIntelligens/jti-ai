@@ -61,6 +61,8 @@ async def test_either_provider_flagging_is_self_harm(monkeypatch, jev_p, clef_p)
         httpx.Response(500),
         httpx.Response(200, json={"answers": {}}),
         httpx.Response(200, json={"answers": {"self_harm": {"noul": True}}}),
+        httpx.Response(200, json={"answers": {"self_harm": {"noul": 1.5}}}),
+        httpx.Response(200, content=b'{"answers": {"self_harm": {"noul": NaN}}}'),
     ],
 )
 async def test_one_provider_failing_uses_the_other(monkeypatch, bad):
@@ -104,3 +106,55 @@ def test_providers_follow_env(monkeypatch):
     monkeypatch.setenv("CLEF_URL", "https://clef.test/v1/systemone")
     assert [p[0] for p in clf._providers()] == ["jev", "clef"]
     assert clf._providers()[0][1] == clf._DEFAULT_JEV_URL
+
+
+@pytest.mark.anyio
+async def test_recent_user_messages_are_sent_as_state(monkeypatch):
+    monkeypatch.setattr(clf, "_providers", lambda: [JEV])
+    seen = []
+
+    def handler(request):
+        seen.append(json.loads(request.content)["state"])
+        return _answer(0.93)
+
+    _use_transport(monkeypatch, handler)
+    assert await clf.classify_self_harm("今晚就全部吃掉", ["我手邊有一整罐安眠藥"]) is True
+    assert seen == [{"message": "今晚就全部吃掉", "recent_user_messages": ["我手邊有一整罐安眠藥"]}]
+
+
+@pytest.mark.anyio
+async def test_first_yes_returns_without_waiting_for_slow_provider(monkeypatch):
+    import asyncio
+    import time
+
+    monkeypatch.setattr(clf, "_providers", lambda: [JEV, CLEF])
+    monkeypatch.setenv("SELF_HARM_CLASSIFIER_TIMEOUT", "5")
+
+    async def handler(request):
+        if request.url.host == "clef.test":
+            await asyncio.sleep(3)
+        return _answer(0.9)
+
+    _use_transport(monkeypatch, handler)
+    started = time.monotonic()
+    assert await clf.classify_self_harm("我想自殺") is True
+    assert time.monotonic() - started < 1
+
+
+@pytest.mark.anyio
+async def test_hanging_provider_is_cut_at_timeout(monkeypatch):
+    import asyncio
+    import time
+
+    monkeypatch.setattr(clf, "_providers", lambda: [JEV, CLEF])
+    monkeypatch.setenv("SELF_HARM_CLASSIFIER_TIMEOUT", "0.2")
+
+    async def handler(request):
+        if request.url.host == "clef.test":
+            await asyncio.sleep(3)
+        return _answer(0.05)
+
+    _use_transport(monkeypatch, handler)
+    started = time.monotonic()
+    assert await clf.classify_self_harm("笑到想死") is False
+    assert time.monotonic() - started < 1
