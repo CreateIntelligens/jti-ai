@@ -338,3 +338,61 @@ async def test_chat_treats_explicit_self_harm_as_crisis_when_model_misses_it(mon
     assert result["image_id"] is None and result["url"] is None
     assert all("image_id" not in c and "url" not in c for c in result["citations"])
     assert agent.saved_history == [result["message"]]
+
+
+class _PlainReplyChatSession(FakeChatSession):
+    """模型沒給專線的一般回覆，用來看危機判斷是不是由分類器決定。"""
+
+    def send_message(self, message, config=None):
+        response = super().send_message(message, config)
+        if len(self.sent_messages) == 2:
+            return _text_response("謝謝您的分享，有需要可以再跟我說。")
+        return response
+
+
+async def _chat_with_classifier(monkeypatch, user_message, classify):
+    import app.services.gemini_service as gemini_service
+    from app.services import self_harm_classifier
+
+    monkeypatch.setattr(gemini_service, "client", object())
+    monkeypatch.setattr(self_harm_classifier, "classify_self_harm", classify)
+    session = Session(session_id="sid-clf", language="zh")
+    session.metadata = {"store_name": "__hciot__", "model": "test-model"}
+    agent = _CrisisAgent(FakeSessionManager(session), _PlainReplyChatSession())
+    return await agent.chat("sid-clf", user_message)
+
+
+@pytest.mark.anyio
+async def test_chat_uses_classifier_for_metaphorical_self_harm(monkeypatch):
+    async def classify(message):
+        return True
+
+    result = await _chat_with_classifier(monkeypatch, "好想睡著就不要再醒來", classify)
+    assert "安心專線1925" in result["message"] and "生命線1995" in result["message"]
+    assert result["image_id"] is None
+
+
+@pytest.mark.anyio
+async def test_chat_trusts_classifier_over_regex_for_jokes(monkeypatch):
+    async def classify(message):
+        return False
+
+    result = await _chat_with_classifier(monkeypatch, "笑到想死", classify)
+    assert "1925" not in result["message"]
+    assert result["image_id"] == "足踝扭傷"
+
+
+@pytest.mark.anyio
+async def test_chat_falls_back_to_regex_when_classifier_hangs(monkeypatch):
+    import asyncio
+
+    from app.services import base_agent
+
+    monkeypatch.setattr(base_agent, "_SELF_HARM_WAIT_SECONDS", 0.05)
+
+    async def classify(message):
+        await asyncio.sleep(5)
+        return False
+
+    result = await _chat_with_classifier(monkeypatch, "我想從頂樓跳下去", classify)
+    assert "安心專線1925" in result["message"]

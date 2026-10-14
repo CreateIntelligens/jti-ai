@@ -39,6 +39,7 @@ from app.services.gemini_clients import (
     mark_client_invalid,
 )
 from app.services.rag.service import get_rag_pipeline
+from app.services.self_harm_classifier import detect_self_harm
 
 logger = logging.getLogger(__name__)
 
@@ -46,6 +47,8 @@ _CHAT_SESSION_CACHE_MAX = 128
 # EmbeddingGemma 2（search_query）上校正：正確段落第 1 名的 cosine distance 約 80% 低於
 # 0.27，閒聊／不相關查詢的第 1 名約 96% 高於它。換 embedding 模型要重新校正。
 _DEFAULT_IMAGE_MAX_DISTANCE = 0.27
+# 分類模型自己有 2 秒時限；這裡再兜底，避免連線卡住拖住整則回覆
+_SELF_HARM_WAIT_SECONDS = 3.0
 
 
 def _image_max_distance() -> float:
@@ -739,6 +742,14 @@ class BaseAgent:
         """回傳 chat 失敗時的預設訊息。"""
         return "AI目前發生錯誤，請稍後再試。"
 
+    @staticmethod
+    async def _await_self_harm(task: "asyncio.Task[bool]", user_message: str) -> bool:
+        try:
+            return await asyncio.wait_for(task, timeout=_SELF_HARM_WAIT_SECONDS)
+        except Exception as exc:
+            logger.warning(f"[SelfHarm] 等不到判斷結果，改用正規表達式: {type(exc).__name__}")
+            return is_self_harm_message(user_message)
+
     async def chat(self, session_id: str, user_message: str, model: str | None = None) -> dict[str, Any]:
         """
         統一的對話流程 (Function-calling / RAG 版本)：
@@ -766,9 +777,15 @@ class BaseAgent:
             
             t0 = time.time()
             logger.info(f"[{self.__class__.__name__}] 訊息: {user_message[:50]}...")
-            
-            # 使用基底類別提供的 tool loop 進行 RAG
-            response, citations = await self._run_tool_loop(chat_session, enriched, session, user_message)
+
+            # 自傷判斷和主模型同時跑，主模型回完時通常早已有結果
+            self_harm_task = asyncio.create_task(detect_self_harm(user_message))
+            try:
+                # 使用基底類別提供的 tool loop 進行 RAG
+                response, citations = await self._run_tool_loop(chat_session, enriched, session, user_message)
+            except BaseException:
+                self_harm_task.cancel()
+                raise
             
             logger.info(f"[{self.__class__.__name__}] 流程總耗時: {(time.time()-t0)*1000:.0f}ms")
 
@@ -779,7 +796,7 @@ class BaseAgent:
             final_text = strip_citations(extract_response_text(response))
             final_text = final_text or self._get_chat_fallback_message(session.language)
             # 存進歷史前就修正，否則下一輪模型會照著錯的號碼講
-            self_harm = is_self_harm_message(user_message)
+            self_harm = await self._await_self_harm(self_harm_task, user_message)
             final_text = enforce_crisis_hotlines(final_text, session.language, force=self_harm)
             self._sync_history_to_db_background(session_id, user_message, final_text, citations)
 

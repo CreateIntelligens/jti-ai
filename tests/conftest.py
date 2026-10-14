@@ -28,3 +28,11 @@ def _isolate_audit_database(monkeypatch):
     from app.services import audit_log
 
     monkeypatch.setattr(audit_log, "_enqueue_record", lambda record: None)
+
+
+@pytest.fixture(autouse=True)
+def _no_self_harm_classifier_network(monkeypatch):
+    """容器的 .env 有 Jev key；測試不打外部 API，一律走正規表達式，要測分類器的案例再自行覆蓋。"""
+    from app.services import self_harm_classifier
+
+    monkeypatch.setattr(self_harm_classifier, "_providers", lambda: [])
