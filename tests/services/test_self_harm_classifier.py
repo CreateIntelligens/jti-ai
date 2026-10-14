@@ -28,30 +28,21 @@ def _answer(p):
 
 
 @pytest.mark.anyio
-async def test_asks_every_provider_with_its_own_auth(monkeypatch):
+async def test_jev_answer_is_used_without_asking_clef(monkeypatch):
     monkeypatch.setattr(clf, "_providers", lambda: [JEV, CLEF])
-    seen = {}
+    seen = []
 
     def handler(request):
-        seen[request.url.host] = (request.headers.get("authorization"), json.loads(request.content))
+        seen.append((request.url.host, request.headers.get("authorization"), json.loads(request.content)))
         return _answer(0.1)
 
     _use_transport(monkeypatch, handler)
     assert await clf.classify_self_harm("好想睡著就不要再醒來") is False
-    assert seen["jev.test"][0] == "Bearer jev-key"
-    assert seen["clef.test"][0] is None
-    assert seen["jev.test"][1]["model"] == "jev-latest"
-    assert seen["clef.test"][1]["model"] == "clef-flash"
-    assert seen["jev.test"][1]["state"] == {"message": "好想睡著就不要再醒來"}
-
-
-@pytest.mark.anyio
-@pytest.mark.parametrize("jev_p, clef_p", [(0.9, 0.1), (0.1, 0.9)])
-async def test_either_provider_flagging_is_self_harm(monkeypatch, jev_p, clef_p):
-    """兩個模型各會漏不同的句子，漏判比多補一句專線嚴重，所以取聯集。"""
-    monkeypatch.setattr(clf, "_providers", lambda: [JEV, CLEF])
-    _use_transport(monkeypatch, lambda r: _answer(jev_p if r.url.host == "jev.test" else clef_p))
-    assert await clf.classify_self_harm("I took all my pills an hour ago") is True
+    assert len(seen) == 1
+    host, auth, body = seen[0]
+    assert host == "jev.test" and auth == "Bearer jev-key"
+    assert body["model"] == "jev-latest"
+    assert body["state"] == {"message": "好想睡著就不要再醒來"}
 
 
 @pytest.mark.anyio
@@ -65,12 +56,17 @@ async def test_either_provider_flagging_is_self_harm(monkeypatch, jev_p, clef_p)
         httpx.Response(200, content=b'{"answers": {"self_harm": {"noul": NaN}}}'),
     ],
 )
-async def test_one_provider_failing_uses_the_other(monkeypatch, bad):
+async def test_jev_failure_falls_back_to_clef_without_auth_header(monkeypatch, bad):
     monkeypatch.setattr(clf, "_providers", lambda: [JEV, CLEF])
-    _use_transport(monkeypatch, lambda r: bad if r.url.host == "jev.test" else _answer(0.06))
-    assert await clf.classify_self_harm("笑到想死") is False
-    _use_transport(monkeypatch, lambda r: bad if r.url.host == "jev.test" else _answer(0.9))
+    seen = []
+
+    def handler(request):
+        seen.append((request.url.host, request.headers.get("authorization")))
+        return bad if request.url.host == "jev.test" else _answer(0.9)
+
+    _use_transport(monkeypatch, handler)
     assert await clf.classify_self_harm("我想吃掉一整罐安眠藥") is True
+    assert seen == [("jev.test", "Bearer jev-key"), ("clef.test", None)]
 
 
 @pytest.mark.anyio
@@ -123,26 +119,7 @@ async def test_recent_user_messages_are_sent_as_state(monkeypatch):
 
 
 @pytest.mark.anyio
-async def test_first_yes_returns_without_waiting_for_slow_provider(monkeypatch):
-    import asyncio
-    import time
-
-    monkeypatch.setattr(clf, "_providers", lambda: [JEV, CLEF])
-    monkeypatch.setenv("SELF_HARM_CLASSIFIER_TIMEOUT", "5")
-
-    async def handler(request):
-        if request.url.host == "clef.test":
-            await asyncio.sleep(3)
-        return _answer(0.9)
-
-    _use_transport(monkeypatch, handler)
-    started = time.monotonic()
-    assert await clf.classify_self_harm("我想自殺") is True
-    assert time.monotonic() - started < 1
-
-
-@pytest.mark.anyio
-async def test_hanging_provider_is_cut_at_timeout(monkeypatch):
+async def test_hanging_jev_is_cut_at_timeout_then_clef_answers(monkeypatch):
     import asyncio
     import time
 
@@ -150,11 +127,11 @@ async def test_hanging_provider_is_cut_at_timeout(monkeypatch):
     monkeypatch.setenv("SELF_HARM_CLASSIFIER_TIMEOUT", "0.2")
 
     async def handler(request):
-        if request.url.host == "clef.test":
+        if request.url.host == "jev.test":
             await asyncio.sleep(3)
-        return _answer(0.05)
+        return _answer(0.9)
 
     _use_transport(monkeypatch, handler)
     started = time.monotonic()
-    assert await clf.classify_self_harm("笑到想死") is False
+    assert await clf.classify_self_harm("我想吃掉一整罐安眠藥") is True
     assert time.monotonic() - started < 1

@@ -47,8 +47,8 @@ _CHAT_SESSION_CACHE_MAX = 128
 # EmbeddingGemma 2（search_query）上校正：正確段落第 1 名的 cosine distance 約 80% 低於
 # 0.27，閒聊／不相關查詢的第 1 名約 96% 高於它。換 embedding 模型要重新校正。
 _DEFAULT_IMAGE_MAX_DISTANCE = 0.27
-# 分類模型自己有 0.8 秒時限；這裡再兜底，避免連線卡住拖住整則回覆
-_SELF_HARM_WAIT_SECONDS = 1.5
+# Jev、Clef 各有 0.8 秒時限，依序最多 1.6 秒；這裡再兜底，避免連線卡住拖住整則回覆
+_SELF_HARM_WAIT_SECONDS = 2.0
 # 危機常分成幾句說（「我有一整罐安眠藥」→「今晚全部吃掉」），判斷時附上前幾句
 _SELF_HARM_RECENT_USER_MESSAGES = 3
 
