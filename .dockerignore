@@ -10,3 +10,4 @@ frontend/
 # Common Node/Python noise
 node_modules/
 dist/
+.venv/
