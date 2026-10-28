@@ -37,7 +37,7 @@ embedding = [
 embedding-heavy = [
     "torch==2.13.0",
     "transformers==5.19.0",
-    "accelerate==1.14.0",
+    "accelerate==1.15.0",
     "sentence-transformers[image]==6.1.0",
     "numpy==2.4.6",
 ]
