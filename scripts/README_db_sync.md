@@ -1,14 +1,15 @@
-# DocumentDB ↔ Atlas 同步與備援
+# 主庫 ↔ Atlas 同步與備援
 
-ai360 km 主資料庫為 **AWS DocumentDB**（經 `db-tunnel` 容器連線），
+ai360 km 主資料庫為 **AWS VPC 內的自架 MongoDB**（經 `db-tunnel` 容器連線；2026-11 起取代 AWS DocumentDB，
+腳本檔名仍沿用 documentdb 字樣），
 **Atlas** 作為備援，達成「主庫不可用時頂上、且資料不漏」。
 
 本目錄含三個檔案：
 
 | 檔案 | 方向 | 何時用 |
 |---|---|---|
-| `sync_documentdb_to_atlas.py` | DocumentDB → Atlas | 平常定時（cron），讓 Atlas 保持最新 |
-| `merge_atlas_to_documentdb.py` | Atlas → DocumentDB | 主庫恢復後，把 fallback 期間資料補回 |
+| `sync_documentdb_to_atlas.py` | 主庫 → Atlas | 平常定時執行，讓 Atlas 保持最新 |
+| `merge_atlas_to_documentdb.py` | Atlas → 主庫 | 主庫恢復後，把 fallback 期間資料補回 |
 | `_mongo_sync_common.py` | （共用） | 業務鍵推導，兩腳本共用，勿單獨執行 |
 
 ---
@@ -17,15 +18,15 @@ ai360 km 主資料庫為 **AWS DocumentDB**（經 `db-tunnel` 容器連線），
 
 ```
 平常：
-   app 寫 → DocumentDB（主）
-   cron 每日 → sync_documentdb_to_atlas.py → Atlas 保持接近最新
+   app 寫 → 主庫
+   定時 → sync_documentdb_to_atlas.py → Atlas 追上主庫
 
 主庫/跳板掛掉：
    app 啟動偵測連不到主庫 → fallback 連 Atlas（已有近期資料）→ 服務頂上
    app 寫 → 寫進 Atlas
 
 主庫恢復：
-   重啟 app → 連回 DocumentDB（主）
+   重啟 app → 連回主庫
    執行 merge_atlas_to_documentdb.py → 把 fallback 期間寫入 Atlas 的資料補回主庫
 ```
 
@@ -45,24 +46,34 @@ fallback 由 app 端 `resolve_mongodb_uri()` 處理（啟動時判斷一次，�
 
 ---
 
-## 平常：定時同步（cron）
+## 平常：定時同步
 
 腳本需要連線字串環境變數。從 `.env` 取用，或直接帶入。
 
-```bash
-# 範例：每日 03:00 跑全量同步（DocumentDB → Atlas）
-# 需在能連到 db-tunnel:27017（或直接連 DocumentDB）的環境執行。
-0 3 * * *  cd /path/to/ai360-km && \
-  SYNC_SOURCE_URI="$MONGODB_URI" \
-  SYNC_TARGET_URI="$MONGODB_URI_FALLBACK" \
-  SYNC_TLS_CA_FILE=/app/global-bundle.pem \
-  python scripts/sync_documentdb_to_atlas.py >> logs/db_sync.log 2>&1
+正式機（hciot）沒有 cron，用 systemd timer `atlas-sync.timer` 每月 1 號 UTC 19:00 執行：
+
+```ini
+# /etc/systemd/system/atlas-sync.service
+[Service]
+Type=oneshot
+User=ec2-user
+ExecStart=/usr/bin/docker exec hciot-ai-backend-1 python scripts/sync_documentdb_to_atlas.py
+StandardOutput=append:/home/ec2-user/hciot-ai/logs/db_sync.log
+StandardError=append:/home/ec2-user/hciot-ai/logs/db_sync.log
 ```
+
+在 backend 容器裡跑時，`MONGODB_URI` 已經帶 `tlsCAFile`，不需要再設 `SYNC_TLS_CA_FILE`。
+`SYNC_TLS_CA_FILE` 只會套用在來源，設成舊的 `/app/global-bundle.pem` 反而會連不上新主庫。
+
+撤銷 API key、停用帳號之後，記得手動跑一次同步：同步之前，Atlas 裡的舊狀態還有效，
+這段期間若 fallback 到 Atlas，撤掉的權限會重新生效。
 
 預演（不寫入）：
 ```bash
 SYNC_DRY_RUN=1 python scripts/sync_documentdb_to_atlas.py
 ```
+
+預演會查目標庫估算「新增」與「比對到」的筆數；「值真的被改寫」的筆數不寫入就算不出來，固定顯示 0。
 
 資料量小（~數萬筆）時全量同步僅數十秒，每日一次即可；要更即時可調高頻率。
 
@@ -77,13 +88,11 @@ SYNC_DRY_RUN=1 python scripts/sync_documentdb_to_atlas.py
 MERGE_DRY_RUN=1 \
   MERGE_SOURCE_URI="$MONGODB_URI_FALLBACK" \
   MERGE_TARGET_URI="$MONGODB_URI" \
-  MERGE_TLS_CA_FILE=/app/global-bundle.pem \
   python scripts/merge_atlas_to_documentdb.py
 
 # 確認無誤後正式補（移除 MERGE_DRY_RUN）
 MERGE_SOURCE_URI="$MONGODB_URI_FALLBACK" \
   MERGE_TARGET_URI="$MONGODB_URI" \
-  MERGE_TLS_CA_FILE=/app/global-bundle.pem \
   python scripts/merge_atlas_to_documentdb.py
 ```
 
@@ -97,17 +106,17 @@ MERGE_SOURCE_URI="$MONGODB_URI_FALLBACK" \
 ### sync_documentdb_to_atlas.py
 | 變數 | 預設 | 說明 |
 |---|---|---|
-| `SYNC_SOURCE_URI` | `MONGODB_URI` | 來源（DocumentDB）|
+| `SYNC_SOURCE_URI` | `MONGODB_URI` | 來源（主庫）|
 | `SYNC_TARGET_URI` | `MONGODB_URI_FALLBACK` | 目標（Atlas）|
-| `SYNC_TLS_CA_FILE` | — | 來源 TLS CA（DocumentDB 需要）|
+| `SYNC_TLS_CA_FILE` | — | 來源 TLS CA（URI 已帶 `tlsCAFile` 時不用設）|
 | `SYNC_DRY_RUN` | — | `1` 只報告不寫入 |
 
 ### merge_atlas_to_documentdb.py
 | 變數 | 預設 | 說明 |
 |---|---|---|
 | `MERGE_SOURCE_URI` | `MONGODB_URI_FALLBACK` | 來源（Atlas）|
-| `MERGE_TARGET_URI` | `MONGODB_URI` | 目標（DocumentDB）|
-| `MERGE_TLS_CA_FILE` | — | 目標 TLS CA（DocumentDB 需要）|
+| `MERGE_TARGET_URI` | `MONGODB_URI` | 目標（主庫）|
+| `MERGE_TLS_CA_FILE` | — | 目標 TLS CA（URI 已帶 `tlsCAFile` 時不用設）|
 | `MERGE_OVERWRITE` | `0` | `1` 用 `$set` 覆蓋（慎用）|
 | `MERGE_DRY_RUN` | — | `1` 只報告不寫入 |
 

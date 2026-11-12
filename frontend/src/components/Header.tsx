@@ -207,7 +207,7 @@ export default function Header({
       }
       const confirmed = window.confirm(
         `預演結果:備援庫有 ${preview.total_inserted} 筆主庫沒有的資料。\n\n` +
-          '這會把這些資料補回主庫(DocumentDB)。衝突時以主庫(AWS)為準,只補不覆蓋既有資料。\n\n' +
+          '這會把這些資料補回主庫。衝突時以主庫為準,只補不覆蓋既有資料。\n\n' +
           '確定要補回主庫嗎？',
       );
       if (!confirmed) {

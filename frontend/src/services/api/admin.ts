@@ -22,8 +22,8 @@ export interface DbSyncResult {
 
 /**
  * 觸發資料庫同步（super_admin only）。走 cookie session 身份（fetchAsAdmin）。
- * - direction='forward'（預設）：DocumentDB → Atlas（平時備份）。
- * - direction='reverse'：Atlas → DocumentDB（災後補回主庫，AWS 為主只補不覆蓋）。
+ * - direction='forward'（預設）：主庫 → Atlas（平時備份）。
+ * - direction='reverse'：Atlas → 主庫（災後補回，以主庫為準只補不覆蓋）。
  * - app='jti'/'hciot'：只同步該應用；app='general'：全域（所有應用 + 系統設定）。
  * - dryRun=true：只預演統計、不寫入。
  */

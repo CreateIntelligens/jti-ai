@@ -1,12 +1,14 @@
 services:
-  # DocumentDB 連線中繼：自動判斷 VPC 內(socat 直連) / VPC 外(autossh 經跳板)。
+  # MongoDB 主庫連線中繼：自動判斷 VPC 內(socat 直連) / VPC 外(autossh 經跳板)。
   # backend 一律連 db-tunnel:27017，無需區分部署環境。詳見 docker/tunnel/README.md
+  # DOCDB_* 是沿用 DocumentDB 時期的變數名，現在指向自架 MongoDB 主庫。
   db-tunnel:
     build:
       context: .
       dockerfile: docker/tunnel/Dockerfile
     environment:
-      - DOCDB_ENDPOINT=${DOCDB_ENDPOINT:-us-west-2-mongodb-cluster.cluster-caep6t8j4kmy.us-west-2.docdb.amazonaws.com}
+      # 不給預設值：沒設時寧可啟動失敗，也不要默默連到已停用的舊主庫。
+      - DOCDB_ENDPOINT=${DOCDB_ENDPOINT:?請在 .env 設定 DOCDB_ENDPOINT（MongoDB 主庫位址）}
       - DOCDB_PORT=${DOCDB_PORT:-27017}
       - LISTEN_PORT=27017
       - BASTION_HOST=${BASTION_HOST:-52.12.0.227}
@@ -95,7 +97,8 @@ services:
       - ./data:/app/data
       - ./logs:/app/logs
       - ./docker:/app/docker:ro
-      # DocumentDB TLS CA（連 DocumentDB 時 MONGODB_URI 以 tlsCAFile 指向此路徑）
+      # 舊 DocumentDB 的 TLS CA，DocumentDB 移除後可拿掉。新主庫的 CA 放
+      # docker/tunnel/mongodb-ca.crt，經上面的 ./docker 掛載進來。
       - ./global-bundle.pem:/app/global-bundle.pem:ro
     depends_on:
       db-tunnel:
