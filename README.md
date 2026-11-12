@@ -2,7 +2,7 @@
 
 ai360 km 是一個以 FastAPI、React/Vite、Google Gemini 和 self-hosted RAG 組成的多應用對話平台。現行應用包含 **JTI 活動助理**、**HCIoT 醫院衛教助理**、**ESG 永續測驗助理**，以及可綁定任意知識庫的 **通用 OpenAI-compatible API**。
 
-系統主資料庫為 AWS DocumentDB（Atlas 作為啟動時備援），保存知識庫與 session/log 資料，使用 EmbeddingGemma 2（`google/embeddinggemma-2`）embedding gateway 產生向量並寫入 LanceDB 做檢索，再由 Gemini 產生最後回答。Embedding gateway 可由本專案 Compose profile 啟動，也可指向 openVman 共用服務。
+系統主資料庫為 AWS VPC 內的自架 MongoDB（2026-11 起取代 AWS DocumentDB；Atlas 作為啟動時備援），保存知識庫與 session/log 資料，使用 EmbeddingGemma 2（`google/embeddinggemma-2`）embedding gateway 產生向量並寫入 LanceDB 做檢索，再由 Gemini 產生最後回答。Embedding gateway 可由本專案 Compose profile 啟動，也可指向 openVman 共用服務。
 
 ## 功能特色
 
@@ -18,7 +18,7 @@ ai360 km 是一個以 FastAPI、React/Vite、Google Gemini 和 self-hosted RAG �
 - **Prompt 與 API Key 管理**：可管理各應用 prompt/runtime settings。對外 API key 由 admin 發行並綁定知識庫，採 Fernet 加密儲存可事後查看/複製；一般 user 唯讀，只看得到自己可見知識庫的 key。
 - **OpenAI-compatible API**：提供 `/v1/chat/completions`，會先查本地 RAG，再呼叫 Gemini 產生回答。
 - **TTS 語音**：背景 job 產生語音並以檔案快取；中文會先走 `NORMALIZE_API_URL`，失敗或未設定時 fallback 到本地 regex + OpenCC 流程。
-- **DocumentDB 主庫 + Atlas 備援**：主庫不可用時啟動自動 fallback 到 Atlas。可由 super_admin 在前端觸發 DocumentDB → Atlas 同步（JTI/HCIoT/ESG 同步自身、General 全域），或災後反向把 Atlas 資料補回主庫（衝突以主庫為準）。詳見 `scripts/README_db_sync.md`。
+- **MongoDB 主庫 + Atlas 備援**：主庫不可用時啟動自動 fallback 到 Atlas。可由 super_admin 在前端觸發主庫 → Atlas 同步（JTI/HCIoT/ESG 同步自身、General 全域），或災後反向把 Atlas 資料補回主庫（衝突以主庫為準）。詳見 `scripts/README_db_sync.md`。
 - **單一入口**：Docker Compose 只對外暴露 `${PORT}`，frontend container 內的 nginx 會代理 API 與前端頁面。
 
 ## 系統架構
@@ -43,7 +43,7 @@ FastAPI backend
   +--> Gemini API             answer generation
   +--> EmbeddingGemma 2 gateway (local profile or shared openVman edge)
   +--> LanceDB                local vector search
-  +--> DocumentDB (primary)   sessions, logs, knowledge stores, image store, vector backup
+  +--> MongoDB (primary)      sessions, logs, knowledge stores, image store, vector backup
   +--> Atlas (fallback)       startup fallback when primary unreachable
   +--> TTS API                background audio generation
 ```
@@ -179,7 +179,7 @@ ai360-km/
 │   │   ├── vector_store/               # LanceDB primary store、MongoDB vector backup
 │   │   ├── session/                    # session managers and factories
 │   │   ├── logging/                    # conversation loggers
-│   │   ├── db_sync/                    # DocumentDB ↔ Atlas 同步核心（forward/reverse，CLI 與 API 共用）
+│   │   ├── db_sync/                    # 主庫 ↔ Atlas 同步核心（forward/reverse，CLI 與 API 共用）
 │   │   ├── general/                    # General managed-app runtime、per-store topic/image/knowledge stores
 │   │   ├── jti/                        # JTI agent、quiz、knowledge、TTS glue
 │   │   ├── hciot/                      # HCIoT agent、topic/image/knowledge stores、TTS glue
@@ -231,7 +231,7 @@ Admin:
 - `GET/POST/PUT/DELETE /api/general/stores/{store_name}/images/...`
 - `POST /api/admin/rag/reindex`（支援 per-store 粒度）
 - `GET /api/admin/rag/audit`（檢查這台的 LanceDB 是否與共用 Mongo 一致）
-- `POST /api/admin/db-sync`（DocumentDB ↔ Atlas 同步，限 super_admin）
+- `POST /api/admin/db-sync`（主庫 ↔ Atlas 同步，限 super_admin）
 - `GET/POST/PUT/DELETE /api/keys`
 
 完整 request/response schema 請看 `/docs`。

@@ -77,18 +77,24 @@ def upsert_collection(
     - modified: 目標庫已有、且**值真的被改寫**的筆數(MongoDB modified_count)。
     - matched:  目標庫已有、業務鍵**比對到**的筆數(含值沒變的;modified ⊆ matched)。
       ⚠ matched 不等於「有更新」——值相同時 matched 計入但 modified 不計。
+    dry_run 時不寫入，upserted/matched 由查詢目標庫估算；modified 不寫入無從得知，固定為 0。
     """
     keys = business_keys(src_col)
     key_desc = key_description(keys)
     ops: list[UpdateOne] = []
+    filters: list[dict] = []
     upserted = modified = matched = 0
 
     def flush() -> None:
-        nonlocal ops, upserted, modified, matched
+        nonlocal ops, filters, upserted, modified, matched
         if not ops:
             return
         if dry_run:
-            ops = []
+            # 目標庫若有同鍵重複文件會多算，上限取本批筆數。
+            found = min(dst_col.count_documents({"$or": filters}), len(filters))
+            matched += found
+            upserted += len(filters) - found
+            ops, filters = [], []
             return
         try:
             res = dst_col.bulk_write(ops, ordered=False)
@@ -100,7 +106,7 @@ def upsert_collection(
             modified += e.details.get("nModified", 0)
             matched += e.details.get("nMatched", 0)
             print(f"      ⚠ bulk_write 部分失敗: {len(e.details.get('writeErrors', []))} 筆")
-        ops = []
+        ops, filters = [], []
 
     for doc in src_col.find({}):
         if keys:
@@ -110,6 +116,7 @@ def upsert_collection(
 
         doc.pop("_id", None)  # 不跨庫帶 ObjectId,讓目標庫自行管理 _id
         ops.append(UpdateOne(flt, build_update(doc), upsert=True))
+        filters.append(flt)
         if len(ops) >= BATCH_SIZE:
             flush()
 

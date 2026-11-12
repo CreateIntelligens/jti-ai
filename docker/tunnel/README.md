@@ -1,11 +1,12 @@
-# db-tunnel — DocumentDB 連線中繼容器
+# db-tunnel — MongoDB 主庫連線中繼容器
 
-讓 backend 在**任何環境**都用同一個位址 `db-tunnel:27017` 連到 AWS DocumentDB，
+讓 backend 在**任何環境**都用同一個位址 `db-tunnel:27017` 連到 AWS VPC 內的自架 MongoDB 主庫
+（2026-11 起取代 AWS DocumentDB），
 容器啟動時自動判斷該直連還是走跳板，無需為不同機器準備不同設定或指令。
 
 ## 運作方式
 
-容器啟動時探測能否直連 DocumentDB endpoint：
+容器啟動時探測能否直連主庫（`DOCDB_ENDPOINT:DOCDB_PORT`）：
 
 | 環境 | 探測結果 | 行為 | 需要金鑰？ |
 |---|---|---|---|
@@ -45,15 +46,21 @@ ssh-keyscan -t ed25519,rsa <跳板IP> > docker/tunnel/known_hosts
 | `bastion_key.example` | ✅ 是 | 範本，說明金鑰怎麼放 |
 | `bastion_key` | ❌ 否（.gitignore） | 實際私鑰 |
 | `known_hosts` | ❌ 否（.gitignore） | 跳板指紋 |
+| `mongodb-ca.crt` | ❌ 否（.gitignore） | 主庫 TLS CA，backend 經 `/app/docker/tunnel/mongodb-ca.crt` 讀取 |
 
 ## 環境變數（compose 中設定）
 
 | 變數 | 預設 | 說明 |
 |---|---|---|
-| `DOCDB_ENDPOINT` | （必填） | DocumentDB cluster endpoint |
-| `DOCDB_PORT` | 27017 | DocumentDB 連接埠 |
+| `DOCDB_ENDPOINT` | （必填） | MongoDB 主庫的內網位址（變數名沿用 DocumentDB 時期） |
+| `DOCDB_PORT` | 27017 | 主庫連接埠（目前的自架主庫是 27018） |
 | `LISTEN_PORT` | 27017 | 容器對 backend 開放的埠 |
 | `BASTION_HOST` | 52.12.0.227 | 跳板機（VPC 外才用） |
 | `BASTION_USER` | ec2-user | 跳板登入帳號 |
 | `BASTION_KEY` | /id_rsa | 容器內金鑰路徑（由 volume 掛入） |
 | `PROBE_TIMEOUT` | 10 | 直連探測逾時秒數 |
+
+## TLS 與主機名稱
+
+主庫憑證只簽給主庫自己的 IP（以及 `127.0.0.1`、`localhost`）。backend 用 `db-tunnel` 這個名稱連線，
+所以 `MONGODB_URI` 要帶 `tlsAllowInvalidHostnames=true`；`tlsCAFile` 的 CA 驗證仍然有效。
