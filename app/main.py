@@ -233,7 +233,9 @@ async def lifespan(_: FastAPI):
     logger.info("👋 ai360 km api shut down cleanly. Goodbye!")
 
 
-def _list_general_store_names() -> list[str]:
+def _list_general_store_names() -> list[str] | None:
+    """None when the registry can't be read, so callers never mistake an outage
+    for "no stores" and prune every general store's vectors."""
     try:
         from app.routers.general.stores import get_store_registry
 
@@ -244,13 +246,47 @@ def _list_general_store_names() -> list[str]:
         ]
     except Exception as e:
         logger.error("[RAG] Failed to list general stores: %s", e)
-        return []
+        return None
 
 
-def _build_rag_backfill_jobs(general_store_names: list[str]) -> list[tuple[str, str]]:
+def _build_rag_backfill_jobs(general_store_names: list[str] | None) -> list[tuple[str, str]]:
     jobs = list(_FIXED_RAG_BACKFILL_JOBS)
-    jobs.extend(("general", store_name) for store_name in general_store_names)
+    jobs.extend(("general", store_name) for store_name in general_store_names or [])
     return jobs
+
+
+def _list_all_store_names() -> set[str] | None:
+    """所有店名，不分 app、不分擁有者；只用來判斷 general 向量的店是否已刪除。
+
+    不能用 list_stores(app="general")：綁在 jti/hciot/esg key 下的店、個人 key
+    的店都會被它濾掉，但它們的向量同樣存在 general_knowledge。
+    """
+    try:
+        from app.routers.general.stores import get_store_registry
+
+        return {doc["name"] for doc in get_store_registry().collection.find({}, {"name": 1}) if doc.get("name")}
+    except Exception as e:
+        logger.error("[RAG] Failed to list knowledge stores for pruning: %s", e)
+        return None
+
+
+def _prune_deleted_general_stores(backfill: Any) -> None:
+    from app.services.mongo_client import is_using_fallback
+
+    # 備援庫（Atlas）是舊鏡像，店清單可能缺新店，拿它來判斷會誤刪。
+    if is_using_fallback():
+        logger.warning("[RAG] Running on fallback database; skip pruning deleted general stores")
+        return
+    # 跑完 backfill 才讀，期間新建並已建索引的店才不會被當成已刪除。
+    store_names = _list_all_store_names()
+    if store_names is not None:
+        backfill.prune_deleted_general_stores(store_names)
+
+
+def _run_rag_jobs(backfill: Any, general_store_names: list[str] | None) -> None:
+    for source_type, partition in _build_rag_backfill_jobs(general_store_names):
+        backfill.run_backfill(source_type, partition)
+    _prune_deleted_general_stores(backfill)
 
 
 async def _run_module_startup_tasks() -> None:
@@ -472,10 +508,7 @@ async def _run_rag_backfill(backfill: Any) -> None:
 
     try:
         general_store_names = _list_general_store_names()
-        for source_type, partition in _build_rag_backfill_jobs(general_store_names):
-            await loop.run_in_executor(
-                None, backfill.run_backfill, source_type, partition
-            )
+        await loop.run_in_executor(None, _run_rag_jobs, backfill, general_store_names)
 
         total = backfill.lancedb_store.get_stats().get("count", 0)
         elapsed = time.time() - started_at
@@ -483,7 +516,7 @@ async def _run_rag_backfill(backfill: Any) -> None:
             "[RAG] Ready — %d chunks indexed in %.1fs (%d general stores)",
             total,
             elapsed,
-            len(general_store_names),
+            len(general_store_names or []),
         )
     except Exception as exc:
         logger.error("[RAG] Backfill failed: %s", exc)
@@ -522,8 +555,7 @@ async def _run_rag_sync_round(backfill: Any, lock_client: Any) -> bool:
             return False
 
     try:
-        for source_type, partition in _build_rag_backfill_jobs(_list_general_store_names()):
-            await loop.run_in_executor(None, backfill.run_backfill, source_type, partition)
+        await loop.run_in_executor(None, _run_rag_jobs, backfill, _list_general_store_names())
     except Exception as exc:
         logger.error("[RAG] Periodic sync failed: %s", exc)
     finally:
