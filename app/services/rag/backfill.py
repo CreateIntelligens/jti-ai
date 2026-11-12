@@ -387,6 +387,31 @@ class BackfillService:
         for orphan in orphans:
             self.delete_from_rag(source_type, orphan, language=language)
 
+    def prune_deleted_general_stores(self, live_store_names: set[str]) -> None:
+        """清掉已刪除的 general 店留在本機 LanceDB 的向量。
+
+        backfill 只會對還存在的店跑、在店內清孤兒；整家店在另一台被刪掉時，
+        這台再也不會輪到它，向量會一直留著（曾留下 10/6 攻擊者測試店的向量）。
+        呼叫端讀不到店清單時不要呼叫；清單是空的也跳過，寧可少清也不要誤刪全部。
+        """
+        if not live_store_names:
+            logger.warning("[Backfill] General store list is empty; skip pruning deleted stores")
+            return
+        full_source_type = _knowledge_source_type("general")
+        try:
+            indexed = self.lancedb_store.list_source_languages(full_source_type)
+        except Exception as e:
+            logger.error(f"[Backfill] Failed to list general stores in LanceDB: {e}")
+            return
+        # __ 開頭是系統管理的固定店（__jti__、__hciot__ 等），不在店清單裡也不能刪。
+        deleted = {name for name in indexed - live_store_names if not name.startswith("__")}
+        for store_name in sorted(deleted):
+            logger.info(f"[Backfill] Pruning vectors of deleted general store {store_name}")
+            try:
+                self.lancedb_store.delete_by_source_language(full_source_type, store_name)
+            except Exception as e:
+                logger.error(f"[Backfill] Failed to prune deleted general store {store_name}: {e}")
+
     def delete_from_rag(self, source_type: str, filename: str, language: str | None = None):
         """Removes a file's chunks from the local RAG store."""
         full_source_type = _knowledge_source_type(source_type)

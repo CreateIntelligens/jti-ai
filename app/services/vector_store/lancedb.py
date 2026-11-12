@@ -17,6 +17,11 @@ from app.services.embedding.service import (
 logger = logging.getLogger(__name__)
 
 
+def _quote(value: str) -> str:
+    """Escape a value for a single-quoted LanceDB SQL filter literal."""
+    return value.replace("'", "''")
+
+
 class LanceDBStore:
     def __init__(self, uri: str = "data/shared/lancedb", table_name: str = "knowledge"):
         self.uri = uri
@@ -221,6 +226,24 @@ class LanceDBStore:
         except Exception as e:
             logger.warning(f"LanceDB list_file_ids failed: {e}")
             return set()
+
+    def list_source_languages(self, source_type: str) -> set[str]:
+        """Returns every source_language (partition) indexed for the given type."""
+        tbl = self.table
+        if tbl is None:
+            return set()
+        where = f"source_type = '{_quote(source_type)}'"
+        rows = tbl.search().where(where).select(["source_language"]).limit(1_000_000).to_list()
+        return {r["source_language"] for r in rows if r.get("source_language")}
+
+    def delete_by_source_language(self, source_type: str, source_language: str) -> None:
+        """Deletes every chunk of one partition, e.g. all files of one general store."""
+        tbl = self.table
+        if tbl is None:
+            return
+        tbl.delete(
+            f"source_type = '{_quote(source_type)}' AND source_language = '{_quote(source_language)}'"
+        )
 
     def get_stats(self) -> Dict[str, Any]:
         """Returns basic statistics about the table."""
