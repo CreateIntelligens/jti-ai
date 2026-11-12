@@ -282,16 +282,22 @@ class MongoDBClient:
         # ===== quiz_results 集合 =====
         quiz_results_col = db["quiz_results"]
         try:
-            for idx_name in list(quiz_results_col.index_information().keys()):
-                if idx_name != "_id_" and "store_name" not in idx_name and "language" in idx_name:
+            index_keys = [("store_name", 1), ("language", 1), ("set_id", 1), ("quiz_id", 1)]
+            indexes = quiz_results_col.index_information()
+            for idx_name in indexes:
+                if idx_name not in ("_id_", "language_1") and "store_name" not in idx_name and "language" in idx_name:
                     try:
                         quiz_results_col.drop_index(idx_name)
                     except Exception:
                         pass
-            quiz_results_col.create_index(
-                [("store_name", 1), ("language", 1), ("set_id", 1), ("quiz_id", 1)],
-                unique=True,
-            )
+            if not any(
+                info.get("key") == index_keys
+                and info.get("unique")
+                and not info.get("sparse")
+                and not info.get("partialFilterExpression")
+                for info in indexes.values()
+            ):
+                quiz_results_col.create_index(index_keys, unique=True)
             quiz_results_col.create_index("language")
             collections_ready.append("quiz_results")
         except Exception as e:

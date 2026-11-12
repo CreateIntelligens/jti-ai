@@ -60,6 +60,9 @@ build/
 .env
 .env.local
 .env.*.local
+.env.mongodb-cutover
+docker-compose.override.yml
+mongodb-ca.crt
 
 # Logs
 *.log
