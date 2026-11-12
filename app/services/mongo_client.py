@@ -133,6 +133,38 @@ def _ensure_conversation_indexes(conversations) -> None:
     conversations.create_index("store_name", sparse=True)
 
 
+def _ensure_index(collection, keys: list[tuple[str, int]], *, unique: bool = False) -> None:
+    """同樣 key 與選項的索引已存在就不動，不看名稱，沒有才建。
+
+    從別的庫搬來的索引名稱可能跟 MongoDB 自動取的不同，直接 create_index
+    會撞 IndexOptionsConflict；也避免多個 worker、多台主機啟動時在共用庫上
+    互相刪建（曾讓 language_1 被刪掉後沒建回來）。
+    """
+    for info in collection.index_information().values():
+        if (
+            list(info.get("key", [])) == keys
+            and bool(info.get("unique")) == unique
+            and not info.get("sparse")
+            and not info.get("partialFilterExpression")
+        ):
+            return
+    collection.create_index(keys, unique=unique)
+
+
+def _drop_legacy_uniques_without_store_name(collection) -> None:
+    """題庫與測驗是多店共用，唯一鍵少了 store_name 會讓不同店的同編號互撞。
+
+    只刪這種舊的唯一索引；一般查詢用的索引（例如 language_1）保留。
+    """
+    for name, info in collection.index_information().items():
+        fields = [field for field, _ in info.get("key", [])]
+        if name != "_id_" and info.get("unique") and "store_name" not in fields:
+            try:
+                collection.drop_index(name)
+            except Exception:
+                pass
+
+
 class MongoDBClient:
     """MongoDB 客戶端單例"""
 
@@ -245,19 +277,13 @@ class MongoDBClient:
         # store_name makes two stores collide on the same bank_id/id.
         quiz_bank_questions = db["quiz_bank_questions"]
         try:
-            for idx_name in list(quiz_bank_questions.index_information().keys()):
-                # Drop legacy uniques that lack store_name (e.g. the old
-                # language_1_bank_id_1_id_1). Keep store_name-scoped indexes.
-                if idx_name != "_id_" and "store_name" not in idx_name:
-                    try:
-                        quiz_bank_questions.drop_index(idx_name)
-                    except Exception:
-                        pass
-            quiz_bank_questions.create_index(
+            _drop_legacy_uniques_without_store_name(quiz_bank_questions)
+            _ensure_index(
+                quiz_bank_questions,
                 [("store_name", 1), ("language", 1), ("bank_id", 1), ("id", 1)],
                 unique=True,
             )
-            quiz_bank_questions.create_index([("store_name", 1), ("language", 1), ("bank_id", 1)])
+            _ensure_index(quiz_bank_questions, [("store_name", 1), ("language", 1), ("bank_id", 1)])
             collections_ready.append("quiz_bank_questions")
         except Exception as e:
             logger.warning(f"Index creation for 'quiz_bank_questions': {e}")
@@ -265,16 +291,13 @@ class MongoDBClient:
         # ===== quiz_bank_metadata 集合 =====
         quiz_bank_metadata = db["quiz_bank_metadata"]
         try:
-            for idx_name in list(quiz_bank_metadata.index_information().keys()):
-                if idx_name != "_id_" and "store_name" not in idx_name:
-                    try:
-                        quiz_bank_metadata.drop_index(idx_name)
-                    except Exception:
-                        pass
-            quiz_bank_metadata.create_index(
-                [("store_name", 1), ("language", 1), ("bank_id", 1)], unique=True
+            _drop_legacy_uniques_without_store_name(quiz_bank_metadata)
+            _ensure_index(
+                quiz_bank_metadata,
+                [("store_name", 1), ("language", 1), ("bank_id", 1)],
+                unique=True,
             )
-            quiz_bank_metadata.create_index("language")
+            _ensure_index(quiz_bank_metadata, [("language", 1)])
             collections_ready.append("quiz_bank_metadata")
         except Exception as e:
             logger.warning(f"Index creation for 'quiz_bank_metadata': {e}")
@@ -282,23 +305,13 @@ class MongoDBClient:
         # ===== quiz_results 集合 =====
         quiz_results_col = db["quiz_results"]
         try:
-            index_keys = [("store_name", 1), ("language", 1), ("set_id", 1), ("quiz_id", 1)]
-            indexes = quiz_results_col.index_information()
-            for idx_name in indexes:
-                if idx_name not in ("_id_", "language_1") and "store_name" not in idx_name and "language" in idx_name:
-                    try:
-                        quiz_results_col.drop_index(idx_name)
-                    except Exception:
-                        pass
-            if not any(
-                info.get("key") == index_keys
-                and info.get("unique")
-                and not info.get("sparse")
-                and not info.get("partialFilterExpression")
-                for info in indexes.values()
-            ):
-                quiz_results_col.create_index(index_keys, unique=True)
-            quiz_results_col.create_index("language")
+            _drop_legacy_uniques_without_store_name(quiz_results_col)
+            _ensure_index(
+                quiz_results_col,
+                [("store_name", 1), ("language", 1), ("set_id", 1), ("quiz_id", 1)],
+                unique=True,
+            )
+            _ensure_index(quiz_results_col, [("language", 1)])
             collections_ready.append("quiz_results")
         except Exception as e:
             logger.warning(f"Index creation for 'quiz_results': {e}")

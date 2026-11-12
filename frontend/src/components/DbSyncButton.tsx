@@ -23,7 +23,7 @@ const TITLE_TEXT: Record<DbSyncApp, string> = {
 };
 
 /**
- * DocumentDB → Atlas 同步按鈕（super_admin only）。
+ * 主庫 → Atlas 同步按鈕（super_admin only）。
  * 呼叫端負責只在 super_admin 時 render 本元件。
  */
 export default function DbSyncButton({ app, className }: DbSyncButtonProps) {
