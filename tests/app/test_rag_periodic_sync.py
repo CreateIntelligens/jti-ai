@@ -33,7 +33,15 @@ class TestRagSyncRound(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         self.client = MagicMock()
         self.backfill = MagicMock()
-        patcher = patch.object(app_main, "_list_general_store_names", return_value=["store-a"])
+        for name, value in (
+            ("_list_general_store_names", ["store-a"]),
+            ("_list_all_store_names", {"store-a", "store-key-mapped"}),
+        ):
+            patcher = patch.object(app_main, name, return_value=value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        # 測試環境連不到主庫時，app 啟動會把自己標成 fallback，清理就會被跳過。
+        patcher = patch("app.services.mongo_client.is_using_fallback", return_value=False)
         patcher.start()
         self.addCleanup(patcher.stop)
 
@@ -81,6 +89,56 @@ class TestRagSyncRound(unittest.IsolatedAsyncioTestCase):
             self.backfill.run_backfill.call_count,
             len(app_main._FIXED_RAG_BACKFILL_JOBS) + 1,
         )
+
+    async def test_prunes_against_every_store_not_just_general_app(self):
+        await app_main._run_rag_sync_round(self.backfill, None)
+
+        self.backfill.prune_deleted_general_stores.assert_called_once_with({"store-a", "store-key-mapped"})
+
+
+class TestPruneDeletedGeneralStores(unittest.TestCase):
+    def test_skips_on_fallback_database(self):
+        backfill = MagicMock()
+        with (
+            patch("app.services.mongo_client.is_using_fallback", return_value=True),
+            patch.object(app_main, "_list_all_store_names", return_value={"store-a"}) as list_all,
+        ):
+            app_main._prune_deleted_general_stores(backfill)
+
+        list_all.assert_not_called()
+        backfill.prune_deleted_general_stores.assert_not_called()
+
+    def test_skips_when_store_list_unreadable(self):
+        backfill = MagicMock()
+        with (
+            patch("app.services.mongo_client.is_using_fallback", return_value=False),
+            patch.object(app_main, "_list_all_store_names", return_value=None),
+        ):
+            app_main._prune_deleted_general_stores(backfill)
+
+        backfill.prune_deleted_general_stores.assert_not_called()
+
+    def test_all_store_names_ignore_app_and_owner(self):
+        # 綁在 jti key 下的店、個人 key 的店也把向量放在 general_knowledge，
+        # 它們必須算「還存在」，否則每輪同步都會被清掉。
+        registry = MagicMock()
+        registry.collection.find.return_value = [
+            {"name": "store_general"},
+            {"name": "store_jti_key", "managed_app": "jti"},
+            {"name": "store_byok", "owner_key_hash": "abc"},
+        ]
+        with patch("app.routers.general.stores.get_store_registry", return_value=registry):
+            names = app_main._list_all_store_names()
+
+        self.assertEqual(names, {"store_general", "store_jti_key", "store_byok"})
+        registry.collection.find.assert_called_once_with({}, {"name": 1})
+        registry.list_stores.assert_not_called()
+
+    def test_all_store_names_report_outage_as_none(self):
+        registry = MagicMock()
+        registry.collection.find.side_effect = RuntimeError("mongo down")
+        with patch("app.routers.general.stores.get_store_registry", return_value=registry):
+            self.assertIsNone(app_main._list_all_store_names())
 
 
 if __name__ == "__main__":
