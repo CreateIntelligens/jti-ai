@@ -3,7 +3,7 @@ FROM node:24-alpine
 WORKDIR /app
 
 # 安裝 nginx 和 envsubst (gettext)，並透過 corepack 啟用 pnpm
-RUN apk add --no-cache nginx gettext && \
+RUN apk add --no-cache "nginx>=1.30.7" gettext && \
     corepack enable && \
     mkdir -p /var/lib/nginx/tmp/client_body /run/nginx /app/node_modules /app/dist && \
     chown -R node:node /app
